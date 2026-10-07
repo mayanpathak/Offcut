@@ -1706,7 +1706,7 @@ Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
 
 **Checked, on this machine with Docker 28.3.2.**
 
-- **The image builds:** `docker build -f server/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) -t offcut-api:local .`, 146 s for the compile step. The image is 34 MB; its user is 10001; its only variables are `PATH` and `GIT_SHA`; it holds no `.env` file and no source.
+- **The image builds:** `docker build -f server/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) -t offcut-api:local .`, 146 s for the compile step. The image is 132 MB on disk (34 MB compressed); its user is 10001; its only variables are `PATH` and `GIT_SHA`; it holds no `.env` file and no source.
 - **The image runs.** With the variables of `.env` and a `postgres:18` container as the database: the migration ran, `GET /api/v1/healthz` answered `{"ok":true,"version":"92286ab3..."}`, equal to `git rev-parse HEAD`, with both response headers; `POST /api/v1/notify-me` answered 204 and the row was in `platform_waitlist` with the address in lower case; an unknown path answered 404.
 - **With no variables it stops:** `config error: APP_ORIGIN`, exit status 1.
 - **SIGTERM (known issue 19).** `docker stop` ended the container in 0.6 s with exit status 0, inside the grace period of 10 s. The shutdown path of `main.rs` had never run before: it exists only on Unix.
