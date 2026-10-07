@@ -12,8 +12,6 @@
 
 | # | Item | Who | Needed by |
 |---|---|---|---|
-| 1 | Postgres still accepts logins without a password: `pg_hba.conf` has `trust` on the two loopback lines. Change them back to `scram-sha-256` and restart the `postgresql-x64-18` service | Human | Before Prompt 09 |
-| 2 | The `offcut` role's password is unproven while item 1 is open, because `trust` accepts any password. Re-run the `psql` check after item 1 | Agent | Before Prompt 09 |
 | 3 | Steps due before Prompt 01, not confirmed: accounts opened, one database at each Postgres candidate (TE-6), sign-up at both asset hosts (TE-7), merchant application submitted (TE-9), two dev signing keys generated | Human | TE-6, TE-7, TE-9 as early as possible; keys before Prompt 09 |
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
@@ -517,3 +515,20 @@ One thing is accepted that is not in the samples: `"props": null` on an event wi
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check` pass.
 
 **"Done when".** All three boxes ticked.
+
+---
+
+## 2026-10-07 - Local Postgres: password checks back on
+
+Outside the repository. Closes open items 1 and 2.
+
+**Changed (by the human).** In `C:\Program Files\PostgreSQL\18\data\pg_hba.conf`, the two loopback lines were set back from `trust` to `scram-sha-256`, and the `postgresql-x64-18` service was restarted. All six rules of the file now say `scram-sha-256`.
+
+**Checked (by the agent, on port 9000).**
+
+- Login as `postgres` without a password is refused: `fe_sendauth: no password supplied`.
+- Login as `offcut` with a wrong password is refused: `password authentication failed`.
+- `psql "postgres://offcut:offcut@localhost:9000/offcut_dev" -c "select 1"` returns one row. This is the Milestone-0 check of Prompt 01, now proven with the password check on.
+- The `offcut` role has `CREATEDB`, which the integration tests of Prompt 13 need.
+
+Whether the `postgres` superuser password was changed while access was open is the human's own record; nothing in Offcut uses that login.
