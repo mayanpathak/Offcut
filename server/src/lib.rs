@@ -3,6 +3,7 @@
 
 pub mod client_ip;
 pub mod config;
+pub mod db;
 pub mod error;
 pub mod headers;
 pub mod log;

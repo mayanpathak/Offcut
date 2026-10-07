@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO platform_waitlist (email_normalized, wanted) VALUES ($1, $2)\n         ON CONFLICT (email_normalized, wanted) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "86a4fc3839a4cd8d6358f5959461674a6ff18630037031bcb4d1fecd2ad6072f"
+}

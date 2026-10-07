@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO analytics_events (anon_id, name, props)\n         SELECT $1, name, props FROM UNNEST($2::text[], $3::jsonb[]) AS batch (name, props)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b1197e970222a3f00c5af33bd885f9cb12f4bed82e55460e4ced3a5b89d4a2c1"
+}

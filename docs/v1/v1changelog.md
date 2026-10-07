@@ -681,6 +681,44 @@ Closes open item 6 (G§1.6).
   - Eviction keeps the newest keys, by last use and not by first use; both indexes stay at `max_keys` entries.
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass.
 - No `std::time` clock in `server/src`: the limiter reads `tokio::time::Instant` only. `std::time::Duration` is used; it is not a clock.
-- Longest file: `rate_limit.rs`, 384 lines, of which 190 are tests.
+- Longest file: `rate_limit.rs`, 384 lines, of which 192 are tests.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 11: database layer
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `server/migrations/0001_init.sql` | The SQL of TS §23.2, copied by line range from `docs/technicalspec.md`: 8 tables, 5 indexes, the `CHECK` constraints (D-7) |
+| `server/src/db/mod.rs` | `connect(database_url)` (a pool of at most 5 connections) and `migrate(pool)` (`sqlx::migrate!("./migrations")`) |
+| `server/src/db/analytics_events.rs` | `insert_batch(pool, anon_id, rows)` and `purge_older_than(pool, days)` |
+| `server/src/db/platform_waitlist.rs` | `upsert(pool, email_normalized, wanted)`; one unit test |
+| `server/.sqlx/` | The offline query cache: three files, one per query |
+
+**Changed.** `server/src/lib.rs`: declares `db`.
+
+**The three queries.** Each is a `sqlx::query!`, checked against the schema when the server is compiled.
+
+- `insert_batch`: one `INSERT ... SELECT ... FROM UNNEST($2::text[], $3::jsonb[])`. It is one statement, so a batch is stored whole or not at all. `ts` is not in the column list; the database sets it to `now()`.
+- `purge_older_than`: `DELETE ... WHERE ts < now() - make_interval(days => $1)`; returns the number of rows deleted.
+- `upsert`: `INSERT ... ON CONFLICT (email_normalized, wanted) DO NOTHING`.
+
+**Differs from the specs.**
+
+- **`cargo sqlx prepare -- --all-targets` was run from `server/`**, without `--workspace`, as the prompt and G§3.6 say. §10.8 writes `--workspace`, which would put the cache at the repository root.
+- **`platform_waitlist.rs` has a private `wanted_text` and one unit test.** The prompt asks for no tests here. `Wanted` has no function that gives its text, so the column value is written out in a match with no wildcard; the test proves each value equals the JSON form of the variant, which is also what the column's `CHECK` allows (D-2).
+
+**Checked.**
+
+- `sqlx migrate run --source server/migrations` on `offcut_dev`, twice: the first run applied `1/migrate init`, the second did nothing. `\dt` shows the 8 tables and `_sqlx_migrations`.
+- `\d analytics_events`: the columns are `id, anon_id, name, props, ts`, and `ts` defaults to `now()`.
+- `SQLX_OFFLINE=true cargo check -p offcut-api --all-targets` passes. So does `cargo clippy` with `.env` moved away and no `DATABASE_URL` in the environment, which proves the build needs only `server/.sqlx/`.
+- There is no `.sqlx` at the repository root.
+- The three statements were run by hand in a transaction that was rolled back: a batch of two events gave two rows with the props as sent; of one row dated 91 days ago and one dated 89 days ago, the purge deleted only the first; the second identical waitlist insert added nothing. No row was left in `offcut_dev`.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass (42 server tests).
+
+**"Done when".** Both boxes ticked.
