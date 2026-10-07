@@ -16,9 +16,9 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
-| 10 | **One of the three values Prompt 27 needs does not exist yet.** Done: the production `DATABASE_URL` (Neon, Singapore; item 36) and the Vercel production URL, `https://offcut-one.vercel.app`. Open: create the Cloudflare R2 bucket, enable its public URL and set CORS for that origin (TE-7, G§8.2): its public base URL. Also set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it with `"framework": null`, so builds are not affected) | Human | Before the steps of item 11 |
+| 10 | The three values Prompt 27 needs exist: the production `DATABASE_URL` (Neon, Singapore; item 36), the asset base URL `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev` and the app origin `https://offcut-one.vercel.app`. Left over: set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it, so builds are not affected) | Human | Any time before Prompt 30 |
 | 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
-| 36 | The Neon project now in use is in `ap-southeast-1` (Singapore) and the image runs against it (see the entry "The image against Neon"). Two things the agent cannot see: (a) the password of its role was pasted into the chat with the agent once and must have been reset since; if it was not, reset it (Neon: Roles & Databases); (b) the first project, in Sydney, whose password was pasted too, is to be deleted | Human | Before the Render service is created |
+| 36 | **Reset the password of the Neon role `neondb_owner`**: it was pasted into the chat with the agent, and on 2026-10-08 the connection string in use still held that password. Then replace `PROD_DATABASE_URL` in `.env.deploy`. Also delete the first Neon project (Sydney), whose password was pasted too | Human | Before the Render service is created |
 
 ## Known issues for later prompts
 
@@ -1766,3 +1766,19 @@ This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in
 **Undone.** `vercel link` appended `.vercel` and `.env*` to `.gitignore`, with CRLF endings; both were already there. The file was put back. It also wrote `.env.local` in the repository root, holding a `VERCEL_OIDC_TOKEN` that nothing here reads; git ignores the file.
 
 **Not written down here.** `orgId` and `projectId` are in `.vercel/project.json`, which git ignores. They become GitHub secrets in Prompt 28.
+
+## 2026-10-08 - Cloudflare R2 bucket; `.env` repaired (outside the repository)
+
+**Done (by the human).** The R2 bucket `offcut` (location automatic: Asia Pacific; class Standard), its public development URL, a CORS policy, and an account API token with "Object Read & Write".
+
+**Checked (by the agent).**
+
+- The public address is `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev`. A request with `Origin: https://offcut-one.vercel.app` is answered with `Access-Control-Allow-Origin` for that origin and `Access-Control-Expose-Headers: Accept-Ranges,Content-Length,Content-Range`; a preflight for `GET` with `Range` gets 204; a preflight from another origin gets 403.
+- The token's keys work on the S3 endpoint: a signed listing of the bucket answered 200. The bucket is empty.
+
+**`.env` was broken and is repaired.** The human had put the Neon connection string into `DATABASE_URL` and added the R2 values below the 15 variables, three of those lines in a form `sh` and `docker --env-file` refuse (a space in a name, a line with no `=`). With that file the server tests would have created and dropped their databases on the production server. The agent, printing no value:
+
+- put `DATABASE_URL` back to the local database (known issue 1) and removed everything after the 15 variables; the file loads in `sh` again and the local database answers;
+- moved the removed values to a new file `.env.deploy` in the repository root: `PROD_DATABASE_URL`, the four `ASSET_S3_*` variables of `scripts/upload-assets.sh`, and the token value. `ASSET_S3_ENDPOINT` had held the public address; it now holds the S3 endpoint, which was on the line with no `=`. Git ignores the file (`.env*`), and `.dockerignore` keeps it out of an image. No program reads it by itself.
+
+**Differs from the specs.** The header of `upload-assets.sh` says the four variables belong in no file of the repository. `.env.deploy` is in the folder, though not in git. It is where the human had already put them; delete the file after the uploads if the keys should not stay on disk.
