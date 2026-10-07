@@ -14,17 +14,19 @@ yanked = "deny"
 ignore = []
 
 [licenses]
-# Permissive licenses only. The list is finalised on the first `cargo deny check`
-# that runs with real dependencies.
+# Permissive licenses only: exactly the ones the dependency tree uses. A new
+# license is an error until it is read and added here.
 allow = [
   "MIT",
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
-  "BSD-2-Clause",
   "BSD-3-Clause",
   "ISC",
   "Unicode-3.0",
   "Zlib",
+  # A permissive license for data. `webpki-roots` (through sqlx's rustls) is
+  # Mozilla's list of root certificates and holds no code under it.
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 exceptions = []
@@ -46,14 +48,22 @@ skip-tree = []
 # A crate listed here is an error unless every crate that depends on it directly
 # is one of its `wrappers`.
 deny = [
-  # Browser, GPU and randomness crates: only the binding and renderer crates may
-  # depend on them, so no pure crate can pull them in.
-  { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  # Browser, GPU and randomness crates: of the workspace, only the binding and
+  # renderer crates may depend on them, so no pure crate can pull them in.
+  #
+  # The other wrappers are third-party crates that depend on a banned crate
+  # themselves; cargo-deny checks every direct parent, not only ours.
+  # - `reqwest` (a dev-dependency of the server), `wasm-bindgen-futures`,
+  #   `web-sys` and `js-sys` use the browser crates when built for wasm.
+  # - `uuid`, `rand` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # `uuid` is also a dependency of the pure crates, which take it without its
+  # random features; that is checked with `cargo tree`, not here.
+  { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest"] },
+  { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys"] },
+  { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys"] },
   { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres"] },
+  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "ring"] },
 
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.

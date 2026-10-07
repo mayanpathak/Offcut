@@ -23,7 +23,8 @@ time = "0.3.55"
 sha2 = "0.11.0"
 base64 = "0.23.1"
 ed25519-dalek = "3.0.0"
-reqwest = "0.13.5"
+# No TLS: the server tests call the API on 127.0.0.1 over plain HTTP.
+reqwest = { version = "0.13.5", default-features = false }
 # Exact: must equal the installed wasm-bindgen CLI (scripts/build-wasm.sh checks it).
 wasm-bindgen = "=0.2.129"
 

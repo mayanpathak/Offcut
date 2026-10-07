@@ -22,10 +22,9 @@
 | # | Issue | Affects |
 |---|---|---|
 | 1 | Local Postgres listens on port **9000**. The docs write the dev connection string with 5432. Use `postgres://offcut:offcut@localhost:9000/offcut_dev` in `.env` and in every `psql` command | Prompts 09, 11-13, 23 |
-| 2 | **`cargo deny check` fails since Prompt 09** (bans and licenses), as predicted: the server's dependencies bring in the banned crates through third parties. Prompt 13 is where the specs settle `deny.toml`. Needed there: (a) wrappers: `getrandom` is used by `uuid`, `rand`, `ring`, `jobserver`; `rand` by `sqlx-postgres`; `js-sys`, `web-sys` and `wasm-bindgen` by `reqwest`, `wasm-bindgen-futures` and each other; (b) the license allowlist, from the first full run. Until then the pure crates are checked by hand: `cargo tree -p offcut-types -e normal` and `-p offcut-api-types` show no `rand` or `getrandom` | Prompt 13 |
 | 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
 | 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
-| 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
+| 6 | `cargo deny check` passes with warnings: `unused-wrapper` for the media and renderer crates, which do not exist until V2, and `duplicate` for ten crates present in two versions. They are warnings, not errors | Every `cargo deny check` |
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests are the guard for any type added later | Any new shared type |
 | 9 | Choices in the two type crates go beyond the letter of §6, §7 and §9. They are listed under "Differs from the specs" in the entries of Prompts 03 to 08. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 | 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
@@ -36,6 +35,8 @@
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
 | 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
+| 21 | `cargo test --workspace` needs `DATABASE_URL` in the environment, pointing at a Postgres whose role has `CREATEDB`: the 23 server integration tests create a database each. Locally: `set -a; . ./.env; set +a`. CI needs a Postgres service container and the variable | Prompt 26 |
+| 22 | `deny.toml` cannot tell that a pure crate turned on a random feature of `uuid`: `uuid` is a listed wrapper of `getrandom`, because the server uses its `v4` feature. The check that does tell is `cargo tree -p offcut-types -e normal` (and `-p offcut-api-types`) printing no `rand` or `getrandom`. It is run by hand; put it in a gate script or in CI | Prompts 24, 26 |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -800,5 +801,62 @@ The API now runs: `GET /healthz`, `POST /events` and `POST /notify-me` answer un
 - Only `config.rs` reads the environment. Longest new file: `router.rs`, 281 lines.
 
 **Not checked.** The SIGTERM path. It exists only on Unix, and this machine is Windows, where the server stops on Ctrl-C. Prompt 27 runs the image in Docker; check there that `docker stop` ends the process within the grace period (known issue 19).
+
+**"Done when".** Both boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 13: server integration tests and license policy
+
+Closes known issue 2: `cargo deny check` passes again. The server (Phase C, Prompts 09 to 13) is complete.
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `server/tests/common/mod.rs` | `TestApp { base_url, pool, client }` and `TestApp::spawn()` | |
+| `server/tests/analytics_allowlist.rs` | The 14 cases of §13.2 | 14 |
+| `server/tests/notify_me.rs` | The 10 cases of §13.3 | 9 |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `deny.toml` | The license list and the ban wrappers, as described below |
+| `Cargo.toml` | `reqwest` is declared with `default-features = false` |
+| `Cargo.lock` | 47 fewer packages (287 to 240): the TLS stack that `reqwest` no longer brings in |
+
+**How a test runs.** `TestApp::spawn()` creates a database `offcut_test_<random>` on the server that `DATABASE_URL` names, applies the migrations, and serves the real router on `127.0.0.1` at a free port, with a rate limiter of its own. Each test has its own database, so the tests run in parallel. When the `TestApp` is dropped, its database is dropped.
+
+**`deny.toml`.**
+
+- **Licenses.** The list is now exactly what the dependency tree uses. Removed: `BSD-2-Clause`, which nothing uses. Added: `CDLA-Permissive-2.0`, a permissive license for data; `webpki-roots` (Mozilla's root certificates, through sqlx's rustls) is under it.
+- **Bans.** cargo-deny checks every direct parent of a banned crate, third-party crates included. The third-party parents are now listed as wrappers: `reqwest`, `wasm-bindgen-futures`, `web-sys` and `js-sys` for the browser crates (they use them when built for wasm); `uuid`, `rand` and `ring` for `getrandom`; `sqlx-postgres` for `rand`. A workspace crate that is not a binding or renderer crate still fails the check if it depends on any of the six.
+
+**Differs from the specs.**
+
+- **`TestApp` has a private fourth field and a `Drop`.** §13.1 lists three fields. The fourth is the database name; `Drop` removes the database, on a thread with a runtime of its own, because `Drop` cannot await. Without it every run would leave 23 databases behind.
+- **`notify_me.rs` has 9 test functions for the 10 cases.** The first valid request, the same request again and the same email with `safari` are one test, because each needs the rows of the one before. One test was added: each of the five `wanted` values is accepted by the column's `CHECK`.
+- **The test configuration has `trusted_proxy_hops: 1`.** The local `.env` has 0. With 1 the server reads `X-Forwarded-For`, so the case "a request that carried `X-Forwarded-For`" proves the header was read and still not stored.
+- **`reqwest` without its default features.** The tests call `127.0.0.1` over plain HTTP. The defaults brought in a TLS stack with a C library to compile and more licenses to allow. The JSON bodies are written with `serde_json`, so the `json` feature is not needed either.
+- **The tests' queries are not `sqlx::query!`.** They are checked when they run. The offline cache in `server/.sqlx/` holds the server's three queries and nothing from the tests.
+
+**Checked.**
+
+- `set -a; . ./.env; set +a; cargo test -p offcut-api`: 57 unit tests and 23 integration tests pass, in parallel, in about 8 seconds.
+- `analytics_allowlist.rs`, beyond the letter of the 14 cases:
+  - The 19 events are stored in the order sent, each with its name and its props; the two events without props are stored with `{}`. The order of the samples equals the order of `ANALYTICS_EVENT_DOCS`.
+  - A free-text prop is added to each of the 19 events in turn: all 19 are rejected.
+  - A batch with a bad event in the middle or at the end stores nothing. A batch that parses but breaks a cap stores nothing either.
+  - Exactly at the caps (3,600,000 ms; a count of 10,000; 50 events) is accepted.
+  - A rejected body is answered with `{"code":"bad_request","retry_after_secs":null}` and nothing of the request.
+- `notify_me.rs`: the sixth request is 429, the `Retry-After` header and `retry_after_secs` are equal and between 1 and 720, and `/healthz` still answers for the same IP.
+- After the run, no `offcut_test_*` database is left on the server.
+- Without `DATABASE_URL`, each integration test fails at once with `DATABASE_URL is not set. Load it first: set -a; . ./.env; set +a`.
+- `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`. It still prints warnings: unused wrappers (known issue 6) and ten crates present in two versions.
+- Ban drill: `rand` added to `offcut-types` made `cargo deny check bans` fail with `direct parent 'offcut-types' of banned crate 'rand' was not marked as a wrapper`. Reverted.
+- `cargo tree -p offcut-types -e normal` and `-p offcut-api-types` show no `rand`, `getrandom`, `wasm-bindgen`, `js-sys` or `web-sys`.
+- `cargo sqlx prepare --check -- --all-targets` in `server/`: the cache is up to date.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `check-gen-clean.sh` pass.
 
 **"Done when".** Both boxes ticked.
