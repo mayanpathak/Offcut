@@ -12,10 +12,9 @@
 
 | # | Item | Who | Needed by |
 |---|---|---|---|
-| 3 | Steps due before Prompt 01, not confirmed: accounts opened, one database at each Postgres candidate (TE-6), sign-up at both asset hosts (TE-7), merchant application submitted (TE-9), two dev signing keys generated | Human | TE-6, TE-7, TE-9 as early as possible; keys before Prompt 09 |
+| 3 | Steps due before Prompt 01, not confirmed: the Vercel, Render, uptime-monitor and merchant accounts opened; one database at each Postgres candidate (TE-6); sign-up at both asset hosts (TE-7); merchant application submitted (TE-9). Done since: the dev signing keys and the GitHub repository | Human | TE-6, TE-7, TE-9 as early as possible |
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
-| 6 | No GitHub remote yet; nothing has been pushed (G§1.6) | Human | Before Prompt 26 |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
 
 ## Known issues for later prompts
@@ -609,3 +608,28 @@ Outside the repository (`.env` is ignored by git). Closes the signing-key part o
 **Not passing: `cargo deny check`.** It fails on bans and licenses now that the server has real dependencies. This was expected and is Prompt 13's work (known issue 2). The pure crates were checked by hand and still pull in no randomness.
 
 **"Done when".** Both boxes ticked: the unit tests are green and clippy is clean; the `Debug` test proves no secret leaks.
+
+---
+
+## 2026-10-07 - GitHub repository
+
+Closes open item 6 (G§1.6).
+
+**Added.** The remote `origin`: `https://github.com/mayanpathak/Offcut.git`. The repository is public and was empty. `main` was pushed with its 12 commits, up to `dd30e99` (Prompt 09), and tracks `origin/main`.
+
+**Checked before the push, over the whole history.**
+
+- `.env` was never committed, and no tracked file is named like a secret.
+- Neither dev signing key from `.env` occurs in any commit. They were compared without being printed.
+- No private-key block occurs in any commit.
+- The only key-shaped strings are the test constants in `server/src/config.rs`.
+- The dev database login `offcut:offcut` occurs in the docs and in this changelog. It is the local development login of G§0.4 and reaches nothing outside the machine.
+
+**Checked after the push.** `git ls-remote origin` and the GitHub API both report `dd30e99` as the head of `main`, equal to the local head.
+
+**Worth knowing.**
+
+- The push made public: the product spec, the technical spec, the build plan, the V1 documents and this changelog.
+- The commits carry the author name and email of the local git configuration.
+- GitHub's quick-start snippet (`git init`, a new `README.md`, a "first commit") was not used. The repository already existed locally, and `README.md` at the root is not in the TS §5 tree.
+- Later commits are pushed when the human asks for it. CI does not exist until Prompt 26, so nothing depends on the remote before then.
