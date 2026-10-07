@@ -719,6 +719,8 @@ offcut/
     ├── technicalspec.md
     ├── buildplan.md                   build order as versions V1-V10 over the §28 steps
     ├── v1/v1implementation.md         file-by-file implementation plan for V1 (M0.1)
+    ├── v1/v1buildguide.md             step-by-step build order for V1, with a milestone per phase
+    ├── v1/coding-prompts.md           the 30 V1 coding prompts, run in order
     ├── v1/v1changelog.md              record of every change made while building V1
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```

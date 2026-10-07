@@ -278,6 +278,8 @@ Every path below is in the TS §5 tree (plus `server/tests/notify_me.rs`, D-12).
     ├── technicalspec.md
     ├── buildplan.md
     ├── v1/v1implementation.md         this file
+    ├── v1/v1buildguide.md             F   step-by-step build order
+    ├── v1/coding-prompts.md           F   the 30 coding prompts
     ├── v1/v1changelog.md              P   one entry per change made while building V1
     └── file-specs/TEMPLATE.md         F
 ```

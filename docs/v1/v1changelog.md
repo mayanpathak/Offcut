@@ -2,7 +2,7 @@
 
 **What this is.** A record of every change made while building V1: what was done, what differs from the specs, how it was checked, and what is still open. `v1implementation.md` says what each file contains and `v1buildguide.md` says what to do next; this file says what actually happened.
 
-**How it is kept.** One entry per prompt of `Offcut V1 — 30 coding prompts.md`, or per change made outside a prompt. Entries are in date order, oldest first; new entries go at the end. Every commit that changes the repository adds to this file in the same commit. "Open items" below is rewritten whenever an item opens or closes.
+**How it is kept.** One entry per prompt of `coding-prompts.md`, or per change made outside a prompt. Entries are in date order, oldest first; new entries go at the end. Every commit that changes the repository adds to this file in the same commit. The two tables below are rewritten whenever an item opens or closes: a closed item is removed and the entry that closed it says so. Item numbers are not reused.
 
 **References.** `§n` is a section of `v1implementation.md`, `G§n` of `v1buildguide.md`, `TS §n` of `technicalspec.md`.
 
@@ -25,7 +25,6 @@
 |---|---|---|
 | 1 | Local Postgres listens on port **9000**. The docs write the dev connection string with 5432. Use `postgres://offcut:offcut@localhost:9000/offcut_dev` in `.env` and in every `psql` command | Prompts 09, 11-13, 23 |
 | 2 | The `deny.toml` ban on `rand` and `getrandom` covers the whole dependency graph. When the server gains real dependencies, crates such as `uuid` and `sqlx` will depend on them directly and `cargo deny check` will fail until they are listed as wrappers | Prompts 09, 13 |
-| 3 | `docs/v1/v1buildguide.md` and `docs/v1/Offcut V1 — 30 coding prompts.md` are tracked but are in neither the TS §5 tree nor §4. `check-file-tree.mjs` must either skip `docs/` or the two files must be added to the trees | Prompt 24 |
 | 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
 | 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
@@ -162,3 +161,15 @@ Commit `1b8ea2c`.
 **Changed.** `docs/technicalspec.md` §5 and `docs/v1/v1implementation.md` §4: `docs/v1/v1changelog.md` added to both file trees, so the new file is listed where `check-file-tree.mjs` will look (Prompt 24).
 
 **Checked.** `git status` clean after the commit.
+
+---
+
+## 2026-10-07 - The two V1 working documents listed in the file trees
+
+Closes known issue 3: `v1buildguide.md` and the prompts file were tracked but listed in neither file tree, so `check-file-tree.mjs` (Prompt 24) would have rejected them.
+
+**Renamed.** `docs/v1/Offcut V1 — 30 coding prompts.md` to `docs/v1/coding-prompts.md`. The new name is the one in the file's own title. The old name contains spaces, and the file trees separate a path from its description with spaces, so it could not be listed without ambiguity. The file's contents are unchanged. The copy in `sh2clips/documents/` keeps the old name. The Prompt 01 entry above shows the name as it was then.
+
+**Changed.** `docs/technicalspec.md` §5 and `docs/v1/v1implementation.md` §4: `docs/v1/v1buildguide.md` and `docs/v1/coding-prompts.md` added to both file trees.
+
+**Checked.** Every tracked file under `docs/` is now in the TS §5 tree. `git status` clean after the commit.
