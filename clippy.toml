@@ -1,0 +1,8 @@
+disallowed-methods = [
+  { path = "std::time::Instant::now",    reason = "pure crates must not read a clock (TS §7)" },
+  { path = "std::time::SystemTime::now", reason = "pure crates must not read a clock (TS §7)" },
+]
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true

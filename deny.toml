@@ -1,0 +1,72 @@
+# cargo-deny configuration (v1implementation §12.1, TS §7). Checked by `cargo deny check`.
+
+[graph]
+targets = []
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+# Vulnerability advisories are always errors; a yanked crate is one too.
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Permissive licenses only. The list is finalised on the first `cargo deny check`
+# that runs with real dependencies.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.8
+exceptions = []
+
+[licenses.private]
+# The workspace crates are `publish = false` and carry no license field.
+ignore = true
+registries = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+allow = []
+skip = []
+skip-tree = []
+# A crate listed here is an error unless every crate that depends on it directly
+# is one of its `wrappers`.
+deny = [
+  # Browser, GPU and randomness crates: only the binding and renderer crates may
+  # depend on them, so no pure crate can pull them in.
+  { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
+
+  # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
+  # that may, from the TS §7 graph; `offcut-api` is in none of the lists.
+  { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
+  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect"] },
+  { crate = "offcut-detect", wrappers = ["offcut-wasm-render"] },
+  { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
+  { crate = "offcut-scene", wrappers = ["offcut-render"] },
+  { crate = "offcut-render", wrappers = ["offcut-wasm-render"] },
+]
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
