@@ -1,0 +1,164 @@
+# v1changelog.md - Offcut V1: record of changes
+
+**What this is.** A record of every change made while building V1: what was done, what differs from the specs, how it was checked, and what is still open. `v1implementation.md` says what each file contains and `v1buildguide.md` says what to do next; this file says what actually happened.
+
+**How it is kept.** One entry per prompt of `Offcut V1 — 30 coding prompts.md`, or per change made outside a prompt. Entries are in date order, oldest first; new entries go at the end. Every commit that changes the repository adds to this file in the same commit. "Open items" below is rewritten whenever an item opens or closes.
+
+**References.** `§n` is a section of `v1implementation.md`, `G§n` of `v1buildguide.md`, `TS §n` of `technicalspec.md`.
+
+---
+
+## Open items
+
+| # | Item | Who | Needed by |
+|---|---|---|---|
+| 1 | Postgres still accepts logins without a password: `pg_hba.conf` has `trust` on the two loopback lines. Change them back to `scram-sha-256` and restart the `postgresql-x64-18` service | Human | Before Prompt 09 |
+| 2 | The `offcut` role's password is unproven while item 1 is open, because `trust` accepts any password. Re-run the `psql` check after item 1 | Agent | Before Prompt 09 |
+| 3 | Steps due before Prompt 01, not confirmed: accounts opened, one database at each Postgres candidate (TE-6), sign-up at both asset hosts (TE-7), merchant application submitted (TE-9), two dev signing keys generated | Human | TE-6, TE-7, TE-9 as early as possible; keys before Prompt 09 |
+| 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
+| 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
+| 6 | No GitHub remote yet; nothing has been pushed (G§1.6) | Human | Before Prompt 26 |
+
+## Known issues for later prompts
+
+| # | Issue | Affects |
+|---|---|---|
+| 1 | Local Postgres listens on port **9000**. The docs write the dev connection string with 5432. Use `postgres://offcut:offcut@localhost:9000/offcut_dev` in `.env` and in every `psql` command | Prompts 09, 11-13, 23 |
+| 2 | The `deny.toml` ban on `rand` and `getrandom` covers the whole dependency graph. When the server gains real dependencies, crates such as `uuid` and `sqlx` will depend on them directly and `cargo deny check` will fail until they are listed as wrappers | Prompts 09, 13 |
+| 3 | `docs/v1/v1buildguide.md` and `docs/v1/Offcut V1 — 30 coding prompts.md` are tracked but are in neither the TS §5 tree nor §4. `check-file-tree.mjs` must either skip `docs/` or the two files must be added to the trees | Prompt 24 |
+| 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
+| 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
+| 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
+
+---
+
+## 2026-10-07 - Environment setup (outside the repository)
+
+Changes to the machine, made for Prompt 01 (G§0.1-G§0.4). None of this is in git.
+
+| Tool | Before | After | How |
+|---|---|---|---|
+| Rust stable | 1.97.1 | 1.99.0 | `rustup update stable` |
+| Rust 1.99.0 toolchain (pinned) | absent | installed with `wasm32-unknown-unknown`, `rustfmt`, `clippy` | installed by rustup on first use of `rust-toolchain.toml` |
+| `wasm-bindgen` CLI | 0.2.108 | 0.2.129 | `cargo install wasm-bindgen-cli --version 0.2.129 --locked --force` |
+| `cargo-deny` | absent | 0.20.2 | `cargo install cargo-deny --locked` |
+| `sqlx-cli` | absent | 0.9.0 | `cargo install sqlx-cli --no-default-features --features rustls,postgres --locked` |
+| `wasm-opt` (binaryen) | absent | version 133 | release archive `binaryen-version_133-x86_64-windows.tar.gz`, SHA-256 checked against the published value |
+
+Unchanged: Git 2.48.1, Node 24.19.0, pnpm 10.15.0, psql 18.4, Docker 28.3.2, OpenSSL 3.2.4, Vercel CLI 43.2.0. Not installed: GitHub CLI `gh` (optional).
+
+**Differs from the guide.**
+
+- `wasm-opt.exe` was copied into `~/.cargo/bin`, which is already on PATH. G§0.3 says to add binaryen's `bin` folder to PATH. The result is the same and PATH is unchanged.
+
+**Local Postgres.**
+
+- The service listens on port 9000, not 5432 (known issue 1).
+- The `postgres` superuser password was not known, so the role could not be created at first. The human set the two loopback lines of `pg_hba.conf` to `trust` and restarted the service. The agent then ran:
+  - `CREATE ROLE offcut LOGIN PASSWORD 'offcut' CREATEDB;`
+  - `CREATE DATABASE offcut_dev OWNER offcut;`
+- The `postgres` superuser password was not changed.
+- A helper script that would have done the whole sequence was written to the session's temporary folder. It made no changes: the agent's attempt to start it was blocked, and when the human ran it, it stopped because `pg_hba.conf` already said `trust`.
+- `pg_hba.conf` has not been changed back yet (open items 1 and 2).
+
+**Checked.** `psql "postgres://offcut:offcut@localhost:9000/offcut_dev" -c "select 1"` returns one row. `uname -s` prints `MINGW64_NT-10.0-26200`. Every tool of the Milestone-0 block prints a version.
+
+---
+
+## 2026-10-07 - Prompt 01: preflight and repository skeleton
+
+Commit `7ff841d`.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `.gitignore` | The paths of §12.8. `web/src/gen/` and `server/.sqlx/` are not ignored |
+| `docs/` | `product.md`, `technicalspec.md`, `buildplan.md`, `v1/v1implementation.md`, `v1/v1buildguide.md`, `v1/Offcut V1 — 30 coding prompts.md` |
+| `docs/file-specs/TEMPLATE.md` | The per-file specification template, copied from TS §34.2 |
+| `fixtures/speech/README.md` | Four reading scripts (A: 60 s reference, 159 words; B: 20 s with no events; C: 20 s with one long pause; D: 30 s of sparse speech), each with its expected transcript and events |
+| `bench/results/.gitkeep` | Empty |
+
+Git: `git init -b main`; `core.autocrlf` set to `input` for this repository.
+
+**Differs from the specs.**
+
+- **Repository root.** The repository is `sh2clips/offcut/`, at the human's instruction. The guide assumes `sh2clips/` itself (G§1.1). Read "repo root" in every document as `offcut/`.
+- **Docs copied, not moved.** G§1.1 says `mv documents docs`. The specs were copied to `offcut/docs/` and `sh2clips/documents/` was left as it was (open item 5).
+- **`.gitignore`.** §12.8 says "generated fixtures" without naming paths. The patterns `fixtures/ok_*`, `fixtures/rej_*` and `fixtures/bad_*` were added, from the fixture names in TS §26.
+- **Reading scripts.** Written by the agent against the detector rules of TS §17.2-§17.5 (open item 4). The expected display strings are left open, because `format_quantity` is written in V2.
+
+**Checked.**
+
+- `git check-ignore`: all eleven sample paths that should be ignored are; `web/src/gen/`, `server/.sqlx/`, committed fixtures and both lock files are not.
+- `git status` clean after the commit; `docs/` holds the three specs.
+- Word counts of the scripts counted with `wc`.
+
+**"Done when".** All three boxes ticked. The `psql` box was ticked later the same day, with the reservation of open item 2.
+
+---
+
+## 2026-10-07 - Prompt 02: Cargo and pnpm workspaces
+
+Commit `1b8ea2c`.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `Cargo.toml` | Workspace, `resolver = "2"`, four members; `[workspace.dependencies]`; `[workspace.lints.clippy]` denying `unwrap_used`, `expect_used`, `panic`, `indexing_slicing`, `wildcard_enum_match_arm`; release profile `lto = true`, `codegen-units = 1`; no `panic = "abort"` |
+| `Cargo.lock` | Four workspace packages, no external dependency yet |
+| `rust-toolchain.toml` | Channel `1.99.0`, target `wasm32-unknown-unknown`, components `rustfmt` and `clippy` |
+| `clippy.toml` | Disallows `std::time::Instant::now` and `std::time::SystemTime::now`; allows unwrap, expect, panic and indexing in tests |
+| `deny.toml` | Advisories; a starting list of eight permissive licenses; the two groups of bans of §12.1 |
+| `crates/offcut-types/`, `crates/offcut-api-types/`, `crates/offcut-wasm-core/` | `Cargo.toml` and a `src/lib.rs` holding one doc comment |
+| `server/` | `Cargo.toml` (package `offcut-api`) and `src/main.rs` holding `fn main() {}` |
+| `pnpm-workspace.yaml`, `package.json`, `web/package.json`, `pnpm-lock.yaml` | Workspace listing `web`; root package with `packageManager: pnpm@10.15.0`, `engines.node >= 24`, empty scripts; the `web` stub |
+
+**Versions in `[workspace.dependencies]`** (from `cargo search` on 2026-10-07; features are set by the crate that uses each one):
+
+| Crate | Version | Crate | Version |
+|---|---|---|---|
+| `serde` | 1.0.229 | `sqlx` | 0.9.0 |
+| `serde_json` | 1.0.151 | `tracing` | 0.1.44 |
+| `ts-rs` | 12.0.1 | `tracing-subscriber` | 0.3.23 |
+| `uuid` | 1.27.0 | `time` | 0.3.55 |
+| `trybuild` | 1.0.121 | `sha2` | 0.11.0 |
+| `thiserror` | 2.0.21 | `base64` | 0.23.1 |
+| `axum` | 0.8.9 | `ed25519-dalek` | 3.0.0 |
+| `tokio` | 1.53.2 | `reqwest` | 0.13.5 |
+| `tower` | 0.5.3 | `wasm-bindgen` | `=0.2.129` (exact) |
+| `tower-http` | 0.7.1 | | |
+
+**The bans in `deny.toml`.**
+
+- `web-sys`, `js-sys`, `wasm-bindgen`, `wgpu`, `rand`, `getrandom`: an error unless every crate that depends on one directly is `offcut-wasm-core`, `offcut-wasm-render` or `offcut-render`.
+- `offcut-mp4`, `-text`, `-detect`, `-dsp`, `-scene`, `-render`: each lists the crates that may depend on it, taken from the TS §7 graph. `offcut-api` is in none of the lists.
+
+**Differs from the specs.**
+
+- **Stub contents.** `cargo new` writes a sample `add` function and test. Each `lib.rs` was reduced to one doc comment, and `main.rs` to an empty `main`.
+- **`publish = false`** was added to all four crate manifests, with `[licenses.private] ignore = true` in `deny.toml`, so `cargo deny` does not report the workspace crates as unlicensed.
+- **`deny.toml`** was written by hand from the layout that `cargo deny init` produces, not by running `init` in the repository and editing the result.
+- **pnpm** stays at 10.15.0 (known issue 5).
+
+**Checked.**
+
+- `cargo metadata`, `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` all pass.
+- Lint drill: a temporary `unwrap`, slice index and `Instant::now()` in non-test code were each rejected by clippy; the same `unwrap` and index in a test module were accepted. Reverted.
+- Ban drill: a temporary `wasm-bindgen` dependency passed in `offcut-wasm-core` and failed `cargo deny check bans` in `offcut-types`. Reverted, `Cargo.lock` restored.
+- `pnpm install` wrote `pnpm-lock.yaml`.
+- `wasm-bindgen --version` prints 0.2.129, equal to the pin.
+- `git status` clean after the commit, lock files included.
+
+**"Done when".** All three boxes ticked.
+
+---
+
+## 2026-10-07 - This changelog
+
+**Added.** `docs/v1/v1changelog.md`, at the human's request: every later change is summarised here in the commit that makes it.
+
+**Changed.** `docs/technicalspec.md` §5 and `docs/v1/v1implementation.md` §4: `docs/v1/v1changelog.md` added to both file trees, so the new file is listed where `check-file-tree.mjs` will look (Prompt 24).
+
+**Checked.** `git status` clean after the commit.
