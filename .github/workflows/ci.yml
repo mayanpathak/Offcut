@@ -2,8 +2,13 @@
 # on main. They are the same commands as `pnpm check`, `pnpm test`,
 # `pnpm build` and `pnpm e2e` locally, in the order of the spec.
 #
-# The steps that run on main only (deploy the API, deploy the web app, check
-# the headers, smoke test) are added when the hosts exist.
+# On main only, after step 9 has passed, steps 10 to 14 deploy: first the API,
+# then the web app, always in that order. The server rejects fields it does
+# not know, so a new client must never reach an old server.
+#
+# The deploy needs, besides VITE_ASSET_BASE_URL:
+#   variable  APP_ORIGIN              https://<project>.vercel.app, no trailing slash
+#   secrets   RENDER_DEPLOY_HOOK_URL, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 
 name: ci
 
@@ -74,6 +79,18 @@ jobs:
             echo "::error::The repository variable VITE_ASSET_BASE_URL is not set. Set it to the asset host named in the CSP of web/vercel.json."
             exit 1
           fi
+          # The value alone: no name, no "=", no spaces, no quotes.
+          case "$VITE_ASSET_BASE_URL" in
+            *[!A-Za-z0-9._~:/-]* | *//*//*)
+              echo "::error::The repository variable VITE_ASSET_BASE_URL must hold a URL and nothing else, like https://assets.example.com"
+              exit 1
+              ;;
+            https://?*) ;;
+            *)
+              echo "::error::The repository variable VITE_ASSET_BASE_URL must start with https://"
+              exit 1
+              ;;
+          esac
 
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: |
@@ -212,6 +229,139 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # The deploy job builds the web app again, for Vercel. It takes the WASM
+      # bundle from here, so it needs no Rust toolchain.
+      - name: Hand the WASM bundle to the deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: wasm-pkg
+          path: web/src/wasm/pkg
+          retention-days: 1
+          if-no-files-found: error
+
+  # --- 10. The API: build the image, push it, tell Render -------------------
+  deploy-api:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/deploy-api.yml
+    secrets:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+  # --- 11 to 14. The web app, once the API runs this commit -----------------
+  deploy-web:
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The production address of the web app; the same value as APP_ORIGIN in Render.
+      APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      VERCEL_CLI_VERSION: 62.7.0
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check the configuration
+        run: |
+          case "$APP_ORIGIN" in
+            *[!A-Za-z0-9.:/-]* | https://*/*)
+              echo "::error::The repository variable APP_ORIGIN must hold an address and nothing else, with no path and no trailing slash, like https://offcut.vercel.app"
+              exit 1
+              ;;
+            https://?*) ;;
+            *)
+              echo "::error::The repository variable APP_ORIGIN is not set, or does not start with https://"
+              exit 1
+              ;;
+          esac
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      # --- 11. The API must run this commit before the web app is deployed --
+      - name: Wait until the API runs this commit
+        run: |
+          # The API host is the one the web app's rewrite points at.
+          api=$(node -e "const v = require('./web/vercel.json'); console.log(new URL(v.rewrites[0].destination).origin)")
+          node scripts/wait-for-version.mjs "$api" "$GITHUB_SHA" 300
+
+      - name: Set up pnpm, the version of package.json
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          pnpm --version
+          echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore the pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.PNPM_STORE }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install the web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Take the WASM bundle of the ci job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: wasm-pkg
+          path: web/src/wasm/pkg
+
+      # --- 12. Build for Vercel here, deploy the result ---------------------
+      # Vercel builds nothing: its builders have no Rust toolchain. The project
+      # is not connected to the Git repository.
+      - name: Deploy the web app to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret $name is not set."
+              exit 1
+            fi
+          done
+          vercel="pnpm dlx vercel@$VERCEL_CLI_VERSION"
+          $vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          $vercel build --prod --token="$VERCEL_TOKEN"
+          $vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: The API answers through the web app's rewrite
+        run: node scripts/wait-for-version.mjs "$APP_ORIGIN" "$GITHUB_SHA" 120
+
+      # --- 13. The headers of the deployment, value for value ---------------
+      - name: Headers of the deployment
+        run: node scripts/check-headers.mjs "$APP_ORIGIN"
+
+      # --- 14. Smoke: isolated, WASM compiles under the CSP, API reachable --
+      - name: Install Chrome for Playwright
+        run: pnpm --filter web exec playwright install --with-deps chrome
+
+      - name: Playwright, the smoke case against the deployment
+        env:
+          E2E_BASE_URL: ${{ vars.APP_ORIGIN }}
+        run: pnpm --filter web exec playwright test --project=non-media --grep @smoke
+
+      - name: Keep the Playwright report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report-deployment
           path: |
             web/playwright-report
             web/test-results

@@ -714,6 +714,8 @@ offcut/
 │   ├── check-hosts.mjs                greps the built bundle for URLs outside allowlist-hosts.ts
 │   ├── check-copy-codes.mjs           every code in gen/domain.ts has copy in messages.ts
 │   ├── check-external-facts.mjs       prints the free-tier facts to re-verify (TE-5..TE-11)
+│   ├── check-headers.mjs              compares a deployment's response headers with web/vercel.json
+│   ├── wait-for-version.mjs           waits until /healthz of a deployment reports one commit
 │   ├── metrics.sql                    queries for the PS §20.5 validation metrics
 │   └── upload-assets.sh               uploads model files and media to the asset CDN
 └── docs/

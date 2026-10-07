@@ -1722,6 +1722,60 @@ Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
 
 **"Done when".** Neither box is ticked. Of the first, "the image runs locally" and "`/healthz` shows the SHA" hold locally; Render does not exist. The second box needs the human steps.
 
+## 2026-10-07 - Prompt 28, prepared ahead: CI steps 10 to 14
+
+**This commit was made on the branch `v1-deploy` and kept off `main` until the Render service, the Vercel project and the secrets existed (open item 11):** on `main` the new jobs run on every push, and they fail without the Render service, the Vercel project and the secrets.
+
+**The prompt is not done.** Prompt 27 is not done, and the real hosts do not exist. Written now: the part that holds no host name. Still to do when the values exist: put the Render host and the asset origin into `web/vercel.json` and the asset URL into `web/.env.local` (known issue 25), then merge.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `scripts/wait-for-version.mjs` | `node scripts/wait-for-version.mjs <origin> <commit> [seconds]`: asks `/api/v1/healthz` every 10 s until `version` is the commit; fails after 300 s, or the number given |
+| `scripts/check-headers.mjs` | `node scripts/check-headers.mjs <url>`: fetches `/` and compares every header of the `/(.*)` rule of `web/vercel.json` with the response, value for value |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `.github/workflows/ci.yml` | "Check the configuration" refuses a `VITE_ASSET_BASE_URL` that is not one `https://` URL and nothing else. On a push to `main`, the `ci` job hands the WASM bundle on as an artifact. Two new jobs, `deploy-api` and `deploy-web` |
+| `docs/technicalspec.md`, §5 | The tree lists the two scripts |
+
+**The two jobs, on a push to `main` only, after the `ci` job has passed.**
+
+| Step of TS §33 | Job | What runs |
+|---|---|---|
+| 10 | `deploy-api` | Calls `deploy-api.yml` |
+| 11 | `deploy-web` | `wait-for-version.mjs` against the API host, for up to 300 s. The host is read from the rewrite in `web/vercel.json` |
+| 12 | `deploy-web` | `vercel pull --yes --environment=production`, `vercel build --prod`, `vercel deploy --prebuilt --prod`, with the Vercel CLI 62.7.0 |
+| - | `deploy-web` | `wait-for-version.mjs` against `APP_ORIGIN`: the API answers through the rewrite with this commit |
+| 13 | `deploy-web` | `check-headers.mjs` against `APP_ORIGIN` |
+| 14 | `deploy-web` | Playwright, `--grep @smoke`, with `E2E_BASE_URL` set to `APP_ORIGIN` |
+
+**Choices.**
+
+- **`deploy-web` does not compile Rust.** `vercel build` runs `vite build`, which needs the WASM bundle. The `ci` job has built it; it is passed on as an artifact kept for one day.
+- **The tests run against the production address, `APP_ORIGIN`, a new repository variable**, not against the address `vercel deploy` prints. That one is unique to the deployment, and Vercel may ask for a login there.
+- **The Vercel token is given to one step only**, the one that calls the Vercel CLI, not to the steps that install packages.
+- The new action, `actions/download-artifact` v8, is pinned to a commit like the others.
+
+**Differs from the specs.**
+
+- **Two scripts that no spec names.** §12.7 describes steps 11 and 13 in words. As files they can be run by hand, and were checked on this machine.
+- **The check of `VITE_ASSET_BASE_URL`** is not in a spec. It answers the failure of the first CI runs (see "First CI runs on GitHub").
+
+**Checked.**
+
+- **`check-headers.mjs` against `vite preview`**, which sends the headers of `vercel.json`: passes with 7 headers. With one value changed in `vercel.json` it names the header, the expected and the received value, exit status 1. Also exit status 1: no argument, not a URL, nothing listening, a host that sends none of the headers.
+- **`wait-for-version.mjs` against the API image of Prompt 27** in a container: returns as soon as the server reports the commit; with another commit and 15 s it lists two attempts and ends with exit status 1; with nothing listening likewise. Refused: no arguments, seconds that are not a number.
+- **The two configuration checks**, run as shell on sample values: the value of the failed runs, a value with quotes, two URLs, `http://`, no scheme and an empty value are refused; for `APP_ORIGIN` also a trailing slash and a path.
+- `ci.yml` and `deploy-api.yml` pass actionlint 1.7.12. `check-file-tree` passes (122 files).
+
+**Not checked: the two jobs have never run.** Nothing here can run them. What the first push to `main` will show: that a job of `ci.yml` may call `deploy-api.yml` with the permissions given; that `pnpm dlx vercel@62.7.0` runs on the runner; that `vercel build` finds the project settings (Root Directory `web`) and passes `VITE_ASSET_BASE_URL` to `vite build`; that Vercel sends the seven headers unchanged; that the `@smoke` case passes against the real API.
+
+**"Done when".** The box is not ticked.
+
 ## 2026-10-07 - Hosts chosen: Neon and Cloudflare R2; `render.yaml` gets its region
 
 **Decided (by the human).** The Postgres host is Neon (TE-6) and the asset host is Cloudflare R2 (TE-7). The measurements of both experiments are still due in Prompt 29.
