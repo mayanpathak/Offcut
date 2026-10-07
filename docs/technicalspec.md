@@ -432,6 +432,7 @@ offcut/
 │   │   └── 0001_init.sql
 │   ├── src/
 │   │   ├── main.rs
+│   │   ├── lib.rs                     module declarations; lets tests/ build the router
 │   │   ├── config.rs                  [ONLY] environment parsing
 │   │   ├── state.rs                   AppState
 │   │   ├── router.rs                  route table, body limits, layers

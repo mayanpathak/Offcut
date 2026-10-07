@@ -23,7 +23,7 @@
 | # | Issue | Affects |
 |---|---|---|
 | 1 | Local Postgres listens on port **9000**. The docs write the dev connection string with 5432. Use `postgres://offcut:offcut@localhost:9000/offcut_dev` in `.env` and in every `psql` command | Prompts 09, 11-13, 23 |
-| 2 | The `deny.toml` ban on `rand` and `getrandom` covers the whole dependency graph. When the server gains real dependencies, crates such as `uuid` and `sqlx` will depend on them directly and `cargo deny check` will fail until they are listed as wrappers | Prompts 09, 13 |
+| 2 | **`cargo deny check` fails since Prompt 09** (bans and licenses), as predicted: the server's dependencies bring in the banned crates through third parties. Prompt 13 is where the specs settle `deny.toml`. Needed there: (a) wrappers: `getrandom` is used by `uuid`, `rand`, `ring`, `jobserver`; `rand` by `sqlx-postgres`; `js-sys`, `web-sys` and `wasm-bindgen` by `reqwest`, `wasm-bindgen-futures` and each other; (b) the license allowlist, from the first full run. Until then the pure crates are checked by hand: `cargo tree -p offcut-types -e normal` and `-p offcut-api-types` show no `rand` or `getrandom` | Prompt 13 |
 | 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
 | 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
@@ -34,6 +34,7 @@
 | 13 | The generated files are not formatted for a linter: `ts-rs` writes a type on one line, with a comma after the last field, and some lines are over 500 characters long. ESLint must either skip `web/src/gen/` or have no style rule that rejects this | Prompt 14 |
 | 14 | In `gen/api.ts`, `ApiError.retry_after_secs` is `number \| null`, and the server writes `null` when there is no retry time. `http.ts` must treat `null` and a missing field the same way | Prompt 16 |
 | 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
+| 17 | Three things `router.rs` must do for `log.rs` to work as specified. (a) Add the trace layer with `Router::layer`, or the route template is not yet known and every request logs `unmatched`. (b) Set the trace layer's response logging to `INFO`; its default is `DEBUG`, and with `LOG_LEVEL=info` no status or latency would be logged. (c) Decide what to do with an `X-Request-Id` sent by the client: `tower-http` keeps it. `log.rs` already refuses to log one that is not a plain id | Prompt 12 |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -532,3 +533,79 @@ Outside the repository. Closes open items 1 and 2.
 - The `offcut` role has `CREATEDB`, which the integration tests of Prompt 13 need.
 
 Whether the `postgres` superuser password was changed while access was open is the human's own record; nothing in Offcut uses that login.
+
+---
+
+## 2026-10-07 - Local `.env` complete
+
+Outside the repository (`.env` is ignored by git). Closes the signing-key part of open item 3.
+
+**Changed (by the human).** `.env` at the repository root was rewritten with all 15 variables of G§3.1, with LF line endings. The first version held only `DATABASE_URL` and had CRLF endings, which would have put a carriage return at the end of every value loaded with `set -a; . ./.env; set +a`. The two dev signing keys were generated on the machine with `openssl rand -base64 32` and written straight to the file.
+
+**Checked (by the agent, without printing any value).** 15 of 15 variables present; `DATABASE_URL` points at `offcut_dev` on port 9000 and the database answers with it; `APP_ORIGIN` is `http://localhost:5173`; `PORT` 8080; both keys are standard base64 that decodes to 32 bytes, and they differ; the seven mail and billing variables are `unset-until-v6`; the file loads in `sh` with no trailing characters.
+
+---
+
+## 2026-10-07 - Prompt 09: server primitives
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `server/src/lib.rs` | Module declarations only: `client_ip`, `config`, `error`, `headers`, `log` | |
+| `server/src/config.rs` | `Config`, `ConfigError { Missing, Malformed }`, `Config::from_env()`; a hand-written `Debug` | 8 |
+| `server/src/log.rs` | `init(level)` (JSON to stdout), `request_span(req)`, `user_tag(user_id)` | 4 |
+| `server/src/error.rs` | `AppError` (7 variants), its `IntoResponse`, `From<sqlx::Error>`, `json_rejection` | 6 |
+| `server/src/headers.rs` | `layer()`: `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` on every response | 1 |
+| `server/src/client_ip.rs` | `client_ip(headers, peer, trusted_hops)` | 11 |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `server/Cargo.toml` | The dependencies of §10: `axum`, `tokio`, `tower`, `tower-http`, `sqlx` (`postgres`, `runtime-tokio`, `tls-rustls`, `uuid`, `time`, `json`, `migrate`, `macros`), `serde`, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber` (`json`), `uuid` (`v4`, `v7`, `serde`), `time`, `sha2`, `base64`, `ed25519-dalek`, `offcut-types`, `offcut-api-types`; dev-dependency `reqwest` |
+| `Cargo.lock` | The server's dependency tree |
+| `docs/technicalspec.md` §5, `docs/v1/v1implementation.md` §4 | `server/src/lib.rs` added to both file trees, as the prompt requires |
+
+`server/src/main.rs` is still `fn main() {}`; Prompt 12 writes it.
+
+**How each file behaves.**
+
+- **`config.rs`.** The only reader of the environment. All 15 variables are required; an empty value counts as missing; `GIT_SHA` is optional and defaults to `dev`. An error carries the variable's name and prints as `config error: <NAME>`, never the value.
+  - A signing key must be standard base64 of exactly 32 bytes.
+  - `APP_ORIGIN` must be `https://host` (a port is allowed) or `http://localhost:port`, with nothing after it: no path, no query, no trailing slash.
+  - `PORT` is a `u16`, `LOG_LEVEL` a tracing level, `FOUNDING_OFFER_ENABLED` exactly `true` or `false`, `TRUSTED_PROXY_HOPS` a `u8`.
+  - `Debug` prints `<redacted>` for six fields: `database_url`, both signing keys, `mail_api_key`, `billing_api_key`, `billing_webhook_secret`.
+- **`log.rs`.** The request span carries the request id, the method and the route template. When no route matched it logs `unmatched`; the raw path and the query string are never read. `user_tag` is the first 8 hex characters of the SHA-256 of the user id.
+- **`error.rs`.** The mapping of the §10.3 table. `RateLimited` also sets a `Retry-After` header. A database error is logged as one fixed word for its kind (`database`, `pool_timed_out`, `io` and so on), never with its message, which can hold values from the query.
+- **`client_ip.rs`.** The algorithm of §10.5 with D-17: no header or zero hops gives the peer; otherwise the entry `trusted_hops` from the right; fewer entries than hops gives the leftmost; an entry that does not parse gives the peer.
+
+**Differs from the specs.**
+
+- **`http` types come from `axum::http`.** §10.2 and §10.5 write `http::Request` and `http::HeaderMap`. The `http` crate is not in the dependency list, and `axum` re-exports the same types.
+- **`config.rs` has a private `from_lookup`**, which `from_env` calls with `std::env::var`. The tests pass a map to it. Changing the process environment in a test is `unsafe` in the 2024 edition and races with other tests.
+- **`ConfigError` implements `Display` and `Error`** (through `thiserror`), so `main` can print it. Both variants print the same text, `config error: <NAME>`, which is the text §10.12 gives.
+- **`headers::layer()` returns a named type, `HeadersLayer`**, not `impl tower::Layer<...>`. `Router::layer` needs to know the service type the layer produces, and an opaque return type hides it.
+- **The two headers replace** any value a handler set. §10.4 says "adds".
+- **`X-Forwarded-For` sent on several header lines is read as one list.** §10.5 speaks of "the header". HTTP allows the split, and reading only the first line would pick the wrong entry.
+- **`user_tag` hashes the id as text**, the lower-case hyphenated UUID. §10.2 says "SHA-256(user id)" without a form. The text form can be checked by hand with `sha256sum`.
+- **`log.rs` logs a request id only if it is a plain id** (letters, digits, hyphens, at most 64 characters). A client can send its own `X-Request-Id`, and the rule is that no text from a request reaches the log (known issue 17).
+- **`log::init` does nothing on a second call** instead of panicking.
+- **`error.rs`, `headers.rs` and `log.rs` have unit tests.** G§3.4 lists none for them; they are small and need no database.
+
+**Checked.**
+
+- `cargo test -p offcut-api`: 30 tests pass.
+  - `config`: a complete environment parses, field by field; each of the 15 variables, removed or emptied, yields `Missing(<its name>)`; four kinds of bad key yield `Malformed` (not base64, 31 bytes, 33 bytes, URL-safe alphabet); 13 bad origins are rejected and 3 good ones accepted; `Debug` contains none of seven secret strings and exactly six `<redacted>`.
+  - `client_ip`: one, two and three entries with hops 1 and 2; absent header; zero hops; garbage in and outside the chosen position; IPv6; spaces and tabs; more hops than entries; several header lines; a line that is not text.
+  - `error`: each variant's status and body; `Retry-After`; the JSON extractor's rejections mapped for seven bad bodies (400), three wrong content types (415) and a 3 MB body (413).
+  - `headers`: both headers on a normal response, on a handler that set its own `Cache-Control`, and on a 404; no `access-control-*` header.
+  - `log`: `user_tag` of a fixed id equals `29af63ce`, the value `sha256sum` gives for that id; an unmatched request logs neither path nor query.
+- `cargo fmt --check` and `cargo clippy --workspace --all-targets -- -D warnings` pass. `cargo test --workspace` passes: 58 + 28 + 30 tests and the `ui` test. `check-gen-clean.sh` prints `gen clean`.
+- Only `config.rs` reads the environment. No file uses a `std::time` clock.
+- No `unwrap`, `expect`, `panic!`, slice indexing or wildcard match arm outside the test modules.
+- Longest file: `config.rs`, 366 lines.
+
+**Not passing: `cargo deny check`.** It fails on bans and licenses now that the server has real dependencies. This was expected and is Prompt 13's work (known issue 2). The pure crates were checked by hand and still pull in no randomness.
+
+**"Done when".** Both boxes ticked: the unit tests are green and clippy is clean; the `Debug` test proves no secret leaks.

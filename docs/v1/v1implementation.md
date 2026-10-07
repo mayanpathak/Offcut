@@ -192,6 +192,7 @@ Every path below is in the TS §5 tree (plus `server/tests/notify_me.rs`, D-12).
 │   ├── .sqlx/                         generated, committed
 │   ├── migrations/0001_init.sql       F   whole schema (D-7)
 │   ├── src/main.rs                    P
+│   ├── src/lib.rs                     P   module declarations only; grows as modules arrive
 │   ├── src/config.rs                  F
 │   ├── src/state.rs                   P   gains mailer and billing in V6
 │   ├── src/router.rs                  P   3 of 15 routes

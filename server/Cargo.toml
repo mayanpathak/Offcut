@@ -8,3 +8,24 @@ publish = false
 workspace = true
 
 [dependencies]
+axum = { workspace = true }
+base64 = { workspace = true }
+ed25519-dalek = { workspace = true }
+offcut-api-types = { workspace = true }
+offcut-types = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio", "tls-rustls", "uuid", "time", "json", "migrate", "macros"] }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+tower = { workspace = true, features = ["util"] }
+tower-http = { workspace = true, features = ["trace", "catch-panic", "set-header", "limit", "request-id"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json"] }
+# The server creates ids, so it may use `v4` and `v7`. The pure crates may not.
+uuid = { workspace = true, features = ["v4", "v7", "serde"] }
+
+[dev-dependencies]
+reqwest = { workspace = true }
