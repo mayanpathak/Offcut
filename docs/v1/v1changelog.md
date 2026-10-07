@@ -40,6 +40,7 @@
 | 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
 | 28 | A use-case may import `workers/pool.ts` but not `workers/protocol.ts`, not even its types (TS §7). A use-case that needs to name `AppFailure` must take it from what `pool.ts` exports | Prompt 21 |
 | 29 | `start-app.ts` must call `setIllegalTransitionReporter(...)` in production builds only: `if (!env.dev)`. `transition()` throws while no reporter is set, which is the behaviour development and test builds need (see the Prompt 15 entry) | Prompt 21 |
+| 30 | **The capability check has a thin margin on a cold start.** `PER_CHECK_TIMEOUT_MS` is 1,000 (TS §13.2). On the development machine (Intel graphics, 16 GB) the GPU adapter needs up to about 600 ms of that on a freshly started Chrome; a slower machine that needs more is told `UNSUPPORTED_WEBGPU`, shown the unsupported page, and counted as a failure in E-8. All checks run together, so a per-check timeout of 2,000 ms would still end inside the 3 s budget of PS §9.3. Decide whether to raise it, and measure on R1 and R2 before E-8 is read | Human; before the landing page goes public (Prompt 28) |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -1252,3 +1253,42 @@ Phase E (the WASM path, Prompts 19 and 20) is complete: all five rows of Milesto
 - The layer rules hold: `workers/pool.ts` imports `wasm/load-core.ts` and the types of `protocol.ts`; `fetch` appears in `net/http.ts` and `wasm/load-core.ts` only.
 
 **"Done when".** The box is ticked. The temporary call in `main.tsx` is marked `TEMPORARY (Prompt 20)` in the file.
+
+---
+
+## 2026-10-07 - Capability check: a capable browser was reported as unsupported on a cold start
+
+Found while proving `start-app.ts` against the local API (Prompt 21), and fixed in the files of Prompt 18. Opens known issue 30.
+
+**What was wrong.** On a Chrome that had just been launched, the check reported `UNSUPPORTED_H264_ENCODE` or `UNSUPPORTED_WEBGPU` on this machine, which supports both. The test of Prompt 18 in real Chrome had not shown it, because that page called every probe once before it ran the check, so the browser was warm.
+
+**What was measured**, on a fresh Chrome for each run (Intel graphics, Windows, 16 GB):
+
+| What | Cold | Warm |
+|---|---|---|
+| The first `prefer-hardware` entry of the encode ladder | about 3.4 s | under 100 ms |
+| A `prefer-software` entry of the ladder | 50 to 130 ms | the same |
+| The first `VideoDecoder.isConfigSupported` call | holds the main thread for about 500 ms | no hold |
+| `requestAdapter()` | up to 1.2 s after the page started the check | about 140 ms |
+
+**The two causes, both in `capability.ts`.**
+
+1. `browserProbe.h264Encode` waited for all four ladder entries. The check asks only whether any entry is supported, and a software entry answers in about 100 ms.
+2. Each check's timeout was started before the checks were. The 500 ms that the first WebCodecs call holds the main thread was therefore taken from the second that the GPU adapter had to answer.
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/platform/capability.ts` | `h264Encode` answers `true` as soon as one ladder entry is supported, and `false` only when all four have said no. `runCapabilityCheck` starts all twelve probe calls first, then gives each its timeout |
+| `web/src/platform/capability.test.ts` | One new test: a probe that holds the thread for 600 ms, and an adapter that answers 900 ms after that, still pass |
+
+`PER_CHECK_TIMEOUT_MS` is unchanged at 1,000, and so is the meaning of TS §13.2: each check has one second to answer. What no longer counts against that second is time in which the page itself kept the browser from answering.
+
+**Checked.**
+
+- Ten cold runs of the whole check after the change, five headed and five headless: all ten `pass`, in 149 to 1,188 ms, inside the 3 s budget. Before the change, the two real runs of this session both failed.
+- `vitest run`: 76 tests pass. The new test fails against the previous `capability.ts` (1 failed, 75 passed) and passes against the new one.
+- `tsc --noEmit` and `eslint .` pass.
+
+**Not solved: the margin is thin** (known issue 30). On this machine the adapter needs up to about 600 ms of its 1,000 ms on a cold start. A slower machine may need more and would then be told it has no WebGPU. That decision is the founder's: see the known-issues table.

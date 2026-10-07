@@ -96,22 +96,61 @@ export const browserProbe: PlatformProbe = {
     return adapter === null ? null : adapter.info.vendor;
   },
   h264Decode: async () => (await VideoDecoder.isConfigSupported(H264_DECODE_PROBE)).supported === true,
-  h264Encode: async () => {
-    const supports = VIDEO_ENCODE_LADDER.map(async (entry) => {
-      const config = videoConfigFor(entry, LIMITS.CREATOR_WIDTH, LIMITS.CREATOR_HEIGHT, CREATOR_VIDEO_BITRATE);
-      return (await VideoEncoder.isConfigSupported(config)).supported === true;
-    });
-    return (await Promise.all(supports)).includes(true);
-  },
+  h264Encode: () =>
+    anyTrue(
+      VIDEO_ENCODE_LADDER.map(async (entry) => {
+        const config = videoConfigFor(entry, LIMITS.CREATOR_WIDTH, LIMITS.CREATOR_HEIGHT, CREATOR_VIDEO_BITRATE);
+        return (await VideoEncoder.isConfigSupported(config)).supported === true;
+      }),
+    ),
   aacDecode: async () => (await AudioDecoder.isConfigSupported(AAC_DECODE_PROBE)).supported === true,
   aacEncode: async () => (await AudioEncoder.isConfigSupported(AAC_ENCODE_CONFIG)).supported === true,
 };
 
 /**
- * The value of `check`, or `otherwise` if it throws, rejects, or has not
- * answered within `PER_CHECK_TIMEOUT_MS`.
+ * True as soon as one of the answers is true; false once all are in and none
+ * was. An answer that rejects counts as false.
+ *
+ * The encode ladder needs this: on a browser that has just started, asking
+ * about a hardware encoder can take seconds, while a software entry answers
+ * at once. One supported entry is all the check asks for.
  */
-function guarded<T>(check: () => T | Promise<T>, otherwise: T): Promise<T> {
+function anyTrue(answers: readonly Promise<boolean>[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    let waiting = answers.length;
+    const settle = (answer: boolean) => {
+      waiting -= 1;
+      if (answer) {
+        resolve(true);
+      } else if (waiting === 0) {
+        resolve(false);
+      }
+    };
+    if (waiting === 0) {
+      resolve(false);
+    }
+    for (const answer of answers) {
+      answer.then(settle, () => {
+        settle(false);
+      });
+    }
+  });
+}
+
+/** Starts a check now. A check that throws at once becomes a rejected promise. */
+function start<T>(check: () => T | Promise<T>): Promise<T> {
+  try {
+    return Promise.resolve(check());
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error("the check threw"));
+  }
+}
+
+/**
+ * The value of a started check, or `otherwise` if it rejects or has not
+ * answered within `PER_CHECK_TIMEOUT_MS` of this call.
+ */
+function withTimeout<T>(started: Promise<T>, otherwise: T): Promise<T> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       resolve(otherwise);
@@ -120,12 +159,9 @@ function guarded<T>(check: () => T | Promise<T>, otherwise: T): Promise<T> {
       clearTimeout(timer);
       resolve(value);
     };
-    // Called inside `then`, so a synchronous throw is a rejection too.
-    void Promise.resolve()
-      .then(check)
-      .then(settle, () => {
-        settle(otherwise);
-      });
+    started.then(settle, () => {
+      settle(otherwise);
+    });
   });
 }
 
@@ -187,12 +223,34 @@ const MEMORY_UNREADABLE = "unreadable";
 
 /**
  * Runs all eleven checks at once, each with its own timeout, so the whole
- * check takes about one second at most, inside `LIMITS.CAPABILITY_CHECK_BUDGET`.
- * A check that throws or times out has failed. The reported reason is the
- * first failed check in the order of `UnsupportedReason`; the later checks
- * still run, so the report is complete.
+ * check stays inside `LIMITS.CAPABILITY_CHECK_BUDGET`. A check that throws
+ * or times out has failed. The reported reason is the first failed check in
+ * the order of `UnsupportedReason`; the later checks still run, so the
+ * report is complete.
+ *
+ * Every check is started before any timeout is. The first WebCodecs call of
+ * a page can hold the main thread for half a second, and that time must not
+ * be taken from the checks that are waiting on the browser.
  */
 export async function runCapabilityCheck(probe: PlatformProbe = browserProbe): Promise<CapabilityReport> {
+  // Step one: start everything. Nothing is awaited and no timer runs yet.
+  const started = {
+    notMobile: start(() => probe.mobileHint() !== true),
+    webCodecs: start(() => probe.hasWebCodecs()),
+    isolated: start(() => probe.isolated()),
+    simd: start(() => probe.simdOk()),
+    storage: start(() => probe.storageOk()),
+    memoryGb: start<number | undefined | typeof MEMORY_UNREADABLE>(() => probe.deviceMemoryGb()),
+    vendor: start(() => probe.gpuVendor()),
+    h264Decode: start(() => probe.h264Decode()),
+    h264Encode: start(() => probe.h264Encode()),
+    aacDecode: start(() => probe.aacDecode()),
+    aacEncode: start(() => probe.aacEncode()),
+    // Not a check: it only fills the report.
+    platform: start(() => probe.platformHint()),
+  };
+
+  // Step two: give each one its timeout, and wait for all of them.
   const [
     notMobile,
     webCodecs,
@@ -207,19 +265,18 @@ export async function runCapabilityCheck(probe: PlatformProbe = browserProbe): P
     aacEncode,
     platform,
   ] = await Promise.all([
-    guarded(() => probe.mobileHint() !== true, false),
-    guarded(() => probe.hasWebCodecs(), false),
-    guarded(() => probe.isolated(), false),
-    guarded(() => probe.simdOk(), false),
-    guarded(() => probe.storageOk(), false),
-    guarded<number | undefined | typeof MEMORY_UNREADABLE>(() => probe.deviceMemoryGb(), MEMORY_UNREADABLE),
-    guarded(() => probe.gpuVendor(), null),
-    guarded(() => probe.h264Decode(), false),
-    guarded(() => probe.h264Encode(), false),
-    guarded(() => probe.aacDecode(), false),
-    guarded(() => probe.aacEncode(), false),
-    // Not a check: it only fills the report.
-    guarded(() => probe.platformHint(), undefined),
+    withTimeout(started.notMobile, false),
+    withTimeout(started.webCodecs, false),
+    withTimeout(started.isolated, false),
+    withTimeout(started.simd, false),
+    withTimeout(started.storage, false),
+    withTimeout(started.memoryGb, MEMORY_UNREADABLE),
+    withTimeout(started.vendor, null),
+    withTimeout(started.h264Decode, false),
+    withTimeout(started.h264Encode, false),
+    withTimeout(started.aacDecode, false),
+    withTimeout(started.aacEncode, false),
+    withTimeout(started.platform, undefined),
   ]);
 
   // A browser that does not report its memory passes (TS §13.2).

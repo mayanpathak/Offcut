@@ -129,6 +129,32 @@ describe("a check that never answers", () => {
     expect(report?.gpu_vendor).toBe("unknown");
   });
 
+  it("starts every check before any timeout, so a slow start does not use up the wait", async () => {
+    vi.useFakeTimers();
+    // The first WebCodecs call of a page can hold the main thread for half a
+    // second. Here it holds it for 600 ms, and the GPU adapter then answers
+    // 900 ms after that: inside its own second, but 1.5 s after the start.
+    const coldStart = probe({
+      h264Decode: () => {
+        vi.advanceTimersByTime(600);
+        return Promise.resolve(true);
+      },
+      gpuVendor: () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve("Intel Inc.");
+          }, 1_500);
+        }),
+    });
+    let report: Awaited<ReturnType<typeof runCapabilityCheck>> | undefined;
+    void runCapabilityCheck(coldStart).then((done) => {
+      report = done;
+    });
+
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS);
+    expect(report).toEqual({ result: "pass", gpu_vendor: "intel", memory_bucket: "gb8plus", platform: "windows" });
+  });
+
   it("does not hold the run up when the other checks answer at once", async () => {
     vi.useFakeTimers();
     const report = runCapabilityCheck(probe());
