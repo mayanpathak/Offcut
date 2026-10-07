@@ -17,7 +17,6 @@
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
 | 10 | The three values Prompt 27 needs exist: the production `DATABASE_URL` (Neon, Singapore; item 36), the asset base URL `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev` and the app origin `https://offcut-one.vercel.app`. Left over: set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it, so builds are not affected) | Human | Any time before Prompt 30 |
-| 11 | The human steps of Prompt 28: create a Vercel token for the team that owns the project `offcut`; set the GitHub secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (the last two are `orgId` and `projectId` in `.vercel/project.json`); set the GitHub variable `APP_ORIGIN` to `https://offcut-one.vercel.app`. Until all four exist, `v1-deploy` must not be merged | Human | Prompt 28 |
 | 36 | **Reset the password of the Neon role `neondb_owner`**: it was pasted into the chat with the agent, and on 2026-10-08 the connection string in use still held that password. Then replace `PROD_DATABASE_URL` in `.env.deploy`. Also delete the first Neon project (Sydney), whose password was pasted too | Human | Before the Render service is created |
 
 ## Known issues for later prompts
@@ -36,7 +35,6 @@
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
 | 31 | On a fresh clone `pnpm check` fails at ESLint and `tsc` until `pnpm build:wasm` has run once: `wasm/load-core.ts` imports files that the build writes and git ignores. `pnpm dev` and `pnpm build` build them; CI builds them in step 5, before step 6. Say so in a README when there is one | Any time |
 | 33 | The pages show one demo video, and it is a recording about another product, Timbre, which the human chose on 2026-10-08 from the videos at hand. E-1 (§14) asks for three hand-made demo clips of Offcut. Replace it before the page is announced: upload the new file, put the printed path into `DEMO_VIDEO_PATH`, and decide then how three are shown | Before E-1 starts |
-| 35 | Not checked: that calling the deploy hook makes Render pull the new `:latest` image. The first green run of `deploy-api.yml` deployed the commit Render already ran. The next commit shows it: `/api/v1/healthz` must report it. If it reports the old one, the hook call needs the image reference as a parameter | The first deploy from CI (Prompt 28) |
 
 ---
 
@@ -1896,3 +1894,24 @@ This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in
 **Changed.** `.github/workflows/ci.yml`: when the two configuration checks refuse `VITE_ASSET_BASE_URL` or `APP_ORIGIN`, the message now gives the length of the value and the value as the shell reads it (`printf %q`), which shows a line break or a space. A variable is not a secret.
 
 **Checked.** By hand: the clean value passes; with a line break, a space or a carriage return at its end, the message shows it. Both workflows pass actionlint 1.7.12.
+
+## 2026-10-08 - Prompt 28 complete: the web app is live, deployed from CI
+
+**The cause of the failed runs.** The new message showed it: `VITE_ASSET_BASE_URL` held 53 characters, the address followed by a carriage return and a line break. The human removed them on GitHub and started the run of `77a304d` again.
+
+**The run, second attempt: all three jobs green.** `ci` (steps 1 to 9), `deploy-api` (image pushed, Render hook called) and `deploy-web` (waited for the API to run the commit, `vercel pull`, `vercel build --prod`, `vercel deploy --prebuilt --prod`, header check, `@smoke`).
+
+**Checked (by the agent, against production).**
+
+- `https://offcut-api.onrender.com/api/v1/healthz` and `https://offcut-one.vercel.app/api/v1/healthz` both answer `{"ok":true,"version":"77a304deb7055c42aac35405b612557302fca932"}`, which is `origin/main`. **This closes known issue 35:** the hook made Render pull the new `:latest` image.
+- `node scripts/check-headers.mjs https://offcut-one.vercel.app`: the 7 headers of `web/vercel.json`, value for value.
+- An unknown path under `/api/v1/` answers 404 through the rewrite; `/settings` answers 200.
+- In Chrome, on `https://offcut-one.vercel.app/`: the page is cross-origin isolated, the capability line reads "Your browser can do this.", the demo video reaches `readyState` 4 and plays, the console has no error, and the only hosts contacted are the page's own and the asset host.
+
+Open item 11 is closed.
+
+**"Done when" of Prompt 28.**
+
+- [x] `pnpm build` still passes `check-hosts` with real values; a merge to `main` runs 1–14 green; `/api/v1/healthz` answers through the Vercel rewrite with the current SHA; the header check and `@smoke` pass.
+
+**Note.** From now on every push to `main` deploys, the API first and then the web app.
