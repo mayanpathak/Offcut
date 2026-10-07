@@ -16,9 +16,9 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
-| 10 | **Two of the three values Prompt 27 needs do not exist yet; the hosts are chosen (Neon, Cloudflare R2).** (a) The production `DATABASE_URL`: see item 36. (b) Create the R2 bucket, enable its public URL and set CORS for the app origin (TE-7, G§8.2): its public base URL. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
+| 10 | **Two of the three values Prompt 27 needs do not exist yet.** (a) Done: the production `DATABASE_URL` exists (Neon, Singapore; item 36). (b) Create the R2 bucket, enable its public URL and set CORS for the app origin (TE-7, G§8.2): its public base URL. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
 | 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
-| 36 | **The password of the first Neon database was pasted into the chat with the agent, and that database is in Sydney, where Render has no region.** Before any value goes into Render: either create a new Neon project in AWS Asia Pacific (Singapore) and delete the first one, which settles both, or keep the first one and reset the password of its role. Use the connection string without `-pooler` | Human | Before the Render service is created |
+| 36 | The Neon project now in use is in `ap-southeast-1` (Singapore) and the image runs against it (see the entry "The image against Neon"). Two things the agent cannot see: (a) the password of its role was pasted into the chat with the agent once and must have been reset since; if it was not, reset it (Neon: Roles & Databases); (b) the first project, in Sydney, whose password was pasted too, is to be deleted | Human | Before the Render service is created |
 
 ## Known issues for later prompts
 
@@ -1738,3 +1738,15 @@ Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
 **Not done, on purpose.** Neon's console offers a set-up for its own tooling (`neon link`, `neon config init`, a `neon.ts`, `neon deploy`). None of it was run: the server reaches the database through `DATABASE_URL` alone and applies its own migrations when it starts (§10), and `check-file-tree` allows no `neon.ts`.
 
 **Checked.** `check-file-tree` passes (120 files), and fails with a `neon.ts` in the repository root, as stated above. `region` is at the level of `plan` in `render.yaml`; this was read, not parsed, and that Render accepts the file stays unchecked until the service is created.
+
+## 2026-10-07 - The image against Neon (G§8.4)
+
+**Done (by the human).** A second Neon project, in `ap-southeast-1` (Singapore), replaces the first one, which was in Sydney. `offcut-api:local` (built from `92286ab`) was run on the development machine with the variables of `.env` and `DATABASE_URL` set to the direct connection string of the new project, the one without `-pooler`.
+
+**Checked, from the output the human pasted.**
+
+- The server connected over TLS, applied the migration and logged `listening` 3.4 s after its first log line. The retention purge then ran its query and deleted 0 rows, so the tables exist.
+- `GET /api/v1/healthz` answered 200 with `{"ok":true,"version":"92286ab3d3eb83992045d7bc05d882c90660844d"}`.
+- `sqlx` logs one warning at start, `ignoring unrecognized connect parameter` for `channel_binding=require`, which Neon puts in its connection strings. It is harmless; removing the parameter from the string removes the warning.
+
+This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in the repository changed.
