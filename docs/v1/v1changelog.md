@@ -1066,3 +1066,33 @@ Closes known issue 14: `http.ts` reads a missing `retry_after_secs` as `null`.
 - Longest file: `http.test.ts`, 361 lines; `http.ts` has 239.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 17: analytics client
+
+**Added.** `web/src/analytics/client.ts` (63 lines): `FLUSH_INTERVAL_MS` (10,000), `FLUSH_AT` (20), `initAnalytics({ anonId })`, `track(event)`, `flush()`.
+
+**How it behaves.**
+
+- `track` puts an event on a queue. It takes only the generated `AnalyticsEvent` union. It never throws and never waits.
+- Before `initAnalytics`, events wait in the queue and `flush` does nothing.
+- `initAnalytics` stores the anonymous id and starts the flushes. A second call does nothing.
+- A flush happens every 10 s, when 20 events are queued, and when the page becomes hidden.
+- One flush sends at most `MAX_EVENTS_PER_BATCH` (50) events, the oldest first, through `postEvents`. The rest wait for the next flush.
+- The events of a flush that fails are dropped. `flush` never rejects.
+- The file imports `gen/` and `net/api-client.ts`, and nothing else.
+
+**Differs from the specs.**
+
+- **The `catch` in `flush` holds only a comment.** It is the one swallowed failure TS §11.3 allows, and the lint rule exempts this file alone. `postEvents` returns its failures instead of throwing them, so the `catch` is a second guard: it keeps `flush` from rejecting whatever a later change to `postEvents` does.
+
+**Checked.**
+
+- `tsc --noEmit` and `eslint .` pass.
+- **The call the prompt names was rejected by `tsc`**, in a temporary file: `track({ name: "landing_view", props: { hero_variant: "outcome", extra: 1 } })` gives `TS2353: 'extra' does not exist in type ...`. Five more calls in the same file were each rejected too: an event name that is not on the allowlist; free text where an enum is expected; a `props` object on an event that has none; text where a number is expected; a missing property.
+- **The layer rule was shown to bite**, in a temporary file under `analytics/`: an import from `state/`, from `persistence/`, from `net/http.ts` and from `config/` were each refused by `boundaries/dependencies`.
+- **Behaviour, in a throwaway test with a fake `postEvents` and fake timers** (6 cases, all passing): an event tracked before `initAnalytics` is sent on the first 10 s tick with the anonymous id, and not at 9,999 ms; the twentieth event triggers a flush; of 70 queued events the first flush sends 50 and the next 20; a flush happens on `visibilitychange` to hidden and not to visible; a flush that fails or throws resolves and its events are not sent again; a second `initAnalytics` does not change the id.
+- All three temporary files were deleted. `http.test.ts` is still the only test file under `web/src/`, and its 21 tests pass.
+
+**"Done when".** The box is ticked.
