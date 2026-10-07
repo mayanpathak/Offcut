@@ -1155,7 +1155,7 @@ Closes known issue 26. Phase D (web foundation and capability check, Prompts 14 
 
 ## 2026-10-07 - Prompt 19: `offcut-wasm-core` and `build-wasm.sh`
 
-**Added.** `scripts/build-wasm.sh` (98 lines).
+**Added.** `scripts/build-wasm.sh` (93 lines).
 
 **Changed.**
 
@@ -1201,3 +1201,54 @@ Closes known issue 26. Phase D (web foundation and capability check, Prompts 14 
 - `cargo check -p offcut-wasm-core --target wasm32-unknown-unknown` passes.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 20: WASM loader, `pool.preload`, browser proof
+
+Phase E (the WASM path, Prompts 19 and 20) is complete: all five rows of Milestone 5 pass.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/src/wasm/load-core.ts` | `CoreApi`, `preloadCore()`, `loadCore()` |
+| `web/src/workers/pool.ts` | `preload()` |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/main.tsx` | **Temporary:** calls `preload()` once. Prompt 21 removes the call; `startApp()` makes it from then on |
+| `web/index.html` | One line: an empty icon, `<link rel="icon" href="data:,">` |
+
+**How it behaves.**
+
+- `preloadCore()` fetches the `.wasm` file and compiles it with `WebAssembly.compileStreaming`, once. Later calls return the same module. A failed attempt is forgotten, so a later call tries again. Nothing is run.
+- `loadCore()` instantiates the compiled module and returns `{ coreVersion }`. It is for workers; the main thread of V1 never calls it.
+- `pool.preload()` returns `{ ok: true }`, or on any failure `{ ok: false, failure: { code: "E_WORKER_CRASH", stage: "import", retryable: true } }`.
+- The `.wasm` file is imported with Vite's `?url`, so the build gives it a content-hashed name under `/assets/` and it is served from the app's own origin.
+
+**From now on `tsc` needs `pnpm build:wasm` first**: `load-core.ts` imports the glue that the script writes to `web/src/wasm/pkg/core/`, which is not in git (G§5.3). CI has that order already (§12.7, steps 5 and 6).
+
+**Differs from the specs.**
+
+- **`index.html` has an empty icon.** §11.1 lists a root element, one script, two metas and a title. Without an icon the browser asks for `/favicon.ico`, gets a 404, and writes an error to the console on every page load, which would fail the "no console error" rows of Milestone 5 and of the smoke test. A `data:` icon is allowed by `img-src 'self' data: blob:` and is neither an inline script nor an inline style.
+
+**Checked.**
+
+- `pnpm build:wasm`, then `tsc --noEmit`, `eslint .` and `vitest run` (75 tests): all pass. `vite build` emits `assets/offcut_core_bg-<hash>.wasm` (16.96 kB, 7.87 kB gzip).
+- **Milestone 5**, with real Chrome driven by a throwaway script, on the committed state:
+
+  | Check | Result |
+  |---|---|
+  | Build output | `offcut_core.js`, `offcut_core_bg.wasm` and two `.d.ts` files (Prompt 19) |
+  | Version guard | Exits with 1 on a mismatch (Prompt 19) |
+  | Dev page, `localhost:5173` | The `.wasm` response is 200 with `content-type: application/wasm`; no console error or warning; no page error |
+  | Preview page, `localhost:4173`, production CSP | The CSP header is sent; the `.wasm` response is 200, `application/wasm`; no `securitypolicyviolation` event; no console message; `crossOriginIsolated` is `true` |
+  | Types | `tsc --noEmit` is green |
+
+- **A worker instantiating the module**, which is what V2 will do. A temporary worker that calls `loadCore()` and a temporary line in `main.tsx` that starts it, in the dev page and in a build served with the production CSP: the worker reported `core_version()` as `0.1.0` and `crossOriginIsolated` as `true`, with no CSP violation. Both were removed and the app rebuilt; the table above was taken after that.
+- The layer rules hold: `workers/pool.ts` imports `wasm/load-core.ts` and the types of `protocol.ts`; `fetch` appears in `net/http.ts` and `wasm/load-core.ts` only.
+
+**"Done when".** The box is ticked. The temporary call in `main.tsx` is marked `TEMPORARY (Prompt 20)` in the file.
