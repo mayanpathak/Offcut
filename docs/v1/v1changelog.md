@@ -29,11 +29,14 @@
 | 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
 | 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
-| 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests, and a read of the generated TypeScript, are the guard | Prompts 04-08 |
-| 8 | The `ts-rs` declarations of the unit and id types are plain (`type TimeMs = number`). The generator must write the branded aliases by hand and skip these declarations (§9 item 2). `EventId` is a string on the wire and must be a branded `string` | Prompt 08 |
-| 9 | Seven choices in `offcut-types` go beyond the letter of §6: four in the Prompt 03 entry, one in the Prompt 04 entry, two in the Prompt 05 entry. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
-| 10 | `ts-rs` types the two maps of `EditState` as `{ [key in WordIdx]: string }` and `{ [key in EventId]: boolean }`: every key required, and mapped over a type that will be a branded alias. Check with `tsc` that this is usable, or override the two fields | Prompt 08 |
+| 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests are the guard for any type added later | Any new shared type |
+| 9 | Choices in the two type crates go beyond the letter of §6, §7 and §9. They are listed under "Differs from the specs" in the entries of Prompts 03 to 08. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 | 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
+| 12 | `web/src/gen/*.ts` were type-checked with TypeScript 7.0.2 from a throwaway install outside the repository. TypeScript becomes a repository dependency in Prompt 14; run `tsc` on the two files again there, with the version that gets pinned | Prompt 14 |
+| 13 | The generated files are not formatted for a linter: `ts-rs` writes a type on one line, with a comma after the last field, and some lines are over 500 characters long. ESLint must either skip `web/src/gen/` or have no style rule that rejects this | Prompt 14 |
+| 14 | In `gen/api.ts`, `ApiError.retry_after_secs` is `number \| null`, and the server writes `null` when there is no retry time. `http.ts` must treat `null` and a missing field the same way | Prompt 16 |
+| 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
+| 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
 
@@ -451,3 +454,66 @@ One thing is accepted that is not in the samples: `"props": null` on an event wi
 - `cargo check -p offcut-api-types --target wasm32-unknown-unknown` passes.
 
 **"Done when".** Both boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 08: code generation to TypeScript
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `scripts/gen-types.sh` | Runs the two ignored `write_typescript` tests with `OFFCUT_GEN_OUT` set. POSIX `sh`; it changes to the repository root first, so it works from any folder |
+| `scripts/check-gen-clean.sh` | Runs `gen-types.sh`, then `git diff --exit-code -- web/src/gen`; prints `gen clean: ...` on success |
+| `web/src/gen/domain.ts` | Generated, committed: 270 lines |
+| `web/src/gen/api.ts` | Generated, committed: 135 lines |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `crates/offcut-types/src/lib.rs` | A second test module, `typescript`: the generator of `domain.ts`, the ignored test `write_typescript` that writes it, and a normal test of its output. 345 lines |
+| `crates/offcut-api-types/src/lib.rs` | The same for `api.ts`. 216 lines |
+| `package.json` | Root script `gen:types`: `sh scripts/gen-types.sh` |
+
+**What `domain.ts` holds, in order.**
+
+1. A two-line header: generated, do not edit, how to regenerate.
+2. 24 branded aliases: the 16 units and 8 ids. `export type TimeMs = number & { readonly __unit: "TimeMs" };`. The four `Uuid` ids and `EventId` are branded strings.
+3. The other 35 types from their `ts-rs` declarations, in module order: `Span`, `WordRange`, then media, transcript, events, prosody, edit, profile, summary, stage, error.
+4. `LIMITS`: 21 properties, `as const`. A unit value carries its brand (`MAX_CLIP_DURATION: 90000 as DurMs`); a plain one does not (`OUTPUT_FPS: 30`).
+5. `ERROR_CODES` (29), `REJECT_REASONS` (14), `UNSUPPORTED_REASONS` (11): one code per line, `as const`.
+
+**What `api.ts` holds, in order.** The header; one `import type { ... } from "./domain";` with 12 names; the 38 types of section 7 in module order (auth, account, billing, usage, analytics, errors); `ANALYTICS_EVENT_DOCS` with 19 entries, `as const`; `export const MAX_EVENTS_PER_BATCH = 50;`.
+
+**How the generators stay complete.** Nothing in them is a second copy of the Rust source:
+
+- The base of each brand (`number` or `string`) comes from the type's own `ts-rs` output.
+- The import list of `api.ts` is computed: every name the API types refer to, minus the names they declare.
+- The code arrays are read from the `ts-rs` union of each enum.
+- A normal test in each crate, run by every `cargo test`, reads the crate's source files and fails if a `pub struct` or `pub enum` (or a row of the `prop_enums!` table) is missing from the output, or declared twice. The same test fails if a `pub const` of `limits.rs` is missing from `LIMITS`, and checks the counts 59 types, 24 brands, 21 limits, 29 / 14 / 11 codes, 38 API types, 19 docs.
+
+**Closes two known issues.**
+
+- **Known issue 8** (brands): done as described above.
+- **Known issue 10** (the two maps of `EditState`): no override is needed. `tsc` reads `{ [key in WordIdx]: string }` over a branded key as an index signature: `{}` is a valid value, and a lookup with a `WordIdx` gives `string | undefined` under `noUncheckedIndexedAccess`.
+
+**Differs from the specs.**
+
+- **Rust doc comments are carried into the TypeScript**, on the brands too. §9 does not mention comments. They come from `ts-rs` and cost nothing to keep.
+- **Trailing spaces are removed** from each generated line. `ts-rs` leaves one after some fields of a documented type.
+- **Each crate has a second, non-ignored generator test.** §9 names only `write_typescript`. Without it, a broken generator would be noticed only when the script runs.
+- **`check-gen-clean.sh` prints a success line.** The guide's version prints nothing; the prompt asks that it "prints success".
+
+**Checked.**
+
+- `sh scripts/gen-types.sh` twice: the SHA-256 of both files is unchanged. Also unchanged when run through `pnpm gen:types` and when started from another folder.
+- `sh scripts/check-gen-clean.sh` prints `gen clean`. Drill: a doc comment in `units.rs` was changed, the check exited 1 and showed the differing line; reverted, the check passed again.
+- Both files and both scripts have LF line endings and no carriage return. The generated files have no trailing spaces.
+- Counts in the files: `ERROR_CODES` 29, `REJECT_REASONS` 14, `UNSUPPORTED_REASONS` 11, `LIMITS` 21, `ANALYTICS_EVENT_DOCS` 19.
+- **Type check** (known issue 12): `tsc` 7.0.2 with `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` accepts both files, together with a file that uses them: limits with their brands, the three arrays compared with their unions, the two maps of `EditState`, four sample events, a waitlist request, an `ApiError`.
+- **Misuse is rejected.** A second file with seven mistakes gives seven errors, one per line: a bare number as a `DurMs`; a `TimeMs` as a `DurMs`; a `ClipId` as an `ExportId`; an event with a prop that is not on the allowlist; an event with free text where an enum is expected; an unknown event name; an unknown `wanted`.
+- `cargo test --workspace`: 58 + 28 tests pass, plus the `ui` test; the two `write_typescript` tests are ignored in a normal run.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check` pass.
+
+**"Done when".** All three boxes ticked.
