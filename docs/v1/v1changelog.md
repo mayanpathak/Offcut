@@ -17,7 +17,7 @@
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
 | 10 | The three values Prompt 27 needs exist: the production `DATABASE_URL` (Neon, Singapore; item 36), the asset base URL `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev` and the app origin `https://offcut-one.vercel.app`. Left over: set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it, so builds are not affected) | Human | Any time before Prompt 30 |
-| 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
+| 11 | The human steps of Prompt 27 that are left, in order: **set the GitHub variable `VITE_ASSET_BASE_URL` to `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev`** (until then `check-hosts` fails in CI on any commit from "The demo video" on); run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again. Then hand the Render host name to the agent. Done: `main` pushed, the demo clip uploaded | Human | Prompt 27 |
 | 36 | **Reset the password of the Neon role `neondb_owner`**: it was pasted into the chat with the agent, and on 2026-10-08 the connection string in use still held that password. Then replace `PROD_DATABASE_URL` in `.env.deploy`. Also delete the first Neon project (Sydney), whose password was pasted too | Human | Before the Render service is created |
 
 ## Known issues for later prompts
@@ -33,10 +33,10 @@
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
-| 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
+| 25 | `web/vercel.json` still holds the placeholder `render-host.example.invalid`. Replace it with the Render host (G§8.7). The asset host is filled in, there and in `web/.env.local` | Prompt 28 |
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
 | 31 | On a fresh clone `pnpm check` fails at ESLint and `tsc` until `pnpm build:wasm` has run once: `wasm/load-core.ts` imports files that the build writes and git ignores. `pnpm dev` and `pnpm build` build them; CI builds them in step 5, before step 6. Say so in a README when there is one | Any time |
-| 33 | `LandingPage` and `UnsupportedPage` show one video, `DEMO_VIDEO_PATH` (§11.12). E-1 (§14) and Prompt 27 speak of three demo clips. Decide how the pages show three when the uploaded paths are handed over | Prompt 27, last step |
+| 33 | The pages show one demo video, and it is a recording about another product, Timbre, which the human chose on 2026-10-08 from the videos at hand. E-1 (§14) asks for three hand-made demo clips of Offcut. Replace it before the page is announced: upload the new file, put the printed path into `DEMO_VIDEO_PATH`, and decide then how three are shown | Before E-1 starts |
 | 35 | Not checked: that calling the deploy hook makes Render pull the new `:latest` image. The first run with a real service shows it: `/api/v1/healthz` must report the new commit. If it reports the old one, the hook call needs the image reference as a parameter | Prompt 27, human step 5 |
 
 ---
@@ -1782,3 +1782,31 @@ This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in
 - moved the removed values to a new file `.env.deploy` in the repository root: `PROD_DATABASE_URL`, the four `ASSET_S3_*` variables of `scripts/upload-assets.sh`, and the token value. `ASSET_S3_ENDPOINT` had held the public address; it now holds the S3 endpoint, which was on the line with no `=`. Git ignores the file (`.env*`), and `.dockerignore` keeps it out of an image. No program reads it by itself.
 
 **Differs from the specs.** The header of `upload-assets.sh` says the four variables belong in no file of the repository. `.env.deploy` is in the folder, though not in git. It is where the human had already put them; delete the file after the uploads if the keys should not stay on disk.
+
+## 2026-10-08 - The demo video: uploaded, and the asset host filled in
+
+**Decided (by the human).** One video for now, not three: the 10 MB recording about Timbre from `testclips/` (known issue 33). `main` was pushed first, at `ad996fc`.
+
+**Uploaded (by the agent, with the keys of `.env.deploy`).** `media/demo.81cafa494d9c2b68.mp4` in the bucket `offcut`, 10,376,359 bytes.
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/net/asset-fetch.ts` | `DEMO_VIDEO_PATH` is the uploaded path |
+| `web/vercel.json` | The asset host in `media-src` and `connect-src` is `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev`. The Render host is still the placeholder (known issue 25) |
+| `web/.env.local` (not in git) | `VITE_ASSET_BASE_URL` is the same address |
+| `scripts/upload-assets.sh` | The hash is taken from standard input (see below) |
+| `.gitignore` | `testclips/`: 110 MB of videos the human keeps in the repository folder |
+
+**A bug in `upload-assets.sh`, found by the first real upload.** R2 answered 400, `XAmzContentSHA256Mismatch`. Given a file name with a backslash in it, as in a Windows path, `sha256sum` puts a backslash before the hash, and the script sent that as the hash. The local test of Prompt 27 used a relative path and did not meet it. The script now reads the file through standard input, where there is no name.
+
+**Checked.**
+
+- **The file, from its public address:** the bytes have the SHA-256 the name holds; `Content-Type: video/mp4`; `Cache-Control: public, max-age=31536000, immutable`; with `Range: bytes=0-8388607` the answer is 206 with `Content-Range: bytes 0-8388607/10376359`, and with `Origin` set to the app origin or to `http://localhost:5173` it carries `Access-Control-Allow-Origin` for that origin.
+- **The video plays on the local page.** The built page, served by `vite preview` on port 5173 with the headers of `vercel.json`, in Chrome: the page is cross-origin isolated, the video reaches `readyState` 4 (1920 x 842, 257 s), plays, and the console has no error. On another port the browser blocks it, as it should: the CORS policy of the bucket names the app origin and `http://localhost:5173` only.
+- `pnpm check`, `pnpm test`, `pnpm build` (with `check-hosts` on the real asset host) and `pnpm e2e` (12 cases) pass.
+
+**Not checked.** CI with this commit: it needs the repository variable changed first (open item 11).
+
+**"Done when" of Prompt 27.** Still open: the image on Render, and the second, fully green run of `deploy-api.yml`. The demo video plays on the local page from the asset host.

@@ -18,3 +18,6 @@ fixtures/rej_*
 fixtures/bad_*
 
 # Not ignored on purpose: web/src/gen/ and server/.sqlx/ are generated and committed.
+
+# Videos to try the app with. Never committed.
+testclips/

@@ -86,7 +86,9 @@ for file in "$@"; do
   base=$(basename "$file")
   extension=${base##*.}
   stem=${base%.*}
-  sha256=$(sha256sum "$file" | cut -d' ' -f1)
+  # From standard input: given a name with a backslash in it, as in a Windows
+  # path, sha256sum puts a backslash before the hash.
+  sha256=$(sha256sum < "$file" | cut -d' ' -f1)
   hash=$(printf '%s' "$sha256" | cut -c1-"$HASH_LENGTH")
   path="$folder/$stem.$hash.$extension"
 
