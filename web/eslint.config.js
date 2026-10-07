@@ -212,6 +212,21 @@ export default defineConfig(
     },
   },
 
+  // The E2E tests: the type-aware rules, without the app's layer and network
+  // rules. A test drives a browser; it is not part of the app.
+  {
+    files: ["tests-e2e/**/*.ts"],
+    extends: [tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "no-console": "error",
+    },
+  },
+
   // The four fetch files: `fetch` is allowed, the other network APIs are not.
   {
     files: FETCH_FILES,

@@ -25,6 +25,11 @@ export default defineConfig({
   },
   preview: {
     headers: productionHeaders,
+    // No proxy, which the preview server would otherwise take over from
+    // `server`. The E2E tests run against it with a fake API in the browser;
+    // a request that slips past the fake, such as the analytics batch a
+    // closing page sends, must end here and never reach a real API.
+    proxy: {},
   },
   build: {
     target: "esnext",

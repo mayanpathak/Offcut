@@ -1539,3 +1539,53 @@ Each script finds the repository root from its own location, so it runs from any
 - After the last revert the app was rebuilt and all four scripts pass again; `git status` shows only the four new files.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 25: Playwright suite
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/playwright.config.ts` | Channel `chrome`; `baseURL` is `E2E_BASE_URL` or `http://localhost:4173`; starts `vite preview` unless `E2E_BASE_URL` is set; one project, `non-media` |
+| `web/tests-e2e/helpers/fake-api.ts` | `installFakeApi(page, options)`, `FakeApi { requests, eventsOf(name) }` |
+| `web/tests-e2e/helpers/fixtures.ts` | `flushAnalytics(page)` |
+| `web/tests-e2e/landing.spec.ts` | The 12 cases of §13.7 |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/vite.config.ts` | `preview.proxy` is empty: the preview server forwards nothing to an API |
+| `web/tsconfig.json` | `tests-e2e` is type-checked |
+| `web/eslint.config.js` | `tests-e2e/**/*.ts` is linted with the type-aware rules, without the app's layer and network rules |
+
+**How the suite works.**
+
+- It runs against `vite preview`, which serves the build with the headers of `vercel.json`: the production CSP, COOP and COEP. Run `pnpm build` first.
+- `installFakeApi` answers every request under `/api/v1` inside the browser: `GET /healthz` 200, `POST /events` 204, `POST /notify-me` the status the test configures, anything else 404. It records each request with its body.
+- `flushAnalytics` moves the page's clock 11 s forward, past the flush interval. A test that uses it installs the Playwright clock before it opens the page; no real time passes.
+- The expected texts come from `copy/messages.ts`, and the event list from `gen/api.ts`, so a test cannot drift from the app.
+- Every case holds on a browser that can run Offcut and on one that cannot.
+
+**The `@smoke` case.** It is the one case also meant for a deployment (`E2E_BASE_URL=<url> ... --grep @smoke`, Prompt 28). There it uses the real API and blocks only `POST /events`, so a run adds no analytics rows; locally the API is the fake. It asserts: the CSP header allows WASM; `crossOriginIsolated` is `true`; the `.wasm` file answers 200 with `application/wasm` and compiles; `GET /api/v1/healthz` answers 200; no `securitypolicyviolation` event fired.
+
+**Differs from the specs.**
+
+- **The `@smoke` case fetches and compiles the bundle itself**, by reading the file's path out of the app's script. §13.7 has it observe "a `.wasm` response", but the app preloads the bundle only on a browser it can run in (§11.10, step 7), and the browser of CI may lack WebGPU: there would be no such response to observe. Compiling in the page is the step that needs the CSP's permission, so the proof is the same.
+- **`vite preview` has no proxy.** It would otherwise take over the `/api/v1` proxy of the dev server. A page that closes sends its last analytics batch with `keepalive`, and Playwright cannot intercept a request of a page that is gone: in the first run those batches reached the preview server and were forwarded to port 8080. With a local API running, a test run would have written analytics rows. Now such a request ends at the preview server.
+- **`tests-e2e` is type-checked and linted.** §12.3 puts only `src` under `tsc`. The config file `playwright.config.ts` is not: it reads `process.env`, and the repository has no Node type definitions.
+- **Whether the run is against a deployment** is passed to the tests as `metadata.deployed` of the config, so no test file reads the environment.
+- **The waitlist-success case types a plain address.** An `<input type="email">` strips surrounding spaces itself, so a browser test cannot show that the use-case trims; the throwaway test of Prompt 21 did.
+
+**Checked.**
+
+- `pnpm --filter web exec playwright test --project=non-media`: 12 passed, in about 20 s. `--grep @smoke`: 1 passed.
+- **On a browser without WebGPU** (Chrome started with `--disable-gpu --disable-features=WebGPU,Vulkan`, by a temporary line in the config): the capability line reads "Your browser cannot use the graphics processor here." and all 12 cases pass, three runs in a row.
+- **The suite was shown to fail when the app is wrong.** Three temporary changes, each rebuilt, run and reverted: `hero_variant: "privacy"` tracked (the `landing_view` case failed); `'wasm-unsafe-eval'` removed from the CSP (the `@smoke` case failed); the drop handler replaced by one that posts to the API (the drop-zone case failed).
+- **One failure that did not come back.** In one run of 13 tests in parallel, the drop-zone case failed once. It then passed 70 times in a row, 30 on this browser and 40 without WebGPU. The case now also waits for the app's wake-up request before it starts counting requests. CI retries a failed case once.
+- No test touches a real server: with the proxy gone, the preview server's log shows no forwarded request during a run.
+- `tsc --noEmit`, `eslint .` and `vitest run` (76 tests) pass. `check-file-tree` passes with the four new files.
+
+**"Done when".** The box is ticked.
