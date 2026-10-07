@@ -96,6 +96,12 @@ version = "0.1.0"
 [[package]]
 name = "offcut-api-types"
 version = "0.1.0"
+dependencies = [
+ "offcut-types",
+ "serde",
+ "serde_json",
+ "ts-rs",
+]
 
 [[package]]
 name = "offcut-types"

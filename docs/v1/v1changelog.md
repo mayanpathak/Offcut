@@ -344,3 +344,54 @@ This prompt finishes the crate: twelve modules, 57 unit tests and one compile-fa
 **Not done, as the prompt orders.** `EntitlementClaims` (V2). The generator test `write_typescript` (Prompt 08).
 
 **"Done when".** Both boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 06: `offcut-api-types` DTOs and API errors
+
+**Added.**
+
+| Path | Types | Tests |
+|---|---|---|
+| `crates/offcut-api-types/src/auth.rs` | `MagicLinkRequest`, `VerifyRequest`, `SessionResponse` | 4 |
+| `crates/offcut-api-types/src/account.rs` | `MeResponse`, `Wanted`, `NotifyMeRequest`, `AccountExport`, `ExportedUser`, `ExportedSession`, `ExportedReceipt` | 6 |
+| `crates/offcut-api-types/src/billing.rs` | `SubscriptionSummary`, `SubscriptionStatus`, `BillingInterval`, `Offer`, `CheckoutRequest`, `UrlResponse` | 4 |
+| `crates/offcut-api-types/src/usage.rs` | `UsageReceiptRequest`, `EntitlementResponse` | 2 |
+| `crates/offcut-api-types/src/errors.rs` | `ApiError`, `ApiErrorCode` (13 members, D-3) | 4 |
+
+The definitions are those of TS §10.7 and §7.6, field for field; the three `Exported*` structs are the V1 decision of §7.1. The files hold definitions only: no function and no `impl` outside the test modules.
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `crates/offcut-api-types/Cargo.toml` | Dependencies `offcut-types`, `serde` (`derive`), `ts-rs`; dev-dependency `serde_json` |
+| `crates/offcut-api-types/src/lib.rs` | Declares and re-exports the five modules. `analytics` follows in Prompt 07 |
+| `Cargo.toml` | `offcut-types` and `offcut-api-types` added to `[workspace.dependencies]` as path dependencies, so each crate that uses them writes `workspace = true` |
+| `Cargo.lock` | The new dependency edges |
+
+**How the types serialize.**
+
+- Enums: a `snake_case` string. `Wanted::Safari` is `"safari"`, `SubscriptionStatus::PastDue` is `"past_due"`, `Offer::CreatorAnnualFounding` is `"creator_annual_founding"`, `ApiErrorCode::NotFound` is `"not_found"`.
+- Structs: an object with the Rust field names. `{"email":"a@example.com","wanted":"safari"}`.
+- `ApiError`: `{"code":"rate_limited","retry_after_secs":30}`. Without a retry time the field is written as `null`: `{"code":"not_found","retry_after_secs":null}`. A body that leaves the field out is also read.
+
+**The five request structs deny unknown fields:** `MagicLinkRequest`, `VerifyRequest`, `NotifyMeRequest`, `CheckoutRequest`, `UsageReceiptRequest`. The sixth request type, `EventsBatch`, arrives with `analytics.rs` in Prompt 07. Response structs do not deny unknown fields.
+
+**Differs from the specs.**
+
+- **Enums derive `Copy, Eq, Hash`** as well as the six derives of §6, the same choice as in Prompt 04: `Wanted`, `SubscriptionStatus`, `BillingInterval`, `Offer`, `ApiErrorCode`.
+- **`serde_json` is a dev-dependency**, for the round-trip tests, as in `offcut-types`.
+- **`retry_after_secs` is written as `null` when absent.** The specs give the field as `Option<u32>` and do not say whether an absent value is left out. The plain derive was kept. Prompt 16 (`http.ts`) must accept both `null` and a missing field.
+
+**Checked.**
+
+- `cargo test -p offcut-api-types`: 20 tests pass.
+  - A round-trip against literal JSON for each of the 15 structs, and every value of each of the 5 enums.
+  - An unknown field on `NotifyMeRequest` is rejected. An unknown `wanted` is rejected (`"edge"`, `"Launch"`, `"LAUNCH"`, `""`), and so is a missing `email` or `wanted`.
+  - An unknown field is rejected on each of the other four request structs.
+  - `ApiErrorCode`: its 13 strings in the order of §7.6, through a match with no wildcard, and the `ts-rs` union equal to the same list.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` pass.
+- `cargo check -p offcut-api-types --target wasm32-unknown-unknown` passes.
+
+**"Done when".** The box is ticked: tests green, 13 `ApiErrorCode` members, every request struct that exists so far denies unknown fields.
