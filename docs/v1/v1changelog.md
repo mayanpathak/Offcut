@@ -33,12 +33,10 @@
 | 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
 | 21 | `cargo test --workspace` needs `DATABASE_URL` in the environment, pointing at a Postgres whose role has `CREATEDB`: the 23 server integration tests create a database each. Locally: `set -a; . ./.env; set +a`. CI needs a Postgres service container and the variable | Prompt 26 |
-| 22 | `deny.toml` cannot tell that a pure crate turned on a random feature of `uuid`: `uuid` is a listed wrapper of `getrandom`, because the server uses its `v4` feature. The check that does tell is `cargo tree -p offcut-types -e normal` (and `-p offcut-api-types`) printing no `rand` or `getrandom`. It is run by hand; put it in a gate script or in CI | Prompts 24, 26 |
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
 | 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
-| 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
 
@@ -1488,3 +1486,56 @@ Phase F (UI and use-cases, Prompts 21 to 23) is complete. The app works locally 
 **For Prompt 25.** Playwright will not click an element that has `aria-disabled="true"`: it waits for it to become enabled and times out. The drop zone and the sample button are such elements. A test must use `click({ force: true })` or dispatch the event.
 
 **"Done when".** Every row passes; the analytics rows hold only enum props; the only console error is the missing demo video.
+
+---
+
+## 2026-10-07 - Prompt 24: gate scripts
+
+Closes known issues 16 and 22.
+
+**Added.**
+
+| Path | Fails when |
+|---|---|
+| `scripts/check-file-tree.mjs` | A source file is not in the tree of TS §5; a source file has more than 400 lines; a crate breaks the dependency graph of TS §7 |
+| `scripts/check-copy-codes.mjs` | A code has neither copy nor a pending entry; a pending code already has copy; the pending list names a code that does not exist |
+| `scripts/check-hosts.mjs` | The built app holds a URL on a host other than the asset host; the CSP of `vercel.json` names a host other than the asset host |
+| `scripts/check-external-facts.mjs` | Never: it prints the seven free-tier facts, TE-5 to TE-11, one line each with the date last checked |
+
+Each script finds the repository root from its own location, so it runs from any folder, and each prints one line on success and one line per problem on failure.
+
+**`check-file-tree.mjs`.**
+
+- It reads the fenced tree under "## 5. Complete File Tree" of `docs/technicalspec.md`: 110 of the repository's files are in it now. A directory that the tree lists without content, such as `fixtures/golden/`, covers what is in it.
+- Checked are files directly in the root and under `crates/`, `server/`, `web/`, `scripts/`, `verify/`, `corpus/`, `bench/` and `.github/`. Ignored: the two lock files, `server/.sqlx/`, `*.stderr`, snapshots.
+- A file the tree lists and the repository does not have is not an error.
+- The line limit counts `.rs`, `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`, `.sh`, `.css`, `.py` and `.sql` files. Not counted: test files (`*.test.ts`, `web/tests-e2e/`, `server/tests/`, `crates/*/tests/`), the generated `web/src/gen/`, and in a Rust file the inline test module. The longest file now is `capability.ts`, 320 lines.
+- The graph of TS §7 is a table in the script, one row per crate. A crate that is not in the table is itself a problem.
+
+**`check-copy-codes.mjs`.** `COPY_PENDING` is written out: the 14 `REJECT_*` codes (due in V3) and the 23 `E_*` codes without copy (due by V7). No `UNSUPPORTED_*` code may be pending. Now: 6 of 29 error codes, 0 of 14 rejections and 11 of 11 unsupported reasons have copy.
+
+**`check-hosts.mjs`.** It reads every file of `web/dist` as bytes, the `.wasm` file too. `VITE_ASSET_BASE_URL` comes from the environment, or from `web/.env.local` when it is not set. `NON_NETWORK_LITERALS` has four entries, each with its reason: the XML namespace names under `http://www.w3.org/`, the address in React's error text, the address in a React Router error text, and `http://localhost` exactly, which React Router gives to `new URL()` as a base. The app shell is 110.0 kB gzip: 108.3 kB of script, 1.3 kB of CSS, 0.3 kB of HTML.
+
+**Differs from the specs.**
+
+- **`check-file-tree.mjs` also checks new files that are not committed yet** (`git ls-files --cached --others --exclude-standard`). §12.6 says "tracked". A stray file should fail before its first commit, and the guide's own proof adds a file without committing it.
+- **`check-file-tree.mjs` also runs `cargo tree` on the two pure crates** and fails if one resolves `rand`, `getrandom`, `wasm-bindgen`, `js-sys`, `web-sys` or `wgpu`. This is the check that known issue 22 asked for: `cargo deny` cannot tell that a pure crate turned on a random feature of `uuid`.
+- **`check-copy-codes.mjs` has three checks beyond D-13**: a pending code that does not exist, copy for a code that does not exist, and a code listed twice.
+- **`check-hosts.mjs` matches `http://localhost` exactly.** With a port or a path it would be a real address, and is refused.
+- **`check-external-facts.mjs` has no date yet for any fact.** Two notes say that Vercel's and Render's terms were read in October 2026 for the spec; no experiment has measured a deployment. Prompt 29 fills the dates in.
+
+**Checked.**
+
+- All four scripts pass on the clean tree. `server/src/lib.rs` is in the tree of TS §5.
+- **The three failures the prompt names, each caught and reverted:**
+
+  | Change | Result |
+  |---|---|
+  | `web/src/stray.ts` added | `check-file-tree`: `web/src/stray.ts: not in the file tree of TS §5` |
+  | The `UNSUPPORTED_WEBGPU` message deleted | `check-copy-codes`: `UNSUPPORTED_WEBGPU: has no copy in messages.ts and is not in COPY_PENDING` |
+  | `https://example.com/help` put in a message, then `vite build` | `check-hosts`: `web/dist/assets/index-<hash>.js: https://example.com/help` |
+
+- **Six more, each caught and reverted:** a source file of 401 lines; `offcut-types` made to depend on `offcut-api-types`; `uuid`'s `v4` feature turned on in `offcut-types`, which `check-file-tree` refuses with `resolves getrandom` while `cargo deny check bans` says `bans ok`; copy written for the pending code `E_MUX`; `VITE_ASSET_BASE_URL` set to another host than the CSP's; `http://localhost:8080/api` put in a message.
+- After the last revert the app was rebuilt and all four scripts pass again; `git status` shows only the four new files.
+
+**"Done when".** The box is ticked.
