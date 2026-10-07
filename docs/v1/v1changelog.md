@@ -33,7 +33,9 @@
 | 13 | The generated files are not formatted for a linter: `ts-rs` writes a type on one line, with a comma after the last field, and some lines are over 500 characters long. ESLint must either skip `web/src/gen/` or have no style rule that rejects this | Prompt 14 |
 | 14 | In `gen/api.ts`, `ApiError.retry_after_secs` is `number \| null`, and the server writes `null` when there is no retry time. `http.ts` must treat `null` and a missing field the same way | Prompt 16 |
 | 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
-| 17 | Three things `router.rs` must do for `log.rs` to work as specified. (a) Add the trace layer with `Router::layer`, or the route template is not yet known and every request logs `unmatched`. (b) Set the trace layer's response logging to `INFO`; its default is `DEBUG`, and with `LOG_LEVEL=info` no status or latency would be logged. (c) Decide what to do with an `X-Request-Id` sent by the client: `tower-http` keeps it. `log.rs` already refuses to log one that is not a plain id | Prompt 12 |
+| 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
+| 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
+| 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -720,5 +722,83 @@ Closes open item 6 (G§1.6).
 - There is no `.sqlx` at the repository root.
 - The three statements were run by hand in a transaction that was rolled back: a batch of two events gave two rows with the props as sent; of one row dated 91 days ago and one dated 89 days ago, the purge deleted only the first; the second identical waitlist insert added nothing. No row was left in `offcut_dev`.
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass (42 server tests).
+
+**"Done when".** Both boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 12: routes, router and `main`
+
+The API now runs: `GET /healthz`, `POST /events` and `POST /notify-me` answer under `/api/v1`. Closes known issue 17.
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `server/src/auth/mod.rs` | Declares `magic_link` (D-11) | |
+| `server/src/auth/magic_link.rs` | `normalize_email(raw)` | 6 |
+| `server/src/account/mod.rs` | Declares `notify` | |
+| `server/src/account/notify.rs` | The `notify_me` handler | |
+| `server/src/analytics/mod.rs` | The `ingest` handler, `within_bounds`, `props` | 3 |
+| `server/src/analytics/retention.rs` | `spawn_purge_task(pool)`, `purge_once(pool)` | |
+| `server/src/router.rs` | `build(state)`, `healthz`, `not_found`, the route table, the layers | 6 |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `server/src/main.rs` | The eight steps of §10.12 |
+| `server/src/lib.rs` | Declares `account`, `analytics`, `auth`, `router` |
+| `server/src/error.rs` | `db_error_kind` is now `pub`, so the purge task and `main` log a database failure the same way a handler does |
+
+**How it behaves.**
+
+- **`normalize_email`.** Trims and lower-cases. `Some` only for 3 to 254 bytes, exactly one `@` with text before it, a dot somewhere after it, and no whitespace or control character.
+- **`notify_me`.** A body that does not parse is 400 (413 or 415 where that applies); an address that does not normalize is 400; otherwise the row is inserted if absent and the answer is 204 either way.
+- **`ingest`.** The five steps of §10.9. A batch of 0 or more than 50 events, or any event over a cap, is 400 and nothing is stored. The `props` column gets the `props` member of the event's JSON, or `{}`.
+- **Retention.** The purge runs once at start and then every 6 hours. The number of days is `offcut_types::ANALYTICS_RETENTION_DAYS`; the number 90 is not typed in the server.
+- **Layers**, outermost first: request id, trace, panic to 500, the two headers, media guard, 16 kB body limit; then per route the body limit of the table (1 kB for `/notify-me`) and the rate limit.
+- **Anything else** is 404 `not_found`: an unknown path under `/api/v1`, a path outside it, and a known path with the wrong method.
+- **`main`.** A configuration error prints `config error: <NAME>` to stderr and exits with 1. A failure to connect, migrate or listen is logged and exits with 1. SIGTERM or Ctrl-C starts a graceful shutdown.
+
+**Known issue 17, closed.** (a) The trace layer is added with `Router::layer`: the log shows `"route":"/api/v1/notify-me"`, and `unmatched` only for a path that matched nothing. (b) The response line is logged at `INFO`. (c) A request id sent by the client is replaced: the id is generated per request, as §10.11 says, and the client's text never reaches the log.
+
+**Differs from the specs.**
+
+- **The route table is in `router.rs` and the modules have no `routes()` function.** §10.9 and §10.10 give `analytics::routes()` and `account::routes()`; §10.11 asks for the table as one block of `.route(...)` calls in `router.rs` with the twelve V6 routes as comments, and the TS §5 tree describes `router.rs` as "route table, body limits, layers" and the two `mod.rs` files as handlers. Both cannot hold. §10.11 and the TS were followed: a route's body limit and rate limit are per route, the rate limit needs the `AppState`, and a module that returned its routes without them would have to be rebuilt in V6, when `account` has three routes with three different limits. In consequence `analytics::ingest` and `account::notify::notify_me` are `pub`. `v1implementation.md` was not edited (known issue 20).
+- **The twelve V6 routes are comment lines** giving route, body limit and rate limit group, not commented-out `.route(...)` calls: the handlers they would name do not exist, and their names are V6's to choose.
+- **The request id layer is a small function in `router.rs`**, not `tower-http`'s. That one keeps an id the client sent.
+- **A wrong method on a known path is 404**, not axum's default 405 with an empty body. The table of §10.11 says "anything else" is `not_found`, and `ApiErrorCode` has no member for 405.
+- **The media guard compares the media type without its parameters and without regard to case**: `Application/Octet-Stream; charset=binary` is refused too.
+- **`router.rs` and `analytics/mod.rs` have unit tests.** The six layers are in a function that takes any router, so the tests run them around two plain routes with no database.
+- **A failed migration is logged with its text**; a failed connection only with its kind. At boot no request exists, and a migration error names a migration, which is what the reader needs.
+
+**Checked.**
+
+- `cargo test -p offcut-api`: 57 tests pass (15 new).
+  - `normalize_email`: the six cases of §10.10, 27 inputs in all, including a 254-byte address accepted and a 255-byte one refused, and bytes counted rather than characters.
+  - `within_bounds`: each duration at the cap and one over; each of the seven counts over the cap alone.
+  - `router`: a media request is 415 on a route and off one; a panic is 500 `internal` with a request id; unknown path and wrong method are 404 with both headers; the request id is new for each request and replaces the client's; a JSON body of exactly 16,384 bytes is accepted and one byte more is 413.
+- `env -u DATABASE_URL cargo run -p offcut-api` prints `config error: DATABASE_URL` and exits with 1.
+- With the server running against `offcut_dev` (G§3.4 and Milestone 3):
+
+  | Request | Result |
+  |---|---|
+  | `GET /api/v1/healthz` | 200, `{"ok":true,"version":"dev"}`, `cache-control: no-store`, `x-content-type-options: nosniff`, an `x-request-id`, no `access-control-*` header |
+  | `POST /notify-me` with `"  Someone@Example.COM "` | 204; the row is `someone@example.com`, `launch` |
+  | `POST /events` with one valid `landing_view` | 204; one row with the props as sent |
+  | `POST /events` with `hero_variant: "hello"` | 400 `bad_request`; no row |
+  | `POST /events` with `content-type: video/mp4` | 415 `unsupported_media_type` |
+  | `GET /api/v1/nope` | 404 `not_found` |
+  | `POST /notify-me` without `@`; with a body over 1 kB | 400; 413 |
+  | The sixth and seventh `POST /notify-me` | 429, `retry-after: 705`, `"retry_after_secs":705` |
+
+- The valid `/events` request carried `X-Forwarded-For: 198.51.100.77` and `User-Agent: MarkerAgent/9.9`. Neither is in the stored row.
+- The server's log of that session holds none of: the email address in either spelling, its domain, the forwarded address, the user agent, `127.0.0.1`, a prop name, the anonymous id.
+- The rows written by these checks were deleted from `offcut_dev` afterwards.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `check-gen-clean.sh` pass.
+- Only `config.rs` reads the environment. Longest new file: `router.rs`, 281 lines.
+
+**Not checked.** The SIGTERM path. It exists only on Unix, and this machine is Windows, where the server stops on Ctrl-C. Prompt 27 runs the image in Docker; check there that `docker stop` ends the process within the grace period (known issue 19).
 
 **"Done when".** Both boxes ticked.

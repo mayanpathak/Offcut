@@ -78,7 +78,7 @@ impl IntoResponse for AppError {
 /// A fixed word for the kind of database failure. `sqlx::Error` may gain
 /// variants, so this asks about the kinds worth telling apart and calls the
 /// rest "other".
-fn db_error_kind(error: &sqlx::Error) -> &'static str {
+pub fn db_error_kind(error: &sqlx::Error) -> &'static str {
     if error.as_database_error().is_some() {
         "database"
     } else if matches!(error, sqlx::Error::PoolTimedOut) {
