@@ -41,6 +41,7 @@
 | 26 | `navigator.userAgentData` has no type in TypeScript 6.0.3 (`NavigatorUAData` is absent from `lib.dom`). `capability.ts` reads `mobile` and `platform` from it and must declare the two fields itself | Prompt 18 |
 | 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
 | 28 | A use-case may import `workers/pool.ts` but not `workers/protocol.ts`, not even its types (TS §7). A use-case that needs to name `AppFailure` must take it from what `pool.ts` exports | Prompt 21 |
+| 29 | `start-app.ts` must call `setIllegalTransitionReporter(...)` in production builds only: `if (!env.dev)`. `transition()` throws while no reporter is set, which is the behaviour development and test builds need (see the Prompt 15 entry) | Prompt 21 |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -958,5 +959,51 @@ Closes known issues 12 and 13. The web shell builds, type-checks and lints; it h
 - `web/dist`, `web/.env.local` and `web/node_modules` are ignored by git.
 
 **Not done, as the prompt orders.** `playwright.config.ts` (Prompt 25). `vitest run` exits with 1 until the first test file exists (Prompt 16).
+
+**"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 15: web foundation
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/src/config/env.ts` | `env { assetBaseUrl, dev }`. The only reader of `import.meta.env` |
+| `web/src/config/allowlist-hosts.ts` | `allowedHosts()`, `isAllowedUrl(url)` |
+| `web/src/workers/protocol.ts` | The 13 types of TS §14.1 and §14.2, and the re-export of `FailureStage`. No function, no constant |
+| `web/src/state/machines/transition.ts` | `MachineDef`, `IllegalTransitionError`, `setIllegalTransitionReporter`, `transition` |
+| `web/src/state/capability-store.ts` | `CapabilityReport`, `CapabilityStatus`, `CapabilityState`, `useCapabilityStore`, `beginCheck`, `setSupported`, `setUnsupported` |
+| `web/src/persistence/schema.ts` | `DB_NAME`, `DB_VERSION`, `STORES` (all eight, D-6), `META_KEYS`, `Versioned<T>`, `OffcutDb`, and one record type per store |
+| `web/src/persistence/db.ts` | `openDb()`, `metaGet(key)`, `metaSet(key, value)` |
+
+No file outside `web/src/` changed.
+
+**How each file behaves.**
+
+- **`env.ts`.** Throws when the module loads if `VITE_ASSET_BASE_URL` is missing, empty, not a URL, not `https://`, or has a query string or a fragment. Trailing slashes are removed, so `assetBaseUrl + "/" + path` has one slash.
+- **`allowlist-hosts.ts`.** The two hosts are the page's own and the asset host. `isAllowedUrl` reads a URL relative to the page; a `data:` or `blob:` URL, a protocol-relative URL to another host, and a host that merely starts with the asset host are all refused.
+- **`transition.ts`.** A pair missing from a machine's definition is illegal. With no reporter set, an illegal attempt throws `IllegalTransitionError`. Once `setIllegalTransitionReporter` has been called, it calls the reporter and returns the state unchanged.
+- **`capability-store.ts`.** Three legal transitions: `unchecked` to `checking`, and `checking` to `supported` or to `unsupported`. The reason and the report are stored only when the transition was legal. `unsupported` accepts nothing more.
+- **`db.ts`.** `openDb` opens the database once and returns the same promise afterwards; a failed attempt is forgotten, so a later call tries again. Upgrade 1 creates the eight stores. `metaGet` returns `undefined` for a missing key, and for a value whose `schemaVersion` is above `DB_VERSION`, which it also deletes (TS §23.3).
+
+**Differs from the specs.**
+
+- **`transition()` decides between throwing and reporting by whether a reporter is set**, not by reading the build mode. §11.4 says development and test builds throw and production builds report, but `state/` may import only `gen`, and `import.meta.env` may be read only in `config/env.ts`. So the mode is handed in the same way the reporter is: `start-app.ts` must call `setIllegalTransitionReporter` in production builds only (known issue 29).
+- **`schema.ts` exports six record types** (`ClipRecord`, `TranscriptRecord`, `EditsRecord`, `RenderCacheRecord`, `EntitlementRecord`, `ReceiptOutboxRecord`) beside the names §11.5 lists. They are the value types of `OffcutDb`, named so the repositories of V3 need not spell them again.
+- **Choices TS §23.1 leaves open.** A time (`createdAt`, `storedAt` and so on) is a plain number of milliseconds since the Unix epoch. Keys are given on every write, not read from the value, because every value is wrapped in `Versioned`. The `schemaVersion` written is `DB_VERSION`.
+- **`env.ts` also refuses a fragment** (`#`), not only a query string, and strips trailing slashes.
+- **`db.ts` closes its connection when a newer build in another tab asks to upgrade**, and forgets a connection the browser terminated. Neither is in §11.5; without the first, a version 2 in one tab would wait for every other tab to be closed.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm --filter web exec eslint .` pass. The lint run covers the layer rules: `state/` imports only `gen/`, `zustand` and its own `machines/transition.ts`; `persistence/` imports only `gen/` and `idb`; `protocol.ts` imports only `gen/`.
+- **A throwaway test file, run once and deleted** (the prompt allows no new test file): 15 cases, all passing.
+  - `env`: two good values; seven bad ones each throw an error naming the variable.
+  - `allowlist-hosts`: seven URLs, the five refusals listed above among them.
+  - Capability store: the two legal paths; all six illegal attempts throw and leave the stored reason untouched; with a reporter set, an illegal attempt is reported as `("capability", "unchecked", "pass")` and the state stays `unchecked`.
+  - `db`, against `fake-indexeddb` installed outside the repository: the database has version 1 and exactly the eight stores; `openDb` returns the same connection twice; a value round-trips and is stored as `{ schemaVersion: 1, value }`; a value with `schemaVersion: 2` reads as absent and is gone afterwards.
+- There is no `*.test.ts` file under `web/src/`.
 
 **"Done when".** The box is ticked.
