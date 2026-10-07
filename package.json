@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.15.0",
   "engines": { "node": ">=24" },
   "scripts": {
-    "gen:types": "sh scripts/gen-types.sh"
+    "gen:types": "sh scripts/gen-types.sh",
+    "build:wasm": "sh scripts/build-wasm.sh"
   }
 }

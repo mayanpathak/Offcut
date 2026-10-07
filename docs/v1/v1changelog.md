@@ -1144,3 +1144,60 @@ Closes known issue 26. Phase D (web foundation and capability check, Prompts 14 
 - Milestone 4: `tsc`, ESLint and Vitest are green, and the four deliberate lint violations were rejected in Prompt 14.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Pushed to GitHub
+
+`main` was pushed to `origin` at commit `94c2a02` (Prompts 10 to 18). Before the push the nine commits were searched for secrets: no `.env` or key file, and neither signing key of `.env`. The only database URL in them is the local development string of known issue 1, which was already in the published docs.
+
+---
+
+## 2026-10-07 - Prompt 19: `offcut-wasm-core` and `build-wasm.sh`
+
+**Added.** `scripts/build-wasm.sh` (98 lines).
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `crates/offcut-wasm-core/Cargo.toml` | `crate-type = ["cdylib"]`; dependencies `wasm-bindgen` (the workspace's exact pin) and `offcut-types`; dev-dependency `serde_json` |
+| `crates/offcut-wasm-core/src/lib.rs` | `init()`, `core_version()`, the panic hook; 3 unit tests |
+| `package.json` | Root script `build:wasm`: `sh scripts/build-wasm.sh` |
+| `Cargo.lock` | The two new dependency edges |
+
+**The crate.**
+
+- `init()` runs when the module is instantiated (`#[wasm_bindgen(start)]`) and installs the panic hook once; a second call does nothing.
+- `core_version()` returns `CARGO_PKG_VERSION`, now `0.1.0`.
+- **The panic hook** throws a JavaScript `Error`. Its message is `E_WORKER_CRASH`, then ` at <file>:<line>:<column>`. The text of the panic is added only in debug builds, because it can quote the data that caused the panic. The hook writes nothing to the console.
+- No product rule, no branching on a domain value.
+
+**The script.** For each entry of `BUNDLES` (V1: `offcut-wasm-core:core`):
+
+1. Compare `wasm-bindgen --version` with the `wasm-bindgen` version in `Cargo.lock`; stop with exit code 1 if they differ, naming both and the command that installs the right one.
+2. `cargo build --target wasm32-unknown-unknown --release` with `RUSTFLAGS=-C target-feature=+simd128`.
+3. `wasm-bindgen --target web --out-name offcut_<name> --out-dir web/src/wasm/pkg/<name>`.
+4. `wasm-opt -O3 --enable-simd --enable-bulk-memory --enable-nontrapping-float-to-int`. `--dev` skips this step.
+
+`--watch` builds, then builds again whenever a `.rs`, `.toml` or `Cargo.lock` file under `crates/` or at the root is newer than the last build; a failed build is reported and the watch goes on. An unknown option exits with 2. The script changes to the repository root first, so it works from any folder.
+
+**Differs from the specs.**
+
+- **`serde_json` is a dev-dependency of the crate.** One test proves that the code the hook writes is the serialized form of `ErrorCode::WorkerCrash`, so the two cannot drift apart. It is also what makes the crate use `offcut-types`, which §8 lists as a dependency; no code path of V1 needs it otherwise.
+- **The crash message carries the source location.** §8 asks only that it start with `E_WORKER_CRASH`. A location holds no user data, and a crash report without one is hard to act on.
+- **`--watch` polls once a second with `find -newer`.** It needs no tool beyond the POSIX ones the script already uses.
+
+**Checked.**
+
+- `pnpm build:wasm` writes `offcut_core.js`, `offcut_core_bg.wasm` (16,966 bytes), `offcut_core.d.ts` and `offcut_core_bg.wasm.d.ts` to `web/src/wasm/pkg/core/`, which git ignores.
+- **Version guard** (Milestone 5, row 2): with a `wasm-bindgen` on `PATH` that reports 0.2.108, the script and `pnpm build:wasm` both exit with 1 and print `the wasm-bindgen CLI is 0.2.108, but Cargo.lock has the crate at 0.2.129`. The script itself was not edited for this.
+- `--dev` gives a module of 24,746 bytes: `wasm-opt` removes about a third. `--fast` exits with 2. Started from `web/src/`, the script builds the same file.
+- `--watch`: one build at start; none in 3 idle seconds; one after `lib.rs` was touched; `the build failed; waiting for a change` after a line that is not Rust was appended; one more build after the file was restored.
+- **The module, loaded in Node:** `WebAssembly.validate` accepts it; `core_version()` returns `0.1.0`; calling `init()` a second time is harmless.
+- **The panic hook, in a temporary build** with one function that indexes past the end of an empty vector: calling it from JavaScript threw an `Error` with the message `E_WORKER_CRASH at crates\offcut-wasm-core\src\lib.rs:34:10`, no panic text (a release build), and nothing was printed. The function was removed and the bundle rebuilt.
+- `cargo test --workspace`: 170 tests pass (3 new): the version; the four forms of the crash message, each starting with the code; the code equal to `ErrorCode::WorkerCrash`.
+- `cargo fmt --check` and `cargo clippy --workspace --all-targets -- -D warnings` pass. `cargo deny check` passes: `offcut-wasm-core` is a listed wrapper of `wasm-bindgen`.
+- `cargo check -p offcut-wasm-core --target wasm32-unknown-unknown` passes.
+
+**"Done when".** The box is ticked.

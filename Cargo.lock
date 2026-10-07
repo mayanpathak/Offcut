@@ -985,6 +985,11 @@ dependencies = [
 [[package]]
 name = "offcut-wasm-core"
 version = "0.1.0"
+dependencies = [
+ "offcut-types",
+ "serde_json",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "once_cell"
