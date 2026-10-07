@@ -37,7 +37,6 @@
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
 | 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
-| 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
 | 30 | **The capability check has a thin margin on a cold start.** `PER_CHECK_TIMEOUT_MS` is 1,000 (TS §13.2). On the development machine (Intel graphics, 16 GB) the GPU adapter needs up to about 600 ms of that on a freshly started Chrome; a slower machine that needs more is told `UNSUPPORTED_WEBGPU`, shown the unsupported page, and counted as a failure in E-8. All checks run together, so a per-check timeout of 2,000 ms would still end inside the 3 s budget of PS §9.3. Decide whether to raise it, and measure on R1 and R2 before E-8 is read | Human; before the landing page goes public (Prompt 28) |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
@@ -1350,3 +1349,54 @@ The places where V6, V2 and V7 add their steps are marked in the file.
 - **A throwaway test with every dependency replaced by a fake** (8 cases, all passing, then deleted): the result mapping of `submitNotifyMe`, including the trimmed email in the request and no request for text without `@`; the seven steps of `startApp` in order; a stored id reused, a stored value that is not a UUID replaced, an in-memory id when storage fails; no preload on an unsupported browser; `client_error` when the preload fails; a second `startApp()` returning the same promise; the copy functions (90 seconds, 4 GB, and waits of 1 second, 45 seconds, 1 minute and 12 minutes).
 - **The whole chain in real Chrome against the local API and Postgres**: a page load, a reload and a close gave exactly four rows in `analytics_events`, `landing_view` and `capability_check` twice, all with one `anon_id`: the id survives a reload. The props are enum words only: `{"hero_variant": "outcome"}` and `{"result": "pass", "platform": "windows", "gpu_vendor": "intel", "memory_bucket": "gb8plus"}`. `GET /api/v1/healthz` was called once per load. No console error. The batch is sent when the page is hidden or left, which is how a short visit gets counted.
 - This run is what exposed the cold-start fault of the capability check; see the entry before this one.
+
+---
+
+## 2026-10-07 - Prompt 22: styles and components
+
+Closes known issue 27.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/src/ui/styles/tokens.css` | Custom properties on `:root` (fonts, type scale, spacing, radius, nine colours, with a dark set under `prefers-color-scheme: dark`) and the four rules that apply to the whole document |
+| `web/src/ui/styles/pages.module.css` | The classes of the pages |
+| `web/src/ui/styles/components.module.css` | The classes of the components |
+| `web/src/ui/components/WhatLeavesTable.tsx` | The four fixed rows of PS §12.7, then one row per entry of `ANALYTICS_EVENT_DOCS` |
+| `web/src/ui/components/NotifyMeForm.tsx` | Props `wanted`, `preselect?`. States `idle`, `sending`, `waking`, `done`, `error` |
+| `web/src/ui/components/DropZone.tsx` | A drop target and the sample-clip button, both inactive |
+| `web/src/ui/components/CapabilityGate.tsx` | Prop `children` |
+| `web/src/ui/pages/UnsupportedPage.tsx` | Prop `reason` |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/net/asset-fetch.ts` | Exports `DEMO_VIDEO_PATH` (`media/demo.mp4`) |
+| `web/eslint.config.js` | `ui` may import two names from `net/asset-fetch.ts`: `assetUrl` and `DEMO_VIDEO_PATH` |
+
+**How the components behave.**
+
+- **`WhatLeavesTable`.** Two tables. The event rows come from the generated list, each with its short name from `messages.ts`, its wire name, and its description from the generated list; the page cannot fall behind the allowlist.
+- **`NotifyMeForm`.** With one `wanted` value it shows an email field and a button; with more, a choice in front, starting at `preselect`. Submitting calls `submitNotifyMe`. The button is disabled while a request is going. The status line shows `sending`, then the waking message if the use-case reports it, then the success message or the message of the failure. The submit handler always prevents the native form post, and the form has `noValidate`, so the use-case decides what an email is.
+- **`DropZone`.** A drop, a click, Enter or Space shows the not-ready message. Both controls carry `aria-disabled="true"`. The handlers never touch `event.dataTransfer`: the dropped file is not read, stored or inspected. `dragover` and `drop` are prevented, or the browser would open the file in the tab.
+- **`CapabilityGate`.** `supported`: the children. `unsupported`: `UnsupportedPage` with the stored reason. Otherwise the "checking" line.
+- **`UnsupportedPage`.** The title, the sentence for the reason, the supported list, the demo video, and the form with `safari`, `firefox`, `mobile`, `linux`; `mobile` is chosen first when the reason is `UNSUPPORTED_MOBILE`.
+
+**Differs from the specs.**
+
+- **`ui` may import `assetUrl` and `DEMO_VIDEO_PATH` from `net/asset-fetch.ts`**, and nothing else from `net`. §11.12 has two pages show the demo video "from `assetUrl`"; TS §7 forbids `ui` to import `net` (known issue 27). The lint rule now names those two imports, which build a URL and make no request. A namespace import of the same file is refused, so the `fetchAsset` that V2 adds there stays out of reach of the UI.
+- **`DEMO_VIDEO_PATH` lives in `net/asset-fetch.ts`.** Two pages need the same path and the specs name no home for it. The file does not exist on any host yet (Prompt 27), and its name there will carry a content hash: this constant changes then.
+- **The stylesheets have a dark colour set.** §11.14 asks for tokens; the second set costs nine lines and no script.
+- **Four `data-testid` attributes** (`what-leaves`, `analytics-events`, `drop-zone`, and `unsupported-reason` on the page): hooks for `landing.spec.ts` of Prompt 25, which must count rows and find the reason.
+
+**Checked.**
+
+- `tsc --noEmit` and `eslint .` pass, `react/jsx-no-literals` included. `vitest run`: 76 tests.
+- No file under `src/ui/` has a `style=` attribute; the only CSS is the three files above.
+- **The lint rules, in a temporary component that was deleted:** refused were a namespace import of `net/asset-fetch.ts`, and imports of `net/http.ts`, `persistence/db.ts`, `analytics/client.ts` and `workers/pool.ts`, and a sentence written as JSX text. The import of `assetUrl` alone was accepted.
+- The components import only `usecases/`, `state/`, `copy/`, `gen/`, the two names above, React, and each other.
+- **Not yet seen in a browser.** No page mounts these components before Prompt 23; their behaviour is checked there, against the Milestone 6 table.
+
+**"Done when".** The box is ticked.

@@ -92,6 +92,16 @@ const layerPolicies = [
     from: { file: { categories: "test" } },
     allow: { dependency: INTERNAL },
   },
+  // A page shows the demo video, which is on the asset host. `ui` may take
+  // the two names that build its URL from net/asset-fetch.ts, and nothing
+  // from `net` that makes a request (v1implementation §11.12).
+  {
+    from: from("ui"),
+    allow: {
+      to: to("net", "asset-fetch.ts"),
+      dependency: { specifiers: ["assetUrl", "DEMO_VIDEO_PATH"] },
+    },
+  },
   // `net` may name the types of the worker protocol, never its code (D-8).
   {
     from: from("net"),

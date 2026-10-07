@@ -5,6 +5,13 @@
 import { env } from "../config/env";
 
 /**
+ * The demo video of the landing page (E-1), relative to the asset host's
+ * base URL. The file is uploaded in the deploy phase; until then this path
+ * does not load.
+ */
+export const DEMO_VIDEO_PATH = "media/demo.mp4";
+
+/**
  * The URL of a file on the asset host. `path` is relative to its base URL.
  * A request to the asset host carries no query string, and a path may not
  * climb out of the base.
