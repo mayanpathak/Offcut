@@ -1423,3 +1423,68 @@ The earlier fix (the entry "a capable browser was reported as unsupported on a c
 **Checked.** `vitest run`: 76 tests pass; every timeout in the tests is written with the constant. The Milestone 6 walk then passed all 16 rows (next entry).
 
 **Still open** (known issue 30). One machine was measured. A slower one may need more than 2 s, and no value above about 2.5 s fits the 3 s promise. Measure on R1 and R2; if 2 s is not enough there, the promise of PS §9.3 has to change, not only this number.
+
+---
+
+## 2026-10-07 - Prompt 23: pages, routes, entry files, local end-to-end chain
+
+Phase F (UI and use-cases, Prompts 21 to 23) is complete. The app works locally from the browser to Postgres.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/src/ui/pages/LandingPage.tsx` | Prop `settingsPath`. Hero, subhead, supported-browser line, privacy line with the link, capability line, demo video, `DropZone`, the waitlist form |
+| `web/src/ui/pages/EditorPage.tsx` | The not-ready sentence and the waitlist form (D-16) |
+| `web/src/ui/pages/SettingsPage.tsx` | Prop `homePath`. A link back, the title, `WhatLeavesTable` |
+| `web/src/routes.tsx` | `ROUTES` (all six paths of §11.1) and `router`: `/`, `/app` inside `CapabilityGate`, `/settings`; any other path redirects to `/` |
+| `web/src/App.tsx` | `<RouterProvider router={router} />` |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/main.tsx` | Final: imports `tokens.css`, calls `startApp()` once without awaiting it, renders `<App />` |
+| `package.json` | Root script `dev` |
+| `web/src/ui/styles/pages.module.css` | The demo video's box is portrait (at most 20 rem wide), as the video is |
+
+**The `dev` script** builds the WASM bundle once, then starts the watcher in the background and Vite in the foreground:
+`sh -c "sh scripts/build-wasm.sh --dev && { sh scripts/build-wasm.sh --dev --watch & exec pnpm --filter web exec vite; }"`
+
+**Differs from the specs.**
+
+- **The landing page is never replaced by the unsupported page.** On an unsupported browser it shows the reason in its capability line and keeps its content. §11.12 gives it a "capability status line", and §13.7 requires the J1 content to be visible in a CI browser that may lack WebGPU. `/app` is where `CapabilityGate` shows the unsupported page.
+- **Pages get the paths they link to as props**, from `routes.tsx`. A page that imported `ROUTES` would import the file that imports it.
+- **`dev` builds once before it starts Vite.** G§6.5 starts both at the same moment; on a fresh clone Vite would then fail on the import of a bundle that is not built yet.
+
+**Checked.**
+
+- `tsc --noEmit`, `eslint .` and `vitest run` (76 tests) pass. `vite build`: 343 kB of script (109 kB gzip), 4 kB of CSS, the `.wasm` file.
+- **Milestone 6**, with `cargo run -p offcut-api` against `offcut_dev` and `pnpm dev`, in real Chrome driven by a throwaway script that was deleted afterwards. The prompt marks this as a step for the human; the rows below were run by the agent, and a look at the page by a person is still worth a minute.
+
+  | Do | Result |
+  |---|---|
+  | Load `/` | Hero, supported-browser line, privacy line, the link, drop zone, sample button and form are all visible. The prompt reads "Drop a clip (up to 90 seconds, English)." |
+  | Wait | The capability line reads "Your browser can do this." |
+  | `crossOriginIsolated` | `true` |
+  | Submit a new address | The success message; `POST /api/v1/notify-me` 204 |
+  | Submit `abc` | The invalid-email message; no request |
+  | Wait for the timer | `POST /api/v1/events` 204 within 10 s |
+  | Drop a file on the drop zone | The not-ready message; no request; the tab did not navigate to the file |
+  | Follow the link to `/settings` | 4 fixed rows and 19 event rows |
+  | Open `/app` | The not-ready panel with the form |
+  | Open `/account` | Redirected to `/` |
+  | A phone, emulated as DevTools does it, on `/app` | The unsupported page, "Offcut does not work on phones and tablets yet.", `mobile` chosen in the form |
+  | The same phone on `/` | The landing content, with that sentence as the capability line |
+  | Stop the API, submit | "Connecting to the account service…" 3.5 s after the click |
+  | Start the API again | The same submit succeeds 7.4 s after the click: three 502 answers from the dev proxy, then 204 |
+  | Console | One error, the demo video that does not load (`ERR_NAME_NOT_RESOLVED` for `assets.example.invalid`); nothing else |
+
+  The first two walks failed on the second row. That is the subject of the entry before this one; the third walk passed all 16 checks of the script.
+- **The two queries of the guide:** `platform_waitlist` held the one address submitted, `launch`. `analytics_events` held `landing_view` and `capability_check` rows only, with props such as `{"hero_variant": "outcome"}`, `{"result": "pass", "platform": "windows", "gpu_vendor": "intel", "memory_bucket": "gb8plus"}` and, for the phone, `{"result": "fail", "platform": "android", ..., "unsupported_reason": "UNSUPPORTED_MOBILE"}`: enum words and nothing else. The rows were deleted afterwards.
+- **The production build under the production CSP** (`vite preview`): `/`, `/settings`, `/app` and an unknown path each render; `crossOriginIsolated` is `true`; no `securitypolicyviolation` event; the only console error is the demo video.
+- **Seen by eye**, from screenshots: the landing page in a light and a dark colour scheme, in a 900 px and a 390 px window, and the settings page.
+
+**For Prompt 25.** Playwright will not click an element that has `aria-disabled="true"`: it waits for it to become enabled and times out. The drop zone and the sample button are such elements. A test must use `click({ force: true })` or dispatch the event.
+
+**"Done when".** Every row passes; the analytics rows hold only enum props; the only console error is the missing demo video.
