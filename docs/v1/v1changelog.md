@@ -1886,3 +1886,13 @@ This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in
 - [x] The second `deploy-api.yml` run is fully green; the demo video plays on the local page from the asset host.
 
 **Still open from this prompt.** The Neon password (open item 36); known issues 33 (the video is not about Offcut) and 35 (the hook and `:latest`).
+
+## 2026-10-08 - `v1-deploy` merged; the first run stopped at "Check the configuration"
+
+**Done.** The human set the three Vercel secrets and the variable `APP_ORIGIN` (open item 11). `v1-deploy`, rebased on `main`, was merged by fast-forward and pushed (`75cf3cd`).
+
+**The run failed twice at its first check**, before any deploy: "The repository variable VITE_ASSET_BASE_URL must hold a URL and nothing else". In GitHub's form the value reads `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev`, which the check accepts when run by hand, in `bash` and in `sh`. So the stored value holds a character the form does not show, most likely a line break or a space at its end. The earlier run on `64f571b` passed with it: `check-hosts` compares hosts, and a URL parser drops such a character.
+
+**Changed.** `.github/workflows/ci.yml`: when the two configuration checks refuse `VITE_ASSET_BASE_URL` or `APP_ORIGIN`, the message now gives the length of the value and the value as the shell reads it (`printf %q`), which shows a line break or a space. A variable is not a secret.
+
+**Checked.** By hand: the clean value passes; with a line break, a space or a carriage return at its end, the message shows it. Both workflows pass actionlint 1.7.12.

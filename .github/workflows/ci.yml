@@ -82,7 +82,9 @@ jobs:
           # The value alone: no name, no "=", no spaces, no quotes.
           case "$VITE_ASSET_BASE_URL" in
             *[!A-Za-z0-9._~:/-]* | *//*//*)
-              echo "::error::The repository variable VITE_ASSET_BASE_URL must hold a URL and nothing else, like https://assets.example.com"
+              # A variable is no secret, so the value can be shown. %q makes a
+              # space or a line break at its end visible.
+              printf '::error::The repository variable VITE_ASSET_BASE_URL must hold a URL and nothing else, like https://assets.example.com. It holds %s characters, shown here as the shell reads them: %q\n' "${#VITE_ASSET_BASE_URL}" "$VITE_ASSET_BASE_URL"
               exit 1
               ;;
             https://?*) ;;
@@ -275,7 +277,7 @@ jobs:
         run: |
           case "$APP_ORIGIN" in
             *[!A-Za-z0-9.:/-]* | https://*/*)
-              echo "::error::The repository variable APP_ORIGIN must hold an address and nothing else, with no path and no trailing slash, like https://offcut.vercel.app"
+              printf '::error::The repository variable APP_ORIGIN must hold an address and nothing else, with no path and no trailing slash, like https://offcut.vercel.app. It holds %s characters, shown here as the shell reads them: %q\n' "${#APP_ORIGIN}" "$APP_ORIGIN"
               exit 1
               ;;
             https://?*) ;;
