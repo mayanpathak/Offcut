@@ -28,6 +28,9 @@
 | 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
 | 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
+| 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests, and a read of the generated TypeScript, are the guard | Prompts 04-08 |
+| 8 | The `ts-rs` declarations of the unit and id types are plain (`type TimeMs = number`). The generator must write the branded aliases by hand and skip these declarations (§9 item 2). `EventId` is a string on the wire and must be a branded `string` | Prompt 08 |
+| 9 | Four choices in `offcut-types` go beyond the letter of §6 (see the Prompt 03 entry). `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 
 ---
 
@@ -173,3 +176,56 @@ Closes known issue 3: `v1buildguide.md` and the prompts file were tracked but li
 **Changed.** `docs/technicalspec.md` §5 and `docs/v1/v1implementation.md` §4: `docs/v1/v1buildguide.md` and `docs/v1/coding-prompts.md` added to both file trees.
 
 **Checked.** Every tracked file under `docs/` is now in the TS §5 tree. `git status` clean after the commit.
+
+---
+
+## 2026-10-07 - Prompt 03: `offcut-types` units, ids, limits
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `crates/offcut-types/src/units.rs` | The 16 unit types of TS §10.1 and `Span`; `const fn new` and `get` on the 13 integer units; `Option` constructors on `Confidence`, `Lufs`, `Dbfs` and `Span`; the six conversion and arithmetic functions of §6.1; 13 unit tests |
+| `crates/offcut-types/src/ids.rs` | `ClipId`, `ExportId`, `UserId`, `AnonId` (each wraps a `Uuid`), `EventId`, `WordIdx`, `SentenceIdx`, `WordRange`, `JobId`; `const fn new` and `get` on the eight one-field ids; no function generates an id; 7 unit tests |
+| `crates/offcut-types/src/limits.rs` | The 21 constants of TS §10.2 with their comments, and nothing else |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `crates/offcut-types/Cargo.toml` | Dependencies `serde` (`derive`), `ts-rs` (`no-serde-warnings`), `uuid` (`serde` only); dev-dependencies `trybuild`, `serde_json` |
+| `crates/offcut-types/src/lib.rs` | Declares `ids`, `limits`, `units` and re-exports their public items at the crate root |
+| `Cargo.lock` | The new dependencies |
+
+**How the types serialize.**
+
+- Integer units and ids: a bare number (`#[serde(transparent)]`). `DurMs::new(90_000)` is `90000`.
+- `Uuid`-backed ids: the hyphenated string.
+- `EventId`: a decimal string, `"18446744073709551615"`. Reading accepts only the form that writing produces: digits, no sign, no leading zeros.
+- `Confidence`, `Lufs`, `Dbfs`: a number. Reading goes through `new`, so an out-of-range or non-finite value is an error.
+- `Span`, `WordRange`: an object with the Rust field names, `{"start":10,"end":20}`.
+
+**Differs from the specs.** Known issue 9 tracks the first four.
+
+- **`EventId` is not `#[serde(transparent)]`.** §6 says id types are transparent; §9 says `EventId` is serialized as a decimal string because a JavaScript number cannot hold 64 bits. The two cannot both hold. §9 is the specific rule and is marked as a V1 decision, so it was followed, with a hand-written `Serialize` and `Deserialize`.
+- **`Lufs` and `Dbfs` validate when deserializing.** §6.1 asks for this only for `Confidence`. Their `new` rejects non-finite values, and a derived `Deserialize` would have let one in past `new`.
+- **`Span` and `WordRange` derive `Copy, Eq, PartialOrd, Ord, Hash`.** §6 gives these to "integer unit types and id types"; TS §10 gives them to "unit and id types". The two structs live in `units.rs` and `ids.rs`, so the TS §10 reading was used.
+- **`WordRange` has no `new` or `get`.** §6.2 says "each has `new` and `get`" but gives no signature or invariant for a two-field range. Its fields are public, so it is built with a struct literal. A constructor can be added later without breaking anything.
+- **`serde_json` is a dev-dependency.** The manifest in the prompt names only `trybuild`. The round-trip tests this prompt asks for, and the JSON-shape tests of Prompts 04 and 05, need a serde format. It is used in tests only.
+- **`ts-rs` feature `no-serde-warnings`.** `ts-rs` 12.0.1 does not know `#[serde(transparent)]` and printed a warning for each of the 20 uses on every build. On a one-field struct it already emits the inner type, so the attribute changes nothing for it (known issue 7).
+- **`#[ts(type = "...")]` on some fields.** `"number"` on the four 64-bit units (`ts-rs` would say `bigint`) and `"string"` on the `Uuid` ids and `EventId`. This also avoids the `uuid-impl` feature of `ts-rs`.
+- **Overflow.** §6.1 gives `n * 1000 / 30` without saying what happens past `u32::MAX` ms. `FrameIdx::to_time_ms` and `TimeMs::from_micros_floor` saturate at `u32::MAX`; neither can panic. No accepted clip comes near that value.
+- **The divisor 30** is read from `limits::OUTPUT_FPS`, not typed a second time.
+- **`trybuild`** is in the manifest but unused until Prompt 05, as the prompt orders.
+
+**Checked.**
+
+- `cargo test -p offcut-types`: 20 tests pass. They include the six of §6.7, serde round-trips for units and ids, the `EventId` string form (also as a map key), and the `ts-rs` names and shapes.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` pass.
+- `cargo check -p offcut-types --target wasm32-unknown-unknown` passes.
+- `cargo tree`: `uuid` has only its `default` and `serde` features; no `rand` or `getrandom` in the dependency graph.
+- Counts by `grep`: 16 one-field unit structs plus `Span` in `units.rs`; 21 `pub const` and no other item in `limits.rs`; no `From<` implementation anywhere in the crate.
+- No `unwrap`, `expect`, `panic!` or slice indexing outside the test modules.
+- Longest file: `units.rs`, 338 lines.
+
+**"Done when".** All three boxes ticked.
