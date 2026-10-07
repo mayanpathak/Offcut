@@ -30,7 +30,7 @@
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests, and a read of the generated TypeScript, are the guard | Prompts 04-08 |
 | 8 | The `ts-rs` declarations of the unit and id types are plain (`type TimeMs = number`). The generator must write the branded aliases by hand and skip these declarations (§9 item 2). `EventId` is a string on the wire and must be a branded `string` | Prompt 08 |
-| 9 | Four choices in `offcut-types` go beyond the letter of §6 (see the Prompt 03 entry). `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
+| 9 | Five choices in `offcut-types` go beyond the letter of §6: four in the Prompt 03 entry, one in the Prompt 04 entry. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 
 ---
 
@@ -229,3 +229,55 @@ Closes known issue 3: `v1buildguide.md` and the prompts file were tracked but li
 - Longest file: `units.rs`, 338 lines.
 
 **"Done when".** All three boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 04: `offcut-types` stage, media, transcript, events, prosody
+
+**Added.**
+
+| Path | Types | Tests |
+|---|---|---|
+| `crates/offcut-types/src/stage.rs` | `PipelineStage` (six stages, PS §20.2 order) | 3 |
+| `crates/offcut-types/src/media.rs` | `Rotation`, `Orientation`, `ContainerKind`, `VideoCodec`, `AudioCodec`, `ProbeInfo`, `VideoTrackInfo`, `AudioTrackInfo`, `ClipInfo`, `RejectReason` (14 variants) | 6 |
+| `crates/offcut-types/src/transcript.rs` | `Word`, `Sentence`, `Unit`, `Quantity`, `NormalizedSpan`, `Transcript` | 5 |
+| `crates/offcut-types/src/events.rs` | `EventKind`, `ListItem`, `EventParams`, `DetectedEvent` | 5 |
+| `crates/offcut-types/src/prosody.rs` | `WordProsody`, `Prosody` | 1 |
+
+The definitions are those of TS §10.3-§10.5, field for field. The five files hold types only: no function and no `impl` outside the test modules.
+
+**Changed.** `crates/offcut-types/src/lib.rs`: declares and re-exports the five new modules (eight so far; Prompt 05 adds the last four).
+
+**How the types serialize (D-2).**
+
+- Plain enums: a `snake_case` string. `PipelineStage::ProbeAudio` is `"probe_audio"`, `EventKind::NumberReveal` is `"number_reveal"`, `Rotation::R90` is `"r90"`.
+- `RejectReason`: its code, by an explicit rename on each variant. `RejectReason::NoSpeech` is `"REJECT_NO_SPEECH"`.
+- Structs: an object with the Rust field names (`start_ms`, `file_size`, `per_word`). An `Option` that is `None` is written as `null`.
+- `EventParams`: an object tagged with `kind`, its other fields beside the tag: `{"kind":"keyword_pop","word":7}`.
+- `Unit`: a string for the 19 variants without data; `{"count":{"noun":"events"}}` for `Count`.
+
+**Worth knowing.**
+
+- `VideoCodec::ProRes` serializes as `"pro_res"`. That is what `snake_case` gives; the specs name no string for it.
+- A `DetectedEvent` carries `kind` twice: once as its own field and once as the tag inside `params`. That follows from the two spec definitions.
+- `ts-rs` copies doc comments on types and fields into the TypeScript it emits. The generator of Prompt 08 will carry them into `gen/domain.ts`.
+
+**Differs from the specs.**
+
+- **Enums without data also derive `Copy, Eq, Hash`.** §6 lists six derives for every type and adds more only for unit and id types. The eight enums without data (`PipelineStage`, `Rotation`, `Orientation`, `ContainerKind`, `VideoCodec`, `AudioCodec`, `RejectReason`, `EventKind`) got the three extra, so they can be passed by value, compared and used as map keys without a later edit to a frozen file. Structs, `Unit` and `EventParams` have exactly the six derives of §6 (known issue 9).
+
+**Checked.**
+
+- `cargo test -p offcut-types`: 40 tests pass (20 new). The new ones cover the three shapes the prompt names and more:
+  - `RejectReason`: all 14 JSON strings, in the order of §6.4, through a match with no wildcard, so a fifteenth variant does not compile until the test is updated.
+  - `EventParams`: the tagged form of all four variants, compared with literal JSON, and rejection of an unknown or missing `kind`.
+  - `PipelineStage`: all six `snake_case` strings, and rejection of other spellings.
+  - Round-trips with literal JSON for `ProbeInfo`, `ClipInfo`, `AudioTrackInfo`, `Transcript`, `DetectedEvent` and `Prosody`.
+  - The `ts-rs` output of `PipelineStage`, `RejectReason`, `Unit` and `EventParams`, which guards known issue 7.
+- The TypeScript declarations of 14 of the new types were printed once and read against the JSON above. They agree.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` pass.
+- `cargo check -p offcut-types --target wasm32-unknown-unknown` passes.
+- No `unwrap`, `expect`, `panic!` or slice indexing outside the test modules.
+- Longest file: `units.rs`, 338 lines; `media.rs` has 326.
+
+**"Done when".** Both boxes ticked: check and test are green with the derives above, and `RejectReason` has 14 variants whose names match §6.4.
