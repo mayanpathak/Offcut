@@ -37,7 +37,6 @@
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
 | 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
-| 26 | `navigator.userAgentData` has no type in TypeScript 6.0.3 (`NavigatorUAData` is absent from `lib.dom`). `capability.ts` reads `mobile` and `platform` from it and must declare the two fields itself | Prompt 18 |
 | 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
 | 28 | A use-case may import `workers/pool.ts` but not `workers/protocol.ts`, not even its types (TS §7). A use-case that needs to name `AppFailure` must take it from what `pool.ts` exports | Prompt 21 |
 | 29 | `start-app.ts` must call `setIllegalTransitionReporter(...)` in production builds only: `if (!env.dev)`. `transition()` throws while no reporter is set, which is the behaviour development and test builds need (see the Prompt 15 entry) | Prompt 21 |
@@ -1071,7 +1070,7 @@ Closes known issue 14: `http.ts` reads a missing `retry_after_secs` as `null`.
 
 ## 2026-10-07 - Prompt 17: analytics client
 
-**Added.** `web/src/analytics/client.ts` (63 lines): `FLUSH_INTERVAL_MS` (10,000), `FLUSH_AT` (20), `initAnalytics({ anonId })`, `track(event)`, `flush()`.
+**Added.** `web/src/analytics/client.ts` (64 lines): `FLUSH_INTERVAL_MS` (10,000), `FLUSH_AT` (20), `initAnalytics({ anonId })`, `track(event)`, `flush()`.
 
 **How it behaves.**
 
@@ -1094,5 +1093,54 @@ Closes known issue 14: `http.ts` reads a missing `retry_after_secs` as `null`.
 - **The layer rule was shown to bite**, in a temporary file under `analytics/`: an import from `state/`, from `persistence/`, from `net/http.ts` and from `config/` were each refused by `boundaries/dependencies`.
 - **Behaviour, in a throwaway test with a fake `postEvents` and fake timers** (6 cases, all passing): an event tracked before `initAnalytics` is sent on the first 10 s tick with the anonymous id, and not at 9,999 ms; the twentieth event triggers a flush; of 70 queued events the first flush sends 50 and the next 20; a flush happens on `visibilitychange` to hidden and not to visible; a flush that fails or throws resolves and its events are not sent again; a second `initAnalytics` does not change the id.
 - All three temporary files were deleted. `http.test.ts` is still the only test file under `web/src/`, and its 21 tests pass.
+
+**"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 18: capability check and encoder constants
+
+Closes known issue 26. Phase D (web foundation and capability check, Prompts 14 to 18) is complete: Milestone 4 of the guide passes.
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `web/src/platform/simd-probe.ts` | `SIMD_PROBE_BYTES`, the 31 bytes of G§4.4 | |
+| `web/src/workers/render/encoders.ts` | `VideoLadderEntry`, `VIDEO_ENCODE_LADDER` (four entries), `AAC_ENCODE_CONFIG`, `KEYFRAME_INTERVAL_FRAMES`, `CREATOR_VIDEO_BITRATE`, `videoConfigFor` | |
+| `web/src/platform/capability.ts` | `PER_CHECK_TIMEOUT_MS`, `H264_DECODE_PROBE`, `AAC_DECODE_PROBE`, `PlatformProbe`, `browserProbe`, `runCapabilityCheck` | |
+| `web/src/platform/capability.test.ts` | The 11 groups of §13.4 and one more | 54 |
+
+**How the check behaves.**
+
+- All eleven checks start together. Each has a timeout of 1 s; a check that throws, rejects or does not answer in time has failed. The whole check therefore ends after about 1 s at most, inside the 3 s budget.
+- The reason reported is the first failed check in the order of the generated `UNSUPPORTED_REASONS` list, which is the order of TS §13.2. The later checks still run, so the report is complete.
+- A browser that does not report its memory passes. Below `LIMITS.MIN_DEVICE_MEMORY_GB` fails.
+- The report holds four enum values, and `unsupported_reason` only when a check failed; on a pass the key is absent, not `null`. This is the form known issue 15 asks of the client.
+- `gpu_vendor`, `memory_bucket` and `platform` are mapped as the table of §11.8 says. No string the browser gives reaches the report.
+- `browserProbe` reads `navigator.userAgentData` (`mobile`, `platform`), `navigator.deviceMemory`, the GPU adapter's vendor, and the yes-or-no answers of the other checks. Nothing else.
+
+**Differs from the specs.**
+
+- **`encoders.ts` exports `CREATOR_VIDEO_BITRATE` (8,000,000 b/s)**, which the list of §11.8 does not have. Check 9 asks whether the encoder supports 1080x1920, and a `VideoEncoderConfig` needs a bitrate. The value is in the configuration table of TS §21.2, which belongs to this file; and a `BitsPerSec` can only be made in `gen/` or `workers/`, because the lint rule refuses the cast elsewhere.
+- **The storage check opens and deletes a database of its own**, `offcut-capability-probe`. Opening the app's database there, without a version, would create it empty at version 1, and `openDb` would then find no stores and run no upgrade.
+- **`capability.ts` declares the two navigator fields itself** (`userAgentData`, `deviceMemory`): TypeScript 6.0.3 has neither. This was known issue 26.
+- **`capability.ts` has its own alias for `CapabilityReport`**, the same generated type that `state/capability-store.ts` exports under that name. `platform` may not import `state`.
+- **A mobile hint that cannot be read is a failed check**, like any other check that throws. `undefined`, which is what a browser without the API gives, passes.
+- **The ladder entries are probed together**, not one after another, so check 9 also stays inside its second.
+- **The test file has a twelfth group**: the SIMD bytes are a valid module in Node, and the ladder and the AAC configuration equal TS §21.2. A typing mistake in either would otherwise show only in a browser.
+
+**Checked.**
+
+- `pnpm --filter web exec vitest run`: 75 tests pass (21 in `http.test.ts`, 54 here).
+  - Each of the 11 reasons alone; all 55 pairs, each reporting the earlier one; all eleven failing at once.
+  - A check that never answers has failed at exactly 1,000 ms and not at 999; six hanging checks end after one second, not six; a browser that answers at once leaves no timer behind.
+  - A check that throws at once, one that rejects, every probe function throwing, and one that rejects two seconds after its timeout: no unhandled rejection.
+  - Memory 2, 3.9, 4, 7.9, 8 and 64 GB and unreported; nine vendor strings and no adapter; nine platform hints and none; the mobile hint true, false and absent.
+  - Report shape: 126 combinations of odd vendor and platform strings, memory values and mobile hints, every value a member of its enum.
+- **The tests were shown to fail when the code is wrong.** Four temporary changes to `capability.ts`, each reverted: the last failed check reported (4 tests failed); the timeout removed (2 failed); unreported memory made a failure (1 failed); the raw vendor string put in the report (11 failed).
+- **`browserProbe` in real Chrome**, through a temporary page on the dev server, headless and headed, then deleted: every one of the twelve functions answered without throwing; the report was `pass`, `intel`, `gb8plus`, `windows`; the check took 139 ms; the probe database was gone afterwards.
+- `tsc --noEmit` and `eslint .` pass. The lint run covers the layers: `platform/` imports `gen/` and `workers/render/encoders.ts` only.
+- Milestone 4: `tsc`, ESLint and Vitest are green, and the four deliberate lint violations were rejected in Prompt 14.
 
 **"Done when".** The box is ticked.
