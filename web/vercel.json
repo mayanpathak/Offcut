@@ -1,0 +1,24 @@
+{
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build:vite",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "https://render-host.example.invalid/api/v1/:path*" },
+    { "source": "/((?!api/|assets/|ort/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/(.*)", "headers": [
+      { "key": "Cross-Origin-Opener-Policy",   "value": "same-origin" },
+      { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" },
+      { "key": "Content-Security-Policy",      "value": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: https://assets.example.invalid; connect-src 'self' https://assets.example.invalid; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" },
+      { "key": "Referrer-Policy",              "value": "no-referrer" },
+      { "key": "X-Content-Type-Options",       "value": "nosniff" },
+      { "key": "Permissions-Policy",           "value": "camera=(), microphone=(), geolocation=()" },
+      { "key": "Strict-Transport-Security",    "value": "max-age=63072000; includeSubDomains" }
+    ] },
+    { "source": "/assets/(.*)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" } ] },
+    { "source": "/ort/(.*)",    "headers": [ { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" } ] },
+    { "source": "/((?!assets/|ort/).*)", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] }
+  ]
+}

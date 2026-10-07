@@ -1,0 +1,243 @@
+// The lint rules of technicalspec.md §7 for the web app. Every rule is on from
+// the first day, including the ones that have nothing to check yet.
+
+import { readFileSync } from "node:fs";
+
+import { defineConfig, globalIgnores } from "eslint/config";
+import boundaries from "eslint-plugin-boundaries";
+import react from "eslint-plugin-react";
+import tseslint from "typescript-eslint";
+
+const SRC = "src/**/*.{ts,tsx}";
+
+// --- Layers (TS §2, §7) ------------------------------------------------------
+
+// Each folder under src/ is one layer. The three entry files in src/ itself
+// (main.tsx, App.tsx, routes.tsx) belong to no layer and are not checked.
+const LAYERS = [
+  "ui",
+  "usecases",
+  "state",
+  "persistence",
+  "models",
+  "net",
+  "analytics",
+  "workers",
+  "wasm",
+  "platform",
+  "config",
+  "copy",
+  "gen",
+  "entitlement",
+];
+
+/** A whole layer, or the named files of it (paths relative to the layer's folder). */
+const to = (layer, ...files) => ({
+  element: files.length > 0 ? { type: layer, fileInternalPath: files } : { type: layer },
+});
+const from = (layer) => ({ element: { type: layer } });
+
+// What each layer may import, beyond itself. Everything else is refused.
+// Every layer may import `gen`, which holds types and constants only.
+const MAY_IMPORT = {
+  ui: [to("usecases"), to("state"), to("copy"), to("config")],
+  usecases: [
+    to("state"),
+    to("persistence"),
+    to("models"),
+    to("analytics"),
+    to("entitlement"),
+    to("platform"),
+    to("workers", "pool.ts"),
+    to("net", "api-client.ts"),
+  ],
+  state: [],
+  persistence: [],
+  models: [to("net", "asset-fetch.ts"), to("persistence", "opfs.ts"), to("wasm", "load-core.ts")],
+  net: [to("config")],
+  analytics: [to("net", "api-client.ts")],
+  workers: [to("wasm")],
+  wasm: [],
+  // The capability check reads the encoder constants (v1implementation §11.8).
+  platform: [to("workers", "render/encoders.ts")],
+  config: [],
+  copy: [to("config")],
+  gen: [],
+  entitlement: [to("config")],
+};
+
+const INTERNAL = { relationship: { to: "internal" } };
+
+const layerPolicies = [
+  ...LAYERS.map((layer) => ({
+    from: from(layer),
+    allow: [...MAY_IMPORT[layer], ...(layer === "gen" ? [] : [to("gen")])].map((target) => ({
+      to: target,
+    })),
+  })),
+  // A layer's files may import each other, except in `usecases`: a use-case
+  // imports another only if it is cancel-job or restore-clip (TS §7).
+  ...LAYERS.filter((layer) => layer !== "usecases").map((layer) => ({
+    from: from(layer),
+    allow: { dependency: INTERNAL },
+  })),
+  {
+    from: from("usecases"),
+    allow: { to: to("usecases", "cancel-job.ts", "restore-clip.ts") },
+  },
+  // A test imports the file it tests.
+  {
+    from: { file: { categories: "test" } },
+    allow: { dependency: INTERNAL },
+  },
+  // `net` may name the types of the worker protocol, never its code (D-8).
+  {
+    from: from("net"),
+    allow: { to: to("workers", "protocol.ts"), dependency: { kind: "type" } },
+  },
+];
+
+// --- Network access (TS §7, §24.1) -------------------------------------------
+
+const NETWORK_GLOBALS = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "RTCPeerConnection"];
+const GLOBAL_OBJECTS = ["window", "self", "globalThis"];
+// The only files that may call `fetch`. No file may use the other four.
+const FETCH_FILES = [
+  "src/net/http.ts",
+  "src/net/asset-fetch.ts",
+  "src/wasm/load-core.ts",
+  "src/wasm/load-render.ts",
+];
+
+const networkMessage = (name) =>
+  `${name} is not available here. Network requests go through net/http.ts or net/asset-fetch.ts.`;
+
+const restrictedGlobals = (names) => names.map((name) => ({ name, message: networkMessage(name) }));
+const restrictedProperties = (names) => [
+  { object: "navigator", property: "sendBeacon", message: networkMessage("navigator.sendBeacon") },
+  ...GLOBAL_OBJECTS.flatMap((object) =>
+    names.map((property) => ({ object, property, message: networkMessage(property) })),
+  ),
+];
+
+const NETWORK_GLOBALS_BUT_FETCH = NETWORK_GLOBALS.filter((name) => name !== "fetch");
+
+// --- Restricted syntax (TS §7, §11.3) ----------------------------------------
+
+// The branded unit and id types, read from the generated file so the list
+// cannot fall behind it.
+const domain = readFileSync(new URL("./src/gen/domain.ts", import.meta.url), "utf8");
+const BRANDS = [...domain.matchAll(/^export type (\w+) = (?:number|string) & \{ readonly __unit:/gm)].map(
+  (match) => match[1],
+);
+if (BRANDS.length === 0) {
+  throw new Error("eslint.config.js found no branded type in src/gen/domain.ts");
+}
+const brand = `TSTypeReference[typeName.name=/^(${BRANDS.join("|")})$/]`;
+
+const NO_IMPORT_META_ENV = [
+  {
+    selector: "MemberExpression[object.type='MetaProperty'][property.name='env']",
+    message: "import.meta.env is read in config/env.ts only. Import `env` from there.",
+  },
+];
+const NO_BRAND_CAST = [`TSAsExpression > ${brand}`, `TSTypeAssertion > ${brand}`].map((selector) => ({
+  selector,
+  message:
+    "A cast to a unit or id type is allowed in gen/ and workers/ only. Elsewhere the value must arrive already typed.",
+}));
+const NO_SWALLOWED_ERROR = [
+  "CatchClause > BlockStatement[body.length=0]",
+  "CallExpression[callee.property.name='catch'] > :function > BlockStatement[body.length=0]",
+].map((selector) => ({
+  selector,
+  message: "A failure must not be swallowed. Only analytics/client.ts may drop one (TS §11.3).",
+}));
+
+const restrictedSyntax = (...groups) => ["error", ...groups.flat()];
+
+// --- The configuration -------------------------------------------------------
+
+export default defineConfig(
+  // Generated and built files are not linted.
+  globalIgnores(["dist/", "src/gen/", "src/wasm/pkg/", "playwright-report/", "test-results/"]),
+
+  {
+    files: [SRC],
+    extends: [tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    plugins: { boundaries },
+    settings: {
+      "boundaries/root-path": import.meta.dirname,
+      "boundaries/elements": LAYERS.map((layer) => ({ type: layer, pattern: `src/${layer}` })),
+      "boundaries/files": [{ category: "test", pattern: "**/*.test.{ts,tsx}" }],
+      "import/resolver": { node: { extensions: [".ts", ".tsx", ".js", ".json"] } },
+    },
+    rules: {
+      "boundaries/dependencies": [
+        "error",
+        { default: "disallow", checkInternals: true, policies: layerPolicies },
+      ],
+
+      "no-restricted-globals": ["error", ...restrictedGlobals(NETWORK_GLOBALS)],
+      "no-restricted-properties": ["error", ...restrictedProperties(NETWORK_GLOBALS)],
+      "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST, NO_SWALLOWED_ERROR),
+
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        { "ts-ignore": true, "ts-nocheck": true, "ts-expect-error": "allow-with-description" },
+      ],
+      // A switch over a union names every member, and ends in a default.
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: false, requireDefaultForNonUnion: true },
+      ],
+      "no-console": "error",
+    },
+  },
+
+  // The four fetch files: `fetch` is allowed, the other network APIs are not.
+  {
+    files: FETCH_FILES,
+    rules: {
+      "no-restricted-globals": ["error", ...restrictedGlobals(NETWORK_GLOBALS_BUT_FETCH)],
+      "no-restricted-properties": ["error", ...restrictedProperties(NETWORK_GLOBALS_BUT_FETCH)],
+    },
+  },
+
+  // The one exception to each restricted-syntax rule.
+  {
+    files: ["src/config/env.ts"],
+    rules: { "no-restricted-syntax": restrictedSyntax(NO_BRAND_CAST, NO_SWALLOWED_ERROR) },
+  },
+  {
+    files: ["src/workers/**/*.ts"],
+    rules: { "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_SWALLOWED_ERROR) },
+  },
+  {
+    files: ["src/analytics/client.ts"],
+    rules: { "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST) },
+  },
+
+  // User-facing text lives in copy/messages.ts, never in a component.
+  {
+    files: ["src/ui/**/*.tsx", "src/*.tsx"],
+    plugins: { react },
+    languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+    settings: { react: { version: "19" } },
+    rules: {
+      "react/jsx-no-literals": [
+        "error",
+        {
+          noStrings: true,
+          ignoreProps: true,
+          allowedStrings: [".", ",", ":", ";", "!", "?", "-", "–", "—", "/", "(", ")", "·", "…"],
+        },
+      ],
+    },
+  },
+);

@@ -28,8 +28,6 @@
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests are the guard for any type added later | Any new shared type |
 | 9 | Choices in the two type crates go beyond the letter of §6, §7 and §9. They are listed under "Differs from the specs" in the entries of Prompts 03 to 08. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 | 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
-| 12 | `web/src/gen/*.ts` were type-checked with TypeScript 7.0.2 from a throwaway install outside the repository. TypeScript becomes a repository dependency in Prompt 14; run `tsc` on the two files again there, with the version that gets pinned | Prompt 14 |
-| 13 | The generated files are not formatted for a linter: `ts-rs` writes a type on one line, with a comma after the last field, and some lines are over 500 characters long. ESLint must either skip `web/src/gen/` or have no style rule that rejects this | Prompt 14 |
 | 14 | In `gen/api.ts`, `ApiError.retry_after_secs` is `number \| null`, and the server writes `null` when there is no retry time. `http.ts` must treat `null` and a missing field the same way | Prompt 16 |
 | 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
@@ -37,6 +35,12 @@
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
 | 21 | `cargo test --workspace` needs `DATABASE_URL` in the environment, pointing at a Postgres whose role has `CREATEDB`: the 23 server integration tests create a database each. Locally: `set -a; . ./.env; set +a`. CI needs a Postgres service container and the variable | Prompt 26 |
 | 22 | `deny.toml` cannot tell that a pure crate turned on a random feature of `uuid`: `uuid` is a listed wrapper of `getrandom`, because the server uses its `v4` feature. The check that does tell is `cargo tree -p offcut-types -e normal` (and `-p offcut-api-types`) printing no `rand` or `getrandom`. It is run by hand; put it in a gate script or in CI | Prompts 24, 26 |
+| 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
+| 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
+| 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
+| 26 | `navigator.userAgentData` has no type in TypeScript 6.0.3 (`NavigatorUAData` is absent from `lib.dom`). `capability.ts` reads `mobile` and `platform` from it and must declare the two fields itself | Prompt 18 |
+| 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
+| 28 | A use-case may import `workers/pool.ts` but not `workers/protocol.ts`, not even its types (TS §7). A use-case that needs to name `AppFailure` must take it from what `pool.ts` exports | Prompt 21 |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
 ---
@@ -860,3 +864,99 @@ Closes known issue 2: `cargo deny check` passes again. The server (Phase C, Prom
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `check-gen-clean.sh` pass.
 
 **"Done when".** Both boxes ticked.
+
+---
+
+## 2026-10-07 - Prompt 14: web tooling and lint boundaries
+
+Closes known issues 12 and 13. The web shell builds, type-checks and lints; it has no application code yet.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/tsconfig.json` | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noEmit`, bundler resolution, libs `DOM`, `DOM.Iterable`, `WebWorker`, `ESNext`; includes `src` and the two config files |
+| `web/vite.config.ts` | React plugin; dev server with COOP and COEP only and a proxy from `/api/v1` to `http://localhost:8080`; preview headers read from `vercel.json`; `build.target: "esnext"`, `assetsInlineLimit: 0`, `worker.format: "es"` |
+| `web/vitest.config.ts` | `environment: "node"`, `include: src/**/*.test.ts` |
+| `web/eslint.config.js` | Every rule of TS §7, described below |
+| `web/vercel.json` | §12.4, with two placeholder hosts |
+| `web/index.html` | `<div id="root">`, one module script, charset and viewport metas, a title; no inline script or style |
+| `web/public/robots.txt` | Allow all; no sitemap |
+| `web/src/main.tsx` | Temporary: renders an empty `<div>`. Prompt 23 writes the real one |
+| `web/.env.local` | `VITE_ASSET_BASE_URL=https://assets.example.invalid`. Ignored by git |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/package.json` | Scripts `dev`, `build:vite`, `preview`; the dependencies below |
+| `pnpm-lock.yaml` | The dependency tree |
+
+**Versions installed** (latest on 2026-10-07, except TypeScript):
+
+| Package | Version | Package | Version |
+|---|---|---|---|
+| `react`, `react-dom` | 19.3.0 | `vite` | 8.3.3 |
+| `react-router` | 8.4.0 | `@vitejs/plugin-react` | 6.1.2 |
+| `zustand` | 5.0.15 | `vitest` | 5.0.3 |
+| `idb` | 8.0.4 | `jsdom` | 30.1.2 |
+| `typescript` | 6.0.3 | `@playwright/test` | 1.63.0 |
+| `eslint` | 10.12.0 | `typescript-eslint` | 8.71.1 |
+| `eslint-plugin-boundaries` | 7.2.0 | `eslint-plugin-react` | 7.37.5 |
+| `@types/react`, `@types/react-dom` | 19.3.0 | `@types/dom-webcodecs` | 0.1.19 |
+
+**What `eslint.config.js` enforces.** It lints `src/**/*.ts` and `.tsx`, with type information. `src/gen/`, `src/wasm/pkg/` and `dist/` are not linted.
+
+- **Layers.** Each folder under `src/` is one layer: `ui, usecases, state, persistence, models, net, analytics, workers, wasm, platform, config, copy, gen, entitlement`. An import from one layer to another is refused unless this table allows it. Every layer may import `gen`.
+
+  | Layer | May import |
+  |---|---|
+  | `ui` | `usecases`, `state`, `copy`, `config` |
+  | `usecases` | `state`, `persistence`, `models`, `analytics`, `entitlement`, `platform`; of `workers` only `pool.ts`; of `net` only `api-client.ts`; of the other use-cases only `cancel-job.ts` and `restore-clip.ts` |
+  | `models` | of `net` only `asset-fetch.ts`; of `persistence` only `opfs.ts`; of `wasm` only `load-core.ts` |
+  | `net` | `config`; the types of `workers/protocol.ts`, never its code (D-8) |
+  | `analytics` | of `net` only `api-client.ts` |
+  | `workers` | `wasm` |
+  | `platform` | of `workers` only `render/encoders.ts` (§11.8) |
+  | `copy`, `entitlement` | `config` |
+  | `state`, `persistence`, `wasm`, `config`, `gen` | nothing else |
+
+  Files of one layer may import each other, except in `usecases`. A test file may import the file it tests.
+- **Network.** `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `RTCPeerConnection`, the same names on `window`, `self` and `globalThis`, and `navigator.sendBeacon` are refused. `fetch` is allowed in four files: `net/http.ts`, `net/asset-fetch.ts`, `wasm/load-core.ts`, `wasm/load-render.ts`.
+- **Syntax.** `import.meta.env` outside `config/env.ts`. A cast to a branded type (`as TimeMs`) outside `workers/`; the 24 brand names are read from `src/gen/domain.ts` when ESLint starts, so the list cannot fall behind. An empty `catch` block or an empty `.catch()` handler outside `analytics/client.ts`; a comment inside does not make it acceptable.
+- **Text.** `react/jsx-no-literals` in `src/ui/` and the entry files: no string in JSX children except punctuation. Props are not checked.
+- **TypeScript.** No `any`, no non-null `!`, no `@ts-ignore` or `@ts-nocheck` (`@ts-expect-error` with a description is allowed, for type-level tests). A `switch` over a union must name every member. `no-console`.
+
+**Differs from the specs.**
+
+- **TypeScript is 6.0.3, not the latest (7.0.2).** The `typescript` package of version 7 has no compiler API (`createProgram` is absent), and `typescript-eslint` cannot parse a file without it; its supported range ends below 6.1. §3.1 says to pin the latest stable release. Known issue 12 is closed with this version: `tsc` accepts both generated files.
+- **`@webgpu/types` was installed and removed.** TypeScript 6.0.3 declares WebGPU itself, and the package's declarations conflict with it (44 errors with library checking on). This is the condition the prompt gives for removing `@types/dom-webcodecs`, applied to the other package. `@types/dom-webcodecs` shows no conflict and stays. A probe file using `navigator.gpu`, `VideoEncoder`, `AudioEncoder` and `VideoDecoder` type-checked without either package.
+- **`vercel.json` holds two placeholder hosts**: `render-host.example.invalid` in the rewrite and `https://assets.example.invalid` in the CSP. The prompt says placeholders `<render-host>` and `<ASSET_ORIGIN>`; G§4.2 says to put the host of `VITE_ASSET_BASE_URL` in the CSP, because `check-hosts.mjs` compares the two. The guide was followed. `.invalid` never resolves.
+- **The layer table has rows the specs do not give.** TS §2 has no row for `platform`, `wasm`, `config`, `copy`, `gen` or `entitlement`. They were given the smallest set that the files of §11 need.
+- **File-level limits.** TS §7 writes `workers/pool`, `net/api-client`, `net/asset-fetch`, `persistence/opfs` and `wasm/load-core`, not the whole layers. The table follows that.
+- **`eslint-plugin-boundaries` 7 has a new rule, `boundaries/dependencies`**, with policies and selectors; `element-types`, which older guides show, is deprecated. The new one is used.
+- **ESLint's own recommended set is not on.** It lives in `@eslint/js`, which is not in the dependency list of G§4.1. The base is `typescript-eslint`'s `recommendedTypeChecked`, plus the rules above.
+- **`tsconfig.json` includes `vite.config.ts` and `vitest.config.ts`**, so they are type-checked, and sets `resolveJsonModule` so the first can import `vercel.json`.
+- **The root `package.json` is unchanged.** Its scripts arrive in Prompt 26.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit` and `pnpm --filter web exec eslint .` pass. `pnpm install --frozen-lockfile` reports the lock file up to date.
+- **The four violations of the prompt, each in a temporary file, each rejected:**
+
+  | Temporary edit | Rule that fired |
+  |---|---|
+  | `fetch("/x")` in a file under `src/state/` | `no-restricted-globals` |
+  | `import.meta.env.MODE` in `src/net/http.ts` | `no-restricted-syntax` |
+  | `1000 as TimeMs` in `src/net/api-client.ts` | `no-restricted-syntax` |
+  | `import "../net/http"` in a file under `src/state/` | `boundaries/dependencies` |
+
+- **33 more cases, in the same run.** Refused: `ui` importing `net`; a use-case importing another use-case, `net/http.ts`, `workers/protocol.ts` and `workers/render/encoders.ts`; `platform` importing `workers/pool.ts`; a value import of `workers/protocol.ts` from `net`; `XMLHttpRequest` in `net/http.ts` and `WebSocket` in `wasm/load-core.ts`; `window.fetch`; `navigator.sendBeacon`; an empty `catch` holding only a comment; `.catch(() => {})`; `any`; `!`; `@ts-ignore`; `console.log`; a `switch` that misses two members; the text `Hello world` in JSX. Accepted: `fetch` in `net/http.ts` and `wasm/load-core.ts`; `import.meta.env` in `config/env.ts`; a brand cast in `workers/protocol.ts`; a type import of `workers/protocol.ts` from `net`; a use-case importing `cancel-job.ts`, `workers/pool.ts` and `net/api-client.ts`; `platform` importing `workers/render/encoders.ts`; a test importing the file it tests; an empty `catch` in `analytics/client.ts`; `{", "}` and `className="x"` in JSX; `typeof fetch` as a type in a test file.
+- Every temporary file was deleted; `src/` holds `gen/` and `main.tsx`.
+- `pnpm run build:vite` writes `dist/index.html`, one script of 219.54 kB (68.56 kB gzip) and `robots.txt`. `dist/index.html` has no inline script.
+- `vite preview` answers `/` with all seven headers of the `/(.*)` rule of `vercel.json`, value for value. `vite dev` answers with COOP and COEP and no CSP. With no API running, `/api/v1/healthz` through the dev server is 502: the proxy is active.
+- `web/dist`, `web/.env.local` and `web/node_modules` are ignored by git.
+
+**Not done, as the prompt orders.** `playwright.config.ts` (Prompt 25). `vitest run` exits with 1 until the first test file exists (Prompt 16).
+
+**"Done when".** The box is ticked.
