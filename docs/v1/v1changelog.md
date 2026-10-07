@@ -16,8 +16,9 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
-| 10 | **The three values Prompt 27 needs do not exist yet.** (a) Choose the Postgres host (TE-6, G§8.1): the production `DATABASE_URL`. (b) Choose the asset host (TE-7, G§8.2): its public base URL, with CORS set for the app origin. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
+| 10 | **Two of the three values Prompt 27 needs do not exist yet; the hosts are chosen (Neon, Cloudflare R2).** (a) The production `DATABASE_URL`: see item 36. (b) Create the R2 bucket, enable its public URL and set CORS for the app origin (TE-7, G§8.2): its public base URL. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
 | 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
+| 36 | **The password of the first Neon database was pasted into the chat with the agent, and that database is in Sydney, where Render has no region.** Before any value goes into Render: either create a new Neon project in AWS Asia Pacific (Singapore) and delete the first one, which settles both, or keep the first one and reset the password of its role. Use the connection string without `-pooler` | Human | Before the Render service is created |
 
 ## Known issues for later prompts
 
@@ -35,9 +36,7 @@
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
 | 31 | On a fresh clone `pnpm check` fails at ESLint and `tsc` until `pnpm build:wasm` has run once: `wasm/load-core.ts` imports files that the build writes and git ignores. `pnpm dev` and `pnpm build` build them; CI builds them in step 5, before step 6. Say so in a README when there is one | Any time |
-| 32 | `scripts/upload-assets.sh` speaks the S3 API, which Cloudflare R2 offers. The other candidate of TE-7, Hugging Face Hub, has no S3 API and does not let an upload set `Cache-Control`: if it is chosen, the script must be rewritten and the cache header of TS §33 reviewed | The choice of TE-7 |
 | 33 | `LandingPage` and `UnsupportedPage` show one video, `DEMO_VIDEO_PATH` (§11.12). E-1 (§14) and Prompt 27 speak of three demo clips. Decide how the pages show three when the uploaded paths are handed over | Prompt 27, last step |
-| 34 | `render.yaml` names no `region`, so Render uses its default. A service cannot change region later. Before creating the service, add the region nearest to the database chosen in TE-6 | Before the Render service is created |
 | 35 | Not checked: that calling the deploy hook makes Render pull the new `:latest` image. The first run with a real service shows it: `/api/v1/healthz` must report the new commit. If it reports the old one, the hook call needs the image reference as a parameter | Prompt 27, human step 5 |
 
 ---
@@ -1723,3 +1722,19 @@ Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
 - Building the image downloads `clippy`, `rustfmt` and the WASM target (about 20 s), because `rust-toolchain.toml` asks for them and the slim image lacks them. It is harmless and keeps one file in charge of the compiler version.
 
 **"Done when".** Neither box is ticked. Of the first, "the image runs locally" and "`/healthz` shows the SHA" hold locally; Render does not exist. The second box needs the human steps.
+
+## 2026-10-07 - Hosts chosen: Neon and Cloudflare R2; `render.yaml` gets its region
+
+**Decided (by the human).** The Postgres host is Neon (TE-6) and the asset host is Cloudflare R2 (TE-7). The measurements of both experiments are still due in Prompt 29.
+
+**Changed.** `render.yaml`: `region: singapore`.
+
+**Why Singapore.** The first Neon project was created in `ap-southeast-2` (Sydney). Render has five regions (Oregon, Ohio, Virginia, Frankfurt, Singapore) and none in Australia; Singapore is the nearest to Sydney, and it is also the region to use if the database is created again in Singapore (open item 36). Neither a Neon project nor a Render service can change region later.
+
+**Closed.** Known issue 32: R2 is chosen, so `scripts/upload-assets.sh` stays as written. Known issue 34: the region is set.
+
+**Opened.** Open item 36: the database password was pasted into the chat with the agent. The agent wrote it to no file and ran no command with it.
+
+**Not done, on purpose.** Neon's console offers a set-up for its own tooling (`neon link`, `neon config init`, a `neon.ts`, `neon deploy`). None of it was run: the server reaches the database through `DATABASE_URL` alone and applies its own migrations when it starts (§10), and `check-file-tree` allows no `neon.ts`.
+
+**Checked.** `check-file-tree` passes (120 files), and fails with a `neon.ts` in the repository root, as stated above. `region` is at the level of `plan` in `render.yaml`; this was read, not parsed, and that Render accepts the file stays unchecked until the service is created.
