@@ -633,3 +633,54 @@ Closes open item 6 (G§1.6).
 - The commits carry the author name and email of the local git configuration.
 - GitHub's quick-start snippet (`git init`, a new `README.md`, a "first commit") was not used. The repository already existed locally, and `README.md` at the root is not in the TS §5 tree.
 - Later commits are pushed when the human asks for it. CI does not exist until Prompt 26, so nothing depends on the remote before then.
+
+---
+
+## 2026-10-07 - Prompt 10: rate limiter and app state
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `server/src/rate_limit.rs` | `RouteGroup` (16 groups), `Limit`, `RouteGroup::limit()` (a `const fn` holding the whole TS §22.1 table), `RateKey { Ip, EmailHash, User }`, `RateLimiter::new(max_keys)` and `check(group, key, now)`, the `by_ip` middleware | 11 |
+| `server/src/state.rs` | `AppState { db, config, limiter }`, `Clone` | |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `server/src/lib.rs` | Declares `rate_limit` and `state` |
+| `server/Cargo.toml` | Dev-dependency `tokio` with the `test-util` feature |
+| `Cargo.lock` | That feature |
+
+**How the limiter behaves.**
+
+- One token bucket per `(group, key)`. A bucket holds `capacity` tokens and gets one back every `window / capacity`: 1 s for `Events`, 720 s for `NotifyMe`.
+- A request takes one token. With none left, `check` returns `Err(seconds until one is back)`, rounded up, never 0.
+- A refused request costs nothing, but it counts as use for eviction. A client that keeps sending stays limited instead of being evicted and starting with a full bucket.
+- At most `max_keys` buckets. A new key at the limit evicts the least recently used bucket.
+- `by_ip` takes the peer address from the connection, derives the client IP with `client_ip`, and returns `AppError::RateLimited` on refusal. Without a peer address it returns 500: the server must be served with `into_make_service_with_connect_info::<SocketAddr>()` (Prompt 12).
+
+**Differs from the specs.**
+
+- **A bucket is stored as the instant at which it is full again**, not as a token count. Each token taken moves that instant `window / capacity` further away. The behaviour is the continuous refill of §10.6; the arithmetic is on whole nanoseconds, so there is no rounding of fractions of a token.
+- **Eviction uses a second index**, a map from the last-used sequence number to the bucket. §10.6 asks for a sequence number per bucket; the index finds the oldest one without reading all 50,000.
+- **`max_keys` of 0 is read as 1.**
+- **`tokio` has the `test-util` feature in dev-dependencies.** `tokio::time::pause` and `advance`, which the prompt names, need it. It is not in a release build.
+- **`by_ip` has no unit test.** It needs an `AppState`, and so a database pool. The sixth-request case of §13.3 covers it in Prompt 13.
+
+**Checked.**
+
+- `cargo test -p offcut-api`: 41 tests pass (11 new), all on a paused clock:
+  - Every group has the limit of the TS §22.1 table, and every group accepts exactly its capacity in a burst.
+  - The 61st `Events` request in one instant is refused with `Err(1)`.
+  - Requests spread over 30 s use the tokens that came back meanwhile.
+  - The retry time is rounded up: 720, 720, 719 and 1 at four instants.
+  - Tokens return after `advance`; a full bucket does not grow past its capacity.
+  - Two IPs, two groups and the three kinds of key do not share a bucket.
+  - Eviction keeps the newest keys, by last use and not by first use; both indexes stay at `max_keys` entries.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass.
+- No `std::time` clock in `server/src`: the limiter reads `tokio::time::Instant` only. `std::time::Duration` is used; it is not a clock.
+- Longest file: `rate_limit.rs`, 384 lines, of which 190 are tests.
+
+**"Done when".** The box is ticked.
