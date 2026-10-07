@@ -1,0 +1,88 @@
+# Builds the API image from server/Dockerfile, pushes it to GHCR as :<sha> and
+# :latest, and calls the Render deploy hook (technicalspec.md §33, step 11).
+#
+# ci.yml calls it on main, after its own steps pass. It can also be started by
+# hand: Actions > deploy-api > Run workflow.
+#
+# Render pulls the image without credentials, so the package `offcut-api` must
+# be public: once, after the first push, in the package's settings on GitHub.
+
+name: deploy-api
+
+on:
+  workflow_call:
+    secrets:
+      RENDER_DEPLOY_HOOK_URL:
+        required: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# One deploy at a time, in the order they were started: :latest must end up
+# as the newest commit.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Name the image
+        # GHCR accepts lower-case names only.
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/offcut-api" >> "$GITHUB_ENV"
+
+      - name: Build the image
+        run: |
+          docker build \
+            --file server/Dockerfile \
+            --build-arg "GIT_SHA=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$IMAGE:$GITHUB_SHA" \
+            --tag "$IMAGE:latest" \
+            .
+
+      - name: Check that the image starts
+        # With no variables the server must stop at once and name the first one
+        # it misses. That proves the binary runs in the runtime image, as its
+        # user, before anything is pushed.
+        run: |
+          set +e
+          output=$(docker run --rm "$IMAGE:$GITHUB_SHA" 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -eq 0 ] || ! echo "$output" | grep -q '^config error: '; then
+            echo "::error::The image did not stop with a config error (exit status $status)."
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push the image
+        run: |
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+
+      - name: Call the Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::The secret RENDER_DEPLOY_HOOK_URL is not set. The image is pushed; Render was not told. Expected on the first run only, before the Render service exists."
+            exit 1
+          fi
+          # The URL is the credential: it is never printed.
+          curl --fail --silent --show-error --retry 3 --max-time 30 --output /dev/null --request POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Render accepted the deploy."

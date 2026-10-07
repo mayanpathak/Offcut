@@ -257,6 +257,7 @@ offcut/
 ├── pnpm-lock.yaml
 ├── render.yaml                        Render blueprint: one free web service from GHCR image
 ├── .gitignore
+├── .dockerignore                      allow-list for the image build context: Cargo files, crates/, server/
 ├── .github/workflows/
 │   ├── ci.yml                         lint, unit, golden, server tests, non-media E2E
 │   ├── e2e-media.yml                  media E2E on windows-latest with Chrome stable (TE-10)

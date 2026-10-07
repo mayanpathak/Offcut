@@ -1,0 +1,47 @@
+# Render blueprint: the API, and nothing else (TS §1: no disk, no worker, no cron).
+#
+# Render does not build this service. It pulls the image that deploy-api.yml
+# pushed to GHCR; the package must be public. A new image goes live when the
+# workflow calls the service's deploy hook.
+#
+# Every value is entered in the Render dashboard (`sync: false`), never here.
+# The values are listed in docs/v1/v1buildguide.md, step 8.6.
+# Not here on purpose: PORT, which Render sets, and GIT_SHA, which is in the image.
+
+services:
+  - type: web
+    name: offcut-api
+    runtime: image
+    image:
+      url: ghcr.io/mayanpathak/offcut-api:latest
+    plan: free
+    healthCheckPath: /api/v1/healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      - key: LOG_LEVEL
+        sync: false
+      - key: ENTITLEMENT_SIGNING_KEY
+        sync: false
+      - key: ACCESS_TOKEN_SIGNING_KEY
+        sync: false
+      - key: MAIL_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: BILLING_API_KEY
+        sync: false
+      - key: BILLING_WEBHOOK_SECRET
+        sync: false
+      - key: BILLING_PRICE_CREATOR_MONTHLY
+        sync: false
+      - key: BILLING_PRICE_CREATOR_ANNUAL
+        sync: false
+      - key: BILLING_PRICE_CREATOR_ANNUAL_FOUNDING
+        sync: false
+      - key: FOUNDING_OFFER_ENABLED
+        sync: false
+      - key: TRUSTED_PROXY_HOPS
+        sync: false

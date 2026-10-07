@@ -1,0 +1,13 @@
+# Nothing enters an image build unless it is named here. server/Dockerfile
+# copies less than this; the list is the guard for a later `COPY . .`.
+*
+
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!crates/
+!server/
+
+# Never, wherever they are.
+**/.env*
+**/target/

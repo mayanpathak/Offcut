@@ -16,8 +16,8 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
-| 8 | Add the repository variable `VITE_ASSET_BASE_URL` on GitHub (Settings, Secrets and variables, Actions, Variables) with the value `https://assets.example.invalid`. Without it the second step of `ci.yml` fails | Human | Before the first CI run |
-| 9 | Push `main` and the branch `v1-ci`, open a pull request from `v1-ci` into `main`, confirm that CI is green, merge (G§7.5). The workflow has never run: see the Prompt 26 entry for what the first run may show | Human | Before Prompt 27 |
+| 10 | **The three values Prompt 27 needs do not exist yet.** (a) Choose the Postgres host (TE-6, G§8.1): the production `DATABASE_URL`. (b) Choose the asset host (TE-7, G§8.2): its public base URL, with CORS set for the app origin. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
+| 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
 
 ## Known issues for later prompts
 
@@ -30,12 +30,15 @@
 | 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
 | 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
-| 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
 | 31 | On a fresh clone `pnpm check` fails at ESLint and `tsc` until `pnpm build:wasm` has run once: `wasm/load-core.ts` imports files that the build writes and git ignores. `pnpm dev` and `pnpm build` build them; CI builds them in step 5, before step 6. Say so in a README when there is one | Any time |
+| 32 | `scripts/upload-assets.sh` speaks the S3 API, which Cloudflare R2 offers. The other candidate of TE-7, Hugging Face Hub, has no S3 API and does not let an upload set `Cache-Control`: if it is chosen, the script must be rewritten and the cache header of TS §33 reviewed | The choice of TE-7 |
+| 33 | `LandingPage` and `UnsupportedPage` show one video, `DEMO_VIDEO_PATH` (§11.12). E-1 (§14) and Prompt 27 speak of three demo clips. Decide how the pages show three when the uploaded paths are handed over | Prompt 27, last step |
+| 34 | `render.yaml` names no `region`, so Render uses its default. A service cannot change region later. Before creating the service, add the region nearest to the database chosen in TE-6 | Before the Render service is created |
+| 35 | Not checked: that calling the deploy hook makes Render pull the new `:latest` image. The first run with a real service shows it: `/api/v1/healthz` must report the new commit. If it reports the old one, the hook call needs the image reference as a parameter | Prompt 27, human step 5 |
 
 ---
 
@@ -1654,3 +1657,69 @@ The steps for `main` only (10 to 14: deploy, header check, smoke test) are not t
 3. When CI is green, merge it. If a step fails, the log names it; the three risks above are the likely ones.
 
 **"Done when".** The first half is ticked: the four-command local run passes in one go. The second half, CI green on the pull request and the merge, is open until the steps above are done.
+
+---
+
+## 2026-10-07 - First CI runs on GitHub
+
+Closes open items 8 and 9, and the second half of the "Done when" of Prompt 26. No file of the repository changed.
+
+- The pull request from `v1-ci` was merged into `main` (`92286ab`).
+- **The first two runs failed** at step 8, "Hosts in the bundle and in the CSP". The repository variable `VITE_ASSET_BASE_URL` held the whole line `VITE_ASSET_BASE_URL = https://assets.example.invalid` as its value, and `check-hosts.mjs` stopped with `Invalid URL`. The value was corrected on GitHub and both runs were started again.
+- **Both runs are green**: all steps 1 to 9, on the pull request and on `main`. The three things only GitHub could show (Prompt 26 entry) held: the runner's `rustup` and Corepack accept the commands, the `postgres:18` service starts, and the 12 Playwright cases pass in the runner's Chrome.
+- Noticed and not changed: a value of the variable that is not a URL passes every step before step 8, and step 8 reports it as a stack trace. "Check the configuration" could refuse it at the start.
+
+---
+
+## 2026-10-07 - Prompt 27: API container and Render deploy (the agent's part)
+
+Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
+
+**The prompt is not done.** Its three prerequisites do not exist (open item 10), and it says to stop when one is missing. The four files below hold none of the three values, so they were written and checked on this machine; everything that needs a value or an account is open (open item 11).
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `server/Dockerfile` | Two stages. Build: `rust:1.99.0-slim-trixie`, `SQLX_OFFLINE=true`, `cargo build --release --locked -p offcut-api`. Runtime: `debian:13.7-slim` with `ca-certificates`, user `offcut` (uid 10001), the binary, `GIT_SHA` from the build argument |
+| `.dockerignore` | An allow-list: the Cargo files, `crates/`, `server/`. Never `.env*` or `target/` |
+| `.github/workflows/deploy-api.yml` | Triggers `workflow_call` and `workflow_dispatch`. Builds the image, checks that it starts, pushes `:<sha>` and `:latest` to GHCR, calls the Render deploy hook |
+| `render.yaml` | One web service `offcut-api`: `runtime: image`, `plan: free`, `healthCheckPath: /api/v1/healthz`, 14 variables with `sync: false`. No disk, worker or cron |
+| `scripts/upload-assets.sh` | `sh scripts/upload-assets.sh <media\|models> <file>...`: uploads each file as `<folder>/<name>.<hash>.<extension>` with `Cache-Control: public, max-age=31536000, immutable` and prints that path |
+
+**Changed.** `docs/technicalspec.md`, §5: the tree lists `.dockerignore`.
+
+**Choices.**
+
+- **Both images are pinned by digest**, with the tag beside it for a person to read. Both stages are Debian 13, so the binary finds the C library it was linked against.
+- **`deploy-api.yml` uses the Docker of the runner** and one action, `actions/checkout`, pinned to the commit `ci.yml` uses. Its permissions are `contents: read` and `packages: write`. Deploys run one at a time, in the order they were started.
+- **`deploy-api.yml` checks the image before it pushes:** it runs it with no variables and expects it to stop with `config error: ...`. That proves the binary starts in the runtime image, as its user.
+- **The hook step fails with a message when the secret `RENDER_DEPLOY_HOOK_URL` is not set**, after the push. This is the expected first run of the prompt. The URL is never printed.
+- **`upload-assets.sh` needs only `curl` and `sha256sum`.** It signs the request itself (`curl --aws-sigv4`) and reads four variables from the shell: `ASSET_S3_ENDPOINT`, `ASSET_S3_BUCKET`, `ASSET_S3_ACCESS_KEY_ID`, `ASSET_S3_SECRET_ACCESS_KEY`. The credentials reach `curl` on its standard input, not on its command line. Every file is checked before the first upload. The hash is the first 16 hexadecimal digits of the file's SHA-256.
+
+**Differs from the specs.**
+
+- **`ARG GIT_SHA` is in the runtime stage only, as its last instruction.** §12.5 puts it in the build stage. The server reads `GIT_SHA` when it starts, not when it is compiled; in the build stage the argument would make every commit compile again.
+- **`.dockerignore` is new**; no spec names it. Without it a later `COPY . .` could put `.env` into an image.
+- **`render.yaml` lists 14 variables, not all of §3.3:** `PORT` is set by Render and `GIT_SHA` is in the image.
+- **`upload-assets.sh` is written for one of the two candidates of TE-7** (known issue 32).
+
+**Checked, on this machine with Docker 28.3.2.**
+
+- **The image builds:** `docker build -f server/Dockerfile --build-arg GIT_SHA=$(git rev-parse HEAD) -t offcut-api:local .`, 146 s for the compile step. The image is 34 MB; its user is 10001; its only variables are `PATH` and `GIT_SHA`; it holds no `.env` file and no source.
+- **The image runs.** With the variables of `.env` and a `postgres:18` container as the database: the migration ran, `GET /api/v1/healthz` answered `{"ok":true,"version":"92286ab3..."}`, equal to `git rev-parse HEAD`, with both response headers; `POST /api/v1/notify-me` answered 204 and the row was in `platform_waitlist` with the address in lower case; an unknown path answered 404.
+- **With no variables it stops:** `config error: APP_ORIGIN`, exit status 1.
+- **SIGTERM (known issue 19).** `docker stop` ended the container in 0.6 s with exit status 0, inside the grace period of 10 s. The shutdown path of `main.rs` had never run before: it exists only on Unix.
+- **A second build with another `GIT_SHA` compiled nothing**: every layer came from the cache, and the image reported the new value.
+- **`upload-assets.sh` against a local S3 server that checks signatures** (RustFS in a container), with a 9 MB file: the printed path was `media/demo-1.8465fcc35d96d468.mp4`, the hash equal to the start of `sha256sum`; an anonymous `GET` returned the same bytes with the `Cache-Control` above and `Content-Type: video/mp4`; `Range: bytes=0-8388607` returned 206 with `Content-Range`; a second upload printed the same path. Refused, with exit status 1 and nothing uploaded: no file, a folder other than `media` or `models`, a name with a space, a name without an extension, an unknown extension, a missing file, an unset variable, a wrong secret (403).
+- **`deploy-api.yml` and `ci.yml` pass actionlint 1.7.12.** `check-file-tree` passes with the five new files (120 files).
+- No value of `.env` was printed or written anywhere. The containers, the network and the test bucket were removed afterwards.
+
+**Not checked.**
+
+- **`deploy-api.yml` has never run.** Only GitHub can show that the push to GHCR works with the workflow's token.
+- **The image against a hosted database over TLS.** The local check used a container without TLS. G§8.4 runs the image with the hosted connection string; do that once the database is chosen.
+- **`upload-assets.sh` against Cloudflare R2**, and that Render accepts `render.yaml`. Known issue 35 is the third.
+- Building the image downloads `clippy`, `rustfmt` and the WASM target (about 20 s), because `rust-toolchain.toml` asks for them and the slim image lacks them. It is harmless and keeps one file in charge of the compiler version.
+
+**"Done when".** Neither box is ticked. Of the first, "the image runs locally" and "`/healthz` shows the SHA" hold locally; Render does not exist. The second box needs the human steps.
