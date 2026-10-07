@@ -15,7 +15,15 @@ import { SIMD_PROBE_BYTES } from "./simd-probe";
 /** The props of the `capability_check` event; `state/capability-store.ts` names the same type. */
 type CapabilityReport = Extract<AnalyticsEvent, { name: "capability_check" }>["props"];
 
-export const PER_CHECK_TIMEOUT_MS = 1_000;
+/**
+ * How long one check may take to answer. TS §13.2 says one second; it is two
+ * here, because one second is not enough on a browser that has just been
+ * launched: its GPU process is still starting, and `requestAdapter()` was
+ * measured at 1.2 s there, which made a capable browser "unsupported". All
+ * checks run together, so the whole check still ends inside the 3 s of
+ * `LIMITS.CAPABILITY_CHECK_BUDGET` (PS §9.3).
+ */
+export const PER_CHECK_TIMEOUT_MS = 2_000;
 
 /** H.264 High, level 4.0, at the largest input size (PS §9.4). */
 export const H264_DECODE_PROBE: VideoDecoderConfig = {

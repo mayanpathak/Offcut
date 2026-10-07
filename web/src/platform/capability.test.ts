@@ -133,7 +133,8 @@ describe("a check that never answers", () => {
     vi.useFakeTimers();
     // The first WebCodecs call of a page can hold the main thread for half a
     // second. Here it holds it for 600 ms, and the GPU adapter then answers
-    // 900 ms after that: inside its own second, but 1.5 s after the start.
+    // 100 ms before its timeout runs out: in time, counted from when the
+    // checks had all started, and 500 ms too late, counted from the start.
     const coldStart = probe({
       h264Decode: () => {
         vi.advanceTimersByTime(600);
@@ -143,7 +144,7 @@ describe("a check that never answers", () => {
         new Promise((resolve) => {
           setTimeout(() => {
             resolve("Intel Inc.");
-          }, 1_500);
+          }, 600 + PER_CHECK_TIMEOUT_MS - 100);
         }),
     });
     let report: Awaited<ReturnType<typeof runCapabilityCheck>> | undefined;
