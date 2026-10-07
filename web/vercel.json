@@ -4,7 +4,7 @@
   "buildCommand": "pnpm run build:vite",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/v1/:path*", "destination": "https://render-host.example.invalid/api/v1/:path*" },
+    { "source": "/api/v1/:path*", "destination": "https://offcut-api.onrender.com/api/v1/:path*" },
     { "source": "/((?!api/|assets/|ort/).*)", "destination": "/index.html" }
   ],
   "headers": [
