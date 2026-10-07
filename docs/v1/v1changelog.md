@@ -38,8 +38,6 @@
 | 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
 | 27 | §11.12 has `LandingPage` and `UnsupportedPage` show the demo video "from `assetUrl`", which lives in `net/asset-fetch.ts`. TS §7 forbids `ui` to import `net`, and the lint rule refuses it. The URL must reach the page another way, for example through a use-case | Prompts 22, 23 |
-| 28 | A use-case may import `workers/pool.ts` but not `workers/protocol.ts`, not even its types (TS §7). A use-case that needs to name `AppFailure` must take it from what `pool.ts` exports | Prompt 21 |
-| 29 | `start-app.ts` must call `setIllegalTransitionReporter(...)` in production builds only: `if (!env.dev)`. `transition()` throws while no reporter is set, which is the behaviour development and test builds need (see the Prompt 15 entry) | Prompt 21 |
 | 30 | **The capability check has a thin margin on a cold start.** `PER_CHECK_TIMEOUT_MS` is 1,000 (TS §13.2). On the development machine (Intel graphics, 16 GB) the GPU adapter needs up to about 600 ms of that on a freshly started Chrome; a slower machine that needs more is told `UNSUPPORTED_WEBGPU`, shown the unsupported page, and counted as a failure in E-8. All checks run together, so a per-check timeout of 2,000 ms would still end inside the 3 s budget of PS §9.3. Decide whether to raise it, and measure on R1 and R2 before E-8 is read | Human; before the landing page goes public (Prompt 28) |
 | 16 | `ERROR_CODES`, `REJECT_REASONS` and `UNSUPPORTED_REASONS` in `gen/domain.ts` are written one code per line, between `export const NAME = [` and `] as const;`. `check-copy-codes.mjs` can read them line by line | Prompt 24 |
 
@@ -1292,3 +1290,63 @@ Found while proving `start-app.ts` against the local API (Prompt 21), and fixed 
 - `tsc --noEmit` and `eslint .` pass.
 
 **Not solved: the margin is thin** (known issue 30). On this machine the adapter needs up to about 600 ms of its 1,000 ms on a cold start. A slower machine may need more and would then be told it has no WebGPU. That decision is the founder's: see the known-issues table.
+
+---
+
+## 2026-10-07 - Prompt 21: copy, use-cases, app start
+
+Closes known issues 28 and 29.
+
+**Added.**
+
+| Path | Contents |
+|---|---|
+| `web/src/copy/messages.ts` | `messages`, with the eight sections of §11.11 |
+| `web/src/usecases/submit-notify-me.ts` | `NotifyMeOutcome`, `submitNotifyMe(email, wanted, onWaking)` |
+| `web/src/usecases/start-app.ts` | `startApp()` |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `web/src/main.tsx` | The temporary `preload()` call of Prompt 20 is gone. The file calls `startApp()` once, not awaited. It still renders an empty `<div>`; Prompt 23 writes the final file |
+| `web/eslint.config.js` | A use-case may import `config/`, for `env.dev` |
+
+**`messages.ts`.**
+
+- Sections: `landing`, `dropZone`, `capability`, `unsupported`, `notifyMe`, `api`, `settings`, `errors`.
+- All 11 `UNSUPPORTED_*` reasons have copy, the 5 `Wanted` values have a label, the 19 events have a short name, and 6 error codes have `{ title, body, action }`. Each of these four maps is checked by `tsc` against its generated type, so a missing or misspelt key does not compile.
+- No sentence holds a typed-in number. The 90 seconds of the drop-zone prompt come from `LIMITS.MAX_CLIP_DURATION`, the 4 GB of the low-memory reason from `LIMITS.MIN_DEVICE_MEMORY_GB`, and the wait of the rate-limit message from the caller.
+- The wording of PS §10 and §9.3 is used where the specs give it: the hero, the supported-browser line, the privacy line, the drop-zone prompt, "Try with a sample clip", "Your browser can do this.", "Your browser cannot encode H.264 video here."
+
+**`submitNotifyMe`.** Trims the email. Text without `@` gives `invalid_email` and no request. Otherwise: 204 gives `ok`; `apiError.code === "bad_request"` gives `invalid_email`; `E_API_RATE_LIMITED` gives `rate_limited` with the wait if the server sent one; `E_NET_OFFLINE` gives `offline`; anything else gives `unavailable`. It sends no analytics event.
+
+**`startApp`.** A second call returns the promise of the first. The seven steps, in order:
+
+1. In a production build only, set the illegal-transition reporter to track `client_error { E_INTERNAL, "import" }`.
+2. The anonymous id: the stored one if it is a UUID; else a new one, stored. If storage fails, a new one for this page load.
+3. `initAnalytics({ anonId })`.
+4. Track `landing_view { hero_variant: "outcome" }`.
+5. `beginCheck()`, run the capability check, set the store to supported or unsupported, track `capability_check` with the report.
+6. `wake()`.
+7. On a supported browser only: `pool.preload()`; on failure track `client_error` with the failure's code and stage.
+
+The places where V6, V2 and V7 add their steps are marked in the file.
+
+**Differs from the specs.**
+
+- **The anonymous id is checked, not cast.** A new id comes from `crypto.randomUUID()` as a plain string, and the lint rule allows a cast to a branded type only in `gen/` and `workers/`. A type guard tests the UUID form instead. The same guard is applied to the stored value: an id that is not a UUID would make the server refuse every batch from that browser, so such a value is replaced.
+- **A use-case may import `config/`.** TS §2 does not list it. `startApp` needs `env.dev` to decide step 1 (known issue 29), and only `config/env.ts` may read the build mode.
+- **`messages.ts` has five keys beyond the table of §11.11**, each needed by a component of Prompt 22: `notifyMe.emailLabel`, `notifyMe.sending`, `settings.backLink`, `settings.columns` (two headers), `settings.eventColumns` (two headers). Without them a component would hold text of its own.
+- **`settings.events` holds a short name per event**, not a description. The description comes from `ANALYTICS_EVENT_DOCS` in `gen/api.ts`, as §11.13 requires, so the page cannot drift from the allowlist.
+- **`main.tsx` calls `startApp()` already.** The prompt asks only to remove the temporary call; without `startApp()` the bundle would no longer be preloaded until Prompt 23.
+
+**Known issue 28, closed without a change:** `start-app.ts` takes the failure from what `pool.preload()` returns and never names `AppFailure`.
+
+**Checked.**
+
+- `tsc --noEmit`, `eslint .` and `vitest run` (76 tests) pass. There is no new `*.test.ts` file.
+- A grep of `messages.ts` finds none of "never leaves", "GDPR", "DPDP", "CCPA", "SOC 2", "compliant". 11 of 11 `UNSUPPORTED_*` codes have a key. The only digits in a message string are those of the codec name H.264.
+- **A throwaway test with every dependency replaced by a fake** (8 cases, all passing, then deleted): the result mapping of `submitNotifyMe`, including the trimmed email in the request and no request for text without `@`; the seven steps of `startApp` in order; a stored id reused, a stored value that is not a UUID replaced, an in-memory id when storage fails; no preload on an unsupported browser; `client_error` when the preload fails; a second `startApp()` returning the same promise; the copy functions (90 seconds, 4 GB, and waits of 1 second, 45 seconds, 1 minute and 12 minutes).
+- **The whole chain in real Chrome against the local API and Postgres**: a page load, a reload and a close gave exactly four rows in `analytics_events`, `landing_view` and `capability_check` twice, all with one `anon_id`: the id survives a reload. The props are enum words only: `{"hero_variant": "outcome"}` and `{"result": "pass", "platform": "windows", "gpu_vendor": "intel", "memory_bucket": "gb8plus"}`. `GET /api/v1/healthz` was called once per load. No console error. The batch is sent when the page is hidden or left, which is how a short visit gets counted.
+- This run is what exposed the cold-start fault of the capability check; see the entry before this one.

@@ -48,6 +48,8 @@ const MAY_IMPORT = {
     to("analytics"),
     to("entitlement"),
     to("platform"),
+    // For `env.dev`: whether this is a development build.
+    to("config"),
     to("workers", "pool.ts"),
     to("net", "api-client.ts"),
   ],
