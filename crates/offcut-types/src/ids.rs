@@ -85,12 +85,10 @@ impl<'de> Deserialize<'de> for EventId {
     /// leading zeros. One id then has exactly one string.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        match s.parse::<u64>() {
-            Ok(v) if v.to_string() == s => Ok(Self(v)),
-            _ => Err(D::Error::custom(
-                "an event id must be a u64 written as a decimal string",
-            )),
-        }
+        let canonical = s.parse::<u64>().ok().filter(|v| v.to_string() == s);
+        canonical.map(Self).ok_or_else(|| {
+            D::Error::custom("an event id must be a u64 written as a decimal string")
+        })
     }
 }
 

@@ -30,7 +30,9 @@
 | 6 | `cargo deny check` prints `unused-wrapper` warnings for the media and renderer crates, which do not exist until V2. They are warnings, not errors | Every `cargo deny check` |
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests, and a read of the generated TypeScript, are the guard | Prompts 04-08 |
 | 8 | The `ts-rs` declarations of the unit and id types are plain (`type TimeMs = number`). The generator must write the branded aliases by hand and skip these declarations (§9 item 2). `EventId` is a string on the wire and must be a branded `string` | Prompt 08 |
-| 9 | Five choices in `offcut-types` go beyond the letter of §6: four in the Prompt 03 entry, one in the Prompt 04 entry. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
+| 9 | Seven choices in `offcut-types` go beyond the letter of §6: four in the Prompt 03 entry, one in the Prompt 04 entry, two in the Prompt 05 entry. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
+| 10 | `ts-rs` types the two maps of `EditState` as `{ [key in WordIdx]: string }` and `{ [key in EventId]: boolean }`: every key required, and mapped over a type that will be a branded alias. Check with `tsc` that this is usable, or override the two fields | Prompt 08 |
+| 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
 
 ---
 
@@ -281,3 +283,64 @@ The definitions are those of TS §10.3-§10.5, field for field. The five files h
 - Longest file: `units.rs`, 338 lines; `media.rs` has 326.
 
 **"Done when".** Both boxes ticked: check and test are green with the derives above, and `RejectReason` has 14 variants whose names match §6.4.
+
+---
+
+## 2026-10-07 - Prompt 05: `offcut-types` edit, profile, summary, error, lib, compile-fail test
+
+This prompt finishes the crate: twelve modules, 57 unit tests and one compile-fail test.
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `crates/offcut-types/src/edit.rs` | `StyleId`, `CropOffset` (`new`, `get`), `EditState` with `Default` | 6 |
+| `crates/offcut-types/src/profile.rs` | `Plan`, `ProfileKind`, `ExportProfile` | 2 |
+| `crates/offcut-types/src/summary.rs` | `ChangeSummary` | 1 |
+| `crates/offcut-types/src/error.rs` | `ErrorCode` (29), `UnsupportedReason` (11), `FailureStage` (11), `From<PipelineStage> for FailureStage` | 5 |
+| `crates/offcut-types/tests/ui.rs` | Runs every `tests/ui/*.rs` as a compile-fail case; its header says when and how to regenerate the expected output | 1 |
+| `crates/offcut-types/tests/ui/bare_ms_rejected.rs` | Passes a bare `u32`, then a `TimeMs`, where a `DurMs` is expected | |
+| `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` | The compiler output the case must produce, generated with `TRYBUILD=overwrite` | |
+
+**Changed.**
+
+| Path | Change |
+|---|---|
+| `crates/offcut-types/src/lib.rs` | Declares and re-exports all twelve modules. Three tests for the code enums (see "Checked") |
+| `crates/offcut-types/src/ids.rs` | The `Deserialize` of `EventId` is written without a `match`. The first version ended in a `_ =>` arm; invariant 8 allows no wildcard. Behaviour is unchanged and its five tests still pass |
+
+**How the types serialize (D-2).**
+
+- `ErrorCode`: its code, by an explicit rename on each variant. `ErrorCode::WorkerCrash` is `"E_WORKER_CRASH"`.
+- `UnsupportedReason`: likewise. `UnsupportedReason::WebGpu` is `"UNSUPPORTED_WEBGPU"`.
+- `FailureStage`, `StyleId`, `Plan`, `ProfileKind`: a `snake_case` string. `Plan::Creator` is `"creator"`.
+- `CropOffset`: a number. Reading goes through `new`.
+- `EditState`: `{"word_edits":{"3":"ten thousand"},"event_overrides":{"42":false},"style":"clean","crop_offset":0.0}`. JSON map keys are strings, so a `WordIdx` key is written as `"3"`.
+
+**The compile-fail output was read.** It holds two errors, both `E0308: mismatched types`: ``expected `DurMs`, found `u32` `` on line 9 and ``expected `DurMs`, found `TimeMs` `` on line 10. Neither is a missing import or an unresolved name. The file is tied to Rust 1.99.0 (known issue 11).
+
+**Differs from the specs.**
+
+- **`CropOffset` validates when deserializing.** TS §10.6 says the range is "checked in `new()`". A derived `Deserialize` would bypass `new`, so reading goes through it, as for `Confidence` (known issue 9).
+- **`StyleId` implements `Default` (`Clean`).** TS §10.6 says "default Clean" in a comment; §6.4 asks only for `EditState::default()` (known issue 9).
+- **`CropOffset` has `get` and derives `Copy, PartialOrd`.** The specs name only `new`. Without `get` the value could not be read outside the crate, since the field is private.
+- **Enums without data derive `Copy, Eq, Hash`**, as chosen in Prompt 04: `StyleId`, `Plan`, `ProfileKind`, `ErrorCode`, `UnsupportedReason`, `FailureStage`.
+- **Where the code-enum tests live.** §6.6 puts the round-trip tests of the three code enums in `lib.rs`. They are there. The tests that pin the order of each list against the spec are next to the enums, in `error.rs` and `media.rs`.
+
+**Checked.**
+
+- `cargo test -p offcut-types`: 57 unit tests and the `ui` test pass, in normal mode (without `TRYBUILD=overwrite`).
+- The counts 29 / 11 / 11 are each verified twice by tests:
+  - `error.rs`: a literal list of each enum's strings in spec order (29 `E_*` from TS §11.2, 11 `UNSUPPORTED_*` from TS §13.2, 11 stage names), checked through a match with no wildcard, so a new variant does not compile until the test is updated. The `ts-rs` union of each enum must equal the same list.
+  - `lib.rs`: for `ErrorCode`, `RejectReason` and `UnsupportedReason`, the codes are read from the TypeScript union and each must round-trip through serde unchanged. Counts 29, 14 and 11; prefixes `E_`, `REJECT_`, `UNSUPPORTED_`; no duplicates.
+- `From<PipelineStage>` has one arm per stage, and each stage maps to the failure stage with the same string.
+- `EditState::default()` has no edits, no overrides, `StyleId::Clean` and offset `0.0`.
+- `CropOffset::new` accepts -1.0, 0.0 and 1.0 and rejects ±1.001, NaN and both infinities.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` pass.
+- `cargo check -p offcut-types --target wasm32-unknown-unknown` passes.
+- No `unwrap`, `expect`, `panic!`, slice indexing or wildcard match arm outside the test modules.
+- Longest file: `error.rs`, 362 lines, of which 233 are tests.
+
+**Not done, as the prompt orders.** `EntitlementClaims` (V2). The generator test `write_typescript` (Prompt 08).
+
+**"Done when".** Both boxes ticked.
