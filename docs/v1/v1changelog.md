@@ -18,6 +18,7 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 6 | No GitHub remote yet; nothing has been pushed (G§1.6) | Human | Before Prompt 26 |
+| 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
 
 ## Known issues for later prompts
 
@@ -395,3 +396,58 @@ The definitions are those of TS §10.7 and §7.6, field for field; the three `Ex
 - `cargo check -p offcut-api-types --target wasm32-unknown-unknown` passes.
 
 **"Done when".** The box is ticked: tests green, 13 `ApiErrorCode` members, every request struct that exists so far denies unknown fields.
+
+---
+
+## 2026-10-07 - Prompt 07: `offcut-api-types` analytics allowlist
+
+**Added.** `crates/offcut-api-types/src/analytics.rs` (392 lines, 7 tests):
+
+- The constants `MAX_EVENTS_PER_BATCH` (50), `MAX_DURATION_MS` (3,600,000) and `MAX_COUNT` (10,000).
+- The 16 prop enums of §7.2, each serialized as `snake_case` strings.
+- `AnalyticsEvent` with the 19 variants of §7.3, and `AnalyticsEvent::name()`, an exhaustive match with no wildcard.
+- `EventsBatch { anon_id, events }`, which denies unknown fields.
+- `EventDoc` and `ANALYTICS_EVENT_DOCS`: 19 entries in enum order, one sentence each.
+
+**Changed.** `crates/offcut-api-types/src/lib.rs`: declares and re-exports `analytics`.
+
+**How an event serializes.**
+
+- With props: `{"name":"landing_view","props":{"hero_variant":"outcome"}}`.
+- Without props: `{"name":"preview_played"}`, with no `props` key.
+- An optional prop that is absent is left out. The four optional props are `unsupported_reason`, `asr_backend`, `event_kind` and `enabled`.
+
+**What is rejected.** Each of these fails to deserialize, and each is a test case:
+
+- An unknown prop; an unknown event name; an unknown key beside `name` and `props`.
+- Free text or a number where an enum is expected.
+- Text where a number or a boolean is expected; a negative number; a number above `u32::MAX`.
+- A missing prop; missing `props`; a missing `name`.
+- Props on an event that has none (`preview_played` with an object or a string as `props`).
+- In a batch: an unknown key such as `user_id`; an `anon_id` that is not a UUID; a missing `anon_id`; one bad event among good ones.
+
+One thing is accepted that is not in the samples: `"props": null` on an event without props. It is read as the event and written back without `props`, so nothing extra can be carried.
+
+**The allowlist rule.** No variant has a text field: every prop is an enum, a `bool` or a `u32`. The word `String` does not occur in `analytics.rs` at all (`grep -c String` prints 0), and a test fails if it is ever added above the test module or if the generated TypeScript types any prop as `string`.
+
+**Differs from the specs.**
+
+- **The 16 prop enums are declared through a macro**, one line per enum (`GpuVendor: Intel, Amd, Nvidia, Apple, Qualcomm, Other, Unknown;`), in the form of the table in §7.2. Written out one by one they took 150 lines, and the file with its tests would have passed the 400-line limit. The generated enums are the same. A search for `pub enum GpuVendor` finds nothing; search for `GpuVendor:`.
+- **`ANALYTICS_EVENT_DOCS` is built with a private `const fn doc(name, description)`** and marked `#[rustfmt::skip]`, one line per event, for the same reason. 20 lines of the file are longer than 100 characters; all are string tables.
+- **The `serde` attribute of `AnalyticsEvent` is written as two attributes** (`tag`/`content`/`rename_all`, then `deny_unknown_fields`). The formatter breaks the single attribute of §7.3 over six lines. The meaning is the same.
+- **Prop enums derive `Copy, Eq, Hash`**, as chosen in Prompt 04.
+- **The event descriptions were written by the agent** (open item 7). §7.3 gives one example, "How long each processing stage took", which is used unchanged for `stage_timing`.
+
+**Checked.**
+
+- `cargo test -p offcut-api-types`: 27 tests pass (7 new).
+  - One sample of each of the 19 variants, as the JSON the client sends: it deserializes, its `name()` equals the docs entry at the same position, it serializes back to the identical string, and its keys are `name` and `props`, or `name` alone.
+  - The docs names have no duplicates and follow the enum order; the TypeScript union has 19 members; each description is one sentence.
+  - The 16 prop enums have exactly the values of §7.2, row for row.
+  - The rejections listed above.
+- Counts: 19 variants, 19 `name()` arms, 19 docs, 16 prop enums.
+- All six request types now deny unknown fields: the five of Prompt 06 and `EventsBatch`.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` pass.
+- `cargo check -p offcut-api-types --target wasm32-unknown-unknown` passes.
+
+**"Done when".** Both boxes ticked.
