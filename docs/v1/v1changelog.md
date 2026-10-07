@@ -28,7 +28,6 @@
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests are the guard for any type added later | Any new shared type |
 | 9 | Choices in the two type crates go beyond the letter of §6, §7 and §9. They are listed under "Differs from the specs" in the entries of Prompts 03 to 08. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
 | 11 | `crates/offcut-types/tests/ui/bare_ms_rejected.stderr` holds compiler output of Rust 1.99.0. Regenerate and re-read it whenever `rust-toolchain.toml` changes; the command is in `tests/ui.rs` | Any toolchain change |
-| 14 | In `gen/api.ts`, `ApiError.retry_after_secs` is `number \| null`, and the server writes `null` when there is no retry time. `http.ts` must treat `null` and a missing field the same way | Prompt 16 |
 | 15 | In `gen/api.ts`, an optional event prop is typed `prop?: T \| null` (for example `unsupported_reason`). The client should leave an absent prop out; the server accepts `null` too and stores neither | Prompts 17, 18 |
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
 | 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
@@ -1005,5 +1004,65 @@ No file outside `web/src/` changed.
   - Capability store: the two legal paths; all six illegal attempts throw and leave the stored reason untouched; with a reporter set, an illegal attempt is reported as `("capability", "unchecked", "pass")` and the state stays `unchecked`.
   - `db`, against `fake-indexeddb` installed outside the repository: the database has version 1 and exactly the eight stores; `openDb` returns the same connection twice; a value round-trips and is stored as `{ schemaVersion: 1, value }`; a value with `schemaVersion: 2` reads as absent and is gone afterwards.
 - There is no `*.test.ts` file under `web/src/`.
+
+**"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 16: network layer
+
+Closes known issue 14: `http.ts` reads a missing `retry_after_secs` as `null`.
+
+**Added.**
+
+| Path | Contents | Tests |
+|---|---|---|
+| `web/src/net/http.ts` | The three constants (10 s, 70 s, 3 s), `HttpRequest`, `HttpResult`, `HttpDeps`, `createHttp(deps)`, `http`, `toAppFailure` | |
+| `web/src/net/http.test.ts` | The 12 cases of §13.5 and 9 more | 21 |
+| `web/src/net/api-client.ts` | `wake()`, `postEvents(batch)`, `postNotifyMe(req, onWaking)` | |
+| `web/src/net/asset-fetch.ts` | `assetUrl(path)`; no `fetch` yet | |
+
+**Changed.** `web/vitest.config.ts`: `test.env` sets `VITE_ASSET_BASE_URL`. `config/env.ts` refuses to load without it, and `web/.env.local` is not in the repository, so CI would have had no value.
+
+**How a request behaves.**
+
+| Situation | Result |
+|---|---|
+| The browser reports it is offline | `E_NET_OFFLINE` at once; `fetch` is not called |
+| `fetch` rejects with a `TypeError` | `E_NET_OFFLINE`; not tried again |
+| No complete response within 10 s, or status 502, 503, 504 | `retry: "cold-start"`: tried again; finally `E_NET_TIMEOUT`. `retry: "none"`: `E_NET_TIMEOUT` after one attempt |
+| Another 5xx | Tried again in cold-start mode; finally `E_API_5XX` |
+| 429 | `E_API_RATE_LIMITED` with the `apiError`; not tried again |
+| Another 4xx | `E_INTERNAL`, not retryable, with the `apiError`; not tried again |
+| 2xx | `ok: true`; `data` is the parsed JSON, or `undefined` when the body is empty |
+
+- **Retries.** The waits are 1, 2, 4, 8 s and then 8 s each time. Another attempt is made only if it would start before 70 s have passed since the first one started; the timeout of an attempt is cut to the time that is left.
+- **The waking notice.** `onWaking` is called once, 3 s after the first attempt started, if the request is still going then, and never afterwards.
+- **The request.** The URL is `/api/v1` plus the path, never absolute. `credentials: "same-origin"`, `cache: "no-store"`; the JSON content type is sent with a body and only with a body.
+- **`failure`.** `stage` is always `"api"`. `detail` is set in development builds only and holds a fixed word or the status number, nothing from the request.
+- **`assetUrl`.** The base URL, a slash, the path. A path containing `?` or `..` throws.
+
+**Differs from the specs.**
+
+- **The 10 s timeout covers reading the body**, not only waiting for the headers. A response that started and then stalled would otherwise never end.
+- **An `apiError` is accepted only if its `code` is one of the 13 the server defines.** The list in `http.ts` is typed `Record<ApiErrorCode, true>`, so `tsc` fails if the generated union gains or loses a member.
+- **A 429 with no readable body takes its wait from the `Retry-After` header**, which the server also sets.
+- **A 2xx with an empty body gives `undefined` whatever its status**, not only 204. §11.6 names 204; the V6 route that answers 202 has no body either.
+- **A 2xx whose body is not JSON is `E_INTERNAL`.** §11.6 does not say.
+- **A request the caller aborts through `signal` ends with `E_INTERNAL`, not retryable, and is not tried again.** §11.6 gives the field and no outcome for it. No V1 caller passes a signal.
+- **`assetUrl` drops a leading slash from the path**, so `assetUrl("/media/x")` does not produce a double slash.
+- **`http.ts` does not import `config/allowlist-hosts.ts`**, which the TS §7 graph shows. It builds no absolute URL, so there is no host to check.
+
+**Checked.**
+
+- `pnpm --filter web exec vitest run`: 21 tests pass, on a fake clock; none waits in real time. Also with `web/.env.local` moved away.
+  - The 12 cases of §13.5.
+  - All timing out: attempts start at 0, 11, 23, 37 and 55 s, and the request fails at 65 s, inside the 70 s budget. Every timed-out attempt was aborted.
+  - 500 every time: attempts at 0, 1, 3, 7, 15, 23, 31, 39, 47, 55 and 63 s, then `E_API_5XX`.
+  - More than §13.5: 502 and 504 as well as 503; a 500 with `retry: "none"`; the `Retry-After` fallback; six bodies that are not an `ApiError`, each leaving `apiError` undefined; a caller's abort; the notice given at exactly 3,000 ms for a slow answer; the table of `toAppFailure`.
+- **The tests were shown to fail when the code is wrong.** Four temporary changes to `http.ts`, each reverted: the notice given without checking that the request is still going (1 test failed); a third wait of 3 s (2 failed); a 429 tried again (1 failed); an absolute URL (1 failed).
+- `assetUrl`, in a throwaway test that was deleted: two good paths, four refused.
+- `tsc --noEmit` and `eslint .` pass. `fetch` appears in `http.ts` only; `asset-fetch.ts` has none.
+- Longest file: `http.test.ts`, 361 lines; `http.ts` has 239.
 
 **"Done when".** The box is ticked.
