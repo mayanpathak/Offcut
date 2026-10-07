@@ -17,7 +17,7 @@
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
 | 10 | The three values Prompt 27 needs exist: the production `DATABASE_URL` (Neon, Singapore; item 36), the asset base URL `https://pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev` and the app origin `https://offcut-one.vercel.app`. Left over: set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it, so builds are not affected) | Human | Any time before Prompt 30 |
-| 36 | **Reset the password of the Neon role `neondb_owner`**: it was pasted into the chat with the agent, and on 2026-10-08 the connection string in use still held that password. Then replace `PROD_DATABASE_URL` in `.env.deploy`. Also delete the first Neon project (Sydney), whose password was pasted too | Human | Before the Render service is created |
+| 36 | **Reset the password of the Neon role `neondb_owner`**: it was pasted into the chat with the agent, and on 2026-10-08 the string in `.env.deploy`, with that password, still opened the production database. After the reset, put the new string into `DATABASE_URL` in Render and into `PROD_DATABASE_URL` in `.env.deploy`. Also delete the first Neon project (Sydney), whose password was pasted too | Human | Before the page is announced |
 
 ## Known issues for later prompts
 
@@ -1915,3 +1915,17 @@ Open item 11 is closed.
 - [x] `pnpm build` still passes `check-hosts` with real values; a merge to `main` runs 1–14 green; `/api/v1/healthz` answers through the Vercel rewrite with the current SHA; the header check and `@smoke` pass.
 
 **Note.** From now on every push to `main` deploys, the API first and then the web app.
+
+## 2026-10-08 - Uptime monitor on; where V1 stands against §16
+
+**Done (by the human).** An UptimeRobot monitor on `https://offcut-api.onrender.com/api/v1/healthz`, every 5 minutes. Its first check timed out and the next one passed; the API answered three requests from the development machine in under 0.5 s each right after. The likely cause is that the service was asleep at the first check; Render's log was not read.
+
+**The exit checklist of §16, read on this date. V1 is not complete: 12 of 20 boxes hold.**
+
+| Part of §16 | Holds | Open |
+|---|---|---|
+| Code and checks (6) | All 6. `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` pass locally on `0b9f8af`; `ci` is green on `main` (`77a304d`, second attempt); the longest source file has 320 lines; the 130 files of the tree of §4 all exist | - |
+| Deployment (7) | 5. Render runs `77a304d`, and `/api/v1/healthz` answers with it directly and through Vercel; `check-headers` passes; `@smoke` passes against `https://offcut-one.vercel.app` (isolated, WASM compiled under the CSP); the monitor is on | A real email in `platform_waitlist` (the table holds 0 rows). The `landing_view` and `capability_check` rows with only enum props: not looked at, the agent was not allowed to read rows of the production database |
+| Experiments and records (7) | 1. §15.3: all nine points hold (asset host in the CSP, WASM and isolation in production, `protocol.ts` type-checks, the encoder constants are used by the capability check, E2E under the production CSP locally and in CI, the reading scripts, `bench/results/`, the lint boundaries) | `docs/v1/experiments.md` does not exist and `check-external-facts.mjs` has no date (Prompt 29); `TRUSTED_PROXY_HOPS` is 1 by guess, not from TE-5; Vercel's terms not saved; TE-9 not confirmed (open item 3); E-1: one video, about another product (known issue 33); the spec corrections of known issues 9, 18, 20 and 30; the tag `v1` |
+
+The production database: Postgres 18.6, the nine tables of `0001_init.sql`, migration 1 applied, 8 MB.
