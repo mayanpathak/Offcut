@@ -1,0 +1,20 @@
+# Build output
+target/
+node_modules/
+web/dist/
+web/src/wasm/pkg/
+
+# Hosting and local environment
+.vercel/
+.env*
+
+# Test output
+web/test-results/
+web/playwright-report/
+
+# Generated fixtures: written by fixtures/gen_fixtures.sh, never committed (TS §26)
+fixtures/ok_*
+fixtures/rej_*
+fixtures/bad_*
+
+# Not ignored on purpose: web/src/gen/ and server/.sqlx/ are generated and committed.
