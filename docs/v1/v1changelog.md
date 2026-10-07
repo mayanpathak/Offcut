@@ -16,7 +16,7 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
-| 10 | **Two of the three values Prompt 27 needs do not exist yet.** (a) Done: the production `DATABASE_URL` exists (Neon, Singapore; item 36). (b) Create the R2 bucket, enable its public URL and set CORS for the app origin (TE-7, G§8.2): its public base URL. (c) Run `vercel link` from the repository root, set Root Directory `web` and Framework "Other", do not connect the Git repository (G§8.3): the production URL `https://<project>.vercel.app` | Human | Before the steps of item 11 |
+| 10 | **One of the three values Prompt 27 needs does not exist yet.** Done: the production `DATABASE_URL` (Neon, Singapore; item 36) and the Vercel production URL, `https://offcut-one.vercel.app`. Open: create the Cloudflare R2 bucket, enable its public URL and set CORS for that origin (TE-7, G§8.2): its public base URL. Also set the Vercel project's Framework Preset to "Other" (it is "Vite"; `web/vercel.json` overrides it with `"framework": null`, so builds are not affected) | Human | Before the steps of item 11 |
 | 11 | The human steps of Prompt 27, in order: push `main`; run `deploy-api.yml` by hand (the hook step fails this first time); make the GHCR package `offcut-api` public; create the Render service from `render.yaml` and enter the variables of G§8.6; set the GitHub secret `RENDER_DEPLOY_HOOK_URL`; run `deploy-api.yml` again; upload the demo clips with `scripts/upload-assets.sh`. Then hand to the agent: the Render host name, the asset base URL, the Vercel URL and the printed clip paths | Human | Before Prompt 28 |
 | 36 | The Neon project now in use is in `ap-southeast-1` (Singapore) and the image runs against it (see the entry "The image against Neon"). Two things the agent cannot see: (a) the password of its role was pasted into the chat with the agent once and must have been reset since; if it was not, reset it (Neon: Roles & Databases); (b) the first project, in Sydney, whose password was pasted too, is to be deleted | Human | Before the Render service is created |
 
@@ -1750,3 +1750,19 @@ Closes known issue 19. Opens open items 10 and 11, and known issues 32 to 35.
 - `sqlx` logs one warning at start, `ignoring unrecognized connect parameter` for `channel_binding=require`, which Neon puts in its connection strings. It is harmless; removing the parameter from the string removes the warning.
 
 This closes the second point of "Not checked" in the Prompt 27 entry. Nothing in the repository changed.
+
+## 2026-10-07 - Vercel project created (G§8.3)
+
+**Done (by the human).** `vercel link` from the repository root created the project `offcut` in the team `mayans-projects-7746b78b`. The agent first moved the global Vercel CLI from 43.2.0 to 62.7.0, the version `ci.yml` of `v1-deploy` pins: Vercel has switched off the login flow of the old one.
+
+**Checked (by the agent, through the Vercel CLI and API).**
+
+- The production domain is `offcut-one.vercel.app`. `APP_ORIGIN` in Render is therefore `https://offcut-one.vercel.app`.
+- Root Directory is `web`. Build command, install command and output directory are those of `web/vercel.json`.
+- **No Git repository is connected.** The human answered yes to that question of `vercel link`; the connection then failed, because the Vercel account has no GitHub login connection. The project has no `link` entry.
+- Framework Preset is "Vite", not "Other" (open item 10). `web/vercel.json` sets `"framework": null`, which a build uses in its place.
+- There is no deployment yet.
+
+**Undone.** `vercel link` appended `.vercel` and `.env*` to `.gitignore`, with CRLF endings; both were already there. The file was put back. It also wrote `.env.local` in the repository root, holding a `VERCEL_OIDC_TOKEN` that nothing here reads; git ignores the file.
+
+**Not written down here.** `orgId` and `projectId` are in `.vercel/project.json`, which git ignores. They become GitHub secrets in Prompt 28.
