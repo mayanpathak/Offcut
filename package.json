@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "sh -c \"sh scripts/build-wasm.sh --dev && { sh scripts/build-wasm.sh --dev --watch & exec pnpm --filter web exec vite; }\"",
     "gen:types": "sh scripts/gen-types.sh",
-    "build:wasm": "sh scripts/build-wasm.sh"
+    "build:wasm": "sh scripts/build-wasm.sh",
+    "build:vite": "pnpm --filter web run build:vite",
+    "build": "pnpm gen:types && pnpm build:wasm && pnpm build:vite && node scripts/check-hosts.mjs",
+    "check": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo deny check && pnpm --filter web exec eslint . && pnpm --filter web exec tsc --noEmit && node scripts/check-file-tree.mjs && sh scripts/check-gen-clean.sh && node scripts/check-copy-codes.mjs",
+    "test": "cargo test --workspace && pnpm --filter web exec vitest run",
+    "e2e": "pnpm --filter web exec playwright test --project=non-media"
   }
 }

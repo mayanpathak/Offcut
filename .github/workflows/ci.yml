@@ -1,0 +1,219 @@
+# The gates of technicalspec.md §33, steps 1 to 9, on every pull request and
+# on main. They are the same commands as `pnpm check`, `pnpm test`,
+# `pnpm build` and `pnpm e2e` locally, in the order of the spec.
+#
+# The steps that run on main only (deploy the API, deploy the web app, check
+# the headers, smoke test) are added when the hosts exist.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # No Cargo step needs a database to compile: server/.sqlx/ holds the queries.
+  SQLX_OFFLINE: "true"
+  # The service container below. The role must be able to create databases:
+  # every server integration test makes its own.
+  DATABASE_URL: postgres://offcut:offcut@localhost:5432/offcut_dev
+  # The asset host. A repository variable: Settings > Secrets and variables >
+  # Actions > Variables. It must be the host named in the CSP of web/vercel.json.
+  VITE_ASSET_BASE_URL: ${{ vars.VITE_ASSET_BASE_URL }}
+  # The same versions as on the development machine. scripts/build-wasm.sh
+  # refuses a wasm-bindgen CLI that differs from the crate in Cargo.lock.
+  WASM_BINDGEN_VERSION: 0.2.129
+  WASM_BINDGEN_SHA256: 82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e
+  CARGO_DENY_VERSION: 0.20.2
+  CARGO_DENY_SHA256: 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+  BINARYEN_VERSION: version_133
+  BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
+  GITLEAKS_VERSION: 8.18.4
+  GITLEAKS_SHA256: ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: offcut
+          POSTGRES_PASSWORD: offcut
+          POSTGRES_DB: offcut_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U offcut -d offcut_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      # --- 1. Checkout, caches, secret scan ---------------------------------
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The whole history, for the secret scan.
+          fetch-depth: 0
+
+      - name: Check the configuration
+        run: |
+          if [ -z "$VITE_ASSET_BASE_URL" ]; then
+            echo "::error::The repository variable VITE_ASSET_BASE_URL is not set. Set it to the asset host named in the CSP of web/vercel.json."
+            exit 1
+          fi
+
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: |
+          channel=$(grep '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
+          rustc --version
+          echo "RUSTC_VERSION=$(rustc --version | cut -d' ' -f2)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Set up pnpm, the version of package.json
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          pnpm --version
+          echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore the Cargo cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ env.RUSTC_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ env.RUSTC_VERSION }}-
+
+      - name: Restore the pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.PNPM_STORE }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install the build tools
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP"
+          bin="$HOME/.cargo/bin"
+          # Downloads a release archive and refuses it unless its checksum is the one above.
+          fetch() {
+            curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"
+            echo "$3  $2" | sha256sum --check --quiet -
+          }
+
+          fetch "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$WASM_BINDGEN_VERSION/wasm-bindgen-$WASM_BINDGEN_VERSION-x86_64-unknown-linux-musl.tar.gz" wasm-bindgen.tar.gz "$WASM_BINDGEN_SHA256"
+          tar -xzf wasm-bindgen.tar.gz
+          install "wasm-bindgen-$WASM_BINDGEN_VERSION-x86_64-unknown-linux-musl/wasm-bindgen" "$bin/wasm-bindgen"
+
+          fetch "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/cargo-deny-$CARGO_DENY_VERSION-x86_64-unknown-linux-musl.tar.gz" cargo-deny.tar.gz "$CARGO_DENY_SHA256"
+          tar -xzf cargo-deny.tar.gz
+          install "cargo-deny-$CARGO_DENY_VERSION-x86_64-unknown-linux-musl/cargo-deny" "$bin/cargo-deny"
+
+          fetch "https://github.com/WebAssembly/binaryen/releases/download/$BINARYEN_VERSION/binaryen-$BINARYEN_VERSION-x86_64-linux.tar.gz" binaryen.tar.gz "$BINARYEN_SHA256"
+          tar -xzf binaryen.tar.gz
+          install "binaryen-$BINARYEN_VERSION/bin/wasm-opt" "$bin/wasm-opt"
+
+          fetch "https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS_VERSION/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks.tar.gz "$GITLEAKS_SHA256"
+          tar -xzf gitleaks.tar.gz gitleaks
+          install gitleaks "$bin/gitleaks"
+
+          wasm-bindgen --version
+          cargo deny --version
+          wasm-opt --version
+          gitleaks version
+
+      - name: Scan for secrets
+        run: gitleaks detect --source . --redact --no-banner
+
+      - name: Install the web dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- 2. Rust: format, lint, licenses and bans -------------------------
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo deny
+        run: cargo deny check
+
+      # --- 3. The generated TypeScript matches the Rust types ---------------
+      - name: Generate the types
+        run: pnpm gen:types
+
+      - name: Check that nothing changed
+        run: sh scripts/check-gen-clean.sh
+
+      # --- 4. Rust tests, the server's against the Postgres service ---------
+      - name: cargo test
+        run: cargo test --workspace
+
+      # --- 5. The WASM bundle -----------------------------------------------
+      - name: Build the WASM bundle
+        run: pnpm build:wasm
+
+      # --- 6. Web: lint, types, structure, copy -----------------------------
+      - name: ESLint
+        run: pnpm --filter web exec eslint .
+
+      - name: tsc
+        run: pnpm --filter web exec tsc --noEmit
+
+      - name: File tree, file length, crate dependencies
+        run: node scripts/check-file-tree.mjs
+
+      - name: Copy for every code
+        run: node scripts/check-copy-codes.mjs
+
+      # --- 7. Web unit tests ------------------------------------------------
+      - name: Vitest
+        run: pnpm --filter web exec vitest run
+
+      # --- 8. The production build, and the hosts in it ---------------------
+      - name: Build the web app
+        run: pnpm build:vite
+
+      - name: Hosts in the bundle and in the CSP
+        run: node scripts/check-hosts.mjs
+
+      # --- 9. End-to-end, in Chrome, against the build ----------------------
+      - name: Install Chrome for Playwright
+        run: pnpm --filter web exec playwright install --with-deps chrome
+
+      - name: Playwright, the non-media suites
+        run: pnpm e2e
+
+      - name: Keep the Playwright report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
+          if-no-files-found: ignore

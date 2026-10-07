@@ -16,14 +16,14 @@
 | 4 | Review the reading scripts in `fixtures/speech/README.md`. The agent drafted them; the guide lists them as the founder's preparation (G§0.7) | Human | Before V2 |
 | 5 | `sh2clips/documents/` is an untouched duplicate of `docs/`. Delete it, or the two will drift | Human | Any time |
 | 7 | Review the 19 event descriptions in `ANALYTICS_EVENT_DOCS` (`crates/offcut-api-types/src/analytics.rs`). The agent wrote them; the settings page shows them to users as written | Human | Before Prompt 22 |
+| 8 | Add the repository variable `VITE_ASSET_BASE_URL` on GitHub (Settings, Secrets and variables, Actions, Variables) with the value `https://assets.example.invalid`. Without it the second step of `ci.yml` fails | Human | Before the first CI run |
+| 9 | Push `main` and the branch `v1-ci`, open a pull request from `v1-ci` into `main`, confirm that CI is green, merge (G§7.5). The workflow has never run: see the Prompt 26 entry for what the first run may show | Human | Before Prompt 27 |
 
 ## Known issues for later prompts
 
 | # | Issue | Affects |
 |---|---|---|
 | 1 | Local Postgres listens on port **9000**. The docs write the dev connection string with 5432. Use `postgres://offcut:offcut@localhost:9000/offcut_dev` in `.env` and in every `psql` command | Prompts 09, 11-13, 23 |
-| 4 | CI must install binaryen `version_133` and `wasm-bindgen-cli` 0.2.129, the versions used locally | Prompt 26 |
-| 5 | `pnpm` is pinned at 10.15.0, the installed version named in G§1.4. pnpm reports 12.9.1 as available, and §3.1 says to pin the latest stable release. Not changed; decide before CI is written | Prompt 26 |
 | 6 | `cargo deny check` passes with warnings: `unused-wrapper` for the media and renderer crates, which do not exist until V2, and `duplicate` for ten crates present in two versions. They are warnings, not errors | Every `cargo deny check` |
 | 7 | `ts-rs` runs with `no-serde-warnings`, and Cargo applies that feature to every crate in the workspace. `ts-rs` will therefore stay silent about any serde attribute it cannot read. The JSON-shape tests are the guard for any type added later | Any new shared type |
 | 9 | Choices in the two type crates go beyond the letter of §6, §7 and §9. They are listed under "Differs from the specs" in the entries of Prompts 03 to 08. `v1implementation.md` has not been edited to match; reconcile it in the exit audit | Prompt 30 |
@@ -32,11 +32,10 @@
 | 18 | A 500 that comes from a panic in a handler does not carry `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. §10.11 puts the headers layer (4) inside the panic layer (3), so the response built after a panic never passes it. Every other response has both headers. Swapping the two layers would fix it; that is a change to the order the spec gives, so it is left for a decision | Prompt 30 |
 | 19 | The SIGTERM shutdown path of `main.rs` exists only on Unix and has not run: this machine is Windows. Check with `docker stop` that the container ends within the grace period | Prompt 27 |
 | 20 | The route table lives in `router.rs` and the modules have no `routes()` function, against §10.9, §10.10 and G§3.5 (see the Prompt 12 entry). Correct those sections | Prompt 30 |
-| 21 | `cargo test --workspace` needs `DATABASE_URL` in the environment, pointing at a Postgres whose role has `CREATEDB`: the 23 server integration tests create a database each. Locally: `set -a; . ./.env; set +a`. CI needs a Postgres service container and the variable | Prompt 26 |
 | 23 | TypeScript is pinned at 6.0.3, one major version behind the latest (7.0.2): `typescript-eslint` needs the compiler API, which version 7 does not have. Move to 7 when `typescript-eslint` supports it; `tsc` and ESLint must use the same version | Prompt 26, then any time |
-| 24 | `pnpm install` prints a peer warning: `eslint-plugin-react` 7.37.5 declares ESLint up to 9, and ESLint is 10.12.0. Its one rule in use, `react/jsx-no-literals`, was proven to fire and to pass under ESLint 10. Do not treat warnings as errors in the install step of CI | Prompt 26 |
 | 25 | `web/vercel.json` holds the placeholder hosts `render-host.example.invalid` and `assets.example.invalid`, and `web/.env.local` the second one. Replace all three with the real hosts (G§8.7); search for `example.invalid` | Prompt 28 |
 | 30 | **`PER_CHECK_TIMEOUT_MS` is 2,000, against the 1,000 of TS §13.2 and §11.8**, changed by the agent on 2026-10-07 (see the entry "the timeout of one check is 2 s"). With 1,000, the first page load in a freshly launched Chrome on the development machine was reported as `UNSUPPORTED_WEBGPU`: the GPU adapter answered after 1.2 s. Confirm or revert the value; it is one number in `web/src/platform/capability.ts`. Measure the cold start on R1 and R2: if a machine needs more than about 2.5 s, the "under 3 seconds" of PS §9.3 has to change too. Then correct TS §13.2 and §11.8 | Human; before the landing page goes public (Prompt 28) |
+| 31 | On a fresh clone `pnpm check` fails at ESLint and `tsc` until `pnpm build:wasm` has run once: `wasm/load-core.ts` imports files that the build writes and git ignores. `pnpm dev` and `pnpm build` build them; CI builds them in step 5, before step 6. Say so in a README when there is one | Any time |
 
 ---
 
@@ -1589,3 +1588,69 @@ Each script finds the repository root from its own location, so it runs from any
 - `tsc --noEmit`, `eslint .` and `vitest run` (76 tests) pass. `check-file-tree` passes with the four new files.
 
 **"Done when".** The box is ticked.
+
+---
+
+## 2026-10-07 - Prompt 26: root scripts and CI steps 1 to 9
+
+Closes known issues 4, 5, 21 and 24. Opens open items 8 and 9, and known issue 31. **This commit is on the branch `v1-ci`, not on `main`:** the prompt ends with a pull request, which needs one.
+
+**Added.** `.github/workflows/ci.yml`: one job on `ubuntu-latest`, on every pull request and on every push to `main`.
+
+**Changed.** `package.json`: the root scripts of G§7.2.
+
+| Script | Runs |
+|---|---|
+| `dev` | Unchanged from Prompt 23 |
+| `gen:types`, `build:wasm` | Unchanged |
+| `build:vite` | `vite build` in `web` |
+| `build` | `gen:types`, `build:wasm`, `build:vite`, `check-hosts.mjs` |
+| `check` | `cargo fmt --check`, clippy with `-D warnings`, `cargo deny check`, ESLint, `tsc --noEmit`, `check-file-tree.mjs`, `check-gen-clean.sh`, `check-copy-codes.mjs` |
+| `test` | `cargo test --workspace`, `vitest run` |
+| `e2e` | Playwright, project `non-media` |
+
+**`ci.yml`, in the order of TS §33.**
+
+1. Check out with the whole history; install Rust 1.99.0 from `rust-toolchain.toml`, Node 24 and pnpm 10.15.0; restore the Cargo and pnpm caches; install the build tools; scan the history for secrets with gitleaks.
+2. `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo deny check`.
+3. `pnpm gen:types`; `check-gen-clean.sh`.
+4. `cargo test --workspace`, with a `postgres:18` service container and `DATABASE_URL` pointing at it.
+5. `pnpm build:wasm`.
+6. ESLint; `tsc --noEmit`; `check-file-tree.mjs`; `check-copy-codes.mjs`.
+7. `vitest run`.
+8. `pnpm build:vite`; `check-hosts.mjs`.
+9. Install Chrome; `pnpm e2e`. The Playwright report of a failed run is kept for 7 days.
+
+The steps for `main` only (10 to 14: deploy, header check, smoke test) are not there yet; they need hosts and secrets (Prompt 28).
+
+**Choices in the workflow.**
+
+- **The build tools are the versions of the development machine**, downloaded as release archives and refused unless the SHA-256 matches the value written in the file: `wasm-bindgen` 0.2.129, `cargo-deny` 0.20.2, binaryen `version_133`, gitleaks 8.18.4. Compiling them with `cargo install` would add several minutes to every run.
+- **The four actions are pinned to a commit**, with the version as a comment: `actions/checkout` v7, `actions/setup-node` v7, `actions/cache` v6, `actions/upload-artifact` v7. No action from outside the `actions` organisation is used; pnpm comes from Corepack and the `packageManager` field.
+- **`SQLX_OFFLINE` is `true` for the whole job**, so no step needs a database to compile.
+- **`VITE_ASSET_BASE_URL` is a repository variable, with no default.** The second step fails with a message that says so when it is not set (open item 8).
+- `permissions` is `contents: read`. A newer push to a pull request cancels the run of the older one.
+
+**Differs from the specs.**
+
+- **pnpm stays at 10.15.0** (known issue 5, now closed). §3.1 says to pin the latest stable release; 12.9.1 is two major versions on, and the lock file and every script were written and tested with 10.15.0. Move when there is a reason.
+- **The secret scan is gitleaks.** §12.7 says "secret scan" and names no tool.
+
+**Checked.**
+
+- **The four commands in one run**, with `.env` loaded: `pnpm check && pnpm test && pnpm build && pnpm e2e` exits with 0. In it: all eight checks of `check`; 170 Rust tests and 76 web tests; `check-hosts` on the fresh build; 12 Playwright cases.
+- **`ci.yml` passes actionlint 1.7.12** (syntax, expressions, the inputs of the four actions).
+- **Every download of the workflow was made once by hand:** the four archives exist at the URLs the workflow builds, their SHA-256 values equal the ones in the file, and each holds its binary at the path the workflow reads it from.
+- **gitleaks 8.18.4, run locally over the whole history** (31 commits): no leaks found. The first run in CI should therefore not fail on a false alarm.
+- The tags of the four actions were read from GitHub on this date, and the commit of each is what the file pins.
+- No file of the repository holds a control character. One had got into `ci.yml` through a shell quoting fault while it was written, and actionlint refused the file; it was found and removed before the commit.
+
+**Not checked: the workflow has never run.** It cannot run on this machine. What only the first run on GitHub will show: that the runner's `rustup` and Corepack accept the commands as written, that the `postgres:18` image starts and is healthy, and that all 12 Playwright cases pass in the runner's Chrome, which has no WebGPU (they passed locally on a Chrome started without it).
+
+**Human steps** (open items 8 and 9). The prompt's "open a PR; CI green; merge" is yours:
+
+1. On GitHub: Settings, Secrets and variables, Actions, Variables. Add `VITE_ASSET_BASE_URL` with the value `https://assets.example.invalid`, the host that `web/vercel.json` names today. Prompt 28 changes both.
+2. `git push origin main`, then `git push -u origin v1-ci`, and open a pull request from `v1-ci` into `main`.
+3. When CI is green, merge it. If a step fails, the log names it; the three risks above are the likely ones.
+
+**"Done when".** The first half is ticked: the four-command local run passes in one go. The second half, CI green on the pull request and the merge, is open until the steps above are done.
