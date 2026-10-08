@@ -55,15 +55,17 @@ deny = [
   # themselves; cargo-deny checks every direct parent, not only ours.
   # - `reqwest` (a dev-dependency of the server), `wasm-bindgen-futures`,
   #   `web-sys` and `js-sys` use the browser crates when built for wasm.
-  # - `uuid`, `rand` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # - `uuid`, `rand`, `rand_core` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # - `proptest`, a dev-dependency of the media crates, uses `rand`. A test may
+  #   draw random cases; the `cargo tree` check keeps `rand` out of the crates.
   # `uuid` is also a dependency of the pure crates, which take it without its
   # random features; that is checked with `cargo tree`, not here.
   { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest"] },
   { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys"] },
   { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys"] },
   { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres"] },
-  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "ring"] },
+  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres", "proptest"] },
+  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring"] },
 
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.

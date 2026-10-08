@@ -35,6 +35,9 @@
 | 7 | No ESLint rule covers `vite.config.ts`, `vitest.config.ts` or `playwright.config.ts`, as in V1. They are type-checked only | Prompts 43, 56 |
 | 8 | **The secret scan of CI (gitleaks 8.18.4) takes a 44-character base64 literal assigned to a name with `KEY` in it for a secret.** Found in Prompt 33 with the same version run locally. Such a line must end with a `gitleaks:allow` comment **in the commit that first adds it**: the scan reads the whole history, so a comment added in a later commit does not clear the finding. The test public key (`fake-api.ts` in Prompt 46, `ci.yml` in Prompt 58) is such a literal. Before a commit that adds one, fetch the release archive of that version, check its SHA-256 against the published checksum file, and run `gitleaks detect --no-git --source <folder> --redact` | Prompts 46, 58 |
 | 9 | Chrome under Playwright, headless, gives a module worker WebGPU, both encoders and a sync OPFS handle on the development machine (Prompt 33). The adapter is the integrated Intel GPU, not the GTX 1650. No headed run and no launch argument was needed | Every browser check |
+| 10 | **`crates/offcut-mp4/src/boxes.rs` has 392 lines above its test module and `sample_table.rs` 387; the limit is 400** (`cargo fmt` puts most signatures and struct literals on several lines). Prompt 35 writes `demux.rs`, `probe.rs` and `validate.rs` and should add nothing to these two. Code that must go into one of them needs room made first | Prompts 35, 41 |
+| 11 | **What Prompt 35 builds on in `offcut-mp4`** (entry of Prompt 34). To reach a box: `children`, `child`, `descend(r, top, path)`; the whole file can be given as a `BoxHeader` whose `body` is 0 and whose `end` is the file length. `read_stsd(r, h, handler)` needs the handler type from `read_hdlr`. `read_stsz(r, h, MAX_RESOLVED_SAMPLES)` returns the count always and the size table only for a track that will be resolved; for a longer track the other per-sample tables (`ctts`, `stsc`, `stco`/`co64`, `stss`) need not be read, and `resolve` does not look at them. `stts` and `elst` are always needed. `RawTables.movie_timescale` is from `mvhd`. `SampleEntry.object_type` is the object type indication of `esds` (0x40 AAC; 0x69, 0x6B MP3). A `tkhd` matrix is the nine stored values: 65536 is 1.0 | Prompt 35 |
+| 12 | `proptest` writes a folder `proptest-regressions/` beside the crate when a property fails. It is not in the tree of TS §5: delete it once the failure is fixed, or the file-tree check fails | Prompts 35, 36, 41 |
 
 ---
 
@@ -266,3 +269,105 @@ No `false` and no error key: the gate of this prompt is passed and nothing goes 
 - [x] The probe printed `webgpuCanvas`, `h264`, `aac`, `opfsSync` all `true` under `vite preview`, with no line starting "Refused to".
 - [x] The clip reads 1280x720, H.264 and AAC, 48 kHz stereo, 74,705 ms, at most 40,000,000 bytes, two white frames.
 - [ ] `git grep -n "zz-probe" -- web` is empty (done); G M-1 passes (done); **the draft pull request is open and `ci` is green: the human's, not done** (open item 4).
+
+## 2026-10-09 - Prompt 34: `offcut-mp4`: errors, reader, boxes, sample tables
+
+**Started before the `ci` run of Prompt 33 was read.** The prompts file asks for every "Done when" box of the previous prompt first. The push is the human's and had not been made; the human asked for Prompts 33 and 34 in one sitting. Open item 4 stands.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-mp4/src/reader.rs` | `RandomAccess` (TS §15.1) and `MemReader`, the file in memory that tests use: a read past `len()` is `IoError::OutOfBounds`. `Cursor`: big-endian fields from bytes already in memory; a read past their end is `Truncated` |
+| `crates/offcut-mp4/src/boxes.rs` | `BoxHeader`, `read_header`, `children` (§6.3); `child` and `descend`; the readers `read_ftyp`, `read_mvhd`, `read_mdhd`, `read_tkhd`, `read_hdlr`, `read_stsd` with their structs `Ftyp`, `TimeHeader`, `Tkhd`, `SampleEntry` |
+| `crates/offcut-mp4/src/sample_table.rs` | `Sample`, `TrackTable`, `RawTables`, `resolve` (§6.4, steps 1 to 6), `MAX_RESOLVED_SAMPLES` (20,000); the readers `read_stts`, `read_ctts`, `read_stsc`, `read_stsz`, `read_stco`, `read_co64`, `read_stss`, `read_elst` with `StscEntry`, `Stsz`, `Edit` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-mp4/src/lib.rs` | The three modules; `IoError` (3 variants), `ContainerError` (6), `MuxError` (4), as §6.1. `Malformed` and `Unsupported` carry a `&'static str`, so they cannot carry bytes of the file |
+| `crates/offcut-mp4/Cargo.toml` | `offcut-types`, `thiserror`; dev `proptest` with the feature `std` |
+| `Cargo.toml` | `[workspace.dependencies]`: `proptest = { version = "1.11.0", default-features = false }` |
+| `deny.toml` | Two wrappers, both third-party crates (G 2.1): `proptest` for `rand`, `rand_core` for `getrandom`. `cargo deny check` named `rand 0.9.5` and `getrandom 0.3.4`; their direct parents were read with `cargo tree -i` |
+| `docs/v2/v2implementation.md` | §6.2 and §6.3 say what was built (2 replacements, each applied once) |
+
+**Pinned.** `proptest` 1.11.0, the latest release (`cargo search`), without its default features: no fork, no timeout, no temporary files. `thiserror` was already in the workspace (2.0.21).
+
+**The bounds, and where each is.**
+
+| Bound | Where |
+|---|---|
+| A box must end at or before its limit, and the limit is never past the end of the file | `read_header` |
+| At most 4,096 children in one container: `Malformed("children")` | `children` |
+| A path of more than 16 nested boxes: `Malformed("depth")` | `descend` |
+| A table cannot have more records than its box has bytes for: `Malformed(<box>)`, checked before the records are read | `load_table` |
+| A header box is read up to the bytes its fields need, never whole | `load` |
+| An `avcC` or `esds` box over 1 MiB: `Malformed` | `load_descriptor` |
+| A track of more than 20,000 samples is left unresolved: no per-sample memory, and no error | `resolve`; `read_stsz` does not load its size table |
+
+**Decided here, where the plan gives a name and no shape, or is silent.** Each is the smallest choice that keeps Prompt 35 able to write `demux.rs` and `probe.rs` as §6.5 and §6.6 describe them.
+
+- **`BoxHeader.body` is an offset,** the first byte after the header, like `start` and `end`. `body_len()` gives the length.
+- **`RawTables`** (§6.4 names it and gives no fields): `timescale` (from `mdhd`), `movie_timescale` (from `mvhd`; an edit's length is in it), `file_len`, `stts`, `ctts`, `stsc`, `stsz`, `chunk_offsets` (from `stco` or `co64`), `stss`, `elst`. An absent `ctts` or `elst` is an empty list; an absent `stss` is `None`.
+- **`SampleEntry`** (§6.3 lists its content): the four-character code; width and height; channel count and sample rate; `object_type`, the object type indication of `esds`, which §6.6 needs to tell AAC from MP3; `config`, the raw `avcC` payload or the `AudioSpecificConfig`.
+- **`read_stsd` takes the track's handler type** (`vide`, `soun`). A sample entry does not say which of the two layouts it has; `hdlr` does. For audio it reads the three layouts QuickTime and ISO files use (versions 0, 1 and 2) and finds `esds` directly in the entry or inside `wave`.
+- **`read_stsz` takes the largest size table it may load.** The count is always returned.
+- **A `ctts` offset is an `i64`:** version 0 is read unsigned and version 1 signed, into one type.
+- **Fewer than 8 bytes left in a container end its list of children** without an error: padding, or the terminator QuickTime writes. §6.3 does not name the case.
+- **An edit of length 0** shows the media from its start time to its end. §6.4 does not name the case; read literally it would give a track of length 0.
+- **An edit's length is converted to the media timescale to the nearest tick.**
+- **Lenient where a table is longer or shorter than the track:** a `ctts` that covers fewer samples leaves the rest at `pts = dts`; a number in `stss` past the last sample is ignored. Chunks that run out before the samples do are `Malformed("stsc")`; a size table whose length is not the sample count is `Malformed("stsz")`.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The readers of the eight sample-table boxes are in `sample_table.rs`, not in `boxes.rs`** as §6.3 lists them. With all fourteen readers `boxes.rs` had 565 lines after `cargo fmt`, over the limit of 400 (TS §29). The tree of TS §5 already describes `sample_table.rs` by those eight boxes, so no file was added. §6.3 of the plan says so now.
+- **`RandomAccess` has one provided method more than TS §15.1, `is_empty()`.** Copied verbatim, the trait fails clippy (`len_without_is_empty`), and no lint is switched off to pass a gate. An implementation does not write the method. To copy back into TS §15.1 (Prompt 60).
+- **The depth bound is in `descend`,** not in `children`: the signature §6.3 gives `children` has no depth, and `BoxHeader` has no field for one. Nothing in the crate walks boxes recursively, so `descend` is the only place a file could ask for depth.
+- **`proptest` is used already,** in one of the seven cases, so the dependency is not dead until Prompt 41: any bytes, any offset and any limit never make `read_header` panic, a header it returns lies inside its limit, and `children` and four readers run on it without a panic.
+
+**Tests (inline): the seven rows of §6.9 for this prompt.**
+
+| Row of §6.9 | Test |
+|---|---|
+| Header with 32-bit size, 64-bit size, size 0 | `boxes::a_header_with_a_32_bit_size_a_64_bit_size_and_size_0` (also `children` and `descend` on the three boxes, and the depth bound) |
+| Box that ends past the limit | `boxes::a_box_that_ends_past_the_limit_is_truncated` (also a size under the header length, a cut header, a 64-bit size of `u64::MAX`, 4,097 children, and the property above) |
+| `stts` counts that do not sum to the `stsz` count | `sample_table::stts_counts_that_do_not_sum_to_the_stsz_count_are_malformed` |
+| `ctts` version 1 with a negative offset | `sample_table::ctts_version_1_with_a_negative_offset_puts_pts_before_dts` (the box is built in bytes and read with `read_ctts`) |
+| No `stss` | `sample_table::without_stss_every_sample_is_a_keyframe` |
+| One media edit with `media_time` = 2 frames | `sample_table::one_media_edit_of_two_frames_presents_the_first_frame_at_zero` (also a leading empty edit) |
+| Two media edits | `sample_table::two_media_edits_are_unsupported` |
+
+**The drill.** `let _ = v[0];` in the non-test code of `boxes.rs`: `cargo clippy -p offcut-mp4 --all-targets -- -D warnings` fails with "indexing may panic". Reverted from a copy.
+
+**A real file, read with a temporary test (not asked for until Prompt 35; never committed).** The readers and `resolve` on `testclips/speech_scriptA_landscape_720p.mp4`, beside `ffprobe`:
+
+| Read | This crate | `ffprobe` |
+|---|---|---|
+| Top-level boxes | `ftyp`, `moov`, `free`, `mdat` | - |
+| Video samples | 2,246, resolved | 2,246 frames |
+| Video keyframes (`stss`) | 10 | 10 |
+| Video, presented | 2,241,151 ticks of 30,000: 74.705033 s | 74.705033 s |
+| Video edit list | One media edit, `media_time` 2,393; the first frame's `pts` minus the offset is 0, and it is the smallest | Start time 0 |
+| `avcC` | 41 bytes, starting `01 4d 40 1f` (Main) | Main |
+| Video entry, `tkhd` | `avc1`, 1280x720; identity matrix; enabled | `avc1` |
+| Audio samples | 3,493, resolved, every one a keyframe | 3,493 frames |
+| Audio, presented | 3,576,841 ticks of 48,000: 74.517521 s | 74.517521 s |
+| Audio entry | `mp4a`, 2 channels, 48,000 Hz, object type 0x40, `AudioSpecificConfig` `11 90` | `mp4a`, LC |
+| Last video sample | Ends at byte 35,201,023, the length of the file | - |
+
+Every value agrees. The test and its name are gone: `git grep -n zz_real -- crates` prints nothing.
+
+**Checked.**
+
+- `cargo test -p offcut-mp4 --lib`: 7 passed. `cargo clippy -p offcut-mp4 --all-targets -- -D warnings`: clean.
+- `cargo deny check`: advisories, bans, licenses, sources ok. `node scripts/check-file-tree.mjs`: 143 files in the tree, and `offcut-mp4` checked as a pure crate (its normal dependencies resolve no browser or randomness crate; `proptest` is a dev-dependency).
+- Lines above the test module: `boxes.rs` 392, `sample_table.rs` 387, `reader.rs` 97, `lib.rs` 54.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **177 Rust, 76 Vitest, 12 Playwright** (Rust was 170; the seven are new).
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-mp4 --lib` and `cargo clippy -p offcut-mp4 --all-targets -- -D warnings` pass; the seven rows are covered.
+- [x] `cargo deny check` and `node scripts/check-file-tree.mjs` pass with `offcut-mp4` now checked as a pure crate.
+
+**Not checked.** `ci`: nothing was pushed (open item 4). `cargo deny` and clippy ran on Windows only.

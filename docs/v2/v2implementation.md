@@ -478,7 +478,7 @@ pub enum MuxError { Io(IoError), BadConfig(&'static str), OutOfOrder, MoovOverfl
 
 ### 6.2 `reader.rs`
 
-Copy the `RandomAccess` trait of TS §15.1 verbatim. Add `pub struct MemReader(pub Vec<u8>)` implementing `RandomAccess`; its counterpart `pub struct MemSink(pub Vec<u8>)` implementing `MuxSink` lives in `mux.rs` and grows the vector on a write past the end. Both are used by tests and by nothing else. A read past `len()` returns `IoError::OutOfBounds`.
+Copy the `RandomAccess` trait of TS §15.1 verbatim. As built (Prompt 34) it has one provided method more, `is_empty()`, which clippy requires beside `len()`; an implementation does not write it. `reader.rs` also holds `Cursor`, which reads big-endian fields from bytes already in memory and returns `Truncated` past their end. Add `pub struct MemReader(pub Vec<u8>)` implementing `RandomAccess`; its counterpart `pub struct MemSink(pub Vec<u8>)` implementing `MuxSink` lives in `mux.rs` and grows the vector on a write past the end. Both are used by tests and by nothing else. A read past `len()` returns `IoError::OutOfBounds`.
 
 ### 6.3 `boxes.rs`
 
@@ -497,7 +497,7 @@ pub fn children<R: RandomAccess>(r: &mut R, parent: &BoxHeader) -> Result<Vec<Bo
 | More than 4,096 children in one container (D-60) | `Malformed("children")` |
 | Unknown box type | Skipped by its size; never an error |
 
-Typed readers, each taking a `BoxHeader` and returning a plain struct: `ftyp` (major brand, compatible brands), `mvhd` (timescale, duration), `tkhd` (flags, matrix, width, height), `mdhd` (timescale, duration), `hdlr` (handler type), `stsd` (first sample entry: four-character code, coded width and height or channel count and sample rate, and the raw `avcC` payload or the `AudioSpecificConfig` extracted from `esds`), `stts`, `ctts`, `stsc`, `stsz`, `stco`, `co64`, `stss`, `elst`. `stsz` with a constant sample size is supported. Table entry counts are bounded by `body length / entry size` before any allocation.
+Typed readers, each taking a `BoxHeader` and returning a plain struct: `ftyp` (major brand, compatible brands), `mvhd` (timescale, duration), `tkhd` (flags, matrix, width, height), `mdhd` (timescale, duration), `hdlr` (handler type), `stsd` (first sample entry: four-character code, coded width and height or channel count and sample rate, and the raw `avcC` payload or the `AudioSpecificConfig` extracted from `esds`), `stts`, `ctts`, `stsc`, `stsz`, `stco`, `co64`, `stss`, `elst`. `stsz` with a constant sample size is supported. Table entry counts are bounded by `body length / entry size` before any allocation. As built (Prompt 34): the readers of the eight sample-table boxes (`stts`, `ctts`, `stsc`, `stsz`, `stco`, `co64`, `stss`, `elst`) are in `sample_table.rs`, beside `resolve`, because `boxes.rs` with all fourteen readers exceeds 400 lines (TS §29); `read_stsd` also takes the track's handler type, which says how to read the entry; `read_stsz` also takes the largest size table it may load, so that a track left unresolved (section 6.4, step 6) costs no memory; an `avcC` or `esds` box over 1 MiB is `Malformed`; and the depth bound of D-60 is in `descend`, the one function that follows a path of nested boxes.
 
 ### 6.4 `sample_table.rs`
 

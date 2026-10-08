@@ -6,3 +6,10 @@ publish = false
 
 [lints]
 workspace = true
+
+[dependencies]
+offcut-types = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true, features = ["std"] }
