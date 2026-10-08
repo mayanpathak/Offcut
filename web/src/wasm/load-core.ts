@@ -5,11 +5,48 @@
 // ./pkg/core/ (not in git). Vite serves the .wasm file from the app's own
 // origin under a content-hashed name, as `application/wasm`.
 
-import initCore, { core_version } from "./pkg/core/offcut_core";
+import { type Bytes, type ClipInfo, type Hz, type ProbeInfo, REJECT_REASONS, type RejectReason } from "../gen/domain";
+import initCore, {
+  core_version,
+  type DemuxerHandle,
+  open_demuxer,
+  probe_and_validate,
+  resample,
+  Sha256Stream,
+} from "./pkg/core/offcut_core";
 import coreWasmUrl from "./pkg/core/offcut_core_bg.wasm?url";
 
-/** What the module offers. V2 adds the media, text and hashing functions. */
-export type CoreApi = { coreVersion(): string };
+/** One compressed audio frame, with its place on the clip's timeline in microseconds. */
+export type AudioSample = { data: Uint8Array; ptsUs: number; durationUs: number };
+
+/** A file the demuxer has opened. `free()` gives its memory in the module back. */
+export type CoreDemuxer = {
+  probe(fileSize: Bytes): ProbeInfo;
+  /** The raw `avcC` payload. */
+  videoDescription(): Uint8Array | undefined;
+  /** The `AudioSpecificConfig`. */
+  audioDescription(): Uint8Array | undefined;
+  audioSampleCount(): number;
+  readAudioSample(index: number): AudioSample;
+  free(): void;
+};
+
+/**
+ * What the module offers. A rejection is a value; a failure is thrown as the
+ * plain object `{ code, detail }` the module made (TS §11.1, §11.3).
+ * V2 adds `normalizeTranscript` with the text crate.
+ */
+export type CoreApi = {
+  coreVersion(): string;
+  openDemuxer(handle: FileSystemSyncAccessHandle): CoreDemuxer | { rejected: RejectReason };
+  probeAndValidate(
+    d: CoreDemuxer,
+    fileSize: Bytes,
+    decodeSupported: boolean,
+  ): { ok: ClipInfo } | { rejected: RejectReason };
+  resample(input: Float32Array, from: Hz, to: Hz): Float32Array;
+  newSha256(): { update(chunk: Uint8Array): void; finalizeHex(): string };
+};
 
 let compiled: Promise<WebAssembly.Module> | undefined;
 let loaded: Promise<CoreApi> | undefined;
@@ -32,14 +69,77 @@ export async function preloadCore(): Promise<void> {
   await compile();
 }
 
+// The module's own object behind each demuxer this file handed out.
+const handles = new WeakMap<CoreDemuxer, DemuxerHandle>();
+
+function isRejection(thrown: unknown): thrown is { rejected: RejectReason } {
+  if (typeof thrown !== "object" || thrown === null || !("rejected" in thrown)) {
+    return false;
+  }
+  const reasons: readonly unknown[] = REJECT_REASONS;
+  return reasons.includes(thrown.rejected);
+}
+
+function wrapDemuxer(handle: DemuxerHandle): CoreDemuxer {
+  const demuxer: CoreDemuxer = {
+    probe: (fileSize) => handle.probe(fileSize) as ProbeInfo,
+    videoDescription: () => handle.video_description(),
+    audioDescription: () => handle.audio_description(),
+    audioSampleCount: () => handle.audio_sample_count(),
+    readAudioSample: (index) => handle.read_audio_sample(index) as AudioSample,
+    free: () => {
+      handles.delete(demuxer);
+      handle.free();
+    },
+  };
+  handles.set(demuxer, handle);
+  return demuxer;
+}
+
+const api: CoreApi = {
+  coreVersion: core_version,
+  openDemuxer(handle) {
+    try {
+      return wrapDemuxer(open_demuxer(handle));
+    } catch (thrown) {
+      // A file that is not an MP4 or MOV, or a broken one: a value. Anything
+      // else is a failure and goes on to the caller as it was thrown.
+      if (isRejection(thrown)) {
+        return thrown;
+      }
+      throw thrown;
+    }
+  },
+  probeAndValidate(d, fileSize, decodeSupported) {
+    const handle = handles.get(d);
+    if (handle === undefined) {
+      throw new Error("probeAndValidate: this demuxer was freed, or was not opened by openDemuxer");
+    }
+    return probe_and_validate(handle, fileSize, decodeSupported) as { ok: ClipInfo } | { rejected: RejectReason };
+  },
+  resample: (input, from, to) => resample(input, from, to),
+  newSha256() {
+    const stream = new Sha256Stream();
+    return {
+      update: (chunk) => {
+        stream.update(chunk);
+      },
+      // The module frees the stream when it hands the digest over.
+      finalizeHex: () => stream.finalize_hex(),
+    };
+  },
+};
+
 /**
- * Instantiates the compiled module, compiling it first if needed. For
- * workers: the main thread never runs WASM (INV-17).
+ * Instantiates the compiled module, compiling it first if needed. For the
+ * workers, and for the model manager, which hashes a downloaded file on the
+ * main thread in short slices (v2implementation D-36). That is the one use
+ * on the main thread: no media work runs there (INV-17).
  */
 export function loadCore(): Promise<CoreApi> {
   loaded ??= compile()
     .then((module) => initCore({ module_or_path: module }))
-    .then((): CoreApi => ({ coreVersion: core_version }))
+    .then((): CoreApi => api)
     .catch((error: unknown) => {
       loaded = undefined;
       throw error;

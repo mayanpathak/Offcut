@@ -36,8 +36,8 @@
 | 7 | No ESLint rule covers `vite.config.ts`, `vitest.config.ts` or `playwright.config.ts`, as in V1. They are type-checked only | Prompts 43, 56 |
 | 8 | **The secret scan of CI (gitleaks 8.18.4) takes a 44-character base64 literal assigned to a name with `KEY` in it for a secret.** Found in Prompt 33 with the same version run locally. Such a line must end with a `gitleaks:allow` comment **in the commit that first adds it**: the scan reads the whole history, so a comment added in a later commit does not clear the finding. The test public key (`fake-api.ts` in Prompt 46, `ci.yml` in Prompt 58) is such a literal. Before a commit that adds one, fetch the release archive of that version, check its SHA-256 against the published checksum file, and run `gitleaks detect --no-git --source <folder> --redact` | Prompts 46, 58 |
 | 9 | Chrome under Playwright, headless, gives a module worker WebGPU, both encoders and a sync OPFS handle on the development machine (Prompt 33). The adapter is the integrated Intel GPU, not the GTX 1650. No headed run and no launch argument was needed | Every browser check |
-| 10 | **`crates/offcut-mp4/src/boxes.rs` has 392 lines above its test module and `sample_table.rs` 387; the limit is 400** (`cargo fmt` puts most signatures and struct literals on several lines). Prompt 35 writes `demux.rs`, `probe.rs` and `validate.rs` and should add nothing to these two. Code that must go into one of them needs room made first | Prompts 35, 41 |
-| 11 | **What Prompt 35 builds on in `offcut-mp4`** (entry of Prompt 34). To reach a box: `children`, `child`, `descend(r, top, path)`; the whole file can be given as a `BoxHeader` whose `body` is 0 and whose `end` is the file length. `read_stsd(r, h, handler)` needs the handler type from `read_hdlr`. `read_stsz(r, h, MAX_RESOLVED_SAMPLES)` returns the count always and the size table only for a track that will be resolved; for a longer track the other per-sample tables (`ctts`, `stsc`, `stco`/`co64`, `stss`) need not be read, and `resolve` does not look at them. `stts` and `elst` are always needed. `RawTables.movie_timescale` is from `mvhd`. `SampleEntry.object_type` is the object type indication of `esds` (0x40 AAC; 0x69, 0x6B MP3). A `tkhd` matrix is the nine stored values: 65536 is 1.0 | Prompt 35 |
+| 10 | **`crates/offcut-mp4/src/boxes.rs` has 392 lines above its test module, `sample_table.rs` 387 and `demux.rs` 369; the limit is 400** (`cargo fmt` puts most signatures and struct literals on several lines). Code that must go into one of them needs room made first. The muxer has its own two files | Prompts 41, 48 |
+| 11 | **What Prompt 37 builds on** (entries of Prompts 35 and 36). In a worker: `const core = await loadCore()`; `core.openDemuxer(syncHandle)` returns a `CoreDemuxer` or `{ rejected }` (test with `"rejected" in result`); `demuxer.probe(size)` gives the `ProbeInfo` whose `video.codec_string` and `demuxer.videoDescription()` go into `VideoDecoder.isConfigSupported`; `core.probeAndValidate(demuxer, size, supported)` gives `{ ok }` or `{ rejected }`. Audio: `audioDescription()`, `audioSampleCount()`, `readAudioSample(i)` with `ptsUs` (may be negative) and `durationUs`. A failure is thrown as the plain object `{ code, detail }`, not an `Error`. Call `demuxer.free()` when done, before closing the handle. `core.resample(pcm, from, to)` returns exactly `round(len x to / from)` samples. `offcut-mp4` also has a test-only module, `demux::fixture`, that builds small MP4 files | Prompts 37, 41 |
 | 12 | `proptest` writes a folder `proptest-regressions/` beside the crate when a property fails. It is not in the tree of TS §5: delete it once the failure is fixed, or the file-tree check fails | Prompts 35, 36, 41 |
 
 ---
@@ -484,3 +484,96 @@ No expectation was adjusted. `git grep -n zz_real_clip -- crates web scripts` pr
 - [x] `validate_probe` has 11 rejecting branches, read against TS §15.2 line by line; G M-2 passes.
 
 **Human.** Push; read `ci` (open item 4).
+
+## 2026-10-09 - Prompt 36: resampler, core bindings, `CoreApi`
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-dsp/src/resample.rs` | `resample_mono(input, from, to)` (§7, TS §18.1) and its four inline tests |
+| `crates/offcut-wasm-core/src/hash_api.rs` | `Sha256Stream`: `new`, `update`, `finalize_hex` (64 lower-case hex digits) |
+| `crates/offcut-wasm-core/src/media_api.rs` | `DemuxerHandle`, `open_demuxer`, `probe_and_validate`, `resample`, and the five methods of D-53 (`probe`, `video_description`, `audio_description`, `audio_sample_count`, `read_audio_sample`); the private `JsRandomAccess` over a `FileSystemSyncAccessHandle` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-dsp/src/lib.rs` | `pub mod resample;` and `DspError { Empty, NonFinite }`, unused until V3 |
+| `crates/offcut-dsp/Cargo.toml` | `offcut-types`, `rubato` (feature `fft_resampler`), `thiserror`; dev `proptest` |
+| `crates/offcut-wasm-core/Cargo.toml` | `offcut-mp4`, `offcut-dsp`, `js-sys`, `web-sys` (features `FileSystemSyncAccessHandle`, `FileSystemReadWriteOptions`), `serde`, `serde-wasm-bindgen`, `sha2`. Not `offcut-text` (Prompt 42) |
+| `crates/offcut-wasm-core/src/lib.rs` | `mod hash_api; mod media_api;` and three helpers: `failure(code, detail)`, the plain object `{ code, detail }`; `to_plain` and `to_js`, every conversion through `Serializer::json_compatible()` (D-31). The panic hook and `core_version` are untouched |
+| `Cargo.toml` | `[workspace.dependencies]`: `offcut-mp4`, `offcut-dsp` (paths), `rubato`, `js-sys`, `web-sys`, `serde-wasm-bindgen` |
+| `deny.toml` | One wrapper, a third-party crate: `serde-wasm-bindgen` for `js-sys` and for `wasm-bindgen` (named by `cargo deny check`; parents read with `cargo tree -i`) |
+| `web/src/wasm/load-core.ts` | `CoreApi` of §13.3 without `normalizeTranscript`; the types `CoreDemuxer` and `AudioSample`; the comment on `loadCore()` corrected (D-36): the model manager is the one caller on the main thread |
+
+**Pinned.** `rubato` 5.0.1 (latest; without its default features, then `fft_resampler`), `serde-wasm-bindgen` 0.6.5 (latest), `js-sys` 0.3.106 and `web-sys` 0.3.106 (the releases that go with `wasm-bindgen` 0.2.129, and what `Cargo.lock` already held). `sha2` 0.11.0 was in the workspace. Brought in by `rubato`: `realfft` 3.5.0, `rustfft` 6.4.1, `audioadapter` 5.0.0. No license was added to `deny.toml`.
+
+**The `wasm-bindgen` pair.** After `cargo check -p offcut-wasm-core --target wasm32-unknown-unknown`: `Cargo.lock` has the crate at 0.2.129 and `wasm-bindgen --version` prints 0.2.129. No dependency asked for a newer one; the pin was not touched.
+
+**The resampler.** `rubato`'s synchronous FFT resampler, 1,024 frames per call, one channel. The whole clip goes through `process_all`, which removes the resampler's start-up delay; the result is then cut or padded with silence to exactly `round(len x to / from)`, computed in integers. `from == to` is a copy. Empty input or a rate of 0 is an empty vector. The signature returns no error (TS §18.1), and with rates above 0 the library has none to give; if it ever did, the function returns silence of the promised length, so that the length rule holds for any input.
+
+**Shapes, as built (§13.2).**
+
+| Call | Success | Failure |
+|---|---|---|
+| `open_demuxer` | `DemuxerHandle` | Throws `{ rejected: "REJECT_CONTAINER" }` for `NotIsoBmff` and `Fragmented`, `{ rejected: "REJECT_CORRUPT" }` for `Truncated`, `Malformed`, `Unsupported`; `{ code: "E_STORAGE_IO", detail }` for `Io`, and when the size of the file cannot be read |
+| `probe` | `ProbeInfo` | `{ code: "E_INTERNAL", detail: "Serialize" }` |
+| `probe_and_validate` | `{ ok: ClipInfo }` or `{ rejected: RejectReason }`, both returned | As `probe` |
+| `read_audio_sample` | `{ data: Uint8Array, ptsUs, durationUs }` | `{ code: "E_DECODE_AUDIO", detail }` |
+
+`detail` is the name of the error's variant (`"Malformed"`, `"Read"`), written out in two `match` statements; the box name a `Malformed` carries is not passed on. `JsRandomAccess` reads the size once, in `open_demuxer`, and calls `read(buffer, { at })` per read; fewer bytes than asked for is `IoError::Read`.
+
+**`load-core.ts`.** `openDemuxer` returns a thrown `{ rejected }` as a value, after checking the reason against `REJECT_REASONS`, and rethrows anything else unchanged. Decided here, because §13.3 uses the name `CoreDemuxer` and does not define it: it is an object with `probe`, `videoDescription`, `audioDescription`, `audioSampleCount`, `readAudioSample` and `free`, typed with the generated types, so that a worker never handles the `any` the module's own declarations give. The module's handle behind it is kept in a `WeakMap`; `probeAndValidate` on a demuxer that was freed throws an `Error`.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **Two inline tests in `offcut-wasm-core`,** which the prompt does not ask for: the digest of `"abc"` fed in two pieces, and the table of §6.1 (which failure of `open` is which rejection or code). Both run natively; neither calls into JavaScript.
+- **`DemuxerHandle` keeps the bytes of the last sample read,** so that reading 3,493 audio frames does not allocate 3,493 times. The object returned holds its own copy.
+- **A browser check of the media exports, which the prompt leaves to Prompt 37** (below).
+
+**Tests (inline): the four rows of §7.**
+
+| Row of §7 | Test |
+|---|---|
+| proptest: lengths 0 to 200,000; (44,100; 48,000), (48,000; 16,000), (48,000; 48,000) | `the_output_length_is_the_rounded_input_length_times_the_rate_ratio` (48 cases) |
+| A 1 kHz sine at 48 kHz resampled to 16 kHz | `a_1_khz_sine_keeps_its_level_and_its_phase`: peak within 1% of 1.0; the falling zero crossing within one output sample of its place |
+| An impulse at sample 4,800 | `an_impulse_stays_where_it_was_in_time`: the output peak is at 1,600 plus or minus 1 |
+| Same input twice | `the_same_input_twice_gives_byte_identical_output` (also `from == to`, empty input, a rate of 0, and one exact length: 30,000 samples from 44,100 to 48,000 give 32,653) |
+
+**Browser check (dev).** `vite` on port 5173, a temporary Playwright case.
+
+| Asked | Result |
+|---|---|
+| The SHA-256 of `"abc"` through `core.newSha256()` | `ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad` |
+| `core.resample(new Float32Array(48000), 48000, 16000).length` | 16000 |
+
+Not asked, and run with a temporary module worker (`zz-demux.worker.ts`): the reference clip written to OPFS and opened through a synchronous handle, so the path a file takes in Prompt 37 was exercised once here.
+
+| Read in the worker | Result |
+|---|---|
+| `probe(size)` | A plain object with the fields of the generated `ProbeInfo`: `container: "mp4"`, `duration: 74705`, `video.codec_string: "avc1.4d401f"`, `rotation: "r0"`, `frame_count: 2246`, `is_vfr: true`, `audio.codec_string: "mp4a.40.2"`, 48,000 Hz, 2 channels |
+| `probeAndValidate(d, size, true)` | `{ ok: { duration: 74705, display_width: 1280, display_height: 720, orientation: "landscape", ... } }` |
+| `probeAndValidate(d, size, false)` | `{ rejected: "REJECT_DECODE_UNSUPPORTED" }`, returned |
+| Descriptions | `avcC` 41 bytes; `AudioSpecificConfig` `[17, 144]` |
+| `readAudioSample(0)` | 512 bytes in a `Uint8Array`, `ptsUs` 0, `durationUs` 21333; 3,493 samples; the last one ends at 74,517,520 microseconds |
+| `readAudioSample(3493)` | Throws the plain object `{ code: "E_DECODE_AUDIO", detail: "Malformed" }` |
+| A 6-byte text file | `{ rejected: "REJECT_CONTAINER" }`, returned |
+| 3,293,491 samples from 44,100 to 48,000 Hz | 3,584,752 samples, a `Float32Array` |
+
+Both temporary files are deleted.
+
+**Checked.**
+
+- `cargo test -p offcut-dsp`: 4 passed, one of them the proptest. `pnpm build:wasm` writes `web/src/wasm/pkg/core/`: `offcut_core_bg.wasm` is 371,738 bytes after `wasm-opt`.
+- `pnpm gen:types && sh scripts/check-gen-clean.sh`: no diff. V2 adds no shared type here.
+- `cargo deny check`: ok. `node scripts/check-file-tree.mjs`: 149 files; `offcut-dsp` is checked as a pure crate, and `rubato` with the FFT resampler resolves no browser or randomness crate.
+- `pnpm build`: `check-hosts` reads the larger bundle and finds no new host literal.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **193 Rust, 76 Vitest, 12 Playwright** (Rust was 187: four in `offcut-dsp`, two in `offcut-wasm-core`).
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-dsp` passes with its proptest; `pnpm build:wasm` writes `web/src/wasm/pkg/core/`.
+- [x] `pnpm gen:types && sh scripts/check-gen-clean.sh` shows no diff; both browser values match.
+
+**Not measured.** How long `resample_mono` takes on the reference clip in the browser. It is part of the `probe_audio` budget, read in Prompt 37 and on R1.

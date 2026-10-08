@@ -19,6 +19,8 @@ members = [
 [workspace.dependencies]
 offcut-types = { path = "crates/offcut-types" }
 offcut-api-types = { path = "crates/offcut-api-types" }
+offcut-mp4 = { path = "crates/offcut-mp4" }
+offcut-dsp = { path = "crates/offcut-dsp" }
 serde = "1.0.229"
 serde_json = "1.0.151"
 ts-rs = "12.0.1"
@@ -27,6 +29,7 @@ trybuild = "1.0.121"
 thiserror = "2.0.21"
 # Tests only. Without its default features: no fork, no timeout, no temporary files.
 proptest = { version = "1.11.0", default-features = false }
+rubato = { version = "5.0.1", default-features = false }
 axum = "0.8.9"
 tokio = "1.53.2"
 tower = "0.5.3"
@@ -42,6 +45,10 @@ ed25519-dalek = "3.0.0"
 reqwest = { version = "0.13.5", default-features = false }
 # Exact: must equal the installed wasm-bindgen CLI (scripts/build-wasm.sh checks it).
 wasm-bindgen = "=0.2.129"
+# The releases that go with that wasm-bindgen. For the binding crates only.
+js-sys = "0.3.106"
+web-sys = "0.3.106"
+serde-wasm-bindgen = "0.6.5"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
