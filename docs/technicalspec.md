@@ -292,7 +292,8 @@ offcut/
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
 │   │   │   ├── validate.rs            [ONLY] validate_probe(): PS §9.4 limits -> RejectReason
-│   │   │   └── mux.rs                 Mp4Muxer (faststart)
+│   │   │   ├── mux.rs                 Mp4Muxer (faststart)
+│   │   │   └── mux_boxes.rs           box writers for the muxer (v2implementation D-55)
 │   │   └── tests/
 │   │       ├── demux_fixtures.rs
 │   │       ├── probe_rejections.rs
@@ -659,6 +660,7 @@ offcut/
 │   │           ├── pages.module.css
 │   │           └── components.module.css
 │   └── tests-e2e/
+│       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
 │       ├── helpers/fake-api.ts
 │       ├── helpers/fixtures.ts
@@ -726,6 +728,12 @@ offcut/
     ├── v1/v1buildguide.md             step-by-step build order for V1, with a milestone per phase
     ├── v1/coding-prompts.md           the 30 V1 coding prompts, run in order
     ├── v1/v1changelog.md              record of every change made while building V1
+    ├── v2/v2implementation.md         file-by-file implementation plan for V2 (M0.2 to M0.4)
+    ├── v2/v2implementation-notes.md   analysis and consistency check written around the V2 plan
+    ├── v2/v2buildguide.md             step-by-step build order for V2, with a milestone per phase
+    ├── v2/coding-promptsv2.md         the 30 V2 coding prompts (31 to 60), run in order
+    ├── v2/experiments.md              outcome of every experiment V2 runs (TE-n, E-n) and the M0 gate decision
+    ├── v2/v2changelog.md              record of every change made while building V2
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 

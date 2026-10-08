@@ -1,6 +1,19 @@
 [workspace]
 resolver = "2"
-members = ["crates/offcut-types", "crates/offcut-api-types", "crates/offcut-wasm-core", "server"]
+members = [
+    "crates/offcut-types",
+    "crates/offcut-api-types",
+    "crates/offcut-mp4",
+    "crates/offcut-dsp",
+    "crates/offcut-text",
+    "crates/offcut-detect",
+    "crates/offcut-scene",
+    "crates/offcut-render",
+    "crates/offcut-entitlement",
+    "crates/offcut-wasm-core",
+    "crates/offcut-wasm-render",
+    "server",
+]
 
 # Every shared dependency is versioned here, once. Features are set by the crate that uses it.
 [workspace.dependencies]
