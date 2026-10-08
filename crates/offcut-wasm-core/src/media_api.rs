@@ -17,10 +17,56 @@ use web_sys::{FileSystemReadWriteOptions, FileSystemSyncAccessHandle};
 
 use crate::{failure, to_js};
 
-/// A file in OPFS, read where the demuxer asks.
+/// How much of the file one call into the browser fetches for a small read.
+/// A call costs about 0.4 ms whatever its size (measured in Prompt 37), and a
+/// clip's audio frames lie a few kilobytes apart between its video frames:
+/// read one at a time, 75 seconds of audio spent 1.3 s in 3,493 calls.
+const WINDOW_BYTES: usize = 1 << 20;
+
+/// A file in OPFS, read where the demuxer asks, through one window of bytes
+/// read ahead. The file must not change while this is open.
 struct JsRandomAccess {
     handle: FileSystemSyncAccessHandle,
     len: Bytes,
+    /// The bytes of the file from `window_at` on.
+    window: Vec<u8>,
+    window_at: u64,
+}
+
+impl JsRandomAccess {
+    fn new(handle: FileSystemSyncAccessHandle, len: Bytes) -> Self {
+        Self {
+            handle,
+            len,
+            window: Vec::new(),
+            window_at: 0,
+        }
+    }
+
+    /// One read from the file. Fewer bytes than asked for is a failure: the
+    /// file ends before the box said it would.
+    fn read_exact(
+        handle: &FileSystemSyncAccessHandle,
+        at: u64,
+        buf: &mut [u8],
+    ) -> Result<(), IoError> {
+        let options = FileSystemReadWriteOptions::new();
+        options.set_at(at as f64);
+        let read = handle
+            .read_with_u8_array_and_options(buf, &options)
+            .map_err(|_| IoError::Read)?;
+        if read == buf.len() as f64 {
+            Ok(())
+        } else {
+            Err(IoError::Read)
+        }
+    }
+
+    /// The part of the window that holds `len` bytes from `at`, if it holds them all.
+    fn in_window(&self, at: u64, len: usize) -> Option<&[u8]> {
+        let start = usize::try_from(at.checked_sub(self.window_at)?).ok()?;
+        self.window.get(start..start.checked_add(len)?)
+    }
 }
 
 impl RandomAccess for JsRandomAccess {
@@ -32,18 +78,27 @@ impl RandomAccess for JsRandomAccess {
         if buf.is_empty() {
             return Ok(());
         }
-        let options = FileSystemReadWriteOptions::new();
-        options.set_at(offset.get() as f64);
-        let read = self
-            .handle
-            .read_with_u8_array_and_options(buf, &options)
-            .map_err(|_| IoError::Read)?;
-        // Fewer bytes than asked for: the file ends before the box said it would.
-        if read == buf.len() as f64 {
-            Ok(())
-        } else {
-            Err(IoError::Read)
+        let at = offset.get();
+        // A read as large as the window gains nothing from it.
+        if buf.len() >= WINDOW_BYTES {
+            return Self::read_exact(&self.handle, at, buf);
         }
+        if self.in_window(at, buf.len()).is_none() {
+            // The window moves to start at this read. It ends with the file,
+            // but is never shorter than the read, so that a read past the end
+            // fails as it would without a window.
+            let left = usize::try_from(self.len.get().saturating_sub(at)).unwrap_or(usize::MAX);
+            self.window.clear();
+            self.window.resize(left.min(WINDOW_BYTES).max(buf.len()), 0);
+            self.window_at = at;
+            if let Err(error) = Self::read_exact(&self.handle, at, &mut self.window) {
+                self.window.clear();
+                return Err(error);
+            }
+        }
+        let bytes = self.in_window(at, buf.len()).ok_or(IoError::Read)?;
+        buf.copy_from_slice(bytes);
+        Ok(())
     }
 }
 
@@ -112,10 +167,7 @@ pub fn open_demuxer(handle: FileSystemSyncAccessHandle) -> Result<DemuxerHandle,
     let size = handle
         .get_size()
         .map_err(|_| failure(ErrorCode::StorageIo, io_name(IoError::Read)))?;
-    let reader = JsRandomAccess {
-        handle,
-        len: Bytes::new(size as u64),
-    };
+    let reader = JsRandomAccess::new(handle, Bytes::new(size as u64));
     match Demuxer::open(reader) {
         Ok(demuxer) => Ok(DemuxerHandle {
             demuxer,

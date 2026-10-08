@@ -1025,7 +1025,7 @@ One device per `Renderer`; textures are created in `new` and `resize` only. **Bu
 }
 ```
 
-`JsRandomAccess` (private, D-30) calls `handle.getSize()` once and `handle.read(buffer, { at })` per read; a short read is `IoError::Read`.
+`JsRandomAccess` (private, D-30) calls `handle.getSize()` once and reads through `handle.read(buffer, { at })`; a short read is `IoError::Read`. As built (Prompt 37) it keeps one window of 1 MiB read ahead: a read smaller than the window that the window does not hold moves the window to start there, so reading a clip's audio frames one after the other costs a few dozen calls into the browser, not one per frame (one call was measured at about 0.4 ms, whatever its size). The file must not change while a demuxer is open on it.
 
 ### 13.2 Return and error shapes
 
@@ -1248,7 +1248,7 @@ Client side:
 | A message for an unknown or finished `jobId` | Dropped (TS §14.4) |
 | Worker `error` or `messageerror` event | Every pending call rejects with `{ code: "E_WORKER_CRASH", stage, retryable: true }` (TS C-14). V4 adds the restart |
 | `cancel(jobId)` | Posts `Cancel`. V2 has no caller and no timeout (V4) |
-| Dev builds, after posting | Asserts every `ArrayBuffer` in the transfer list is detached (TS §14.3) |
+| After posting, in every build | Every `ArrayBuffer` in the transfer list must be detached (TS §14.3); if one is not, the call rejects with `E_INTERNAL`. (Prompt 37: `workers/` may not read `import.meta.env` or import `config/`, so the file cannot tell a development build; the check costs nothing, as with D-45) |
 
 Worker side (`serveWorker`):
 
@@ -1314,7 +1314,7 @@ One table drives everything:
 `decodeAudio(handle, info, isCancelled)` (signature: TS §15.1) returns mono `Float32Array` at the source rate:
 
 1. Configure one `AudioDecoder` with `{ codec: info.audio_codec_string, sampleRate: info.audio_sample_rate, numberOfChannels: info.audio_channels, description }`.
-2. Feed samples in decode order as `EncodedAudioChunk`s (`type: "key"`, `timestamp: ptsUs`), 32 at a time, waiting for `dequeue` while `decodeQueueSize > 32`. Cancellation check per batch.
+2. Feed samples in decode order as `EncodedAudioChunk`s (`type: "key"`, `timestamp: ptsUs`), 32 at a time. Cancellation check per batch; after each batch one turn of the event loop, so that outputs are delivered and a cancel message is read; then wait for `dequeue` while `decodeQueueSize > 256`. (Corrected in Prompt 37: with the bound at 32 the decoder's queue stayed shallow and 75 s of audio took 1.7 s to decode; with 256 it takes about 0.5 s, and the output is the same, sample for sample.)
 3. For each `AudioData`: copy every channel as `f32-planar`, average the channels into mono, append, `close()` in `finally`.
 4. `flush()`, then `close()` the decoder.
 5. Align (TS §15.1): let `first` be the `pts` of audio sample 0. Positive: prepend `round(first x rate / 1e6)` zero samples. Negative: drop that many samples from the head. Then pad with zeros or truncate the tail to `round(duration_ms x rate / 1000)`. This looks at timestamps only, never at audio content (INV-5).

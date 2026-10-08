@@ -39,6 +39,11 @@
 | 10 | **`crates/offcut-mp4/src/boxes.rs` has 392 lines above its test module, `sample_table.rs` 387 and `demux.rs` 369; the limit is 400** (`cargo fmt` puts most signatures and struct literals on several lines). Code that must go into one of them needs room made first. The muxer has its own two files | Prompts 41, 48 |
 | 11 | **What Prompt 37 builds on** (entries of Prompts 35 and 36). In a worker: `const core = await loadCore()`; `core.openDemuxer(syncHandle)` returns a `CoreDemuxer` or `{ rejected }` (test with `"rejected" in result`); `demuxer.probe(size)` gives the `ProbeInfo` whose `video.codec_string` and `demuxer.videoDescription()` go into `VideoDecoder.isConfigSupported`; `core.probeAndValidate(demuxer, size, supported)` gives `{ ok }` or `{ rejected }`. Audio: `audioDescription()`, `audioSampleCount()`, `readAudioSample(i)` with `ptsUs` (may be negative) and `durationUs`. A failure is thrown as the plain object `{ code, detail }`, not an `Error`. Call `demuxer.free()` when done, before closing the handle. `core.resample(pcm, from, to)` returns exactly `round(len x to / from)` samples. `offcut-mp4` also has a test-only module, `demux::fixture`, that builds small MP4 files | Prompts 37, 41 |
 | 12 | `proptest` writes a folder `proptest-regressions/` beside the crate when a property fails. It is not in the tree of TS §5: delete it once the failure is fixed, or the file-tree check fails | Prompts 35, 36, 41 |
+| 13 | **How code in a worker is written** (entry of Prompt 37). A failure with a name is thrown as `new WorkerFailure(code, detail, stage?)` from `workers/rpc.ts`: ESLint refuses a thrown plain object, and `toAppFailure` reads the error's `code`. A handler that saw its cancel flag returns `CANCELLED`. `ctx.isCancelled` and `ctx.progress` are passed on as `() => ctx.isCancelled()`, never unbound. A worker posts with `postMessage(message, { transfer })`; `serveWorker` does it and finds the `Float32Array`s and `OffscreenCanvas`es of a result itself. The lists `oneWay` and `duringPreview` are given to `serveWorker` in the worker's entry file: a worker may not import `pool.ts` | Prompts 43, 50, 53 |
+| 14 | **A new worker gets one line in `pool.ts`:** `import url from "./<name>.worker.ts?worker&url"`, a row in `WORKERS` (script, stage) and a client in `pool`. That form gives the built script's URL, which the `modulepreload` link and `new Worker` both use; `new URL("./x.worker.ts", import.meta.url)` outside `new Worker(...)` would ship the TypeScript source as an asset | Prompts 43, 50 |
+| 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
+| 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
+| 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 
 ---
 
@@ -594,3 +599,99 @@ Both temporary files are deleted.
 **Closes.** The push that Prompt 35 ends with. `rubato` and the binding dependencies build and pass `cargo deny` on Linux, which the entries of Prompts 34 to 36 had left unchecked.
 
 **Changed.** This file only.
+
+## 2026-10-09 - Prompt 37: `opfs.ts`, `rpc.ts`, `pool.ts`, media worker
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/persistence/opfs.ts` | `paths`, the ten functions of TS §23.1; `fileHandle`, `getFile`, `size`, `writeAt`, `truncate`, `move`, `remove`, `list`, `writeAudio`, `readAudio` (§15.2); `OpfsError`, tagged `quota` or `io`; the one `Bytes` cast, in `toBytes()` |
+| `web/src/workers/rpc.ts` | `createClient`, `serveWorker`, `toAppFailure`, `CANCELLED`, `WorkerCallError`, the types of §15.6; `WorkerFailure`; the "Retryable" column of TS §11.2 as the table `RETRYABLE` |
+| `web/src/workers/media/import.ts` | `importToOpfs`: 4 MiB chunks, the cancel flag read before each, progress in bytes after each; `openSource`; `byteSize` |
+| `web/src/workers/media/audio-decode.ts` | `decodeAudio`: one `AudioDecoder`, mono by the mean of the channels, placed on the clip's timeline by timestamps only |
+| `web/src/workers/media.worker.ts` | `importAndProbe` (steps 1 to 6 of §16.1) and `extractAudio`; the last statement, and the only one with an effect, is `serveWorker(...)` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/workers/pool.ts` | The table `WORKERS` with one row, `media`; `pool.media`, a client whose worker is created by its first call; `preload()` keeps its V1 signature and now also adds one `modulepreload` link per worker script; re-exports `WorkerCallError` and `Cancelled` |
+| `crates/offcut-wasm-core/src/media_api.rs` | `JsRandomAccess` reads through a window of 1 MiB (see "Two things measured") |
+| `docs/v2/v2implementation.md` | §13.1, §15.6 and §16.3 say what was built (3 replacements, each applied once) |
+
+**Browser check (dev), on the reference clip.** `vite` on port 5173; a temporary Playwright case that calls `pool.media` as a use-case will. The dropped `File` was named `My Holiday Video.mp4`.
+
+| Asked | Result |
+|---|---|
+| `duration` | 74,705 (the value of Prompt 33) |
+| `pcm48.length` and `round(duration x 48)` | 3,585,840 and 3,585,840 |
+| `pcm16.length` and `round(duration x 16)` | 1,195,280 and 1,195,280 |
+| OPFS | `clips/<clipId>/` holds one entry, `source`, of 35,201,023 bytes. No name from the dropped file |
+| A `File` of 500,000,001 bytes | `{ rejected: "REJECT_FILE_SIZE" }`; no directory was made for its clip id |
+| A 6-byte text file | `{ rejected: "REJECT_CONTAINER" }` |
+| `paths.modelFile("m", "../x")` | Throws |
+| `await size("nope")` | `null` |
+
+**Not asked, and checked in the same run.**
+
+| Checked | Result |
+|---|---|
+| **The decoded audio against ffmpeg's** (`ffmpeg -af "pan=mono\|c0=0.5*c0+0.5*c1" -ar 48000 -f f32le`), sample for sample | **Identical:** over all 3,576,832 samples ffmpeg gives, the largest difference is 0. No lag. The last non-zero sample is number 3,571,711 in both. The 9,008 samples after ffmpeg's end are silence: the audio track is 187 ms shorter than the video |
+| The 16 kHz output against ffmpeg's own resampler | No lag; a difference of 2.3% of the signal's level, largest single sample 0.05. Two different low-pass filters; the length rule and the timing are the same |
+| Progress | 9 messages, the last one at 35,201,023 of 35,201,023 bytes |
+| A second `extractAudio` for the same clip; one after the worker had rejected another file | The same lengths (the second one probes the source again) |
+| `extractAudio` for a clip id that has no file | Rejects with `{ code: "E_STORAGE_IO", stage: "import", retryable: true }` |
+| `opfs.ts` helpers | `writeAt` twice, `size` 6; `truncate` to 5; `move` from the `.part` name to the final name, the bytes intact and the `.part` gone; `list`; `writeAudio` and `readAudio` give the same three floats back; `remove` twice (the second on nothing) |
+| Cancel, through `createClient` directly (`pool` has no cancel before V4) | A call cancelled as soon as its job id is known resolves with `{ cancelled: true }` |
+| A second call while one is pending | Rejects with `E_INTERNAL`, `retryable: false`, detail `Busy`; the first call still answers |
+| A method the worker does not have | Rejects with `E_INTERNAL`, detail `NoHandler` |
+| **A production build, served with the headers of `vercel.json`** (a temporary hook in `main.tsx`) | The same five numbers; `crossOriginIsolated` true; no CSP violation. The worker is the chunk `assets/media.worker-<hash>.js` (15.6 kB), and the `modulepreload` link names that file |
+
+**Two things measured, and what was changed for them.** The first run took 3.6 s for `extractAudio` on the development machine, which is faster than R1; the budget for probe and audio together is 3.7 s on R1 (D-64).
+
+| Found | Changed | After |
+|---|---|---|
+| **One read of the OPFS file costs about 0.4 ms, whatever its size.** The demuxer read the 3,493 audio frames one at a time: 1.35 s | `JsRandomAccess` keeps a window of 1 MiB read ahead. A read the window does not hold moves the window to start there; a read as large as the window bypasses it. A read past the end still fails as `IoError::Read` | 0.11 to 0.15 s for the same reads |
+| **The decoder works through a shallow queue slowly.** With "32 at a time, waiting for `dequeue` while the queue is above 32" (§16.3), decoding took 1.7 s; with every frame queued at once, 0.4 s | 32 frames per batch as before, with the cancel check; after each batch one turn of the event loop (outputs are delivered, a cancel message is read); waiting for `dequeue` only above 256 queued frames | 0.4 to 0.6 s. The output is still identical to ffmpeg's |
+
+`extractAudio` now takes 0.8 to 1.4 s and `importAndProbe` 0.5 to 0.6 s on the development machine (dev server and production build alike). These are `dev` readings and stand for nothing on R1.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **`WorkerFailure`,** an `Error` with `code`, `detail` and an optional `stage`. §15.6 has a worker throw the plain object `{ code, detail, stage? }`; ESLint (`only-throw-error`, part of the type-checked set V1 turned on) refuses that in TypeScript. `toAppFailure` reads `code` from either. The objects the WASM bundle throws are plain objects, as before.
+- **The transfer check runs in every build** and fails the call with `E_INTERNAL`. §15.6 asks for it in development builds only, and `workers/` can neither read `import.meta.env` nor import `config/env.ts` (V1's lint). It is one comparison per transferred buffer.
+- **A one-way handler that throws** makes the worker report an uncaught error, which the client sees as a crash of that worker. No answer can carry the failure, and it must not be swallowed.
+- **A handler that returns `CANCELLED` without its flag set** is answered with `E_INTERNAL` (detail `CancelledUnasked`).
+- **`importToOpfs` has a fourth, optional parameter,** the progress function: TS §15.1 gives it three, and §16.2 asks it for progress once per chunk. It returns the handle or `CANCELLED`.
+- **`decodeAudio` opens its own demuxer on the handle it is given** and frees it. TS §15.1 gives it the handle, not a demuxer. A decoder that answers at another sample rate than the container states (which an implicit SBR stream would) is `E_DECODE_AUDIO`, detail `SampleRate`, not audio of the wrong length.
+- **Decoded samples are written straight to their place** in a buffer of the final length; what lies before video time 0 or after the video's end is not kept. One buffer, in place of a decoded copy and an aligned copy.
+- **`pool.ts` takes the worker's URL from `./media.worker.ts?worker&url`** (known issue 14). §15.7 writes `new Worker(new URL(...))`; the preload link needs the same URL, and outside `new Worker(...)` that form does not give the built script.
+- **The table of `pool.ts` holds script and stage.** The one-way list and the list of methods accepted beside the preview are arguments of `serveWorker` in each worker's entry file, because a worker may not import `pool.ts` (TS §7). For the media worker both are empty.
+- **`move()` uses `FileSystemFileHandle.move`,** which Chrome has for OPFS files and the TypeScript library does not declare yet. Where it is missing the call fails as `io`.
+- **`OpfsError`** is the tagged error §15.2 describes without naming.
+
+**The two lint checks of "Done when".**
+
+| Check | Result |
+|---|---|
+| ESLint on `src/persistence` and `src/workers` | Clean. `media/import.ts` and `media.worker.ts` import `persistence/opfs.ts`: edge D-27 b, positive side |
+| `export const zzSecond = 1 as Bytes;` added to `opfs.ts` | `no-restricted-syntax`: "In this file one cast is allowed: to Bytes, in the last return of toBytes() (D-59)". Reverted |
+| The cast moved out of `toBytes()` into `size()` | The same rule fires. Reverted |
+
+**Checked.**
+
+- G M-3: `cargo test -p offcut-dsp -p offcut-mp4` green; `pnpm build:wasm && pnpm check && pnpm build` green, `check-hosts` passes with the worker chunk (6 files in `web/dist`); `wasm-bindgen` 0.2.129 in `Cargo.lock` and from the CLI; `web/src/gen` and `workers/protocol.ts` unchanged.
+- The bundle: `offcut_core_bg.wasm` 372,779 bytes. The app shell, gzip: 118.2 kB, of which the worker chunk is 6.0 kB.
+- Lines: `rpc.ts` 374, `opfs.ts` 219, `audio-decode.ts` 161, `media.worker.ts` 117, `pool.ts` 86, `import.ts` 65; `media_api.rs` 273.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **193 Rust, 76 Vitest, 12 Playwright**, as after Prompt 36: this prompt adds no test file (`rpc.test.ts` is V4).
+- Every temporary file is gone: three Playwright cases, the hook `web/src/zz-spike.ts` and its line in `main.tsx`, and the timing lines that were in two worker files for the measurements.
+
+**"Done when".**
+
+- [x] The five numbers and the two rejections match; G M-3 passes.
+- [x] ESLint is clean for `persistence`, `workers`: edge D-27 b proves its positive side; a second `Bytes` cast in `opfs.ts` fails lint.
+
+**Not checked.** A cancel in the middle of a copy or of a decode: the one cancel tested arrives before the first chunk. The quota path (`E_STORAGE_QUOTA`): no full disk was made. Both have tests in V4 and V7 (`rpc.test.ts`, `failure-recovery.spec.ts`).
+
+**Human.** Push; read `ci` (open item 4).
