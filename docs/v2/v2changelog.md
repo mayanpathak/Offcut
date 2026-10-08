@@ -17,10 +17,11 @@
 | 1 | Add the origin `http://localhost:4173` to the CORS policy of the asset bucket (D-41). On 2026-10-08 the bucket answers for the app origin and for `http://localhost:5173` only | Human | Prompt 44 |
 | 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). Prompt 33 wrote the public half of the present key into `web/src/config/entitlement-public-key.ts`. If the key is replaced, that literal and §1A item 12 must be derived again in the same change; a token signed with the new key is otherwise refused by every browser. Nothing is signed before V6 | Human | Before V6; sooner is cheaper |
 | 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 44, 51 and 59, and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
-| 4 | **Push `v2-build` and open the draft pull request** (`git push -u origin v2-build`; then `gh pr create --draft --base main`, or the GitHub website: `gh` is not installed). Read the `ci` run. A pull request deploys nothing. This is the first run of the secret scan, of `cargo deny` on Linux and of the new `tsc` step of Prompt 32 on V2 code | Human | Now; Prompt 35 ends with the next push |
+| 4 | After every prompt marked **Push**: `git push` from `offcut/` (the repository is not the `sh2clips` folder), then read the `ci` run of pull request #2. The next prompt waits for green | Human | Prompts 35, 37, 41, 44, ... |
 | 5 | Submit the merchant onboarding (TE-9) if it is not submitted. Approval can take two weeks | Human | V6 |
 | 6 | Reset the Neon password (V1 item 36) and replace the demo video (V1 item 33) | Human | Before the page is announced |
 | 7 | The file `.env.local` in the repository root holds one line with no name, a test-mode API key. Git ignores the file and no program reads that line. Move it into `.env.deploy` under a name | Human | Any time |
+| 8 | Turn on branch protection for `main` on GitHub (Settings, Branches): require a pull request and the `ci` check. `main` is unprotected, and a push to it deploys | Human | Before Prompt 59 |
 
 ## Known issues for later prompts
 
@@ -268,7 +269,7 @@ No `false` and no error key: the gate of this prompt is passed and nothing goes 
 
 - [x] The probe printed `webgpuCanvas`, `h264`, `aac`, `opfsSync` all `true` under `vite preview`, with no line starting "Refused to".
 - [x] The clip reads 1280x720, H.264 and AAC, 48 kHz stereo, 74,705 ms, at most 40,000,000 bytes, two white frames.
-- [ ] `git grep -n "zz-probe" -- web` is empty (done); G M-1 passes (done); **the draft pull request is open and `ci` is green: the human's, not done** (open item 4).
+- [x] `git grep -n "zz-probe" -- web` is empty; G M-1 passes; the draft pull request is open and `ci` is green (pull request #2, run of 2026-10-08 on `3ad4c06`; see the entry "The first push").
 
 ## 2026-10-09 - Prompt 34: `offcut-mp4`: errors, reader, boxes, sample tables
 
@@ -371,3 +372,21 @@ Every value agrees. The test and its name are gone: `git grep -n zz_real -- crat
 - [x] `cargo deny check` and `node scripts/check-file-tree.mjs` pass with `offcut-mp4` now checked as a pure crate.
 
 **Not checked.** `ci`: nothing was pushed (open item 4). `cargo deny` and clippy ran on Windows only.
+
+## 2026-10-09 - The first push: draft pull request #2, `ci` green
+
+**Done by the human.** `git push -u origin v2-build` and a draft pull request, #2, `v2-build` into `main`. The first attempt ran in `sh2clips`, which is not a repository; the repository is `sh2clips/offcut`.
+
+**Read by the agent** (the public API of GitHub; `gh` is not installed).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `3ad4c06`, the commit of Prompt 34, equal to the local branch |
+| Pull request #2 | Open, draft |
+| The `ci` run on `3ad4c06` | Success. Job `ci`: 2.7 minutes. Jobs `deploy-api` and `deploy-web`: skipped, as on every pull request |
+| Steps that ran on V2 code for the first time | The secret scan (the public key line with its `gitleaks:allow`), `cargo clippy`, `cargo deny` (the two new wrappers), `cargo test` (177), both `tsc` steps (the second is new in Prompt 32), the file tree, the hosts check, Playwright: all success |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3`; `main` is at `322c7d3` |
+
+**Closes.** The last "Done when" box of Prompt 33, and with it G M-1. The three things the entry of Prompt 32 and 33 left unchecked hold on Linux: the new `tsc` step, `cargo deny` with `proptest`, and the secret scan.
+
+**Changed.** This file only: open item 4 is now the standing push step, open item 8 (branch protection) is new, the box of Prompt 33 is ticked.
