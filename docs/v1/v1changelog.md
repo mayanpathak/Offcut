@@ -1929,3 +1929,23 @@ Open item 11 is closed.
 | Experiments and records (7) | 1. §15.3: all nine points hold (asset host in the CSP, WASM and isolation in production, `protocol.ts` type-checks, the encoder constants are used by the capability check, E2E under the production CSP locally and in CI, the reading scripts, `bench/results/`, the lint boundaries) | `docs/v1/experiments.md` does not exist and `check-external-facts.mjs` has no date (Prompt 29); `TRUSTED_PROXY_HOPS` is 1 by guess, not from TE-5; Vercel's terms not saved; TE-9 not confirmed (open item 3); E-1: one video, about another product (known issue 33); the spec corrections of known issues 9, 18, 20 and 30; the tag `v1` |
 
 The production database: Postgres 18.6, the nine tables of `0001_init.sql`, migration 1 applied, 8 MB.
+
+## 2026-10-08 - V2 starts; the V2 documents, corrected against the V1 code
+
+**Decided (by the human).** V1's code is complete and deployed, and the build is ahead of the calendar (`buildplan.md` §1 starts it on 12 Oct). V2 starts now. The open boxes of §16 are done later and do not hold V2 back: the tag `v1`, `docs/v1/experiments.md` (TE-5, TE-6, TE-7, TE-11), the E-1 outreach with three demo clips of Offcut, and TE-9. Open item 36 (the Neon password) and known issues 30 and 33 stay open as written.
+
+**Added.** `docs/v2/v2implementation.md` and `docs/v2/v2implementation-notes.md`. No code changed.
+
+**Corrected in the V2 documents (by the agent), after reading them against this repository.** The list is in the notes file, under "Revision of 2026-10-08". In short:
+
+- Lint edges that V1's matrix lacks and the first draft had missed (D-27 e and f, D-32, D-59).
+- Crate edges: `offcut-wasm-render` reaches `offcut-scene` through `offcut-render` (D-61); `deny.toml` wrappers (D-28, §22.1 of the V2 document).
+- `check-hosts.mjs` exceptions for the render bundle and `ort/` (D-38); the edit of `upload-assets.sh` (D-62); the preview port in the bucket's CORS policy (D-41); Node types and the bench file (D-63).
+- The build order (detection and entitlement before the render bundle), the demuxer's sample bound (D-60), and a fallback for the one event V2 shows (D-42).
+- Precondition 10 of the V2 document no longer asks for the tag `v1`.
+
+**The public half of `ENTITLEMENT_SIGNING_KEY`** (precondition 12 of the V2 document): `KnENazU2ypDUgG3mibKKiP0g4L5zgrgiWTCeCLNjeLg=`, derived by the human from the key in Render and written into that precondition. It is a public value.
+
+**`.env` repaired a third time.** The human had put the Render key at the end of `.env`, on a line with no name. The agent checked, printing no value, that the public key above is the public half of that line, then moved the line to `.env.deploy` as `PROD_ENTITLEMENT_SIGNING_KEY`. `.env` holds its 15 variables again and loads in `sh`. **That line was also selected in the editor, which shared the private key with the agent's chat**: see the reply of that date for the recommendation to replace the key in Render while nothing has been signed with it.
+
+**Checked.** Every replacement in `v2implementation.md` was applied exactly once (96 of 96). A search of the file finds no remaining reference to the old step numbers of the spike or to the removed statements. Nothing was built or run: only documents changed.
