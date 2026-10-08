@@ -202,6 +202,11 @@ jobs:
       - name: tsc
         run: pnpm --filter web exec tsc --noEmit
 
+      # The second program of v2implementation D-63: the E2E tests, the bench
+      # and the tool configuration files, which may use Node's types.
+      - name: tsc, the tests and the tool configuration
+        run: pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json
+
       - name: File tree, file length, crate dependencies
         run: node scripts/check-file-tree.mjs
 

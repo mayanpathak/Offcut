@@ -29,6 +29,10 @@
 | 1 | A `src/lib.rs` of 0 bytes fails `cargo fmt --check`: rustfmt wants one line break. The eight skeletons hold one line break (LF) | Any prompt that creates an empty Rust file |
 | 2 | `coding-promptsv2.md` does not say which branch Prompts 59 and 60 work on after the merge. On `main`, the line `BASE=$(git merge-base main HEAD)` of the Standard Agent Block gives `HEAD`, and the frozen-file diff then compares nothing. From the merge on, use the baseline SHA above in place of `$BASE`, and put the commits made after the merge on a branch of their own | Prompts 59, 60 |
 | 3 | `cargo deny check` passes with warnings, as in V1 (V1 item 6): `unused-wrapper` for crates that are not dependencies yet, and `duplicate`. They are warnings, not errors | Prompts 34 to 48 |
+| 4 | **The one cast each minting file may hold is tied to a name** in `web/eslint.config.js` (`MINTING`). It must be the last `return` of a function declaration with that name: `toBytes` in `persistence/opfs.ts`, `models/download.ts` and `models/model-manager.ts`; `newClipId` in `usecases/import-clip.ts`; `newExportId` in `usecases/start-export.ts`; `toTimeMs` in `usecases/control-preview.ts`. In `state/model-store.ts` it is the top-level line `const ZERO_BYTES = 0 as Bytes;`, not exported. An arrow function, another name or a cast anywhere else in the file fails lint | Prompts 37, 39, 40, 53, 54 |
+| 5 | `boundaries/dependencies` reports an import only when the imported file exists. An import of a file that is not written yet is reported by `tsc`, and by another ESLint rule, not as a layer violation. A drill on a layer edge needs its target file | Any lint drill |
+| 6 | `web/vite.config.ts` and `web/vitest.config.ts` are type-checked by `web/tests-e2e/tsconfig.json`, with Node's types, and no longer by `web/tsconfig.json` (entry of Prompt 32). Prompt 43 adds a build-start step to `vite.config.ts` that uses Node's file API: it type-checks there without a further change | Prompt 43 |
+| 7 | No ESLint rule covers `vite.config.ts`, `vitest.config.ts` or `playwright.config.ts`, as in V1. They are type-checked only | Prompts 43, 56 |
 
 ---
 
@@ -115,3 +119,85 @@ The lines reworded for R1: §1A boxes 13 and 14 and the row for V1 known issue 3
 - The temporary case `web/tests-e2e/zz-pre.spec.ts` answered `/api/v1/events` itself, so it added no row to production. It was deleted before the gate.
 
 **Not done.** Nothing was pushed. No dependency, no logic and no rule change: those are Prompt 32 and later.
+
+## 2026-10-08 - Prompt 32: tree, purity and ban rules; test tooling; lint edges
+
+**REOPENED V1 CONTRACT: `web/eslint.config.js`** (D-27, D-58, D-59). Nothing in it was loosened: the diff adds lines and removes none.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `scripts/check-file-tree.mjs` | `ALLOWED_CRATE_DEPS["offcut-scene"]` gains `offcut-text` (D-28). `PURE_CRATES` gains `offcut-mp4`, `offcut-dsp`, `offcut-text`, `offcut-detect`, `offcut-scene` and `offcut-entitlement`: the `cargo tree` check now runs on eight crates |
+| `deny.toml` | The `offcut-text` ban gains the wrapper `offcut-scene` (D-28). Nothing else |
+| `.gitignore` | `web/public/ort/` and `fixtures/.cache/` |
+| `package.json` | Dev-dependency `@playwright/test` at exactly `1.63.0`, the version `pnpm-lock.yaml` resolves for `web` (D-63). `check` runs a second `tsc --noEmit -p tests-e2e/tsconfig.json` after the first |
+| `web/package.json` | Dev-dependency `@types/node` `^24.19.1`, the Node major of `engines` (D-63). Resolved: 24.19.1 |
+| `web/tsconfig.json` | `include` is `src` alone (see "Differs") |
+| `web/eslint.config.js` | 15 entries, listed below |
+| `.github/workflows/ci.yml` | Step 6 gains the second `tsc` pass (see "Differs") |
+| `docs/v2/v2implementation.md` | D-63, §4, §22.3 and §22.5 say what was built (5 replacements, each applied once) |
+
+**Added.** `web/tests-e2e/tsconfig.json`: extends `../tsconfig.json`, sets `types` to the two of the app plus `node`, and includes `tests-e2e`, `playwright.config.ts`, `vite.config.ts`, `vitest.config.ts` and `../bench`.
+
+**The 15 entries of `web/eslint.config.js`.**
+
+| # | Entry | Kind |
+|---|---|---|
+| 1 | D-27 a: `usecases/import-clip.ts` may import `net/asset-fetch.ts` | Layer policy |
+| 2 | D-27 b: `workers/**` may import `persistence/opfs.ts` | Layer policy |
+| 3 | D-27 c: `workers/render.worker.ts` may import `config/entitlement-public-key.ts` | Layer policy |
+| 4 | D-27 d: `models/**` may import `state/model-store.ts` and `config/model-manifest.json` | Layer policy |
+| 5 | D-27 e: `models/model-manager.ts` may import `persistence/db.ts` | Layer policy |
+| 6 | D-27 f: `state/**`, `models/**` and `usecases/**` may import `workers/protocol.ts`, types only | Layer policy |
+| 7 | D-58: `usecases/import-clip.ts` may import `usecases/run-pipeline.ts` | Layer policy |
+| 8 | D-58: `usecases/start-export.ts` may import `usecases/control-preview.ts` | Layer policy |
+| 9 | D-59: `persistence/opfs.ts`, one cast to `Bytes`, in `toBytes()` | Cast override |
+| 10 | D-59: `models/download.ts`, one cast to `Bytes`, in `toBytes()` | Cast override |
+| 11 | D-59: `models/model-manager.ts`, one cast to `Bytes`, in `toBytes()` | Cast override |
+| 12 | D-59: `state/model-store.ts`, one cast to `Bytes`, in `const ZERO_BYTES = 0 as Bytes` | Cast override |
+| 13 | D-59: `usecases/import-clip.ts`, one cast to `ClipId`, in `newClipId()` | Cast override |
+| 14 | D-59: `usecases/start-export.ts`, one cast to `ExportId`, in `newExportId()` | Cast override |
+| 15 | D-59: `usecases/control-preview.ts`, one cast to `TimeMs`, in `toTimeMs()` | Cast override |
+
+Entries 1 to 8 are eight objects at the end of `layerPolicies`. Entries 9 to 15 are the seven rows of the table `MINTING`, each of which becomes one configuration object.
+
+**How a cast override works.** It does not switch the brand-cast rule off for its file. It replaces the rule's selectors by three: a cast to any other unit or id type is refused; a cast to the file's one type is refused unless it is the expression of the last `return` of the named helper (in `model-store.ts`: unless it is the top-level `const ZERO_BYTES = 0 as Bytes`); an angle-bracket cast is refused. So a second cast in the file fails, also inside the helper. `newClipId` and `newExportId` are the names §19.2 and §19.5 give; `toBytes`, `toTimeMs` and `ZERO_BYTES` were chosen here (known issue 4).
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`web/tsconfig.json` includes `src` alone; `vite.config.ts` and `vitest.config.ts` moved to `web/tests-e2e/tsconfig.json`.** D-63 and the prompt only take `tests-e2e` out of the first. Done that way, the drill of G 1.4 did not fire: with `@types/node` installed, `console.log(process.cwd())` in `web/src/main.tsx` passed `tsc`. The cause, read with `tsc --explainFiles`: `vite/dist/node/index.d.ts` holds a reference to Node's types, and the two configuration files import Vite, so one program with `src` gave app code every Node global. Before V2 the reference found nothing, because `@types/node` was not installed. With the two files in the second program the drill fires, and the sentence of §22.3, "App code therefore never sees a Node global", is true. The test files under `src` import `vitest` and do not bring Node's types in (measured: `src` alone, tests included, refuses `process`). D-63, §4 and §22.3 of the plan are corrected.
+- **`ci.yml` step 6 runs the second `tsc` pass.** Neither the prompt nor §22.5 asks for it. CI calls `tsc` directly, not `pnpm check`, so without the step CI would no longer type-check `tests-e2e`, nor now the three configuration files. One step added; §22.5 says so.
+- **The drill "`persistence/opfs` imported from `state/`" (G 1.5)** does not reach the layer rule as the guide writes it: `opfs.ts` does not exist before Prompt 37, and the plugin classifies only an import it can resolve (known issue 5). As written, ESLint still fails, on `@typescript-eslint/no-unsafe-assignment`. With a one-line stub `opfs.ts` in place, `boundaries/dependencies` refuses the import. Both runs are in the table below.
+- **`engines` in the root `package.json`** was put back on one line after `pnpm add` had spread it over three.
+
+**The nine drills.** Each edit was undone after the rule fired; a frozen file was restored from a copy.
+
+| # | Temporary edit | What fired |
+|---|---|---|
+| 1 | `crates/offcut-mp4/src/zz.rs` | `check-file-tree`: "not in the file tree of TS §5" |
+| 2 | `offcut-text` as a dependency of `offcut-mp4` | `check-file-tree`: "offcut-mp4 may not depend on offcut-text (TS §7)" |
+| 3 | `rand = "*"` in `offcut-entitlement` | `check-file-tree`: "resolves rand" and "resolves getrandom"; `cargo deny check bans`: "crate 'rand = 0.10.3' is explicitly banned" |
+| 4 | `web-sys = "*"` in `offcut-scene` | `cargo deny check bans`: "crate 'web-sys = 0.3.106' is explicitly banned"; `check-file-tree` too |
+| 5 | `console.log(process.cwd())` in `web/src/main.tsx` | `tsc --noEmit`: TS2591, cannot find name `process` (after the change above) |
+| 6 | The same line in `web/tests-e2e/helpers/fixtures.ts` | Nothing, as intended: `tsc --noEmit -p tests-e2e/tsconfig.json` stays clean |
+| 7 | `1 as Bytes` in `web/src/ui/pages/LandingPage.tsx` | `no-restricted-syntax`: the brand-cast rule |
+| 8 | `import type { AppFailure } from "../../workers/protocol"` in the same file | `boundaries/dependencies`: no policy from `ui` to `workers` |
+| 9 | `import { paths } from "../persistence/opfs"` in `web/src/state/capability-store.ts` | With a stub `opfs.ts`: `boundaries/dependencies`: no policy from `state` to `persistence`. Without it: `no-unsafe-assignment` |
+
+**Both sides of the 15 entries, proven now and not when each file is first written.** A script wrote 12 stub files under the real names (the entries are keyed by name), linted them, changed one thing at a time, and deleted every stub.
+
+- Positive: the 12 stubs, which use every new edge and each allowed cast once, lint with 0 problems.
+- Negative, each refused by the rule named: a second cast outside the helper; a second `return` with a cast that is not the last statement; a nested cast inside the helper; another brand inside the helper; the helper's name in a file that is not listed; `ZERO_BYTES` with a value other than 0; a second constant; an angle-bracket cast (all `no-restricted-syntax`). Another use-case importing `asset-fetch`; `state` importing `persistence/opfs`; `media.worker.ts` importing the public key; `models` importing another state file; `download.ts` importing `persistence/db`; a value import of `workers/protocol` from `state`; a use-case pair that is not one of the two; an allowed pair the other way round (all `boundaries/dependencies`). 16 of 16.
+
+**Checked.**
+
+- `git check-ignore web/public/ort/x fixtures/.cache/x testclips/x` echoes the three paths.
+- `git diff web/eslint.config.js`: 88 lines added, none removed. `web/eslint.config.js` is 358 lines, under the limit of 400.
+- `node scripts/check-file-tree.mjs`: 139 files in the tree of TS §5; 12 crates within the graph; the eight pure crates resolve no browser or randomness crate.
+- `pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json` type-checks `tests-e2e/**`, `playwright.config.ts`, `vite.config.ts` and `vitest.config.ts`. `playwright.config.ts` was type-checked by nothing before.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check` (with two `tsc` passes), `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **170 Rust, 76 Vitest, 12 Playwright**, the same as the baseline.
+
+**Pinned versions.** `@playwright/test` 1.63.0 (root, exact); `@types/node` 24.19.1 (`web`, `^24.19.1`; 26.6.4 is the latest release, and 24 is the major of `engines`).
+
+**Not checked.** The `ci` run: nothing was pushed. The new step of `ci.yml` runs for the first time on the first push of `v2-build`, after Prompt 33. No YAML linter is installed; the step was read by eye.

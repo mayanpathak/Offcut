@@ -68,7 +68,7 @@ deny = [
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.
   { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
-  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect"] },
+  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene"] },
   { crate = "offcut-detect", wrappers = ["offcut-wasm-render"] },
   { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
   { crate = "offcut-scene", wrappers = ["offcut-render"] },
