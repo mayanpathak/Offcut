@@ -15,9 +15,9 @@
 | # | Item | Who | Needed by |
 |---|---|---|---|
 | 1 | Add the origin `http://localhost:4173` to the CORS policy of the asset bucket (D-41). On 2026-10-08 the bucket answers for the app origin and for `http://localhost:5173` only | Human | Prompt 44 |
-| 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). If it is replaced, say so before Prompt 33, which writes the public half into `config/entitlement-public-key.ts` | Human | Prompt 33 |
+| 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). Prompt 33 wrote the public half of the present key into `web/src/config/entitlement-public-key.ts`. If the key is replaced, that literal and §1A item 12 must be derived again in the same change; a token signed with the new key is otherwise refused by every browser. Nothing is signed before V6 | Human | Before V6; sooner is cheaper |
 | 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 44, 51 and 59, and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
-| 4 | Install `gh` (`winget install GitHub.cli`, then `gh auth login`), or do each `gh` step on the GitHub website | Human | Prompt 33 |
+| 4 | **Push `v2-build` and open the draft pull request** (`git push -u origin v2-build`; then `gh pr create --draft --base main`, or the GitHub website: `gh` is not installed). Read the `ci` run. A pull request deploys nothing. This is the first run of the secret scan, of `cargo deny` on Linux and of the new `tsc` step of Prompt 32 on V2 code | Human | Now; Prompt 35 ends with the next push |
 | 5 | Submit the merchant onboarding (TE-9) if it is not submitted. Approval can take two weeks | Human | V6 |
 | 6 | Reset the Neon password (V1 item 36) and replace the demo video (V1 item 33) | Human | Before the page is announced |
 | 7 | The file `.env.local` in the repository root holds one line with no name, a test-mode API key. Git ignores the file and no program reads that line. Move it into `.env.deploy` under a name | Human | Any time |
@@ -33,6 +33,8 @@
 | 5 | `boundaries/dependencies` reports an import only when the imported file exists. An import of a file that is not written yet is reported by `tsc`, and by another ESLint rule, not as a layer violation. A drill on a layer edge needs its target file | Any lint drill |
 | 6 | `web/vite.config.ts` and `web/vitest.config.ts` are type-checked by `web/tests-e2e/tsconfig.json`, with Node's types, and no longer by `web/tsconfig.json` (entry of Prompt 32). Prompt 43 adds a build-start step to `vite.config.ts` that uses Node's file API: it type-checks there without a further change | Prompt 43 |
 | 7 | No ESLint rule covers `vite.config.ts`, `vitest.config.ts` or `playwright.config.ts`, as in V1. They are type-checked only | Prompts 43, 56 |
+| 8 | **The secret scan of CI (gitleaks 8.18.4) takes a 44-character base64 literal assigned to a name with `KEY` in it for a secret.** Found in Prompt 33 with the same version run locally. Such a line must end with a `gitleaks:allow` comment **in the commit that first adds it**: the scan reads the whole history, so a comment added in a later commit does not clear the finding. The test public key (`fake-api.ts` in Prompt 46, `ci.yml` in Prompt 58) is such a literal. Before a commit that adds one, fetch the release archive of that version, check its SHA-256 against the published checksum file, and run `gitleaks detect --no-git --source <folder> --redact` | Prompts 46, 58 |
+| 9 | Chrome under Playwright, headless, gives a module worker WebGPU, both encoders and a sync OPFS handle on the development machine (Prompt 33). The adapter is the integrated Intel GPU, not the GTX 1650. No headed run and no launch argument was needed | Every browser check |
 
 ---
 
@@ -201,3 +203,66 @@ Entries 1 to 8 are eight objects at the end of `layerPolicies`. Entries 9 to 15 
 **Pinned versions.** `@playwright/test` 1.63.0 (root, exact); `@types/node` 24.19.1 (`web`, `^24.19.1`; 26.6.4 is the latest release, and 24 is the major of `engines`).
 
 **Not checked.** The `ci` run: nothing was pushed. The new step of `ci.yml` runs for the first time on the first push of `v2-build`, after Prompt 33. No YAML linter is installed; the step was read by eye.
+
+## 2026-10-08 - Prompt 33: config contracts, reference clip, worker probe
+
+**Added.** `web/src/config/entitlement-public-key.ts`: `ENTITLEMENT_PUBLIC_KEYS`, a `readonly Uint8Array[]`. It holds the production key, a base64 literal (the value of §1A item 12), and the test key only when `env.entitlementTestPublicKey` is set. No file imports it yet; the render worker is its one reader (D-27 c, Prompt 50).
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/config/env.ts` | One new field, `entitlementTestPublicKey: string \| null`: the value of `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` when it is set and not empty, else `null`. A value that is not base64, or does not decode to 32 bytes, throws when the module loads |
+| `fixtures/speech/README.md` | The row of the reference clip gives the video-stream duration, 74,705 ms, the codecs, the size and the two white frames |
+
+**The production key.** The literal is the public half of the seed that `.env.deploy` holds as `PROD_ENTITLEMENT_SIGNING_KEY`: derived again in a script that printed only "equal" or "not equal"; equal. Whether the key in Render has been replaced since 2026-10-08 is not known to the agent (open item 2). No seed was printed or written.
+
+**The secret scan.** gitleaks 8.18.4, the version of `ci.yml`, was fetched into a scratch folder (the Windows archive; its SHA-256 equals the published checksum) and run. On the new file it reported one finding, the line of the literal. The line now ends with `// gitleaks:allow`, and the scan reports none. It was added before the line was ever committed, which matters: see known issue 8. The history of the branch, scanned the way CI does it: 48 commits, no finding.
+
+**The reference clip (G 1.7).** `testclips/speech_scriptA_landscape_720p.mp4`:
+
+| Read | Value |
+|---|---|
+| Video | `h264`, 1280x720 |
+| Audio | `aac`, 48,000 Hz, 2 channels |
+| Video-stream duration | 74.705033 s: 74,705 ms |
+| Size | 35,201,023 bytes (limit 40,000,000) |
+| Frames 150 and 1950 | `YAVG` 255 and 255 (at least 230 asked) |
+
+**The worker probe (G 1.8), under the production CSP.** A temporary module worker, `web/src/workers/zz-probe.worker.ts`, started by one line in `main.tsx`; a production build served by `vite preview` with the headers of `web/vercel.json`; the console line read by a temporary Playwright case in Chrome, headless.
+
+| Probe | Result |
+|---|---|
+| `webgpuCanvas` (adapter, device, a `webgpu` context on a 1080x1920 `OffscreenCanvas`, configured) | `true`; adapter `intel / gen-12lp` |
+| `h264` (`avc1.640028`, 1080x1920, 8 Mbit/s, 30 fps) | `true` |
+| `aac` (`mp4a.40.2`, 48 kHz, stereo, 160 kbit/s) | `true` |
+| `opfsSync` (a sync access handle, opened and closed) | `true` |
+| `crossOriginIsolated` on the page | `true` |
+| Console lines starting "Refused to"; page errors | None |
+
+No `false` and no error key: the gate of this prompt is passed and nothing goes to `experiments.md`. The worker file, the line in `main.tsx` and the Playwright case were removed the same hour; `git grep -n "zz-probe" -- web` prints nothing.
+
+**Browser check (dev).** `vite` on port 5173, started three times; the page imported `/src/config/entitlement-public-key.ts` and returned the key lengths.
+
+| `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` | Result |
+|---|---|
+| Not set | `[32]` |
+| The base64 of 32 random bytes (made for the run, kept nowhere) | `[32, 32]` |
+| `abc` | The import rejects: "VITE_ENTITLEMENT_TEST_PUBLIC_KEY must decode to 32 bytes" |
+
+**Differs from the prompt or the guide.**
+
+- **`// gitleaks:allow` was added before the push, not after a failed `ci` run.** The prompt adds it only "if the secret scan names the public key line". The scan was run locally and does name it.
+- The probe worker of the guide was given `try`/`catch` around the two encoder questions and one more value, the adapter's vendor and architecture. It is temporary code either way.
+- The probe build was `pnpm build:vite`, not `pnpm build`: no Rust file had changed. The gate ran the whole `pnpm build` afterwards.
+
+**Checked.**
+
+- G M-1: 12 workspace packages; `pnpm check` and `pnpm test` green; `git grep -n "zz-probe" -- web` empty; the frozen-file diff empty.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green. **170 Rust, 76 Vitest, 12 Playwright**, the same as the baseline.
+
+**"Done when".**
+
+- [x] The probe printed `webgpuCanvas`, `h264`, `aac`, `opfsSync` all `true` under `vite preview`, with no line starting "Refused to".
+- [x] The clip reads 1280x720, H.264 and AAC, 48 kHz stereo, 74,705 ms, at most 40,000,000 bytes, two white frames.
+- [ ] `git grep -n "zz-probe" -- web` is empty (done); G M-1 passes (done); **the draft pull request is open and `ci` is green: the human's, not done** (open item 4).
