@@ -390,3 +390,97 @@ Every value agrees. The test and its name are gone: `git grep -n zz_real -- crat
 **Closes.** The last "Done when" box of Prompt 33, and with it G M-1. The three things the entry of Prompt 32 and 33 left unchecked hold on Linux: the new `tsc` step, `cargo deny` with `proptest`, and the secret scan.
 
 **Changed.** This file only: open item 4 is now the standing push step, open item 8 (branch protection) is new, the box of Prompt 33 is ticked.
+
+## 2026-10-09 - Prompt 35: `offcut-mp4`: demux, probe, validate
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-mp4/src/demux.rs` | `SampleMeta` and `Demuxer<R>` with the eight signatures of TS §15.1; `open`, steps 1 to 4 of §6.5; crate-private accessors for the probe (`brand`, `video`, `audio`, `track_counts`). After the first `#[cfg(test)]`: `fixture`, a module that builds small MP4 files in memory for the tests of this crate |
+| `crates/offcut-mp4/src/probe.rs` | `probe`, every field rule of §6.6. It reads the sample count, the runs of `stts` and `presented`, never the sample list |
+| `crates/offcut-mp4/src/validate.rs` | `validate_probe`: the 11 rules of TS §15.2 in that order, and the one place a `ClipInfo` is built |
+
+**Changed.** `crates/offcut-mp4/src/lib.rs`: the three modules.
+
+**`open`, as built.**
+
+| Step | Behaviour |
+|---|---|
+| 1 | A file shorter than 8 bytes is `NotIsoBmff` (the rule of G 2.2), and so is one whose first box is not `ftyp`, `moov`, `mdat`, `free`, `wide` or `skip`. Top-level boxes are read until `moov`: it may come after `mdat`. A `moof` before it, or `mvex` inside it, is `Fragmented`. At most 4,096 top-level boxes are read |
+| 2 | Every `vide` and `soun` track is counted. The video track is the first enabled one; the audio track is the first one |
+| 3 | The chosen tracks are resolved. For a track of more than 20,000 samples only `stsd`, `stts`, the count of `stsz` and `elst` are read |
+| 4 | `t0` is the smallest `pts - edit_offset` of the video track, in its own ticks. A time is `(pts - edit_offset) / timescale - t0`, computed in 128-bit integers and rounded down to microseconds. With no video samples to look at, `t0` is 0 |
+
+**Decided here, where §6.5 and §6.6 are silent.**
+
+- **No enabled video track:** the first video track is used. Some files leave the flag unset on their only track; refusing them as "no video" would be wrong, and the count of tracks is the same either way.
+- **No `moov` at all** (an interrupted recording): `Malformed("moov")`, which becomes `REJECT_CORRUPT`.
+- **A `trak` with no `hdlr`** is skipped and not counted.
+- **A sample index with no track of that kind** is `Malformed("index")`.
+- **A file with no `ftyp`** is reported as `Mp4`: §6.6 gives `Mov` for the brand `qt  ` and `Mp4` otherwise, and that is what is built. A classic QuickTime file has no `ftyp`; V3 may want it to say `Mov` (TE-12).
+- **Sample rate and channel count of AAC** come from the `AudioSpecificConfig`; a channel configuration of 0 there (the layout is described elsewhere) falls back to the sample entry.
+- **`is_vfr` counts every sample duration,** the last one too, as §6.6 says. A file whose last frame is shorter by more than 1 ms than the others reads as variable. The flag changes no rule; it is carried to `ClipInfo`.
+- **`validate_probe` with `video_tracks > 0` and no `video`** (or the same for audio) answers `NoVideo` (`NoAudio`). `probe` never produces that; a hand-made `ProbeInfo` can.
+
+**Tests (inline): the other nine rows of §6.9 and the short-file case. 17 in the crate.**
+
+| Row of §6.9 | Test |
+|---|---|
+| `tkhd` matrices for 0, 90, 180, 270 degrees | `probe::the_tkhd_matrices_of_the_four_quarter_turns` |
+| `avcC` bytes `64 00 28` | `probe::avcc_bytes_64_00_28_give_the_codec_string_avc1_640028` (also the sizes, both frame rates, the audio fields and the duration of that file) |
+| Each of the 11 rules violated alone | `validate::each_of_the_eleven_rules_violated_alone_gives_its_reason` |
+| Two rules violated | `validate::of_two_violated_rules_the_earlier_one_wins` (three pairs) |
+| Exactly 90,000 ms; 60,500 `FpsMilli` | `validate::exactly_90_000_ms_and_60_500_fps_milli_are_accepted` (also a long side of exactly 1,920) |
+| A 1920x1080 probe with `R90` | `validate::a_1920x1080_probe_turned_90_degrees_is_a_1080x1920_portrait_clip` (also unturned, and a square) |
+| A video track of 30,000 samples in one `stts` run | `probe::a_video_track_of_30_000_samples_opens_unresolved_and_is_too_long`: 1,000,000 ms, 30,000 `FpsMilli`, `Duration` |
+| A valid video track beside an `lpcm` track of 4,320,000 samples | `probe::an_lpcm_audio_track_of_4_320_000_samples_opens_and_is_the_wrong_codec`: `AudioCodec` |
+| `read_video_sample(0, ..)` on an unresolved track | `demux::read_video_sample_on_an_unresolved_track_is_malformed_samples` (also a resolved track read: bytes, times, the keyframe to seek to, an index out of range) |
+| The short-file case (the guide's) | `demux::a_file_shorter_than_one_box_header_is_not_iso_bmff` (6 bytes, 0 bytes, 20 bytes of text; also `moof`, `mvex`, and no `moov`) |
+
+**The two drills.** Each was undone from a copy.
+
+| Temporary edit | What fired |
+|---|---|
+| `.unwrap()` in the non-test code of `demux.rs` | clippy: "used `unwrap()` on an `Option` value" |
+| `let _ = std::time::Instant::now();` in `probe.rs` | clippy: "use of a disallowed method `std::time::Instant::now`", with the reason of `clippy.toml`, "pure crates must not read a clock (TS §7)" |
+
+**The real clip (the temporary test `zz_real_clip` of G 2.3; never committed).**
+
+| Field | Printed | Expected |
+|---|---|---|
+| `duration` | 74,705 | 74,705 within 1 |
+| `video.codec`, `codec_string` | `H264`, `avc1.4d401f` | `H264`, starts with `avc1.4d` |
+| `coded_width`, `coded_height`, `rotation` | 1280, 720, `R0` | The same |
+| `frame_count` | 2,246 | 2,246 |
+| `is_vfr` | `true` | `true` |
+| `avg_fps`, `max_fps` | 30,064 and 32,930 | Not fixed by the guide |
+| `audio` | `Aac`, `mp4a.40.2`, 48,000 Hz, 2 channels | The same |
+| `validate_probe(&p, true)` | `Ok(ClipInfo)`: 1280x720, `Landscape`, 74,705 ms | `Ok(ClipInfo)` with `Landscape` |
+
+The test also read every video sample and printed more than the guide asks, to check `open` step 4 and the seek against `ffprobe`:
+
+| Read | This crate | `ffprobe` |
+|---|---|---|
+| Smallest video `pts` | 0 | Start time 0 |
+| End of the last video frame | 74,705,033 microseconds | Duration 74.705033 s |
+| First video sample | `pts` 0, `dts` -79,767, keyframe, 91,736 bytes | The first packet is a keyframe at 0 |
+| End of the last audio frame | 74,517,520 microseconds | Duration 74.517521 s |
+| `keyframe_at_or_before` 0 ms, 30 s, 74 s | Samples 0, 896, 2040 | Keyframes are packets 0, 896 (29.807867 s) and 2040 (67.855600 s) |
+
+No expectation was adjusted. `git grep -n zz_real_clip -- crates web scripts` prints nothing.
+
+**Checked.**
+
+- G M-2: `cargo test -p offcut-mp4 --lib`, 17 passed; `cargo clippy -p offcut-mp4 --all-targets -- -D warnings` clean; `cargo deny check` ok; `pnpm check` green; no `zz_real_clip` outside the documents that describe it.
+- `validate_probe` has 11 `return Err(RejectReason::...)`, numbered 1 to 11 in the code and read against TS §15.2: `Container`, `NoVideo`, `Hevc`, `VideoCodec`, `NoAudio`, `MultiAudioTrack`, `AudioCodec`, `Duration`, `Resolution`, `FrameRate`, `DecodeUnsupported`. It cannot return `FileSize`, `Corrupt` or `NoSpeech`. Its limits are the four it imports from `offcut_types::limits`.
+- Lines above the test module: `demux.rs` 369, `probe.rs` 180, `validate.rs` 85. `boxes.rs` and `sample_table.rs` were not touched.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **187 Rust, 76 Vitest, 12 Playwright** (Rust was 177; the ten are new).
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-mp4 --lib`: the 16 rows of §6.9 and the short-file case pass.
+- [x] The real clip printed the values above; `git grep -n zz_real_clip` finds it in the two documents that describe the test and nowhere else.
+- [x] `validate_probe` has 11 rejecting branches, read against TS §15.2 line by line; G M-2 passes.
+
+**Human.** Push; read `ci` (open item 4).

@@ -2,8 +2,11 @@
 //! Nothing here decodes or encodes a sample, and no file is read whole.
 
 pub mod boxes;
+pub mod demux;
+pub mod probe;
 pub mod reader;
 pub mod sample_table;
+pub mod validate;
 
 use thiserror::Error;
 
