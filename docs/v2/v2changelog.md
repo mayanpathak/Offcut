@@ -577,3 +577,20 @@ Both temporary files are deleted.
 - [x] `pnpm gen:types && sh scripts/check-gen-clean.sh` shows no diff; both browser values match.
 
 **Not measured.** How long `resample_mono` takes on the reference clip in the browser. It is part of the `probe_audio` budget, read in Prompt 37 and on R1.
+
+## 2026-10-09 - The second push: `ci` green on Prompts 35 and 36
+
+**Done by the human.** `git push` of `v2-build` at `bb3abee`, the commit of Prompt 36.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `bb3abee`, equal to the local branch |
+| The `ci` run on `bb3abee` (pull request #2) | Success. Job `ci`: 3.0 minutes. `deploy-api` and `deploy-web`: skipped |
+| Steps that ran on new code | The secret scan, `cargo clippy`, `cargo deny` (with `rubato`, `serde-wasm-bindgen` and the three new wrappers), `cargo test` (193), the WASM bundle with the media and hash exports, both `tsc` steps, the hosts check on the larger bundle, Playwright: all success |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3` |
+
+**Closes.** The push that Prompt 35 ends with. `rubato` and the binding dependencies build and pass `cargo deny` on Linux, which the entries of Prompts 34 to 36 had left unchecked.
+
+**Changed.** This file only.
