@@ -14,7 +14,7 @@
 
 1. Scope: what V2 is and is not
 1A. Preconditions: V1 deliverables V2 relies on
-2. Decisions this document makes (D-18 to D-63)
+2. Decisions this document makes (D-18 to D-64)
 3. Tools, accounts, secrets, environment variables
 4. V2 file tree
 5. Build order (16 steps, each with its own check)
@@ -159,7 +159,7 @@ Numbering continues from V1's D-17. Each is the smallest choice that keeps V3 an
 | D-36 | Model parts are written on the main thread with the async OPFS API: one `createWritable({ keepExistingData: true })`, seek, write, close per 8 MiB part. The hash runs on the main thread through `loadCore()` in 4 MiB reads with a macrotask yield between reads | TS §2 lets `models/` use `persistence/opfs` and `wasm/load-core` and names no worker for it. A close per part is what makes a part survive a closed tab (TS §16.5). This is the one main-thread caller of `loadCore()`; V1's comment there ("the main thread never runs WASM") is corrected to say so. Hashing is not media work (INV-17) |
 | D-37 | ONNX Runtime files are copied to `web/public/ort/<runtime version>/`, and the runtime is pointed at that directory | `vercel.json` (frozen) marks `/ort/*` immutable for a year. An unversioned path would serve a stale runtime after an upgrade |
 | D-38 | **REOPENED V1 CONTRACT (`scripts/check-hosts.mjs`, marked F).** An entry of `NON_NETWORK_LITERALS` (as built: `{ prefix, reason, exact? }`) may carry a `chunk` pattern; such an entry is allowed only in output files whose path matches. Three groups are listed that way, each entry with its reason: the ASR runtime's remote-host literals in the `asr.worker` chunk (found at S6, citing TE-1); literals inside the runtime files copied to `ort/<version>/` (S6); literals inside `offcut_render_bg-*.wasm`, such as vendor and license addresses in the embedded fonts' name tables and addresses in dependency error texts (S10) | V1's script reads every byte of `web/dist`, the `.wasm` files and `ort/` included. The runtime package carries its default hub and CDN host names as strings. Remote loading is off and the CSP blocks those hosts; the script must still fail on such a literal anywhere else. Cost: about ten lines in a script V1 called final; INV-1's static guard gains an exception that TE-1 and the CSP back |
-| D-39 | `fixtures/speech/speech_60s_portrait.mp4` is committed at 40 MB or less (re-encode with the ffmpeg CLI if larger), without Git LFS. The same file is uploaded as the sample clip; its path is `SAMPLE_CLIP_PATH` in `net/asset-fetch.ts` | TS §4 commits the speech fixtures; GitHub warns above 50 MB; LFS has a bandwidth quota. V1 §15.2 makes the sample button active in V2 and no sample clip exists |
+| D-39 | The reference clip (D-64) is not committed. It stays in `testclips/` (git-ignored) on the development machine, at 40 MB or less, and is uploaded at S5 as the sample clip; its path is `SAMPLE_CLIP_PATH` in `net/asset-fetch.ts`. Tests reach it through `helpers/fixtures.ts::referenceClip()`: the `testclips/` file when it exists, else a copy in `fixtures/.cache/` that `globalSetup` downloads from the asset host and checks against the hash segment of its name | The founder's decision of 2026-10-08 is to keep the recording out of the repository. V1 §15.2 makes the sample button active in V2, so the clip is on the asset host anyway and CI can fetch it from there. TS §4 commits the speech fixtures: the committed set starts in V3 |
 | D-40 | Until the clip repos and `quota.ts` exist, V2 keeps one clip: `importClip` removes every other directory under `clips/`, and `startExport` removes every file under `exports/` first | No restore exists before V7 and no eviction before V7; without this, repeated imports fill the quota. Both calls are marked stand-ins that V7's `quota.ensureFree` replaces |
 | D-41 | E2E serves asset-host URLs from a local cache directory (`fixtures/.cache/`) through Playwright routing, with Range support. `E2E_REAL_ASSETS=1` turns routing off for the first-run timing on R1; for that run the asset bucket's CORS policy gains the origin `http://localhost:4173` (`vite preview`) | 150 MB from a free host on every CI run is slow and spends its allowance. The page still requests the asset-host URL, so host assertions stay valid. As built, the bucket allows the app origin and `http://localhost:5173` only, which would block a real-asset run on the preview port |
 | D-42 | `Token` and `TokenKind` (section 8.2), the V2 number subset and the display rules of `format_quantity` (section 8.4), all (assumption, M1.3). One conditional form: if the S6 transcript shows the reference amount without a `$` (for example `12,000 dollars`), the subset gains "a parsed number followed by the word `dollar` or `dollars`", giving `Unit::Usd`. The script is not re-recorded and no threshold changes | TS §17.1 uses `Token` without defining it and gives three display examples without rules. BP §4.1 D limits V2 to "digits and simple spelled numbers". V2's one visible event depends on how the recognizer writes that amount (section 9.3), so the plan names what happens when it writes it differently |
@@ -184,6 +184,7 @@ Numbering continues from V1's D-17. Each is the smallest choice that keeps V3 an
 | D-61 | `offcut-render/src/lib.rs` re-exports the scene crate (`pub use offcut_scene as scene;`). `offcut-wasm-render` has no direct dependency on `offcut-scene`: `session.rs` names `build_scene`, `SceneInput` and `Scene` through `offcut_render::scene` | TS §19.2 has the session call `build_scene`, while the TS §7 graph, the table in `check-file-tree.mjs` and the `offcut-scene` ban in `deny.toml` all let only `offcut-render` depend on `offcut-scene`. A re-export changes none of the three |
 | D-62 | `scripts/upload-assets.sh` (partial in V1) is edited: the folder argument may also be `models/<modelId>` (one more segment of lower-case letters, digits and hyphens), and the content-type table gains a row for any extension in the model's file list that it lacks. A stored name keeps its hash segment (`models/asr-en-v1/<stem>.<hash>.<ext>`), and that printed path is the manifest's `files[].path`. In OPFS a model file is stored under the last path segment without the hash segment, computed by `download.ts::localName(file)` | As built, the script accepts `media` and `models` only and writes one flat level, while TS §16.1 and TS §23.1 put the files under `models/<modelId>/`. The runtime asks the cache adapter for the plain name (`encoder_model.onnx`), and workers do not import the manifest (D-50), so the name on disk must be the plain one |
 | D-63 | Test tooling. (a) `@types/node` is a dev-dependency of `web`, visible only through a new `web/tests-e2e/tsconfig.json` (added to the TS §5 tree) that extends `../tsconfig.json`, adds `node` to `types` and includes `tests-e2e`, `playwright.config.ts` and `../bench`; `web/tsconfig.json` drops `tests-e2e` from its `include`; `pnpm check` runs `tsc --noEmit` for both. (b) The root `package.json` gains the dev-dependency `@playwright/test` at the version `web` pins, and `bench/device-bench.ts` runs as project `bench` of `web/playwright.config.ts` (`testDir: "../bench"`) | (a) The helpers of section 23.4 use Node's crypto, files and child processes. V1 has no Node types and type-checks `tests-e2e` with the app's configuration, where a Node global must never type-check. (b) The pnpm workspace holds `web` alone, so a file under the root `bench/` (TS §5) cannot resolve the package otherwise. `bench/` is outside `web/` and is not linted |
+| D-64 | **The V2 reference clip is the founder's webcam recording of Script A**, `testclips/speech_scriptA_landscape_720p.mp4`: 1280x720 landscape, 74.705 s, H.264 Main with AAC at 48 kHz stereo, a variable frame rate (about 30 fps on average; frame gaps of 32 ms and 48 ms), 35.2 MB, with one fully white frame near 4.99 s and one near 64.85 s (frames 150 and 1950). It takes the place of the 60-second 1080x1920 portrait clip of TS §26; a portrait recording of Script A joins the fixtures in V3. Every budget of PS §20.2 and every threshold of E-3 and E-4 is defined for a 60 s clip and is read in V2 **multiplied by 74.7 / 60 = 1.245**: probe and audio 3.7 s; transcription 25 s; scene build 1.25 s; render and encode 112 s; mux 2.5 s; p90 total 224 s; the audio-chain allowance 5 s; the fallback bands 25-50 s (E-3) and 112-187 s (E-4). `docs/v2/experiments.md` records each reading as measured and also normalised to 60 s | The founder's decision of 2026-10-08: the reference should be what a user really drops in. The clip passes all 11 rules of TS §15.2 as it is, and it exercises the landscape crop and a variable frame rate from the first day. Costs: the output is a centre strip 405 pixels wide enlarged to 1080, so it looks soft; a 720p source is cheaper to decode than a 1080x1920 one, so E-4 here understates the decoding cost of a portrait phone clip, which V3 reads again on the portrait fixture; transcription and render time scale with length, which the factor covers |
 
 ---
 
@@ -392,7 +393,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 │   ├── verify_mp4.py                   NEW P    checks 1-6; 7-11 in V5
 │   ├── requirements.txt                NEW F
 │   └── README.md                       NEW P
-├── fixtures/speech/speech_60s_portrait.mp4    NEW F  (D-39)
+├── testclips/speech_scriptA_landscape_720p.mp4   not in git: the reference clip (D-39, D-64)
 ├── bench/
 │   ├── device-bench.ts                 NEW P    --compare in V9
 │   └── results/<device>-<date>.json    data
@@ -421,7 +422,7 @@ Sixteen steps over ten working days (Mon 19 Oct to Fri 30 Oct 2026), gate on Sun
 
 | # | Step | Produces | Check |
 |---|---|---|---|
-| S1 (day 1) | Contracts and setup | Record and commit the reference clip with its two white-flash frames (TS §26, D-39); 8 new workspace members with empty `lib.rs`; the lint changes of D-27, D-58, D-59; the test tooling of D-63; `env.ts` field; `entitlement-public-key.ts`; the `check-file-tree` pair and `PURE_CRATES`, and the `deny.toml` wrapper (D-28); TS §5 tree updated; `docs/v2/` | `cargo metadata` lists 12 members; `pnpm check` green; `ffprobe` shows the clip as H.264/AAC, 1080x1920, 30 fps, 59-61 s, at most 40 MB |
+| S1 (day 1) | Contracts and setup | The reference clip in `testclips/`, with its two white frames (D-39, D-64; prepared on 2026-10-08); 8 new workspace members with empty `lib.rs`; the lint changes of D-27, D-58, D-59; the test tooling of D-63; `env.ts` field; `entitlement-public-key.ts`; the `check-file-tree` pair and `PURE_CRATES`, and the `deny.toml` wrapper (D-28); TS §5 tree updated; `docs/v2/` | `cargo metadata` lists 12 members; `pnpm check` green; `ffprobe` shows the clip as H.264/AAC, 1280x720, 74.7 s, at most 40 MB |
 | S2 (day 1) | `offcut-mp4` read side | `reader`, `boxes`, `sample_table`, `demux`, `probe`, `validate` (section 6) | `cargo test -p offcut-mp4 --lib`; clippy clean |
 | S3 (day 2) | Resampler; core bindings | `resample.rs`; `media_api.rs`, `hash_api.rs`; `CoreApi` in `load-core.ts` | `cargo test -p offcut-dsp`; `pnpm build:wasm`; `tsc --noEmit` |
 | S4 (day 2) | Worker plumbing and ingest | `opfs.ts`, `rpc.ts`, `pool.ts`, `media.worker.ts`, `media/*` | In `pnpm dev`, a temporary console call imports the reference clip and prints a `ClipInfo` whose duration is within 1 ms of `ffprobe`'s video duration, and `pcm48.length === Math.round(durationMs * 48)`. Remove the call |
@@ -572,7 +573,7 @@ Copy `MuxSink`, `VideoTrackSpec`, `AudioTrackSpec` and the `Mp4Muxer<S>` signatu
 
 **Never.** Buffers sample payloads in memory: each `add_*` writes through the sink at once (TS §31). Reads a clock: timestamps in the file are 0.
 
-**Budget.** Mux + finalize at most 2 s for the reference clip on R1 (PS §20.2), read from `stageTimings`.
+**Budget.** Mux + finalize at most 2 s for a 60 s clip on R1 (PS §20.2), which is 2.5 s for the reference clip (D-64); read from `stageTimings`.
 
 ### 6.9 Inline unit tests
 
@@ -618,7 +619,7 @@ pub fn resample_mono(input: &[f32], from: Hz, to: Hz) -> Vec<f32>;       // TS �
 
 **Never.** Looks at the audio content to decide anything; changes the duration; takes word timings (INV-10).
 
-**Budget.** Part of the 3 s probe + audio extraction budget (PS §20.2); read from `stage_timing stage=probe_audio`.
+**Budget.** Part of the 3 s probe + audio extraction budget (PS §20.2), which is 3.7 s for the reference clip (D-64); read from `stage_timing stage=probe_audio`.
 
 | Inline test | Expect |
 |---|---|
@@ -957,7 +958,7 @@ Count-up strings are shaped at layout time, one run per output frame of the 500 
 
 ### 11.8 Budgets and inline tests
 
-Scene build at most 1 s for the reference clip (PS §20.2); `frame_at` average at most 2 ms on R1 (assumption, M2.4). Both are read by `bench/device-bench.ts` through `stage_timing stage=detect_scene` and the render stage; V2 records them and does not gate on the second.
+Scene build at most 1 s for a 60 s clip (PS §20.2), which is 1.25 s for the reference clip (D-64); `frame_at` average at most 2 ms on R1 (assumption, M2.4). Both are read by `bench/device-bench.ts` through `stage_timing stage=detect_scene` and the render stage; V2 records them and does not gate on the second.
 
 | Inline test | Expect |
 |---|---|
@@ -1354,7 +1355,7 @@ export function postProcess(words: RawWord[], durationMs: DurMs): RawWord[];
 
 **Never.** Requests any URL other than `/ort/...` on the app origin. Writes to OPFS. Drops, merges or shifts words because of a pause: timestamps are the spoken times (INV-5).
 
-**Budget.** Median `load` + `transcribe` at most 20 s for the reference clip on R1 (PS §20.2, E-3); model session at most 700 MB (assumption, TE-14).
+**Budget.** Median `load` + `transcribe` at most 20 s for a 60 s clip on R1 (PS §20.2, E-3), which is 25 s for the reference clip (D-64); model session at most 700 MB (assumption, TE-14).
 
 ### 16.6 `render.worker.ts`
 
@@ -1440,7 +1441,7 @@ Every failure thrown inside `exportClip` carries `stage: "render_encode"`, excep
 
 **Never.** Skips or repeats an output frame because of what the audio contains; trims audio or video (INV-5, INV-10); assembles the output in memory (TS §31); keeps an `EncodedVideoChunk` after copying it into the muxer.
 
-**Budget.** Render + encode at most 90 s and mux at most 2 s for the reference clip on R1 (PS §20.2, E-4).
+**Budget.** Render + encode at most 90 s and mux at most 2 s for a 60 s clip on R1 (PS §20.2, E-4), which is 112 s and 2.5 s for the reference clip (D-64).
 
 ### 16.9 `render/encoders.ts` [ONLY WebCodecs encoder configs], `render/opfs-sink.ts`
 
@@ -1941,9 +1942,10 @@ export function dropClip(page: Page, fixture: string): Promise<void>;        // 
 export function ensureModelCached(context: BrowserContext): Promise<void>;   // runs one download into the context's OPFS
 export function opfsList(page: Page, dir: string): Promise<string[]>;
 export function sourceDurationMs(fixture: string): number;                   // ffprobe on the fixture's video stream
+export function referenceClip(): string;                                     // D-39: the testclips/ file, else its copy in fixtures/.cache/
 ```
 
-`routeAssets` answers every asset-host URL from `fixtures/.cache/` (models) and `fixtures/speech/` (the sample clip), honouring `Range` with 206 and `Content-Range`, and records method, URL, headers and byte counts. With `E2E_REAL_ASSETS=1` it only records (D-41). `globalSetup` downloads any manifest file missing from `fixtures/.cache/` from the real asset host and checks its SHA-256. `mintEntitlementToken` defaults: `plan: "creator"`, `iat = now`, `exp = now + 7 days`, `periodEnd = now + 30 days`. Every media suite calls `installFakeApi` (V1) so no test reaches a real server.
+`routeAssets` answers every asset-host URL from `fixtures/.cache/` (models) and `referenceClip()` (the sample clip, D-39), honouring `Range` with 206 and `Content-Range`, and records method, URL, headers and byte counts. With `E2E_REAL_ASSETS=1` it only records (D-41). `globalSetup` downloads any manifest file missing from `fixtures/.cache/` from the real asset host and checks its SHA-256. When `testclips/` does not hold the reference clip (as on the CI runner), it downloads `SAMPLE_CLIP_PATH` the same way and checks that the file's SHA-256 starts with the hash segment of its name. `mintEntitlementToken` defaults: `plan: "creator"`, `iat = now`, `exp = now + 7 days`, `periodEnd = now + 30 days`. Every media suite calls `installFakeApi` (V1) so no test reaches a real server.
 
 ### 23.5 `web/tests-e2e/landing.spec.ts`: the two replaced cases (D-56)
 
@@ -1969,7 +1971,7 @@ The other V1 cases are unchanged and still pass. This suite must keep passing on
 
 ### 23.7 `web/tests-e2e/pipeline-preview.spec.ts` (V2 cases; TS §27.1, J6-J7)
 
-Model pre-cached with `ensureModelCached`. Fixture: `speech_60s_portrait.mp4`.
+Model pre-cached with `ensureModelCached`. Fixture: the reference clip, through `referenceClip()` (D-39, D-64).
 
 | Case | Expect |
 |---|---|
@@ -1977,7 +1979,7 @@ Model pre-cached with `ensureModelCached`. Fixture: `speech_60s_portrait.mp4`.
 | Real detections only | Every "Found:" line's amount appears in the expected-events list of `fixtures/speech/README.md` |
 | Preview before sign-in | With no `entitlement` record and no session, the player appears; after Play, two screenshots of the canvas 1 s apart differ, and neither is a single flat color |
 | Pause and resume | Pause: two screenshots 500 ms apart are identical. Play again: they differ. No failure message appears (D-45: a leaked frame would fail the pause) |
-| Events | `clip_accepted` with `source: "user"`, `orientation: "portrait"`, `duration_bucket` `lt60` or `lte90`; `stage_timing` for `probe_audio`, `asr` (with `asr_backend`) and `detect_scene`; none for `audio_chain`; `pipeline_done` with `n_number >= 1` and the other three counts 0; exactly one `preview_played` after two plays |
+| Events | `clip_accepted` with `source: "user"`, `orientation: "landscape"`, `duration_bucket: "lte90"` (D-64); `stage_timing` for `probe_audio`, `asr` (with `asr_backend`) and `detect_scene`; none for `audio_chain`; `pipeline_done` with `n_number >= 1` and the other three counts 0; exactly one `preview_played` after two plays |
 | Event shape | Every event body parses as `EventsBatch`; no property is a free string; no feed text appears in any request (INV-2) |
 | Quiet processing | Between `clip_accepted` and `pipeline_done` the only requests are `POST /api/v1/events` (TS §25.2 assertion 4) |
 | Sample clip | Clicking the sample button requests `SAMPLE_CLIP_PATH` from the asset host and yields `clip_accepted` with `source: "sample"` |
@@ -2023,7 +2025,7 @@ A Playwright test file run headed with `channel: "chrome"` against `vite preview
 Result file `bench/results/<BENCH_DEVICE>-<yyyy-mm-dd>.json`:
 
 ```json
-{ "device": "r1", "date": "2026-10-30", "commit": "<sha>", "chrome": "<version>", "clip": "speech_60s_portrait.mp4",
+{ "device": "r1", "date": "2026-10-30", "commit": "<sha>", "chrome": "<version>", "clip": "speech_scriptA_landscape_720p.mp4", "clip_duration_ms": 74705,
   "asr_backend": "webgpu", "runs": 10,
   "stages": { "probe_audio": { "ms": [], "median": 0, "p90": 0 }, "asr": {}, "detect_scene": {}, "render_encode": {}, "mux": {} },
   "total": { "ms": [], "median": 0, "p90": 0 },
@@ -2044,12 +2046,12 @@ Write each outcome into `docs/v2/experiments.md` (question, method, numbers, dat
 |---|---|---|---|---|---|
 | **TE-1** | S6 | Run `asr.worker` in a production build under the production CSP with the model in OPFS. Capture every request with the DevTools protocol while loading and transcribing the reference clip, once per backend | Zero requests outside TS §24.1; word timestamps for the reference clip; WebGPU and WASM backends both run | Second runtime behind the same `whisper-runtime.ts` interface (TS §16 contingency) | `experiments.md`; the option names in `v2changelog.md`; the D-38 list |
 | **TE-2** | S6 | Inspect the runtime's output for a per-token probability; time transcription with and without it | Available at no more than 10% time cost | `Confidence(1.0)` for every word | `experiments.md`; TS §39.3 item 7 |
-| **E-3** | S6, S15 | `pnpm bench:device` on R1, stage `asr`, 10 runs. R2 as well | Median at most 20 s; p90 total at most 180 s (PS §19). In V2 the total lacks the audio chain; add its 4 s budget when reading the p90 | 20-40 s: continue and record the miss. Over 40 s: tiny-size model and stronger caption editing (PS §20.4) | `bench/results/r1-*.json`, `r2-*.json` |
-| **TE-3** | S11 | In `render.worker`, render 1,800 frames of the reference clip to an `OffscreenCanvas` at 1080x1920 with capture method A (`new VideoFrame(canvas)`) and method B (texture readback); encode both and compare ten sampled frames between the two outputs, and inspect one captioned frame by eye; repeat with the tab hidden; R1 and R2 | A correct frame every time; at least 30 frames per second render-only on R1; works hidden | The other capture method; then the Canvas2D backend (TS §19 contingency) | `experiments.md`; the chosen method named in `export-loop.ts` and TS §21.4 |
+| **E-3** | S6, S15 | `pnpm bench:device` on R1, stage `asr`, 10 runs. R2 as well | For a 60 s clip: median at most 20 s; p90 total at most 180 s (PS §19). For the reference clip (D-64): 25 s and 224 s. In V2 the total lacks the audio chain; add its allowance (5 s) when reading the p90 | 25-50 s: continue and record the miss. Over 50 s: tiny-size model and stronger caption editing (PS §20.4) | `bench/results/r1-*.json`, `r2-*.json` |
+| **TE-3** | S11 | In `render.worker`, render every output frame of the reference clip (2,242) to an `OffscreenCanvas` at 1080x1920 with capture method A (`new VideoFrame(canvas)`) and method B (texture readback); encode both and compare ten sampled frames between the two outputs, and inspect one captioned frame by eye; repeat with the tab hidden; R1 and R2 | A correct frame every time; at least 30 frames per second render-only on R1; works hidden | The other capture method; then the Canvas2D backend (TS §19 contingency) | `experiments.md`; the chosen method named in `export-loop.ts` and TS §21.4 |
 | **TE-4** | S11 | Log which ladder entry `pickVideoConfig` returns on R1 and R2 for 1080x1920 and 720x1280; export the reference clip; run the verifier; measure the audio priming (first chunk timestamp, decoded leading silence) and set `AAC_PRIMING_SAMPLES` | A ladder entry supported on both; verifier checks 1-6 pass; A/V offset within one frame. Phone playback and the 11/11 run are M2.5 | Next ladder entries; explicit silent pre-roll with a matching `elst`; bitrate change (TS §21 contingency) | `experiments.md`; ladder order and bitrates in TS §21.2; TS §39.3 item 16 |
-| **E-4** | S11, S15 | `pnpm bench:device` on R1, stage `render_encode`. R2 as well | At most 90 s (PS §19) | 90-150 s: continue and record. Over 150 s: Canvas2D overlay path; cap input at 60 s and 30 fps (PS §20.4) | `bench/results/` |
+| **E-4** | S11, S15 | `pnpm bench:device` on R1, stage `render_encode`. R2 as well | For a 60 s clip: at most 90 s (PS §19). For the reference clip (D-64): 112 s | 112-187 s: continue and record. Over 187 s: Canvas2D overlay path; cap input at 60 s and 30 fps (PS §20.4) | `bench/results/` |
 | **TE-10** | S14 | Run `e2e-media.yml` on a pull request; read the minutes used and the monthly allowance | Suites pass headless; a month of expected runs fits the free minutes | Media job on `main` and manual trigger only; `pnpm e2e:device` locally | `experiments.md`; `check-external-facts.mjs` |
-| **TE-14** | S15 | Make a 90 s, 1080p, 60 fps clip from the reference with the ffmpeg CLI (not committed). Run import, pipeline and export 10 times on R1, reading memory per phase with `measureUserAgentSpecificMemory` and the browser task manager | Peak under 1.5 GB; no tab crash in 10 runs | Smaller queues; preview at 360x640; smaller model (TS §31) | `experiments.md`; TS §39.3 item 23 |
+| **TE-14** | S15 | Make a 90 s, 1080p, 60 fps clip from the reference with the ffmpeg CLI (looped to 90 s and scaled up; not committed). Run import, pipeline and export 10 times on R1, reading memory per phase with `measureUserAgentSpecificMemory` and the browser task manager | Peak under 1.5 GB; no tab crash in 10 runs | Smaller queues; preview at 360x640; smaller model (TS §31) | `experiments.md`; TS §39.3 item 23 |
 | **TE-7** (re-check) | S5 | The real model files, up to 150 MB, are fetched by range from the deployed page | 206 responses; no egress charge appears | The other candidate; split files under the host's limit | `experiments.md` |
 | **E-1** (read only) | S16 | Count `landing_view` rows and `platform_waitlist` rows with `wanted = 'launch'` since V1 went public | At least 1,000 visitors and at least 5% joined | Section 24.3 | `experiments.md` |
 
@@ -2071,10 +2073,12 @@ Decide from three readings (BP §4.3, PS §9.9, PS §20.4):
 | Reading | Continue | Apply the fallback, then continue | Stop |
 |---|---|---|---|
 | E-1 waitlist | At least 1,000 visitors and at least 5% join | Under 1,000 visitors: inconclusive, keep going and keep measuring. 3-5%: rewrite the pitch once and re-run | Under 3% again after the rewrite, with at least 1,000 visitors |
-| E-3 ASR on R1 | Median at most 20 s | 20-40 s: ship and record the miss. Over 40 s: smaller model | Still failing after the fallback: cloud transcription would become launch-blocking (PS §19), which the 0 USD rule cannot fund |
-| E-4 render + encode on R1 | At most 90 s | 90-150 s: ship and record. Over 150 s: Canvas2D path, 60 s / 30 fps cap | No path under budget |
+| E-3 ASR on R1 (reference clip, D-64) | Median at most 25 s | 25-50 s: ship and record the miss. Over 50 s: smaller model | Still failing after the fallback: cloud transcription would become launch-blocking (PS §19), which the 0 USD rule cannot fund |
+| E-4 render + encode on R1 (reference clip, D-64) | At most 112 s | 112-187 s: ship and record. Over 187 s: Canvas2D path, 60 s / 30 fps cap | No path under budget |
 
 **E-1 on the gate day.** Outreach starts after V2's build work (section 1A). If the page has not been announced by the gate, or has had fewer than 1,000 visitors, E-1 falls in the middle column as inconclusive: record that with the visitor count, decide on E-3 and E-4 alone, and keep measuring, as that column says.
+
+The E-3 and E-4 numbers in this table are the 60 s thresholds of PS §19 and PS §20.4 multiplied by 1.245 (D-64). Write both the measured value and the value normalised to 60 s (measured x 60,000 / 74,705).
 
 Write the decision into `docs/v2/experiments.md` as: the three numbers, the column each fell in, the action taken, the date. V3 does not start without it (BP §5: "Depends on V2 and a passed M0 gate").
 
@@ -2154,7 +2158,7 @@ Contracts from the end of V2. Changing one later means touching both sides of a 
 | `.github/workflows/e2e-media.yml` | `rejections.spec.ts` joins the `media` project; a `pnpm fixtures` step | Four more suites |
 | `scripts/check-copy-codes.mjs` | Pending list shrinks by 14 | Pending list shrinks |
 | `verify/*`, `bench/device-bench.ts` | The `audio_chain` stage appears in results with no code change | Nothing |
-| `fixtures/speech/*` | Two pause fixtures, the landscape and no-events clips; `gen_fixtures.sh`, `manifest.json`, `labeled/` | `golden/` |
+| `fixtures/speech/*` | The committed fixture set starts here: a portrait recording of Script A (phone, 1080x1920), the two pause fixtures and the no-events clip; `gen_fixtures.sh`, `manifest.json`, `labeled/`. E-3 and E-4 are read again on the portrait clip (D-64) | `golden/` |
 
 ### 25.3 What must be true on V3's first morning
 
@@ -2228,7 +2232,7 @@ V2 is done when every box is ticked (BP §1.2, BP §4.4, TS §28 M0.2-M0.4).
 
 ## 27. Open references and spec issues found
 
-Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in the inputs that a decision in section 2 covers; the spec should be corrected so the decision is no longer needed. Items 11-18 stay open. Items 19-25 are places where the first draft of this plan did not match V1 as built, or itself; they were found on 2026-10-08 by reading the V1 code and `docs/v1/v1changelog.md`, and each is covered by the decision named.
+Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in the inputs that a decision in section 2 covers; the spec should be corrected so the decision is no longer needed. Items 11-18 stay open. Items 19-25 are places where the first draft of this plan did not match V1 as built, or itself; they were found on 2026-10-08 by reading the V1 code and `docs/v1/v1changelog.md`, and each is covered by the decision named. Item 26 is the founder's choice of reference clip.
 
 | # | Issue | Where | Handled by |
 |---|---|---|---|
@@ -2248,7 +2252,7 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 14 | P-5's structural proof says use-cases between import and `ready` import no `net` module; `import-clip.ts` imports `net/asset-fetch` for the sample clip. The fetch happens before `clip_accepted`, so assertion 4 of TS §25.2 is unaffected | TS §25.1 P-5 vs TS §15.4 | D-27 a. Reword P-5 |
 | 15 | Values the specs defer to V2 experiments and that this plan therefore cannot state: the runtime's option names (TE-1), the AAC priming count (TE-4), Chrome's launch arguments for WebGPU on the CI runner (TE-10), the model file list and hashes | TS §16.4, §21.3, §33 | Recorded at S5, S6, S11, S14 |
 | 16 | Whether the 20 s transcription budget includes loading the session. The session is loaded for every clip (INV-12) | PS §20.2, TS §30 | D-35 counts it. Confirm in PS or TS |
-| 17 | E-3's "p90 total at most 180 s" cannot be measured in V2: the audio chain does not exist | PS §19, BP §4.2 | Section 24.1 reads the V2 total plus the 4 s budget; final reading in V9 |
+| 17 | E-3's "p90 total at most 180 s" cannot be measured in V2: the audio chain does not exist | PS §19, BP §4.2 | Section 24.1 reads the V2 total plus the audio-chain allowance (5 s for the reference clip, D-64); final reading in V9 |
 | 18 | `EntitlementClaims` is not generated to TypeScript, and V6's `entitlement-store` is to hold decoded claims on the main thread, where use-cases may not call WASM | TS §12.1, §10.6 | Open for V6. V2 needs only the unverified `plan` read of D-52 |
 | 19 | `session.rs` calls `build_scene`, but the crate graph, `check-file-tree.mjs` and `deny.toml` let only `offcut-render` depend on `offcut-scene` | TS §7 vs TS §19.2 | D-61 |
 | 20 | `check-hosts.mjs` reads every byte of `web/dist`. The fonts inside the render bundle and the runtime files under `ort/` can hold URL strings, not only the ASR worker chunk | V1 §12.6 as built | D-38 |
@@ -2257,5 +2261,6 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 23 | `tests-e2e` is type-checked with the app's `tsconfig.json`, which has no Node types; the pnpm workspace is `web` alone, so `bench/device-bench.ts` cannot resolve `@playwright/test` | V1 as built vs TS §5 | D-63 |
 | 24 | V1 added `CREATOR_VIDEO_BITRATE` to `encoders.ts` for the capability probe; V1's pages take paths as props; the comment on `loadCore()` rules out the main thread; a use-case may import only `pool.ts` from `workers`; `deny.toml` wrappers must name third-party parents | V1 changelog (Prompts 13, 18, 20, 23), `eslint.config.js` | D-26, D-48, D-36, D-32, section 22.1 |
 | 25 | A demuxer bound that fails at `open` would report a clip that is too long, or one with PCM audio, as corrupt. The build order had the spike before the crates it needs. The one visible event had no fallback | First draft of sections 5, 6.4 and 8.4 | D-60 as revised; S9 to S11; D-42 |
+| 26 | The reference clip of TS §26 and PS §20.2 is a 60-second 1080x1920 portrait clip; V2 uses a 74.7-second 1280x720 webcam recording | TS §26, PS §20.2 vs the founder's decision of 2026-10-08 | D-64, D-39. TS §26 gains a row for this clip when the portrait one is recorded in V3 |
 
 **Decisions to copy back into `technicalspec.md`:** D-25 (§10.8), D-26 (§21.1), D-27 and D-58 (§2, §7), D-28 (§7), D-29 (§19.2), D-30 (§19.2, §20.1), D-34 (§15.1), D-35 (§32), D-37 (§16.4, §24.6), D-42 (§17.1), D-45 (§21.4, INV-11), D-47 (§17.1), D-50 (§16.1), D-53 (§5), D-55 and D-46 (§5), D-59 (§10.1). **Into `buildplan.md`:** the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33. **Into `product.md`:** none.

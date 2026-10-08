@@ -6,7 +6,8 @@ The scripts are written against the detector rules of `technicalspec.md` §17.2-
 
 | Clip | Script | Recorded for |
 |---|---|---|
-| `speech_60s_portrait.mp4` | Script A | V2 |
+| `testclips/speech_scriptA_landscape_720p.mp4` (not in git) | Script A | V2: the reference clip. A webcam recording, 1280x720, 74.7 s (`docs/v2/v2implementation.md`, D-39 and D-64) |
+| `speech_60s_portrait.mp4` | Script A | V3 |
 | `speech_60s_landscape.mp4` | Script A | V3 |
 | `speech_20s_noevents.mp4` | Script B | V3 |
 | `speech_20s_long_pause.mp4` | Script C | V3 |
