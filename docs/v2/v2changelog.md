@@ -22,7 +22,7 @@
 | 6 | Reset the Neon password (V1 item 36) and replace the demo video (V1 item 33) | Human | Before the page is announced |
 | 7 | The file `.env.local` in the repository root holds one line with no name, a test-mode API key. Git ignores the file and no program reads that line. Move it into `.env.deploy` under a name | Human | Any time |
 | 8 | Turn on branch protection for `main` on GitHub (Settings, Branches): require a pull request and the `ci` check. `main` is unprotected, and a push to it deploys | Human | Before Prompt 59 |
-
+| 9 | Read the license of the speech model before the page is announced. Offcut now serves the model files from its own asset host. The repository they were taken from states no license of its own; the model's author says the code and the weights are under the MIT License, which asks for the notice to go with copies | Human | Before the page is announced |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -44,7 +44,8 @@
 | 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
-| 18 | **The speech model is the small-size English one and the limit is 260,000,000 bytes** (D-66; entry of 2026-10-09). Three sets of one candidate source were measured on that date, each with its five configuration files: 214,647,815 bytes (4-bit encoder, mixed 4-bit and 16-bit decoder), 251,728,328 (the 8-bit pair) and 302,289,470 (the 4-bit pair, over the limit). Which of the first two runs on both backends is not known before Prompt 43. The decoder of the 8-bit pair is one file of 156,794,981 bytes: if that set is taken, the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected in Prompt 38, with the range check on that file | Prompts 38, 43, 44 |
+| 18 | **The model on the asset host is the 214,647,815-byte set of the small-size English model** (D-66; entry of Prompt 38): the 4-bit encoder and the mixed 4-bit and 16-bit decoder. **Whether it runs on both backends is not known before Prompt 43.** Its decoder computes in 16-bit floats, which the WebGPU backend needs a device feature for and the WASM backend may not run; TE-1 needs both. The other set that fits the limit is the 8-bit pair, 251,728,328 bytes. Its decoder is one file of 156,794,981 bytes: if that set replaces this one, steps 2 and 3 of Prompt 38 are repeated, and the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected with a range check on that file. The downloaded files are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompts 43, 44 |
+| 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
 
 ---
 
@@ -780,3 +781,117 @@ For comparison, the 4-bit pair of the base-size model is 145,199,758 bytes. The 
 - Prompt 38 chooses the file set (known issue 18). Nothing was downloaded or uploaded.
 - E-3 is more likely to miss its 25 s target, and the ASR phase is estimated 40 MB under the memory budget. Both are read on R1 (Prompts 44 and 59).
 - TS §16.1 had made the small-size model depend on a word error rate above 12% (E-10). That rate has not been measured for either model.
+
+## 2026-10-09 - Prompt 38: upload script, model on the asset host, manifest, `fetchAsset`
+
+**Step 2 was done by the agent.** The prompts file gives the choice of the model, the download and the uploads to the human, "or the agent when this prompt's message says so". The founder chose the 214 MB set and said so on this date: the agent downloads and uploads, the sample clip included. The commit of D-66 (`6e5cc40`) had not been pushed when this prompt started; the last `ci` run read is the one on `3d2c244`.
+
+**Added.** `web/src/config/model-manifest.json`: the shape of TS §16.1; `modelId` `asr-en-v1`; seven files; `totalBytes` 214,647,815.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `scripts/upload-assets.sh` | The folder may also be `models/<modelId>`: one more segment of lower-case letters, digits and hyphens (D-62). The usage line and the header say so. The content-type table is unchanged: the model's files end in `.onnx` and `.json`, and it has both |
+| `web/src/net/asset-fetch.ts` | `SAMPLE_CLIP_PATH`, `AssetResult` and `fetchAsset`, as §15.4. The comment at the top no longer says the file makes no request |
+| `docs/v2/experiments.md` | The record of the TE-7 re-check |
+
+**The model.** The small-size English model with word timestamps (D-66), from `onnx-community/whisper-small.en_timestamped` at revision `80853938`, into `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository.
+
+| File | Bytes | Checked against the source's listing |
+|---|---|---|
+| `encoder_model_q4.onnx` | 66,178,491 | SHA-256 |
+| `decoder_model_merged_q4f16.onnx` | 145,776,485 | SHA-256 |
+| `tokenizer.json` | 2,405,679 | Git blob id |
+| `tokenizer_config.json` | 282,662 | Git blob id |
+| `config.json` | 2,203 | Git blob id |
+| `generation_config.json` | 1,956 | Git blob id |
+| `preprocessor_config.json` | 339 | Git blob id |
+| **Total** | **214,647,815** | The limit is 260,000,000 |
+
+Seven of seven match. Read before the upload: the decoder file names its `cross_attentions` outputs, and `generation_config.json` holds `alignment_heads` (19 pairs). Both are what word timestamps are computed from. `preprocessor_config.json` asks for 16,000 Hz and 30 s windows, which is what §16.5 feeds it.
+
+**The uploads.** The four `ASSET_S3_*` variables were read from `.env.deploy` inside a subshell that ran the two upload commands and ended; no value was printed, and the shell of the next command held none (counted: 0). The script sends the SHA-256 of each file with it, so the host refuses bytes that differ. It printed:
+
+```text
+models/asr-en-v1/config.8825c4174cb86f94.json
+models/asr-en-v1/decoder_model_merged_q4f16.0d38a3ab3d034990.onnx
+models/asr-en-v1/encoder_model_q4.f5a068d9ec94f60d.onnx
+models/asr-en-v1/generation_config.5490747ca976d6b3.json
+models/asr-en-v1/preprocessor_config.a6a76d28c93edb27.json
+models/asr-en-v1/tokenizer.5eb60cec1e77aeeb.json
+models/asr-en-v1/tokenizer_config.93879c3dccdd4b97.json
+media/speech_scriptA_landscape_720p.7da948cecc39438a.mp4
+```
+
+The last line is the sample clip, the founder's webcam recording: it is public from this date. A file on the host cannot be changed; it can be removed in the host's dashboard.
+
+**The manifest.** Written by a one-off script kept outside the repository: it read the seven printed paths, found each file on disk by taking the hash segment out of its stored name, refused a path whose hash segment is not the start of the file's SHA-256, and wrote `path`, `bytes` and `sha256`. No value was typed. `node -e` of G M-4 prints `asr-en-v1 true true`.
+
+**TE-7 re-check: passed.** On the largest file, `Range: bytes=0-8388607` answers `206 8388608`; the header check shows `Cache-Control: public, max-age=31536000, immutable` and the three exposed headers. The full record is in `experiments.md`. The largest single file is 145,776,485 bytes, under the 150 MB of V1's TE-7: the lines known issue 18 named need no correction.
+
+**The three drills.** No credential was in the shell, and the clip was the file argument.
+
+| Folder argument | Result |
+|---|---|
+| `models/../media` | Exit 1: "a model id may hold only lower-case letters, digits and '-'" |
+| `models/ASR_EN` | Exit 1, the same message |
+| `models/asr-en-v1/extra` | Exit 1, the same message |
+| `models/asr-en-v1` | Passes the folder rule and stops at the next one: "ASSET_S3_ENDPOINT is not set" |
+
+Nothing was uploaded by any of the four.
+
+**Browser check (dev).** `vite` on port 5173; a temporary Playwright case; the request headers read through the DevTools protocol.
+
+| Asked | Result |
+|---|---|
+| `fetchAsset(SAMPLE_CLIP_PATH, { range: 0 to 1023 })` | `[true, 206]`, 1,024 bytes |
+| That request | `Range: bytes=0-1023`; no cookie; no `Authorization`; no query string |
+| The same call offline | `navigator.onLine` false; `{ ok: false, cause: "offline" }` |
+
+Not asked, and checked in the same run:
+
+| Checked | Result |
+|---|---|
+| 8 MiB of the largest model file | `[true, 206]`, 8,388,608 bytes; `Content-Range` readable |
+| The same range on a file of 2,405,679 bytes | 206 with the whole file; `Content-Range: bytes 0-2405678/2405679` |
+| A file with no range | `[true, 200]`, 339 bytes; the request has no `Range` header |
+| A path that is not on the host | `{ ok: false, cause: "status", status: 404 }` |
+| A signal aborted before the call, and one aborted during it | `{ ok: false, cause: "aborted" }`, twice |
+| A path with a query string | `assetUrl` throws; no request is made |
+| `document.cookie` on the page | Empty |
+
+**Decided here, where the plan is silent.**
+
+- **`modelVersion` is `small.en-timestamped-q4-q4f16@80853938`:** the model, the two precisions, and the revision of the source. TS §16.1 asks for a "runtime+weights version string"; the runtime is not chosen before Prompt 43, which may add its version. Nothing reads the value before `cacheInfo()` (Prompt 40); `Transcript.model_version` is the `modelId` (D-50).
+- **The files are listed in the order the script printed them,** which is the order of their names. The downloader takes them in that order.
+- **`fetchAsset` looks at the signal first, then at `navigator.onLine`.** A call that is both aborted and offline answers `aborted`.
+- **A rejection of `fetch` that is neither an abort nor a `TypeError` is thrown on.** The table of §15.4 names those two; `fetch` has no third.
+- **Which seven files.** The two halves of the model and the five configuration files the runtime is expected to read. The source also holds `vocab.json`, `merges.txt`, `added_tokens.json`, `special_tokens_map.json` and `normalizer.json`, which `tokenizer.json` makes unnecessary. Prompt 43 shows what the runtime asks for; if it asks for more, steps 2 and 3 are repeated.
+
+**Differs from the prompt or the guide.**
+
+- **`models/` with nothing after it is refused too,** with the same message. The prompt names three bad arguments.
+- **The integrity of two uploads was read back,** which the prompt does not ask for: the 2.4 MB file and the 66 MB file were fetched whole and their SHA-256 equals the manifest's.
+
+**Checked.**
+
+- "Done when": the manifest total is 214,647,815, at most 260,000,000, and equals the sum of `files[].bytes`; every `path` starts with `models/asr-en-v1/`.
+- `pnpm --filter web exec eslint src/net` and `tsc --noEmit` are clean. `node scripts/check-file-tree.mjs` passes: `model-manifest.json` was already in the tree of TS §5.
+- `git grep -n "fetch(" -- web/src` finds the call in the four allowed files only.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green; the frozen-file diff against the baseline is empty. **193 Rust, 76 Vitest, 12 Playwright**, as after Prompt 37: this prompt adds no test.
+- The secret scan, before the commit (known issue 8): gitleaks 8.18.4, the Windows archive with its SHA-256 equal to the published one, run with `--no-git` on the five files of this commit. No finding: the 64-digit hashes of the manifest are not taken for secrets.
+- The temporary Playwright case is deleted and the dev server stopped.
+
+**"Done when".**
+
+- [x] The manifest total is at most 260,000,000 (the limit of D-66) and equals the sum of `files[].bytes`; every `path` starts with `models/asr-en-v1/`.
+- [x] TE-7 is recorded; the ranged fetch from the dev page answers 206.
+
+**Not checked.**
+
+- **Whether this set runs.** Nothing loads the model before Prompt 43 (known issue 18).
+- The billing page of the asset host.
+- The license of the source (open item 9).
+
+**Human.** Push `6e5cc40` and this commit; read `ci`. Prompt 38 is not marked **Push**, but two commits are waiting.

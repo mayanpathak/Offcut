@@ -4,7 +4,11 @@
 #   sh scripts/upload-assets.sh <folder> <file>...
 #   sh scripts/upload-assets.sh media demo-1.mp4 demo-2.mp4 demo-3.mp4
 #
-# <folder> is `media` (demo clips, the sample clip) or `models` (V2).
+#   sh scripts/upload-assets.sh models/asr-en-v1 encoder_model.onnx tokenizer.json
+#
+# <folder> is `media` (demo clips, the sample clip), `models`, or
+# `models/<modelId>`: one more segment of lower-case letters, digits and
+# hyphens, the `modelId` of `web/src/config/model-manifest.json`.
 #
 # A file is stored as <folder>/<name>.<hash>.<extension>, where <hash> is the
 # start of the SHA-256 of its content. A changed file therefore gets a new
@@ -35,13 +39,20 @@ fail() {
   exit 1
 }
 
-[ "$#" -ge 2 ] || fail "usage: sh scripts/upload-assets.sh <media|models> <file>..."
+[ "$#" -ge 2 ] || fail "usage: sh scripts/upload-assets.sh <media|models|models/<modelId>> <file>..."
 
 folder=$1
 shift
 case "$folder" in
   media | models) ;;
-  *) fail "the folder must be media or models, not: $folder" ;;
+  models/*)
+    # The folder becomes part of a URL, and a model id is one segment.
+    model_id=${folder#models/}
+    case "$model_id" in
+      "" | *[!a-z0-9-]*) fail "a model id may hold only lower-case letters, digits and '-': $folder" ;;
+    esac
+    ;;
+  *) fail "the folder must be media, models or models/<modelId>, not: $folder" ;;
 esac
 
 for name in ASSET_S3_ENDPOINT ASSET_S3_BUCKET ASSET_S3_ACCESS_KEY_ID ASSET_S3_SECRET_ACCESS_KEY; do
