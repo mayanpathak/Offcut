@@ -55,6 +55,7 @@
 | 25 | **What Prompts 47 and 48 build on** (entry of Prompt 45). `build_scene(SceneInput { transcript, events, edit, clip, profile })` gives a `Scene`; `frame_at(t)` gives a `DisplayList` in pixels of the output canvas, and `crop()` the part of the source frame to show. **How a `GlyphRun` is drawn:** the glyphs by id, from the file `fonts::bytes(font)` at the weight `fonts::weight(font)` and at `size`, each at its `x`, `y` in the run's own space; filled, then stroked with `stroke.width`, a length of that same space; all of it mapped to the canvas by `transform` (`a b c d e f`). A fading reveal is between `PushLayer { opacity, clip: None }` and `PopLayer`. V2 emits no `FillRect` and no `FillPath`. Pin `vello` 0.11.0 with `wgpu` 30: it shares `skrifa` 0.44 with `parley` 0.11.1. The crate builds for `wasm32-unknown-unknown`. The font files hold addresses in their name tables: `check-hosts` reads them once they are in `offcut_render_bg.wasm` (D-38), and the bundle grows by the 3.2 MB of the fonts and by parley's text data | Prompts 47, 48 |
 | 26 | **What the later prompts build on** (entry of Prompt 46). **Detector:** `offcut_detect::detect(&transcript, &prosody, &edits, &DetectorConfig::default())` gives the events in time order; on the reference clip it must give one, the `$12k` of words 132 and 133. `event_id(kind, anchors)`. **Entitlement:** `verify_token(token, &[[u8; 32]])` gives `EntitlementClaims` or a `TokenError` (all five are `E_ENTITLEMENT_INVALID`); `export_profile(Some(&claims), now)` and `export_profile(None, now)`, with `now` as `UnixSecs` from the caller's clock; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` for `preview_profile()`. `ParsedToken` has no `Debug`, on purpose. `CREATOR_VIDEO_BITRATE` of `profile.rs` must stay equal to the one in `encoders.ts` (D-26). **Tests:** `mintEntitlementToken(o?)` and `seedEntitlement(page, token)` of `helpers/fake-api.ts`; the page must have opened the app before `seedEntitlement`, which rejects otherwise. The test public key is in the entry of Prompt 46: a build for the media suites is made with it in `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`, exported in the terminal and written in no `.env` file. **The crate `offcut-entitlement` states the version of `ed25519-dalek` itself:** when the workspace's version changes, that line changes with it. **The E2E case "a slow API shows the waking message" runs in real time** and can miss its one-second window on a busy machine; run the suite again before reading it as a fault | Prompts 48, 49, 50, 54, 56, 57, 58 |
 | 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). A glyph run is stroked first and filled over the stroke since D-68; the outline that shows is half the stroke's width. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
+| 28 | **What Prompts 50 to 53 build on** (entry of Prompt 49). `new VideoSource(session, clipInfo)`: `await source.frameAtBlocking(t)` for the export and `source.frameAt(t)` for the preview, `t` in milliseconds; **the frame stays the source's: the loop does not close it,** and it stays open until the source hands out a newer one; `source.close()` closes everything. `liveFrames.count` goes up for every frame a decoder gives out and down at every `close()` in `video-source.ts`; a frame the loop makes itself (`new VideoFrame(canvas)`) is counted and closed by the loop. One `VideoSource` can serve a preview and then an export: a time before what it holds starts decoding again. A failure is a `WorkerFailure` with `E_DECODE_VIDEO`. `await pickVideoConfig(profile)` gives the encoder configuration or throws `E_ENCODE_VIDEO`; on the development machine it is `avc1.640028`, `prefer-hardware`. `const sink = await OpfsSink.open(paths.exportTmp(id))`, given to `render.newMuxer(sink, ...)`; `await sink.close()` on success, `await sink.abort()` otherwise; one sink per path at a time. **The verifier:** `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`, with Python 3.13 first in `PATH`; it wants `yuv420p`, 2,242 frames exactly 1/30 s apart, and audio within 21.34 ms of the video. **On the reference clip:** output frames 150 and 1,946 are the two white frames; 80 output times repeat a source frame; decoding alone ran at 652 frames a second on the development machine | Prompts 50, 51, 53, 57 |
 
 ---
 
@@ -2192,3 +2193,137 @@ No white pixel outside the two zones, as before.
 - The temporary worker and the temporary Playwright case are deleted.
 
 **Not checked.** The outline on a real video frame, and at the size a phone shows it: Prompt 55 is where a person looks.
+
+## 2026-10-09 - Prompt 49: verifier, encoders, sink, video source
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `verify/verify_mp4.py` | Checks 1 to 6 of §23.9; the invocation of TS §27.2; one line per check and one that names checks 7 to 11 as not implemented |
+| `verify/requirements.txt` | `numpy==2.5.3`, not imported before V5 |
+| `verify/README.md` | The invocation, the checks, the tool versions, and that the directory shares nothing with the product |
+| `web/src/workers/render/opfs-sink.ts` | `OpfsSink` with `open`, `writeAt`, `close`, `abort` (TS §21.1) |
+| `web/src/workers/render/video-source.ts` | `DemuxerHandle` (D-30), `VideoSource` with `frameAt`, `frameAtBlocking`, `prefetch`, `close` (TS §20.1), `liveFrames` (D-45), `PREVIEW_QUEUE` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/workers/render/encoders.ts` | Three names added: `ENCODE_QUEUE_MAX = 4`, `AAC_PRIMING_SAMPLES = 0`, `pickVideoConfig(profile)`. Two imports for them: the type `ExportProfile`, and `WorkerFailure`. No V1 constant, and no V1 line, was touched |
+| `package.json` | The script `verify`: `python verify/verify_mp4.py` |
+| `docs/v2/v2implementation.md` | §16.7, §16.9 (twice) and §23.9 say what was built (4 replacements, each applied once) |
+
+**Pinned.** NumPy 2.5.3, the latest release (`pip index versions`) and the one installed. Tried with Python 3.13.5 and `ffmpeg` and `ffprobe` 9.0.2.
+
+**The two verifier drills.**
+
+| Run | Printed |
+|---|---|
+| The reference clip, `--profile creator --expected-duration-ms 74705` | `PASS 1`; `FAIL 2: the pixel format is yuvj420p, not yuv420p; the size is 1280x720, expected 1080x1920 for creator`; `FAIL 3: frame 1 comes 239/5000 s after frame 0, not 1/30 s`; `PASS 4`; `FAIL 5: the audio is 74517.521 ms long and the video 74705.033 ms: 187.512 ms apart`; `PASS 6`; the line for 7 to 11; exit 1 |
+| A 2-second copy made with `-movflags -faststart`, the first line | `FAIL 1: moov after mdat: moov at byte 927574, mdat at byte 40` |
+
+**The verifier can also pass,** which the prompt does not ask to show and a judge must: `ffmpeg` made a file that is everything the checks ask (1080x1920, 30 frames a second, `libx264` in `yuv420p`, AAC-LC at 48 kHz in stereo, 2 s, faststart). Six times `PASS`, exit 0. The same file fails where it should when the question changes:
+
+| Run | Fails |
+|---|---|
+| The good file as `--profile free` | 2: the size |
+| The good file with `--expected-duration-ms 2100` | 3: 60 frames, expected 63. 5: the video is 100 ms from the expected |
+| 29.97 frames a second, one channel at 44,100 Hz | 3 and 4 |
+| The good file cut off after 60,000 bytes | 3 and 6 (`ffmpeg` reports 3 error lines). Check 1 passes: its `moov` is whole |
+| A file that is not there | All six, with what `ffprobe` said |
+| `--profile pro` | Exit 2, the message of the argument parser |
+
+**Browser check (dev), not asked for.** `vite` on port 5173; a temporary module worker, `zz-source.worker.ts`; Chrome under Playwright, headless. The reference clip in OPFS; a session of the render bundle as the `DemuxerHandle`.
+
+| Asked | Result |
+|---|---|
+| A muxer writing through an `OpfsSink` to `exports/tmp/<id>.mp4` | `finalize()` returns 263,694; the file on disk is 263,694 bytes and starts with `ftyp` |
+| `writeAt` after `close`; a second `close` | `OpfsError`, `io`; nothing |
+| A second sink on the same path while the first is open | `OpfsError`, `io`: one handle per file |
+| `abort`, and again | The file is gone (`size` is `null`); nothing |
+| `pickVideoConfig` for the Creator and the Free profile | `avc1.640028`, `prefer-hardware`, the first entry of the ladder, at 1080x1920 and 8,000,000, and at 720x1280 and 4,000,000 |
+| For the preview profile; for 16,384 x 16,384 | `E_ENCODE_VIDEO`, detail `NoSupportedConfig`, both |
+
+**The video source on the whole clip.** `frameAtBlocking` for every output time, `n x 1000 / 30` ms for `n` from 0 to 2,241, as the export will ask. The right frame of a time was worked out apart from the source, from the sorted presentation times of the 2,246 samples.
+
+| Read | Result |
+|---|---|
+| Output times whose frame was not the latest at or before it | **0 of 2,242** |
+| A frame older than the one before it | 0 |
+| Output times that got the same frame as the one before | 80: the clip has gaps of 48 ms, longer than an output frame |
+| The last frame handed out | The clip's last, at 74,671,700 microseconds |
+| Frames open at once, at most | 8. One at the end of the loop, the one handed out; **0 after `close()`** |
+| Time for the 2,242 | 3.4 s: 652 frames a second, decoding and reading alone, on the development machine |
+| A time past the end, 80 s | The last frame again |
+| `frameAt` after `close()` | `E_DECODE_VIDEO`, detail `Closed` |
+
+**The two white frames of the clip land where they are in time.** Thirteen frames around each were drawn through the session and a patch read back. Output frame 150 (5,000 ms) is white, 255 where its neighbours are 39 and 48; output frame 1,946 (64,866 ms) is white where its neighbours are 44 and 48. D-64 puts them near 4.99 s and 64.85 s. The second is frame 1,950 of the source: by then four more source frames than output times have passed, which is the variable frame rate.
+
+**As the preview asks: `frameAt` every 8 ms against a running clock.**
+
+| Run | Result |
+|---|---|
+| From 0, for 2 s | The first frame after 30 ms; 3 of 227 calls answered `null`; every frame after that was the right one |
+| A jump to 40 s, for 3 s | The first frame after 42 ms; 6 calls got a frame still catching up, none a frame from after its time |
+| A jump back to 5 s, for 2.5 s | The first frame after 48 ms |
+| One frame back, then forward again | `null` for the step, and the same frame as before after it: no new start |
+| After `close()` | 0 frames open |
+
+Nine frames were open at most: the six ahead, the one handed out, and what the decoder gave before it was asked to stop.
+
+| A source that fails | Result |
+|---|---|
+| A demuxer that throws `{ code, detail: "Malformed" }` | `frameAt` and `frameAtBlocking` throw `E_DECODE_VIDEO`, `Malformed` |
+| Five samples of bytes that are no video | `frameAtBlocking` rejects with `E_DECODE_VIDEO`, `EncodingError`: the decoder's own error. It does not hang |
+| Frames open after both | 0 |
+
+**A frame of the real clip was looked at.** Output frame 1,895 was drawn at 540 x 960 with a caption and handed back as a picture: the speaker upright, the centre strip of the 1280x720 frame, colours as in the clip, white caption with a thin dark outline and the active word in yellow. It is not committed.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **A jump makes a new decoder.** §16.7 says "one `VideoDecoder`"; one is alive at a time. A decoder that is reset may still deliver a frame it had finished, and nothing on a frame says which start it belongs to. With a new decoder each start has its own callbacks, and a frame of an old one is closed unseen.
+- **Which frames are closed goes by ownership.** TS §20.2 closes "frames with pts < t - one frame". The frame of a time can be older than that: the clip's gaps are 48 ms. Of the decoded frames at or before the time asked for, the latest is kept and the ones before it are closed; the frame that was handed out is closed when a newer one is handed out, and by `close()`.
+- **A jump ahead starts again only when the keyframe of the new time has not been fed.** TS §20.2 starts again for any time more than 1 s past the horizon. After a start at a keyframe several seconds before the time asked for (the clip has a keyframe about every 7.5 s) the horizon is behind the time for a while; starting again then would decode the same frames again, each time.
+- **A step back of less than 100 ms is not a jump.** The preview's clock is corrected four times a second and may step back by a frame. `frameAt` answers `null` for it and the loop draws the frame it has.
+- **The queue limit counts frames after the time asked for.** Six for the preview, eight for the export. What the decoder holds inside itself is not counted and cannot be: it is fed while it holds fewer than three samples and the queue has room.
+- **The decoder is also fed when it takes work off its queue,** not only when a frame is asked for: after a jump it catches up at its own speed, not at 3 samples per call.
+- **`frameAtBlocking` for a time before the clip's first frame** hands out the first frame; when the clip has no frame at all it rejects with `NoFrame`.
+- **After the last sample the decoder is flushed,** in both modes, so that the frames it still holds come out.
+- **Whatever goes wrong in the source is `E_DECODE_VIDEO`,** thrown as a `WorkerFailure`: the decoder's error by its name, the demuxer's by its detail, a call after `close()` as `Closed`. After a failure every later call throws the same.
+- **`pickVideoConfig`:** a configuration the browser refuses to read counts as not supported. The preview profile has a bitrate of 0, and the browser throws for it where it would answer "not supported".
+- **`OpfsSink.open` empties a file that is already there.** A short write is `quota`: the file system took part of the bytes and no more.
+- **The verifier fails check 1 for a stream that is neither video nor audio,** names every fault of a check on its line, and lets the audio be 21.34 ms from the video: one AAC frame, 21.33 ms, rounded up as §23.9 rounds the video frame up to 33.4 ms. Read as 21.3 ms, an export whose audio ends one whole AAC frame after the video would fail. Exit status 2 for a missing tool or a wrong argument.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`encoders.ts` gained two imports** beside the three names: the type of the profile, and `WorkerFailure`, which is what a worker throws (known issue 13). The file is also read by the capability check on the main thread, where `rpc.ts` already is.
+- **`FAIL 2` on the reference clip names two faults,** not the one of the guide: the clip is `yuvj420p`, full-range, and the check asks for `yuv420p`.
+- **The browser checks,** and the verifier's own trials beyond the two drills.
+
+**Checked.**
+
+- `git grep -n "import " verify/verify_mp4.py | grep -c "crates\|web"`: 0. Its seven imports are of the standard library.
+- `grep -c "8_000_000\|8000000"`: 1 in `encoders.ts` and 2 in `profile.rs`; the Creator bitrate is 8,000,000 in both.
+- `pnpm --filter web exec tsc --noEmit` and ESLint on `src/workers` and `src/platform`: clean. `opfs-sink.ts` imports `persistence/opfs.ts`: edge D-27 b.
+- `node scripts/check-file-tree.mjs`: 210 files; the three files of `verify/` and the two of `render/` were in the tree of TS §5.
+- Lines: `video-source.ts` 362, `verify_mp4.py` 233, `opfs-sink.ts` 88, `encoders.ts` 83.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers at the first run; the frozen-file diff against the baseline is empty. **255 Rust, 92 Vitest, 12 Playwright**, as before: V2 has no test file for these (§23.1).
+- The app shell is 266.5 kB gzipped. The temporary worker, the temporary Playwright case and the dev server are gone.
+
+**"Done when".**
+
+- [x] Both verifier drills print the stated failures; `git grep -n "import " verify/verify_mp4.py | grep -c "crates\|web"` is 0.
+- [x] `grep -c "8_000_000\|8000000"` finds the Creator bitrate in both `encoders.ts` and `profile.rs`, with equal values; `tsc` and ESLint are clean.
+
+**Not checked.**
+
+- **The verifier on an export of the app.** There is none before Prompt 50. Every file it has judged was made by `ffmpeg` or is the source clip.
+- **A cancel in the middle of `frameAtBlocking`,** and the source under the production CSP. Both come with the export loop.
+- **A clip turned a quarter, and one with a frame rate above 30.** The reference clip is neither. The decoder is configured with the stored size for a turned clip; nothing has decoded one.
+- R1. The decoder of the development machine did 652 frames a second on its own.
+
+**Found, and not for this prompt.**
+
+- **The verifier asks for `yuv420p`, and whether the browser's encoder writes that is not known.** The source is full-range (`yuvj420p`). If an export comes out marked full-range, check 2 fails on a file that plays everywhere. Prompt 50 shows which it is; the check is TS §27.2's and was not softened in advance.
+- **The caption lies across the speaker's mouth** in the frame that was looked at: the caption zone is rows 1,220 to 1,500 of 1,920, and the clip is a close webcam shot. The zone is TS §19.1's, an assumption for E-2; a person should look at it at Prompt 55.

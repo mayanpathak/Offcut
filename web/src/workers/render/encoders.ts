@@ -3,7 +3,8 @@
 // exactly the configurations the export will encode with. Nothing here
 // touches a browser API when the module loads.
 
-import { type BitsPerSec, LIMITS, type Px } from "../../gen/domain";
+import { type BitsPerSec, type ExportProfile, LIMITS, type Px } from "../../gen/domain";
+import { WorkerFailure } from "../rpc";
 
 export type VideoLadderEntry = {
   codec: string;
@@ -45,4 +46,38 @@ export function videoConfigFor(e: VideoLadderEntry, width: Px, height: Px, bitra
     latencyMode: "quality",
     avc: { format: "avc" },
   };
+}
+
+/** The export loop waits while the video encoder holds more frames than this (TS §21.3, §31). */
+export const ENCODE_QUEUE_MAX = 4;
+
+/**
+ * The samples the AAC encoder puts before the first one it was given. The
+ * muxer takes them out of the presentation with an edit list (D-33).
+ * 0 until TE-4 has measured it. (assumption, TE-4)
+ */
+export const AAC_PRIMING_SAMPLES: number = 0;
+
+/**
+ * The configuration an export of this profile is encoded with: the first
+ * entry of the ladder the browser supports at the profile's size and
+ * bitrate. The size and the bitrate come from the profile and from nowhere
+ * else (D-26). No entry supported: `E_ENCODE_VIDEO`.
+ */
+export async function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig> {
+  for (const entry of VIDEO_ENCODE_LADDER) {
+    const config = videoConfigFor(entry, profile.width, profile.height, profile.video_bitrate);
+    let supported = false;
+    try {
+      supported = (await VideoEncoder.isConfigSupported(config)).supported === true;
+    } catch {
+      // The browser refuses a configuration it cannot even read, such as the
+      // bitrate of 0 of the preview profile: not supported, like any other.
+      supported = false;
+    }
+    if (supported) {
+      return config;
+    }
+  }
+  throw new WorkerFailure("E_ENCODE_VIDEO", "NoSupportedConfig");
 }

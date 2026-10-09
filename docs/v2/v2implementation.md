@@ -1412,7 +1412,7 @@ export interface DemuxerHandle {                       // D-30; satisfied by Ren
 | `prefetch(from)` | Declared; does nothing in V2 (V4) |
 | `close()` | Closes every queued frame, then the decoder |
 
-The decoder's error callback rejects the pending `frameAtBlocking` and makes the next `frameAt` throw, both with `E_DECODE_VIDEO`. The source never closes a frame it has handed out as the "current" frame until a newer one replaces it; the loop that received it does not close it either.
+The decoder's error callback rejects the pending `frameAtBlocking` and makes the next `frameAt` throw, both with `E_DECODE_VIDEO`. **As built (Prompt 49):** a jump makes a new `VideoDecoder` and closes the old one, so that an output of the old one can be told from the new one's and is closed unseen; one decoder is alive at a time. Which frames are closed goes by ownership and not by "`t` minus one frame": of the decoded frames at or before the time asked for only the latest is kept, and the frame that was handed out stays open until a newer one is handed out. The reference clip has gaps of 48 ms between frames, so the frame of a time can be older than one output frame. A jump ahead starts again only when the keyframe of the new time was not fed yet, and a step back of less than 100 ms does not start again: `frameAt` answers `null` for it. The queue limit counts frames after the time asked for. The source never closes a frame it has handed out as the "current" frame until a newer one replaces it; the loop that received it does not close it either.
 
 `runPreview(session, source, clock, isStopped)`: TS §20.2 verbatim, per `requestAnimationFrame` in the worker. `clock()` = `audioMs + (performance.timeOrigin + performance.now() - epochMs)`. Ends when `t >= clip duration` (resolve, the preview goes to `stopped`) or when `isStopped()` (resolve). A late frame reuses the last frame and counts in `PreviewStats.late`. No resize rule in V2 (V4). The loop never drives time: the audio clock is the master (TS §20.3).
 
@@ -1467,9 +1467,9 @@ export const AAC_PRIMING_SAMPLES: number;                                      /
 export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // TS §21.1
 ```
 
-`pickVideoConfig`: for each entry of `VIDEO_ENCODE_LADDER` in order, `videoConfigFor(entry, profile.width, profile.height, profile.video_bitrate)`; return the first for which `VideoEncoder.isConfigSupported` reports `supported`; none: throw `{ code: "E_ENCODE_VIDEO" }`. The V1 constants are not edited unless TE-4 reorders the ladder, in which case the new order is recorded in `docs/v2/experiments.md` and TS §21.2. `pickVideoConfig` does not read V1's `CREATOR_VIDEO_BITRATE`; that constant stays the bitrate of the capability probe (D-26).
+`pickVideoConfig`: for each entry of `VIDEO_ENCODE_LADDER` in order, `videoConfigFor(entry, profile.width, profile.height, profile.video_bitrate)`; return the first for which `VideoEncoder.isConfigSupported` reports `supported`; none: throw `{ code: "E_ENCODE_VIDEO" }`. The V1 constants are not edited unless TE-4 reorders the ladder, in which case the new order is recorded in `docs/v2/experiments.md` and TS §21.2. `pickVideoConfig` does not read V1's `CREATOR_VIDEO_BITRATE`; that constant stays the bitrate of the capability probe (D-26). **As built (Prompt 49):** a configuration the browser refuses to read, such as the bitrate of 0 of the preview profile, counts as not supported; the failure is a `WorkerFailure` with the code `E_ENCODE_VIDEO` and the detail `NoSupportedConfig`.
 
-`opfs-sink.ts`: class signature of TS §21.1 verbatim. `open` creates the file and a sync access handle. `writeAt` is a synchronous positional write; a short write or a throw is rethrown tagged `quota` or `io`. `close` flushes and closes. `abort` closes and removes the file. One handle per file (TS §31).
+`opfs-sink.ts`: class signature of TS §21.1 verbatim. `open` creates the file and a sync access handle. `writeAt` is a synchronous positional write; a short write or a throw is rethrown tagged `quota` or `io`. `close` flushes and closes. `abort` closes and removes the file. One handle per file (TS §31). **As built (Prompt 49):** `open` empties a file that is already at the path, which is what an export that did not finish left; a write that is cut short is tagged `quota`; a write after `close` or `abort` is tagged `io`.
 
 ---
 
@@ -2037,7 +2037,7 @@ Invocation: TS §27.2 verbatim. `--source` is accepted and unused until V5. Outp
 | 5 | Video duration within one frame (33.4 ms) of `expected_duration_ms`; audio duration within 21.3 ms of the video duration |
 | 6 | `ffmpeg -v error -i <file> -f null -` writes nothing to stderr and exits 0 |
 
-`verify/requirements.txt` pins NumPy (used from V5). `verify/README.md` states the invocation, the tool versions used, and that this directory shares no code with the product.
+`verify/requirements.txt` pins NumPy (used from V5). `verify/README.md` states the invocation, the tool versions used, and that this directory shares no code with the product. **As built (Prompt 49):** a stream that is neither video nor audio fails check 1; a line names every fault of its check; the audio may be 21.34 ms from the video, one AAC frame rounded up as the 33.4 ms of the video frame is; the exit status is 2 when a tool is missing or an argument is wrong; NumPy is in `requirements.txt` and is not imported before V5.
 
 ### 23.10 `bench/device-bench.ts`
 

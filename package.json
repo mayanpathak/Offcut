@@ -11,7 +11,8 @@
     "build": "pnpm gen:types && pnpm build:wasm && pnpm build:vite && node scripts/check-hosts.mjs",
     "check": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo deny check && pnpm --filter web exec eslint . && pnpm --filter web exec tsc --noEmit && pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json && node scripts/check-file-tree.mjs && sh scripts/check-gen-clean.sh && node scripts/check-copy-codes.mjs",
     "test": "cargo test --workspace && pnpm --filter web exec vitest run",
-    "e2e": "pnpm --filter web exec playwright test --project=non-media"
+    "e2e": "pnpm --filter web exec playwright test --project=non-media",
+    "verify": "python verify/verify_mp4.py"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"
