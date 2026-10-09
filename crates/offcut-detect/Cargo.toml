@@ -6,3 +6,7 @@ publish = false
 
 [lints]
 workspace = true
+
+[dependencies]
+offcut-types = { workspace = true }
+offcut-text = { workspace = true }

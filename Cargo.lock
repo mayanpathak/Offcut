@@ -1155,6 +1155,10 @@ dependencies = [
 [[package]]
 name = "offcut-detect"
 version = "0.1.0"
+dependencies = [
+ "offcut-text",
+ "offcut-types",
+]
 
 [[package]]
 name = "offcut-dsp"
@@ -1169,6 +1173,14 @@ dependencies = [
 [[package]]
 name = "offcut-entitlement"
 version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "ed25519-dalek",
+ "offcut-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "offcut-mp4"

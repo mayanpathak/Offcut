@@ -35,7 +35,7 @@
 | 5 | `boundaries/dependencies` reports an import only when the imported file exists. An import of a file that is not written yet is reported by `tsc`, and by another ESLint rule, not as a layer violation. A drill on a layer edge needs its target file | Any lint drill |
 | 6 | `web/vite.config.ts` and `web/vitest.config.ts` are type-checked by `web/tests-e2e/tsconfig.json`, with Node's types, and no longer by `web/tsconfig.json` (entry of Prompt 32). Prompt 43 adds a build-start step to `vite.config.ts` that uses Node's file API: it type-checks there without a further change | Prompt 43 |
 | 7 | No ESLint rule covers `vite.config.ts`, `vitest.config.ts` or `playwright.config.ts`, as in V1. They are type-checked only | Prompts 43, 56 |
-| 8 | **The secret scan of CI (gitleaks 8.18.4) takes a 44-character base64 literal assigned to a name with `KEY` in it for a secret.** Found in Prompt 33 with the same version run locally. Such a line must end with a `gitleaks:allow` comment **in the commit that first adds it**: the scan reads the whole history, so a comment added in a later commit does not clear the finding. The test public key (`fake-api.ts` in Prompt 46, `ci.yml` in Prompt 58) is such a literal. Before a commit that adds one, fetch the release archive of that version, check its SHA-256 against the published checksum file, and run `gitleaks detect --no-git --source <folder> --redact` | Prompts 46, 58 |
+| 8 | **The secret scan of CI (gitleaks 8.18.4) takes a 44-character base64 literal assigned to a name with `KEY` in it for a secret.** Found in Prompt 33 with the same version run locally. Such a line must end with a `gitleaks:allow` comment **in the commit that first adds it**: the scan reads the whole history, so a comment added in a later commit does not clear the finding. The test public key (`fake-api.ts` in Prompt 46, `ci.yml` in Prompt 58) is such a literal. Before a commit that adds one, fetch the release archive of that version, check its SHA-256 against the published checksum file, and run `gitleaks detect --no-git --source <folder> --redact`. **Prompt 46 added none:** `fake-api.ts` works the test public key out from the seed and holds no base64 literal, the Rust test holds its 32 bytes as numbers, and the scan found nothing in the seed, the two test tokens or the changelog. The literal first appears in `ci.yml` (Prompt 58) | Prompts 46, 58 |
 | 9 | Chrome under Playwright, headless, gives a module worker WebGPU, both encoders and a sync OPFS handle on the development machine (Prompt 33). The adapter is the integrated Intel GPU, not the GTX 1650. No headed run and no launch argument was needed | Every browser check |
 | 10 | **`crates/offcut-mp4/src/boxes.rs` has 392 lines above its test module, `sample_table.rs` 387 and `demux.rs` 369; the limit is 400** (`cargo fmt` puts most signatures and struct literals on several lines). Code that must go into one of them needs room made first. The muxer has its own two files | Prompts 41, 48 |
 | 11 | **What Prompt 37 builds on** (entries of Prompts 35 and 36). In a worker: `const core = await loadCore()`; `core.openDemuxer(syncHandle)` returns a `CoreDemuxer` or `{ rejected }` (test with `"rejected" in result`); `demuxer.probe(size)` gives the `ProbeInfo` whose `video.codec_string` and `demuxer.videoDescription()` go into `VideoDecoder.isConfigSupported`; `core.probeAndValidate(demuxer, size, supported)` gives `{ ok }` or `{ rejected }`. Audio: `audioDescription()`, `audioSampleCount()`, `readAudioSample(i)` with `ptsUs` (may be negative) and `durationUs`. A failure is thrown as the plain object `{ code, detail }`, not an `Error`. Call `demuxer.free()` when done, before closing the handle. `core.resample(pcm, from, to)` returns exactly `round(len x to / from)` samples. `offcut-mp4` also has a test-only module, `demux::fixture`, that builds small MP4 files | Prompts 37, 41 |
@@ -53,6 +53,7 @@
 | 24 | **A first transcription may be slower than the next** (entry of Prompt 44): in a new browser profile, straight after a build and the download of the model, `load` and `transcribe` took 95.5 s on WebGPU and 123.4 s on WASM; the second run took 61.9 s and 98.1 s. One pair of readings, cause not found. The bench of Prompt 59 should keep its first run apart, and E-3 at S15 should say which it reports. **Chrome makes requests of its own** (an update check, a push-message registration) while a page is open: a check that reads the browser's whole network log, and not the page's requests, sees them and must tell them apart by who started them | Prompts 57, 59 |
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 | 25 | **What Prompts 47 and 48 build on** (entry of Prompt 45). `build_scene(SceneInput { transcript, events, edit, clip, profile })` gives a `Scene`; `frame_at(t)` gives a `DisplayList` in pixels of the output canvas, and `crop()` the part of the source frame to show. **How a `GlyphRun` is drawn:** the glyphs by id, from the file `fonts::bytes(font)` at the weight `fonts::weight(font)` and at `size`, each at its `x`, `y` in the run's own space; filled, then stroked with `stroke.width`, a length of that same space; all of it mapped to the canvas by `transform` (`a b c d e f`). A fading reveal is between `PushLayer { opacity, clip: None }` and `PopLayer`. V2 emits no `FillRect` and no `FillPath`. Pin `vello` 0.11.0 with `wgpu` 30: it shares `skrifa` 0.44 with `parley` 0.11.1. The crate builds for `wasm32-unknown-unknown`. The font files hold addresses in their name tables: `check-hosts` reads them once they are in `offcut_render_bg.wasm` (D-38), and the bundle grows by the 3.2 MB of the fonts and by parley's text data | Prompts 47, 48 |
+| 26 | **What the later prompts build on** (entry of Prompt 46). **Detector:** `offcut_detect::detect(&transcript, &prosody, &edits, &DetectorConfig::default())` gives the events in time order; on the reference clip it must give one, the `$12k` of words 132 and 133. `event_id(kind, anchors)`. **Entitlement:** `verify_token(token, &[[u8; 32]])` gives `EntitlementClaims` or a `TokenError` (all five are `E_ENTITLEMENT_INVALID`); `export_profile(Some(&claims), now)` and `export_profile(None, now)`, with `now` as `UnixSecs` from the caller's clock; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` for `preview_profile()`. `ParsedToken` has no `Debug`, on purpose. `CREATOR_VIDEO_BITRATE` of `profile.rs` must stay equal to the one in `encoders.ts` (D-26). **Tests:** `mintEntitlementToken(o?)` and `seedEntitlement(page, token)` of `helpers/fake-api.ts`; the page must have opened the app before `seedEntitlement`, which rejects otherwise. The test public key is in the entry of Prompt 46: a build for the media suites is made with it in `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`, exported in the terminal and written in no `.env` file. **The crate `offcut-entitlement` states the version of `ed25519-dalek` itself:** when the workspace's version changes, that line changes with it. **The E2E case "a slow API shows the waking message" runs in real time** and can miss its one-second window on a busy machine; run the suite again before reading it as a fault | Prompts 48, 49, 50, 54, 56, 57, 58 |
 
 ---
 
@@ -1738,3 +1739,135 @@ The licence was read in each of the three files, not assumed: all three are SIL 
 - **A caption shows a number spoken as one small word as a digit.** Row 2's twelve words hold "three", and the caption says "3" (TS §17.2: a caption shows the display of a number in place of its words). On the reference clip "three reasons" becomes "3 reasons". Known issue 22 left the choice to this prompt; the spec is followed, and a rule that keeps small numbers as words belongs to V3's number rules.
 - **The display of a number has no punctuation.** "$10,000." is shown as `$10k`: the full stop that was part of the word is gone. Keeping it means knowing which characters of a word belong to the number, which is `offcut-text`'s to say (TS §6), not the scene's.
 - **The caption and the reveal show the amount at once:** `$12k` in the caption line and `$12k` large above it. TS does not say that a caption leaves out what a reveal shows.
+
+## 2026-10-09 - Prompt 46: `offcut-detect`, `offcut-entitlement`, token vector
+
+**The token format is proven across the two languages.** A token minted in TypeScript by `mintEntitlementToken` verifies in Rust with the test public key, and the same token with one character of its first segment changed is refused with `Signature`.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-detect/src/config.rs` | `DetectorConfig` with its ten fields and the defaults of §9.1 |
+| `crates/offcut-detect/src/event_id.rs` | `event_id(kind, anchors)`: FNV-1a 64 over the nine bytes of D-47 |
+| `crates/offcut-detect/src/number.rs` | `Candidate`, `find(toks, t, p, cfg)` |
+| `crates/offcut-entitlement/src/claims.rs` | `EntitlementClaims` of TS §10.6, with `deny_unknown_fields`; `CLAIMS_VERSION` |
+| `crates/offcut-entitlement/src/token.rs` | `ParsedToken`, `decode`, `encode`, `signing_input`, `MAX_TOKEN_CHARS` (D-25, D-60) |
+| `crates/offcut-entitlement/src/verify.rs` | `verify_token(token, public_keys)` |
+| `crates/offcut-entitlement/src/profile.rs` | The five constants of §10.4 and `export_profile(claims, now)`, the only builder of an `ExportProfile` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-detect/src/lib.rs` | The three modules; `detect(t, p, edits, cfg)`, the five steps of §9.2 |
+| `crates/offcut-detect/Cargo.toml` | `offcut-types`, `offcut-text` |
+| `crates/offcut-entitlement/src/lib.rs` | The four modules; `TokenError` with five variants; the test vector |
+| `crates/offcut-entitlement/Cargo.toml` | `offcut-types`, `base64`, `ed25519-dalek` (see "Differs"), `serde` (`derive`), `serde_json`, `thiserror` |
+| `Cargo.lock` | The edges of the two crates. No package is new: all of them were in the lock for the server |
+| `web/tests-e2e/helpers/fake-api.ts` | `TEST_ENTITLEMENT_SEED`, `testPublicKeyBase64`, `mintEntitlementToken`, `seedEntitlement` (§23.4) |
+| `docs/v2/v2implementation.md` | §9.2, §10 (crate rules), §10.3 and §23.4 say what was built (4 replacements, each applied once) |
+
+`Cargo.toml` of the workspace and `deny.toml` were not touched.
+
+**Pinned.** Nothing new. `ed25519-dalek` 3.0.0, `base64` 0.23.1 and `serde_json` 1.0.151 are the versions the workspace already had for the server.
+
+**The test key.** The seed was made in this prompt, with `crypto.randomBytes(32)`; the step G 0.5 had left it for here (entry of Prompt 31). It is a constant of `fake-api.ts` and of no other file. **The test public key, a public value, in standard base64, is `mCydb6uLK58faqtJ0v3Ol8tnmNboOoH6t/RD6rcXxxM=`.** It is what `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` must be for a build the E2E tests run against (Prompts 56 to 58), and what the test-key guard of Prompt 58 looks for in a deployed bundle. No deployment accepts a token of this key.
+
+**The vector.** Minted through the temporary `web/tests-e2e/zz-mint.spec.ts` of G 6.5, with `{ plan: "creator", iat: 1760000000, exp: 1760604800, periodEnd: 1762592000 }`. Its claims: `v` 1, `sub` `0190f3a2-7b1c-7def-8a55-0123456789ab`, plan `creator`, 3 free exports remaining. The token (293 characters), the 32 bytes of the public key and the claims are constants of the test module of `crates/offcut-entitlement/src/lib.rs`. A second token, for the plan `free` with 2 exports remaining, is there too. Three things the constants show beyond the row of §10.5:
+
+- The first segment is exactly what `signing_input` writes for the same claims: `JSON.stringify` in TypeScript and `serde_json` in Rust give the same bytes for them, field for field.
+- `encode(claims, signature)` gives the token back, character for character. V6's signer builds on those two functions.
+- Minting twice gives the same token: an Ed25519 signature has no random part.
+
+**`seedEntitlement`, tried in a browser** (the same temporary file; a production build under `vite preview`).
+
+| Asked | Result |
+|---|---|
+| The app opened, then `seedEntitlement(page, token)`; the record read back | `{ schemaVersion: 1, value: { token, storedAt } }` under the key `current` of the store `entitlement`; the database is still at version 1 with its eight stores |
+| The same call on a page of the origin where the app never ran (`/robots.txt`) | Rejects with "the app has not made its database yet", and `indexedDB.databases()` is empty afterwards: nothing was made |
+
+**Decided here, where the plan is silent.**
+
+- **Whether a number still has its words** is read from the tokens: `find` is given the effective tokens and no edits, so it compares the tokens of the number's words with the tokens of what was transcribed. An edit that leaves them the same (a capital letter) is no edit to the detector.
+- **The score is added in the order of the table** (base, unit, magnitude, energy), clamped to 1.0, then multiplied by the lowest confidence of the anchor words. The order matters in 32-bit numbers: 0.50 + 0.30 is exactly the threshold 0.80, which is why `40%` at confidence 1.0 is an event.
+- **"Magnitude" is the absolute value:** -2,000 earns the bonus.
+- **A candidate whose score is not within 0 to 1 makes no event.** `Confidence::new` refuses it; no score of V2 is.
+- **Two display windows that only touch count as overlapping** (D-49 says "overlaps"): a number that ends its fade at 2,700 ms and one that would appear at 2,700 ms are not both kept.
+- **The length of a token is counted in characters,** as §10.2 says, and a token of more than 8,192 bytes is refused before it is counted, so that the count reads a bounded number of bytes.
+- **The order of the checks in `decode`:** the length; the two segments; base64url of the first, then of the second, then its 64 bytes; the JSON; the version.
+- **`verify_strict`,** which also refuses a key of small order and a signature that is not in its canonical form. A token of the TypeScript minter passes it.
+- **`ParsedToken` has no `Debug`.** §10 says a token is never formatted; with `Debug`, a failed `unwrap` would have printed one.
+- **`TokenError`'s messages** name the fault and hold no part of the token.
+- **`mintEntitlementToken`:** `sub` is one fixed user id and `freeExportsRemaining` defaults to 3. The signature of §23.4 has no option for `sub`, and G 6.5 asks that the claims be known in full.
+- **`seedEntitlement` never makes the database.** Opening a database that does not exist would make it, at version 1 and without its stores, and the app would then find it broken. The helper aborts that and rejects.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`ed25519-dalek` is not inherited from the workspace.** The crate's `Cargo.toml` states `version = "3.0.0", default-features = false` itself, against the rule at the top of the workspace file that a version is written once. The workspace entry has the default features (`fast`, `zeroize`), which the server signs with; a member cannot turn off the default features of a dependency it inherits; and `server/Cargo.toml` is frozen, so the entry could not be changed and the server given its features back. The two versions must be kept equal by hand. To settle when V6 opens the server: `default-features = false` in the workspace, and the features named in `server/Cargo.toml`.
+- **A first segment that is a JSON list is refused as `Json`.** The reader would otherwise take the seven values in order, without their names, for the claims (tried: with the check off, such a payload is read). D-25 says the claims are written with their field names, and no signer writes a list. One line, and one case of the test.
+- **`seedEntitlement` reads `DB_NAME`, `DB_VERSION` and `STORES` from `src/persistence/schema.ts`,** and does not write the three values again. The file is frozen; it is read, not edited.
+- **The seed is written as 64 hex digits,** not as a list of bytes: the check of G 6.5 searches for its first 16 hex digits.
+
+**Tests (inline): the 9 rows of §9.4.**
+
+| Row of §9.4 | Test |
+|---|---|
+| "$10,000" at confidence 0.9 | `tests::ten_thousand_dollars_at_confidence_0_9_is_one_number_reveal` (also the split form `$12` `,000` of the reference clip; an edited and a hidden word; an edit elsewhere) |
+| "ten thousand" (no unit) | `tests::ten_thousand_in_words_has_no_unit_and_is_no_event` (also `3000`, `three`, and no words at all) |
+| "40%" at confidence 1.0; at 0.99 | `tests::forty_percent_is_an_event_at_confidence_1_and_none_at_0_99` (also: the least certain word of a number counts) |
+| Two `$` amounts 600 ms apart | `tests::of_two_amounts_600_ms_apart_only_the_earlier_one_is_kept` (also the line itself: 2,850 ms and 2,851 ms) |
+| Two `$` amounts 5 s apart | `tests::two_amounts_5_s_apart_are_both_kept_in_time_order` |
+| Any returned event | `tests::no_returned_event_is_below_the_threshold_of_its_kind`: ten numbers of every score and four confidences (also the energy bonus) |
+| Same inputs twice | `tests::the_same_inputs_twice_give_the_same_events_and_the_same_ids` |
+| `event_id(NumberReveal, 5..6)` | `event_id::tests::the_id_of_a_number_at_words_5_to_6_is_the_fnv_1a_64_of_its_nine_bytes`: `0x8b13f71d9a4f303c`, worked out by another program; the hash against its three published values |
+| Same anchors, different kind | `event_id::tests::the_same_anchors_with_another_kind_have_another_id` |
+
+**Tests (inline): the 9 rows of §10.5.**
+
+| Row of §10.5 | Test |
+|---|---|
+| The cross-language vector | `verify::tests::a_token_minted_in_typescript_verifies_with_the_test_public_key` (also the Free token) |
+| One payload character changed | `verify::tests::the_token_with_one_payload_character_changed_has_no_good_signature` (also one character of the signature; the signature of another token) |
+| A different key; `[wrong, right]` | `verify::tests::another_key_does_not_verify_and_the_right_key_after_a_wrong_one_does` (also no key; bytes that are no key, first and last) |
+| `"abc"`, `"a.b.c"`, `".sig"`, padded base64 | `token::tests::what_is_not_two_segments_of_unpadded_base64url_is_refused` (also the other alphabet, a signature of 63 and of 65 bytes, 2,048 and 2,049 characters, a million characters) |
+| An extra field; `v: 2` | `token::tests::a_payload_with_an_extra_field_is_not_the_claims_and_v_2_is_another_version` (also a missing field, wrong types, an unknown plan, a list; and the token written again from its claims) |
+| `export_profile(None, _)` | `profile::tests::without_claims_the_profile_is_the_preview` |
+| Creator claims, `now` before both ends | `profile::tests::creator_claims_before_both_ends_give_1080x1920_without_a_watermark` (the last second of each end still counts) |
+| Creator claims, `now > exp`; `now > period_end` | `profile::tests::creator_claims_past_either_end_give_the_free_profile` |
+| Free claims | `profile::tests::free_claims_give_the_free_profile` |
+
+**The drill.** One character changed in the first segment of the pasted token (`MDAw` to `MDAx` in the time of issue, so that it is still base64url and still the claims): the vector test fails with `left: Err(Signature)`. Restored from a copy.
+
+**The secret scan, before the commit** (known issue 8): gitleaks 8.18.4, the Windows archive with its SHA-256 equal to the published one, run with `--no-git` on the files of this commit and of the commit of Prompt 45. No finding: not the seed, not the two tokens, not the public key in this entry. No `gitleaks:allow` comment was needed.
+
+**Checked.**
+
+- `cargo test -p offcut-detect -p offcut-entitlement`: 9 and 9 passed. `cargo clippy` on both, with all targets: clean.
+- `cargo tree -p offcut-entitlement -e normal | grep -ci "rand\|getrandom"`: 0. The crate has neither of `ed25519-dalek`'s default features.
+- `git grep -n "7f347b4b1b270181" -- web/src crates`: no output. The seed is in `web/tests-e2e/helpers/fake-api.ts` and nowhere else.
+- `cargo check -p offcut-detect -p offcut-entitlement --target wasm32-unknown-unknown` passes. Not asked for; Prompt 48 builds on it.
+- `node scripts/check-file-tree.mjs`: 195 files; both crates are checked as pure crates. `cargo deny check`: ok. `sh scripts/check-gen-clean.sh`: no diff; `EntitlementClaims` is not generated.
+- G M-6: the three crates pass 11, 9 and 9 rows; clippy is clean on the three; `pnpm check` is green; 3 font files are tracked; no `zz-` file is tracked under `web/tests-e2e`; the generated types are unchanged.
+- Lines above the test module: `number.rs` 102, `token.rs` 79, `lib.rs` of the detector 62, `profile.rs` 58.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **247 Rust, 92 Vitest, 12 Playwright** (Rust was 229: nine in each crate).
+- **`pnpm e2e`, as the gate runs it, passed 11 of 12 in its first run and 12 of 12 in the four runs after it** (three times with Playwright's 6 workers, once with 3). The last of the four is the run of the whole gate, repeated after the last change to a source file of this prompt. The case that failed is "waitlist: a slow API shows the waking message, then success", which runs in real time on purpose: the message it waits for is on the page between the third and the fourth second, and the run, straight after a build, saw "Sending" and then the success text. Nothing was changed between the runs. The app that was served is the build of Prompt 45, file for file (the same content-hashed names): neither crate is in a bundle before Prompt 48, and the case uses none of the new helpers. This is the machine again (known issue 20); the `ci` run of the push is the check.
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-detect -p offcut-entitlement` passes 18 rows; `cargo tree -p offcut-entitlement -e normal | grep -ci "rand\|getrandom"` is 0.
+- [x] No returned event is below `threshold_number` (INV-6); the same inputs give the same ids.
+- [x] The seed occurs in `fake-api.ts` only (`git grep` over `web/src` and `crates` is empty); `sh scripts/check-gen-clean.sh` shows no diff; G M-6 passes.
+
+**Not checked.**
+
+- **`ci`.** Nothing was pushed: the commits of Prompts 45 and 46 are local. The font files, `parley` on Linux, and the secret scan of the whole history run there for the first time.
+- **A token of the server's signer.** V6 writes it; until then the only signer is the TypeScript helper.
+- **The detector on the transcript of the reference clip.** The split form of its amount is a case of the first test; the 157 words themselves reach `detect` in Prompt 48, through the binding.
+
+**Found, and not for this prompt.**
+
+- **An edited number is not shown at all in V2.** A user who corrects `$10,000` to `$20,000` loses the reveal (§9.3: "a span with an edited or hidden word is skipped in V2; V3 re-parses it"). V2 has no way to edit a word, so nobody can meet it before V3.
+- **The scene and the detector disagree by 150 ms on when a number is on the screen.** The detector keeps two numbers apart by windows that start 150 ms before the first word (§9.2); the scene shows a number from the first word (§11.7, "Enter: at `span.start`"). The detector's window is the wider one, so nothing overlaps.
+
+**Open, for the human.** Push `v2-build` (two commits: Prompt 45 and Prompt 46) and read `ci` on pull request #2. Prompt 47 waits for green.

@@ -757,7 +757,7 @@ pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;         // FNV-
 1. `toks = tokenize(&t.words, edits)`.
 2. `cands = number::find(&toks, t, p, cfg)`.
 3. Keep `c.score >= cfg.threshold_number`.
-4. **(D-49)** Sort by `span.start`. Drop a candidate whose window `[span.start - overlay_lead_ms, span.end + number_hold_ms]` overlaps the window of the last kept candidate. V3 replaces steps 3-4 with `exclusions::apply`, the per-kind filter and `resolve::resolve`.
+4. **(D-49)** Sort by `span.start`. Drop a candidate whose window `[span.start - overlay_lead_ms, span.end + number_hold_ms]` overlaps the window of the last kept candidate (as built, Prompt 46: two windows that only touch count as overlapping). V3 replaces steps 3-4 with `exclusions::apply`, the per-kind filter and `resolve::resolve`.
 5. Map each to `DetectedEvent { id: event_id(kind, anchors), kind, span, anchors, params, confidence: Confidence(score), enabled: true }`.
 
 Output is ordered by `span.start`. An empty transcript gives an empty list (TS §17.6).
@@ -801,7 +801,7 @@ One candidate per `NormalizedSpan` whose words all still have their original eff
 
 ## 10. `offcut-entitlement`: token, verification, export profile
 
-**Crate rules** (TS §2). Depends on `offcut-types`, `ed25519-dalek`, `serde`, `serde_json`, `base64`, `thiserror` (D-54). No network, no storage, no clock (the caller passes `now`), no randomness: `ed25519-dalek` is built without its `rand_core` feature. `Cargo.toml` declares `[features] sign = []`; no code is behind it until V6.
+**Crate rules** (TS §2). Depends on `offcut-types`, `ed25519-dalek`, `serde`, `serde_json`, `base64`, `thiserror` (D-54). No network, no storage, no clock (the caller passes `now`), no randomness: `ed25519-dalek` is built without its `rand_core` feature. **As built (Prompt 46):** the crate states `ed25519-dalek` with its version and `default-features = false` itself and does not inherit the workspace entry. That entry keeps the default features (`fast`, `zeroize`) the server uses, `server/Cargo.toml` is frozen, and a member cannot turn off the default features of a dependency it inherits. `Cargo.toml` declares `[features] sign = []`; no code is behind it until V6.
 
 **Never.** Counts exports. Logs or formats a token. Returns a profile from an unverified token: `export_profile` takes claims, and the only way to get claims is `verify_token`.
 
@@ -836,7 +836,7 @@ pub fn signing_input(claims: &EntitlementClaims) -> String;                    /
 pub fn verify_token(token: &str, public_keys: &[[u8; 32]]) -> Result<EntitlementClaims, TokenError>;
 ```
 
-`decode`, then verify the signature over `signed` against each key in order; the first match returns the claims; none gives `Signature`. A key that is not a valid Ed25519 point is skipped. Expiry is not checked here: `export_profile` handles it. Every `TokenError` becomes `E_ENTITLEMENT_INVALID` (TS §11.2), mapped in `profile_api.rs`.
+`decode`, then verify the signature over `signed` against each key in order; the first match returns the claims; none gives `Signature`. **As built (Prompt 46):** with `verify_strict`, which also refuses a key of small order and a signature that is not in its one canonical form. A key that is not a valid Ed25519 point is skipped. Expiry is not checked here: `export_profile` handles it. Every `TokenError` becomes `E_ENTITLEMENT_INVALID` (TS §11.2), mapped in `profile_api.rs`.
 
 ### 10.4 `profile.rs` [ONLY builder of `ExportProfile`]
 
@@ -1965,7 +1965,7 @@ export function sourceDurationMs(fixture: string): number;                   // 
 export function referenceClip(): string;                                     // D-39: the testclips/ file, else its copy in fixtures/.cache/
 ```
 
-`routeAssets` answers every asset-host URL from `fixtures/.cache/` (models) and `referenceClip()` (the sample clip, D-39), honouring `Range` with 206 and `Content-Range`, and records method, URL, headers and byte counts. With `E2E_REAL_ASSETS=1` it only records (D-41). `globalSetup` downloads any manifest file missing from `fixtures/.cache/` from the real asset host and checks its SHA-256. When `testclips/` does not hold the reference clip (as on the CI runner), it downloads `SAMPLE_CLIP_PATH` the same way and checks that the file's SHA-256 starts with the hash segment of its name. `mintEntitlementToken` defaults: `plan: "creator"`, `iat = now`, `exp = now + 7 days`, `periodEnd = now + 30 days`. Every media suite calls `installFakeApi` (V1) so no test reaches a real server.
+`routeAssets` answers every asset-host URL from `fixtures/.cache/` (models) and `referenceClip()` (the sample clip, D-39), honouring `Range` with 206 and `Content-Range`, and records method, URL, headers and byte counts. With `E2E_REAL_ASSETS=1` it only records (D-41). `globalSetup` downloads any manifest file missing from `fixtures/.cache/` from the real asset host and checks its SHA-256. When `testclips/` does not hold the reference clip (as on the CI runner), it downloads `SAMPLE_CLIP_PATH` the same way and checks that the file's SHA-256 starts with the hash segment of its name. `mintEntitlementToken` defaults: `plan: "creator"`, `iat = now`, `exp = now + 7 days`, `periodEnd = now + 30 days`. **As built (Prompt 46):** `sub` is one fixed user id and `freeExportsRemaining` defaults to 3, so the claims of a token are known in full; `seedEntitlement` rejects, and makes nothing, on a page where the app has not made its database yet. Every media suite calls `installFakeApi` (V1) so no test reaches a real server.
 
 ### 23.5 `web/tests-e2e/landing.spec.ts`: the two replaced cases (D-56)
 
