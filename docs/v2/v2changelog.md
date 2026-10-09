@@ -46,6 +46,7 @@
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host is the 214,647,815-byte set of the small-size English model** (D-66; entry of Prompt 38): the 4-bit encoder and the mixed 4-bit and 16-bit decoder. **Whether it runs on both backends is not known before Prompt 43.** Its decoder computes in 16-bit floats, which the WebGPU backend needs a device feature for and the WASM backend may not run; TE-1 needs both. The other set that fits the limit is the 8-bit pair, 251,728,328 bytes. Its decoder is one file of 156,794,981 bytes: if that set replaces this one, steps 2 and 3 of Prompt 38 are repeated, and the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected with a range check on that file. The downloaded files are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompts 43, 44 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
+| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed | Every gate |
 
 ---
 
@@ -895,3 +896,89 @@ Not asked, and checked in the same run:
 - The license of the source (open item 9).
 
 **Human.** Push `6e5cc40` and this commit; read `ci`. Prompt 38 is not marked **Push**, but two commits are waiting.
+
+## 2026-10-09 - The fourth push: `ci` green on D-66 and Prompt 38
+
+**Done by the human.** `git push` of `v2-build` at `1757fe6`, the commit of Prompt 38; the commit of D-66 (`6e5cc40`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `1757fe6`, equal to the local branch |
+| The `ci` run on `1757fe6` (pull request #2, run 11) | Success. Job `ci`: 2.5 minutes, 35 steps passed, 2 skipped, none failed. `deploy-api` and `deploy-web`: skipped |
+| Pull request #2 | Open, draft, no conflict with `main` |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3` |
+
+**Closes.** What the entry of Prompt 38 left for Linux: the secret scan accepts `model-manifest.json`, and the file-tree check, both `tsc` steps and the hosts check pass with the new files.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 39: model machine, store, downloader
+
+Prompts 39 and 40 were asked for in one sitting; each has its own gate and its own commit.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/state/machines/model-machine.ts` | `ModelStatus` (7 states), `ModelEvent` (11 events), `MODEL_MACHINE`: the 14 pairs of §18.1 |
+| `web/src/state/model-store.ts` | `useModelStore`, `ModelState`, `ModelProgress`, and the eight actions `inspected`, `start`, `progress`, `lastByte`, `netFail`, `fail`, `hashOk`, `cleared`. The one cast of the file is `const ZERO_BYTES = 0 as Bytes` |
+| `web/src/models/download.ts` | `MODEL_PART_BYTES`, `MODEL_RETRIES`, `MODEL_BACKOFF_MS`, `VERIFY_SLICE_BYTES`; `ManifestFile`, `DownloadDeps`, `VerifyDeps`, `ModelError`; `createDownloader`, `fetchRanged`, `verifyAndFinalize`, `localName`. The one cast is in `toBytes()` |
+| `web/src/models/download.test.ts` | The 16 cases of §23.3 |
+
+**Changed.** `docs/v2/v2implementation.md`: §17.2 says what was built (1 replacement, applied once).
+
+**The 14 pairs,** counted in the file against §18.1: `unknown` 3, `absent` 1, `partial` 2, `ready` 1, `downloading` 4, `verifying` 2, `failed` 1. `verifying` has no `start` and no way to `downloading`.
+
+**The eight rules of §17.2, and the test that holds each.**
+
+| Rule | Test |
+|---|---|
+| 1. `have` starts at `resumeFrom`; a part larger than the file is truncated | "resumes at the size of the part"; "truncates a part that is larger than the file and starts at 0" |
+| 2. Ranges of 8 MiB, the last one shorter | "downloads a 20 MiB file into an empty part in three ranged requests" |
+| 3. A 206 is written at `have`, counted, and sets the failure count back | The same; "counts failures in a row: a success sets the count back" |
+| 4. A 200 truncates the part and writes the whole body | "starts the part again from 0 when the host answers 200 with the whole file" |
+| 5. A 206 with no bytes, or with more than was asked for, is a failed attempt | "counts a 206 with no bytes, and a body longer than the range, as failed attempts" |
+| 6. Waits of 1, 3 and 9 s; the fourth failure in a row is `E_MODEL_DOWNLOAD`; the part is kept | "waits 1 s after one offline answer and asks for the same range again"; "gives up with E_MODEL_DOWNLOAD after four failures in a row, and keeps the part" |
+| 7. An abort is thrown on as the abort; the part is kept; no wait | "rejects with the abort when the signal aborts mid-file, keeps the part and does not wait" |
+| 8. A full disk is `E_MODEL_STORAGE`, any other storage failure `E_STORAGE_IO` | "names a full disk E_MODEL_STORAGE and any other storage failure E_STORAGE_IO" |
+
+The other five cases: every request names the manifest path and a range; a file with the manifest's hash gets its final name; a file with one flipped byte is removed and has no final name (INV-20); a 9 MiB file is hashed in slices of 4, 4 and 1 MiB with two pauses; `localName`; the manifest (total, limit of 260,000,000, 64 hex digits, path prefix).
+
+**Decided here, where the plan gives a name and no shape, or cannot be built as written.**
+
+- **`ModelError`,** an `Error` with a `code` (`E_MODEL_DOWNLOAD`, `E_MODEL_HASH`, `E_MODEL_STORAGE` or `E_STORAGE_IO`). §17.2 has the downloader `throw { code }`; ESLint refuses a thrown plain object (`only-throw-error`), as it did in Prompt 37, and `models/` may not import the `WorkerFailure` of `workers/rpc.ts`. §17.2 of the plan says so now.
+- **`VerifyDeps`** (§17.2 names it): `opfs` with `getFile`, `move` and `remove`; `newSha256()`, which gives a stream with `update` and `finalizeHex`; `pause()`, one turn of the event loop. The model manager passes the stream of `loadCore()` (Prompt 40). **`download.ts` does not import `wasm/load-core.ts`:** a unit test that loaded it would need the built bundle, which the test job of CI builds but a fresh clone does not have.
+- **`ManifestFile`** is `{ path, bytes, sha256 }` with `bytes` a plain number: it is the type of an entry of the JSON file.
+- **The part file's path comes from the manifest path:** `fetchRanged(file, o)` has no model id (TS §16.2), so the id is the second segment of `models/<modelId>/<file>`. A path of another form throws.
+- **`localName` throws on a name without a hash segment** of 16 hex digits. It never guesses a name.
+- **A 200 whose body is not exactly `file.bytes` long is a failed attempt,** and the part is back at 0 bytes. §17.2 names the longer body of a 206 only.
+- **A connection that breaks while a body is read** is a failed attempt, like an answer that never came.
+- **The signal is looked at before every request.** A wait that has started is not cut short: the abort is seen at the next request, after at most 9 s. `fetchRanged` has no timer to cancel in V2; V4 adds the cancel.
+- **`DownloadDeps.opfs.size` is not called.** The caller passes the size of the part as `resumeFrom` (§17.2, step 1); the type is as §17.2 gives it.
+- **The store's `fail(code)` picks the event.** The machine has three ways into `failed`, and the set has seven files, of which six are checked while the store still says `downloading`. A wrong hash of one of those six is stored as `last_byte` followed by `hash_bad`, so that a wrong hash always goes through `hash_bad`. From `verifying` the only way to `failed` is `hash_bad`, also for a storage failure there; the state then holds the real code. No pair was added.
+- **`progress(p)` is kept only while the status is `downloading` or `verifying`.** It is not a transition. `hashOk()` sets `done` to `total`.
+- **A legal transition stores the whole state,** so that `error` is gone after `start`.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The hash in the three `verifyAndFinalize` cases is not SHA-256** but a small digest written in the test: the real one is in the WASM bundle (see above). The cases prove the slices, the comparison, the move and the removal. The real SHA-256 against the real manifest is the browser check of Prompt 40.
+- **The test makes no `Bytes`.** A cast to a unit type is refused in a test as anywhere else (D-59), and the cases need 0, 8 MiB and 16 MiB as `Bytes`. They are taken from the downloader in `beforeAll`: started with `LIMITS.MAX_FILE_SIZE` as the size of its part, it truncates the part to 0 and writes at 0, 8 MiB and 16 MiB, and the fake file system records those offsets.
+
+**The drill.** `import { http } from "../net/http";` in `download.ts`: ESLint, `boundaries/dependencies`, "There is no policy allowing dependencies from elements of type "models" to elements of type "net"". Restored from a copy.
+
+**Checked.**
+
+- `pnpm --filter web exec vitest run src/models/download.test.ts`: 16 passed.
+- `pnpm --filter web exec eslint src/models src/state`: clean. Edge D-27 d is used by `download.test.ts` (the manifest); edge f is not used yet (see "Not checked").
+- Lines: `download.ts` 276, `model-store.ts` 105, `model-machine.ts` 32.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **193 Rust, 92 Vitest** (Vitest was 76; the 16 are new).
+- **`pnpm e2e` was not green as the gate runs it.** With Playwright's default of 6 workers, 6 of the 12 cases failed in each of four runs on this date: the six that start first time out in the capability check of the start page ("Checking your browser…", or the storage check answering no after its 2 s limit, V1 known issue 30). With `--workers=3`, and with `--workers=2`, **12 of 12 pass**, in 28 s and 35 s. The cause is the machine, not this prompt: the app that was served is the build of Prompt 38, file for file (`assets/index-TZ9rx-jv.js`, `assets/media.worker-wI5sawug.js`, the same content-hashed names), because no file of this prompt is imported by the app yet; `landing.spec.ts` and `playwright.config.ts` are unchanged; the same suite passed with 6 workers after Prompt 38, four hours earlier. At the time of the runs the machine had 2.6 to 4.4 GB of memory free of 15.7, with two other browsers and the editor open. Nothing was changed to make the suite pass. The `ci` run of the next push is the check on a clean machine.
+
+**"Done when".**
+
+- [x] `pnpm --filter web exec vitest run src/models/download.test.ts`: 16 cases pass; the Vitest total is 92.
+- [x] ESLint is clean for `src/models` and `src/state`. Edge D-27 d proves its positive side. **Edge f is first used in Prompt 40,** by `model-manager.ts`: neither file of this prompt needs the `AppFailure` type, and an import that nothing uses fails lint.
+
+**Not checked.** The store against a real download, and the hash with the real SHA-256: both are the browser check of Prompt 40.

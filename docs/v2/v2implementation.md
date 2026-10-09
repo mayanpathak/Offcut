@@ -1491,6 +1491,8 @@ export function verifyAndFinalize(modelId: string, file: ManifestFile, deps: Ver
 export function localName(file: ManifestFile): string;   // D-62: the last segment of file.path without the upload hash, e.g. "encoder_model.onnx"
 ```
 
+As built (Prompt 39): a failure is thrown as a `ModelError`, an `Error` with a `code`, because ESLint refuses a thrown plain object; where this section says `throw { code }`, read `throw new ModelError(code)`. `VerifyDeps` is `{ opfs: Pick<..., "getFile" | "move" | "remove">; newSha256(): Promise<{ update, finalizeHex }>; pause(): Promise<void> }`; the model manager passes the stream of `loadCore()`, and `download.ts` itself does not import `wasm/load-core`. `ManifestFile` is `{ path, bytes, sha256 }`, and the part file's path is built from the second segment of `path`.
+
 Algorithm, TS §16.3:
 
 1. `have = resumeFrom` (the caller passes the `.part` size, 0 when absent). `have > file.bytes`: truncate the part to 0 and restart.
