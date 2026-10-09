@@ -21,7 +21,8 @@ pub fn parse_quantity(tokens: &[Token]) -> Option<(usize, Quantity)> {
     match first.kind {
         TokenKind::Digits => {
             let (value, unit) = digits(&first.text)?;
-            Some((1, quantity(value, unit)))
+            let (used, value) = with_split_groups(tokens, first, value);
+            Some((used, quantity(value, unit)))
         }
         TokenKind::Word => {
             let spelled: Vec<&str> = tokens
@@ -95,6 +96,40 @@ fn digits(text: &str) -> Option<(f64, Unit)> {
         (true, true) => return None,
     };
     Some((parse_decimal(text)?, unit))
+}
+
+/// A recognizer may write `$12,000` as two words, `$12` and `,000`: it starts
+/// a new word at the separator. A word that begins with a comma and exactly
+/// three digits, straight after a whole number, is the next group of that
+/// number (D-42). Nothing else that is written begins a word that way.
+/// Returns the tokens used and the value.
+fn with_split_groups(tokens: &[Token], first: &Token, value: f64) -> (usize, f64) {
+    // A number with a decimal part, or with a sign after it, has ended.
+    if first.text.contains('.') || first.text.ends_with('%') {
+        return (1, value);
+    }
+    let (mut used, mut value, mut word) = (1usize, value, first.word);
+    while let (Some(comma), Some(group)) = (tokens.get(used), tokens.get(used.saturating_add(1))) {
+        let starts_next_word =
+            comma.word == group.word && comma.word.get() == word.get().saturating_add(1);
+        let is_group = comma.kind == TokenKind::Punct
+            && comma.text == ","
+            && group.kind == TokenKind::Digits
+            && group.text.len() == 3
+            && group.text.bytes().all(|b| b.is_ascii_digit());
+        let Some(digits) = group
+            .text
+            .parse::<f64>()
+            .ok()
+            .filter(|_| starts_next_word && is_group)
+        else {
+            break;
+        };
+        value = value * 1_000.0 + digits;
+        used = used.saturating_add(2);
+        word = group.word;
+    }
+    (used, value)
 }
 
 const UNITS: [&str; 9] = [
@@ -383,6 +418,37 @@ mod tests {
         assert_eq!(read(&["percent"]), None);
         assert_eq!(read(&["."]), None);
         assert_eq!(read(&[]), None);
+    }
+
+    #[test]
+    fn a_number_the_recognizer_split_at_its_separator_is_one_number() {
+        // The reference clip's amount, as the recognizer wrote it: two words.
+        assert_eq!(read(&["$12", ",000"]), some(3, 12_000.0, Unit::Usd, "$12k"));
+        assert_eq!(
+            read(&["$12", ",000", "in", "sales."]),
+            some(3, 12_000.0, Unit::Usd, "$12k")
+        );
+        assert_eq!(
+            read(&["3", ",000", ",000."]),
+            some(5, 3_000_000.0, Unit::None, "3,000,000")
+        );
+        assert_eq!(
+            read(&["1,250", ",500"]),
+            some(3, 1_250_500.0, Unit::None, "1,250,500")
+        );
+
+        // A comma that ends a word is a comma: the number after it is another number.
+        assert_eq!(read(&["12,", "000"]), some(1, 12.0, Unit::None, "12"));
+        // Not a group of three digits, a number that had ended, a group in a later word.
+        assert_eq!(read(&["$12", ",00"]), some(1, 12.0, Unit::Usd, "$12"));
+        assert_eq!(read(&["$12", ",0000"]), some(1, 12.0, Unit::Usd, "$12"));
+        assert_eq!(read(&["1.5", ",000"]), some(1, 1.5, Unit::None, "1.5"));
+        assert_eq!(read(&["40%", ",000"]), some(1, 40.0, Unit::Percent, "40%"));
+        assert_eq!(read(&["$12.", ",000"]), some(1, 12.0, Unit::Usd, "$12"));
+        assert_eq!(
+            read(&["$12", "and", ",000"]),
+            some(1, 12.0, Unit::Usd, "$12")
+        );
     }
 
     #[test]

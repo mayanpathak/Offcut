@@ -60,7 +60,7 @@ The scripts are written against the detector rules of `technicalspec.md` §17.2-
 | 4 | ListReveal | "three reasons … First … Second … Third" | header "3 REASONS"; items "the captions write themselves", "the numbers animate automatically", "everything runs on my laptop" |
 | 5 | NumberReveal | "twelve thousand dollars" | value 12,000, currency USD, label "in sales" |
 
-The exact display strings come from `format_quantity` (`technicalspec.md` §17.2), which is written in V2. Fill them in here when the reference clip is first run through the pipeline.
+The exact display strings come from `format_quantity` (`technicalspec.md` §17.2). For the V2 reference clip they are in the section "The V2 reference clip as recognized" below; V2 produces the fifth of these events only.
 
 **Why it is worded this way.**
 
@@ -71,6 +71,70 @@ The exact display strings come from `format_quantity` (`technicalspec.md` §17.2
 - "BRUTAL" follows the intensifier "really". It still needs the louder, higher delivery to pass 0.80.
 - The script contains no other number words, no years, no clock times, no version numbers, and no "first", "second" or "third" outside the list.
 - At least two filler sentences separate neighbouring overlay events, so their display windows do not overlap (§17.5).
+
+## The V2 reference clip as recognized
+
+**Clip.** `testclips/speech_scriptA_landscape_720p.mp4`: the founder reading Script A to a webcam, 74,705 ms.
+**Recognized on.** 2026-10-09 (Prompt 43), by the model `asr-en-v1` of `web/src/config/model-manifest.json` (the small-size English model: a 4-bit encoder, and a 4-bit decoder that computes in 16-bit floats), on the WebGPU backend and again on the WASM backend. The two transcripts are equal, word for word and millisecond for millisecond.
+
+**Expected transcript.** 157 words in 17 sentences. A test compares with this text, not with the script: the recording and the script differ, and so does what the recognizer hears. Words are counted from 0; times are milliseconds from the first video frame.
+
+| # | Words | Starts | Ends | Text |
+|---|---|---|---|---|
+| 1 | 0-14 | 1,560 | 8,880 | Last year, I almost quit making videos, editing 8 every evening at almost nobody watched. |
+| 2 | 15-19 | 9,160 | 10,380 | So I added it up. |
+| 3 | 20-27 | 10,580 | 14,100 | I had spent 3000 hours editing by hand. |
+| 4 | 28-35 | 14,260 | 17,960 | This is literally brutal way to make anything. |
+| 5 | 36-43 | 18,100 | 21,740 | The slow part was always a rough cut. |
+| 6 | 44-59 | 22,100 | 28,580 | Then I checked my workflow and the rough cut went from 90 minutes to 10 minutes. |
+| 7 | 60-72 | 29,040 | 34,880 | That change gave me my evenings back and honestly it was not luck. |
+| 8 | 73-78 | 35,280 | 37,800 | There are three reasons it worked. |
+| 9 | 79-83 | 38,120 | 40,680 | First the captions write themselves. |
+| 10 | 84-88 | 41,080 | 44,060 | Second the numbers animate automatically. |
+| 11 | 89-94 | 44,220 | 46,600 | Third everything runs on my laptop. |
+| 12 | 95-105 | 46,840 | 50,480 | I record a clip, drop it in and read the result. |
+| 13 | 106-117 | 50,580 | 55,020 | If a caption is wrong, I fix the word and move on. |
+| 14 | 118-126 | 55,420 | 60,960 | Now I publish every week instead of every month. |
+| 15 | 127-135 | 61,200 | 64,280 | Last month those clips earned $12 ,000 in sales. |
+| 16 | 136-149 | 64,360 | 68,900 | So I keep talking to my camera and let the software handle the rest. |
+| 17 | 150-156 | 69,120 | 71,520 | Your ideas matter more than your timeline. |
+
+The first word starts at 1,560 ms and the last one ends at 71,520 ms. No word starts before the one before it has ended, and the shortest word is 120 ms long.
+
+**Numbers in the transcript** (`Transcript.numbers`), as `offcut-text` reads them.
+
+| Words | As written by the recognizer | Value | Unit | Display | Spoken at (ms) |
+|---|---|---|---|---|---|
+| 8-8 | `8` | 8 | none | `8` | 4,980 to 6,180 |
+| 23-23 | `3000` | 3,000 | none | `3,000` | 11,880 to 12,560 |
+| 55-55 | `90` | 90 | none | `90` | 26,040 to 26,320 |
+| 58-58 | `10` | 10 | none | `10` | 26,820 to 27,180 |
+| 75-75 | `three` | 3 | none | `3` | 36,080 to 36,400 |
+| 132-133 | `$12 ,000` | 12,000 | usd | `$12k` | 62,660 to 63,540 |
+
+The recognizer writes the amount as two words, `$12` and `,000`: it starts a new word at the thousands separator. `offcut-text` reads the two as one quantity (`docs/v2/v2implementation.md`, D-42 and section 8.4).
+
+**Expected events of V2.** One. V2 detects NumberReveal only, and only a quantity with a currency and a magnitude of at least 1,000 clears the threshold of 0.80 (section 9.3 of the V2 plan).
+
+| # | Kind | Words | Expected content |
+|---|---|---|---|
+| 1 | NumberReveal | 132-133, `$12 ,000` | value 12,000, unit USD, display `$12k`, no label in V2 |
+
+The five other numbers have no unit, score 0.70 and must not become events (INV-6). That holds for the `8` too, which the recognizer wrote where the script says "ate".
+
+**Where the transcript differs from Script A.** Which of these the speaker said and which the recognizer misheard has not been judged by ear.
+
+| Script A | Recognized |
+|---|---|
+| "Editing ate every evening, and almost nobody watched." | "editing 8 every evening at almost nobody watched." |
+| "three thousand hours" | "3000 hours" |
+| "That is a really BRUTAL way" | "This is literally brutal way" |
+| "always the rough cut" | "always a rough cut" |
+| "Then I changed my workflow" | "Then I checked my workflow" |
+| "from ninety minutes to ten minutes" | "from 90 minutes to 10 minutes" |
+| "every weekday instead of every month" | "every week instead of every month" |
+| "twelve thousand dollars" | "$12 ,000" |
+| "So keep talking to the camera" | "So I keep talking to my camera" |
 
 ## Script B: 20 seconds with no events
 

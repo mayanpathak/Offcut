@@ -15,5 +15,11 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@huggingface/transformers>onnxruntime-node": "-",
+      "@huggingface/transformers>sharp": "-"
+    }
   }
 }

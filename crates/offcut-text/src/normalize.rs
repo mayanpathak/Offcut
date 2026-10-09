@@ -142,6 +142,30 @@ mod tests {
             ),
             (12_000.0, &Unit::Usd, "$12k")
         );
+
+        // The same amount as a recognizer writes it, in two words: one span over both.
+        let split = normalize_transcript(
+            vec![
+                raw("earned", 0, 300, 1.0),
+                raw("$12", 320, 900, 1.0),
+                raw(",000", 900, 1_300, 1.0),
+                raw("in", 1_320, 1_400, 1.0),
+            ],
+            "asr-en-v1",
+        );
+        let spans: Vec<(u32, u32, &str)> = split
+            .numbers
+            .iter()
+            .map(|n| {
+                (
+                    n.words.start.get(),
+                    n.words.end.get(),
+                    n.quantity.display.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(spans, [(1, 3, "$12k")]);
+        assert_eq!(split.words.len(), 4);
     }
 
     #[test]

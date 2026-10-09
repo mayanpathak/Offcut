@@ -44,10 +44,11 @@
 | 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
-| 18 | **The model on the asset host is the 214,647,815-byte set of the small-size English model** (D-66; entry of Prompt 38): the 4-bit encoder and the mixed 4-bit and 16-bit decoder. **Whether it runs on both backends is not known before Prompt 43.** Its decoder computes in 16-bit floats, which the WebGPU backend needs a device feature for and the WASM backend may not run; TE-1 needs both. The other set that fits the limit is the 8-bit pair, 251,728,328 bytes. Its decoder is one file of 156,794,981 bytes: if that set replaces this one, steps 2 and 3 of Prompt 38 are repeated, and the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected with a range check on that file. The downloaded files are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompts 43, 44 |
+| 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s and a fallback line of 50 s on R1 (E-3). If Prompt 44 reads over 50 s on R1, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompt 44 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
 | 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
 | 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): Prompt 45 decides how captions show it | Prompts 43, 45, 46, 48, 50 |
+| 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word:** TE-2 (Prompt 44) wires the real figure in `whisper-runtime.ts` and `word-timestamps.ts`; the package's word-timestamp path returns no probability by itself, so that is work, not a switch. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 
 ---
@@ -1293,3 +1294,173 @@ A confidence comes back as the 32-bit value it is kept in: 0.98 reads as 0.98000
 **Found, and not for this prompt.** A cardinal in words is read wherever it stands, as row 5 of §8.5 asks ("three" is 3), so the "one" of "this one is better" is a quantity too, with the display `1`. Captions show a quantity's display in place of its words (TS §17.2). Whether a lone small number in words should be shown as a digit is a question for the captions of Prompt 45 and for V3's rules, not for the parser.
 
 **Human.** Push; read `ci`. Prompt 41 is marked **Push**; this commit goes with it.
+
+## 2026-10-09 - The sixth push: `ci` green on Prompts 41 and 42
+
+**Done by the human.** `git push` of `v2-build` at `792662f`, the commit of Prompt 42; the commit of Prompt 41 (`cc02715`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `792662f`, equal to the local branch |
+| The `ci` run on `792662f` (pull request #2, run 13) | Success |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3` |
+
+**Closes.** The push that Prompt 41 ends with. The muxer, `offcut-text` and the larger core bundle build and pass on Linux; Playwright passes there with its default workers, as it did in the gate of Prompt 42.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 43: ORT copy step, ASR worker, host entries, first transcript
+
+**REOPENED V1 CONTRACT: `scripts/check-hosts.mjs`** (D-38) **and `web/eslint.config.js`** (one rule). Nothing in either was loosened for a file that had passed before: the ESLint diff adds 19 lines and removes none, and every new entry of the hosts list holds in one named file only.
+
+**The first transcript. The reference clip, in Chrome, with the model read from OPFS.** 157 words in 17 sentences; the first word at 1,560 ms, the last one ending at 71,520 ms; the amount as one `Usd` quantity with the display `$12k`. The WebGPU backend and the WASM backend give the same transcript, word for word. It is in `fixtures/speech/README.md`.
+
+**It is too slow, and that is for Prompt 44 to judge.** On the development machine `load` and `transcribe` together took **65 s on WebGPU and 102 s on WASM** for the 74.7 s clip. The target of E-3 is 25 s on R1 and the line at which D-66's fallback applies is 50 s; R1 is the weaker machine. These are `dev` readings and decide nothing, but nobody should be surprised on R1. Details below.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/workers/asr/word-timestamps.ts` | `mergeWindows`, `postProcess`, `ASR_MIN_WORD` (40 ms), the type `AsrWindow` |
+| `web/src/workers/asr/model-cache-adapter.ts` | `createModelCache(modelId)`: `match` answers from OPFS or throws; `put` does nothing |
+| `web/src/workers/asr/whisper-runtime.ts` | `loadModel`, `transcribe`, `unloadModel`, the type `RawWord` (TS §16.2). The only importer of the runtime |
+| `web/src/workers/asr.worker.ts` | `load`, `transcribe`, `unload`; its last statement is `serveWorker(...)` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/package.json` | `@huggingface/transformers` at exactly `4.3.1` |
+| `package.json` | `pnpm.overrides`: two dependencies of that package are not installed (see "Differs") |
+| `pnpm-lock.yaml` | The runtime with `@huggingface/jinja` 0.5.10, `@huggingface/tokenizers` 0.2.0, `onnxruntime-web` 1.31.0-dev.20260914-8d85527a0 and what that needs |
+| `web/vite.config.ts` | The plugin `offcut:copy-ort` (at build start: two files into `web/public/ort/<version>/`, other version directories removed); one resolve condition (see "Differs") |
+| `web/src/workers/pool.ts` | The row `asr` and the client `pool.asr`. Two rows now |
+| `web/eslint.config.js` | The rule of TDR-3: `no-restricted-imports` for `@huggingface/transformers` and `onnxruntime-web`, and their subpaths, in every file of `src`; off in `workers/asr/whisper-runtime.ts` alone |
+| `scripts/check-hosts.mjs` | An entry may carry `chunk`, a pattern for the path of an output file; 13 entries that carry one |
+| `crates/offcut-text/src/numbers.rs`, `normalize.rs` | The split form of D-42 and its test row (see "The amount") |
+| `fixtures/speech/README.md` | The section "The V2 reference clip as recognized": the transcript by sentence with times, its six numbers, the one expected event of V2, and where the transcript differs from Script A |
+| `docs/v2/v2implementation.md` | D-42, §8.4, §8.5, §16.5, and two rows of §22.3 say what was built (6 replacements, each applied once) |
+
+**Pinned.** `@huggingface/transformers` 4.3.1 (latest; Apache-2.0), exact. It resolves `onnxruntime-web` 1.31.0-dev.20260914-8d85527a0 (MIT), the version it names itself; that string is the name of the directory under `/ort/`.
+
+**Every option of the runtime that is used,** read in the package's own source (`src/env.js`, `src/utils/hub.js`, `src/utils/cache.js`, `src/backends/onnx.js`, `src/pipelines/automatic-speech-recognition.js`), not taken from memory: the package is one major version past what the plan was written against.
+
+| Option | Set to | What it does |
+|---|---|---|
+| `env.allowRemoteModels` | `false` | No file is asked of the model host |
+| `env.allowLocalModels` | `true` | Has to be: with both kinds of loading off the runtime refuses to start. A "local" file is asked of the cache first |
+| `env.fetch` | A function that rejects | Whatever the cache does not have would be fetched from `/models/...` on the app's own origin. It is refused before it is made |
+| `env.useBrowserCache` | `false` | The runtime keeps nothing in the Cache API |
+| `env.useFSCache` | `false` | No file system cache (there is none in a browser) |
+| `env.useWasmCache` | `false` | The runtime does not fetch and keep ONNX Runtime's files itself |
+| `env.useCustomCache`, `env.customCache` | `true`, the OPFS adapter | The model cache is OPFS |
+| `env.backends.onnx.wasm.wasmPaths` | `{ mjs, wasm }` under `<origin>/ort/<version>/` | Where ONNX Runtime loads its loader and its module from; the default is a CDN |
+| `env.backends.onnx.versions.web` | Read | The `<version>` of that path |
+| `env.backends.onnx.wasm.proxy` | `false` | No helper worker from a `blob:` address |
+| `env.backends.onnx.wasm.numThreads` | `clamp(hardwareConcurrency - 2, 1, 4)` | Threads of the WebAssembly module |
+| `pipeline("automatic-speech-recognition", modelId, { device, dtype })` | `device` `"webgpu"` or `"wasm"`; `dtype` `{ encoder_model: "q4", decoder_model_merged: "q4f16" }` | The backend, and which file each half of the model is |
+| The call `recognizer(audio, { return_timestamps: "word" })` | - | Word timestamps. `audio` is a `Float32Array` at 16 kHz |
+| `pipeline.dispose()` | - | Releases the sessions |
+
+Not used: `chunk_length_s` and `stride_length_s` (the windows are cut here, so that each is a cancellation point and a progress step), `language` and `task` (an English-only model takes neither), `env.remoteHost`, `env.localModelPath`.
+
+**What the runtime asks its cache for** (read with a temporary line, since removed): seven names, each one of the seven files of the manifest, and nothing else. `config.json`, `tokenizer_config.json`, `preprocessor_config.json`, `tokenizer.json`, `onnx/encoder_model_q4.onnx`, `onnx/decoder_model_merged_q4f16.onnx`, `generation_config.json`, each asked as `/models/asr-en-v1/<name>`. The manifest of Prompt 38 is complete, and nothing was uploaded again.
+
+**Browser check (dev, model cached).** `vite` on port 5173; Chrome under Playwright with a profile of its own; the model downloaded into OPFS by the model manager (47 s); the reference clip imported by `pool.media`.
+
+| Asked | Result |
+|---|---|
+| About 150 to 190 words | **157** |
+| Times increasing; the first under 3,000 ms; the last under 74,705 | No word starts before the one before it ended; first 1,560; the last word ends at 71,520 |
+| `numbers` holds one `Usd` span for the amount, display `$12k` | `{ value: 12000, unit: "usd", display: "$12k" }` over words 132 and 133, after the split form was added (below). Five other numbers, none with a unit |
+| `backend` | `webgpu` when asked for; `wasm` when asked for |
+
+| Read in the same runs | WebGPU | WASM, 4 threads |
+|---|---|---|
+| `load` | 4.8 s and 5.9 s | 6.8 s |
+| `transcribe` | 60.7 s and 58.9 s | 94.8 s |
+| The three windows (30 s, 30 s, 24.7 s of audio) | 21 to 24 s, 22 s, 15 s | 35 s, 35 s, 25 s |
+| Transcript | 157 words | The same, word for word and millisecond for millisecond |
+| `unload` | 0.05 s; a second `unload` answers too; `transcribe` after it fails with `E_INTERNAL`, detail `NoModel` | The same |
+| Progress | `{ stage: "asr", done: 0, total: 3, feed: { kind: "transcribing" } }`, then 1, 2 and 3 of 3 without a feed line | The same |
+| `pcm16` after the call | Detached: it was transferred | The same |
+| Requests while loading and transcribing | Only to `localhost:5173`: the two files under `/ort/1.31.0-dev.20260914-8d85527a0/` and the dev server's modules. Two more went to the asset host, for the demo video of the start page, which is not the recognizer's | The same |
+| Workers | The media worker, the ASR worker, and three threads of ONNX Runtime started from `/ort/.../ort-wasm-simd-threaded.asyncify.mjs` | The same |
+
+This is the dev server, which has no CSP. TE-1, on a production build with the CSP, is Prompt 44.
+
+**The amount, and the form added for it (D-42).** The recognizer writes the twelve thousand dollars with a `$` and digits, as D-42 hoped, but as **two words: `$12` and `,000`**. The runtime starts a new word at a punctuation token, and the thousands separator is one. The first run therefore gave two quantities, `$12` and `0`. The prompt names two forms the amount might arrive in and asks for the form of §8.4 with its test row; this is a third form, handled the same way:
+
+- **`numbers.rs`:** a word that begins with a comma and exactly three digits, straight after a whole number in digits, is the next group of that number. `$12` then `,000` is 12,000 dollars in three tokens, and the span covers both words. Nothing else that is written begins a word with a comma and a digit: a comma that belongs to the sentence ends the word before it, and `12,` then `000` stays 12.
+- **Test row:** `numbers::a_number_the_recognizer_split_at_its_separator_is_one_number` (the form, its repetition, and seven cases that are not it), and three lines in the first test of `normalize.rs` (one span over both words). 12 tests in `offcut-text`, was 11.
+- **The `dollars` form is not added.** The transcript has the `$`.
+- It is in Rust and not in `word-timestamps.ts`: a rule about how a number is written belongs to `offcut-text` (TS §6), a worker file has no test in V2, and the words of the transcript stay what the recognizer returned.
+
+**The three drills.** Each was undone from a copy.
+
+| Temporary edit | What fired |
+|---|---|
+| `@huggingface/transformers` and `onnxruntime-web/webgpu` imported in `asr.worker.ts` | ESLint, `no-restricted-imports`, on both lines: "The speech runtime is imported by workers/asr/whisper-runtime.ts only (TDR-3)" |
+| `https://huggingface.co/`, a listed literal, written into `web/src/main.tsx` | `check-hosts`, 1 problem: `web/dist/assets/index-DWT86Cga.js: https://huggingface.co/` |
+| The `chunk` of that entry pointed at `assets/zz-nothing.js` | `check-hosts`, 1 problem: `web/dist/assets/asr.worker-B0hYuSuN.js: https://huggingface.co/` |
+
+A fourth, not asked for and needed here (see "Differs"): `console.log(process.cwd())` in `web/src/main.tsx` fails `tsc` with TS2591 again.
+
+**The 13 entries of `check-hosts.mjs`,** one per literal the failing build named. Two are addresses the runtime could ask; eleven are text.
+
+| Literal | Where it may be | Why it is not a request |
+|---|---|---|
+| `https://huggingface.co/` (exactly) | The ASR worker's chunk | The runtime's default model host. Remote loading is off and `env.fetch` refuses; TE-1 (Prompt 44) proves no request |
+| `https://cdn.jsdelivr.net/npm/onnxruntime-web@$` (exactly) | The same | The runtime's default place for ONNX Runtime's files, replaced by `/ort/<version>/` before the first session; TE-1 |
+| `https://huggingface.co/docs/`, `https://github.com/huggingface/transformers.js/issues/`, `https://gist.github.com/hollance/`, `https://developer.mozilla.org/en-US/docs/Web/API/Cache`, `https://web.dev/cross-origin-isolation-guide/`, `https://rolldown.rs/in-depth/bundling-cjs` | The same | Addresses in the text of errors and warnings, of the runtime, of ONNX Runtime and of the bundler |
+| `https://tinyurl.com/sudb9s96`, `https://docs.nvidia.com/cuda/cublas/`, `https://github.com/google/re2/wiki/Syntax`, `https://ieeexplore.ieee.org/document/1163711`, `https://arxiv.org/abs/1502.03167` | `ort/<version>/ort-wasm-simd-threaded.asyncify.wasm` | Text of operator descriptions compiled into ONNX Runtime |
+
+The CSP was not touched: it names neither host, and a request to one would be refused by the browser.
+
+**Decided here, where the plan is silent.**
+
+- **The windows start every 25 s and are 30 s long;** the last one ends where the audio does. 74.7 s is three windows. A clip of 30 s or less is one.
+- **`mergeWindows`:** in the 5 s two windows share, the earlier window's words are kept up to the middle and the later window's from there on; that is "the instance farther from a window edge". A word the two windows placed on either side of the middle, with the same text and overlapping times, is kept once.
+- **`postProcess`:** a word that starts before the one before it ended starts where that one ended; a word shorter than 40 ms is lengthened to 40 ms, or to the start of the next word if that comes first.
+- **`transcribe` returns the `CANCELLED` sentinel** when its flag is set, as `importToOpfs` does; TS §16.2 gives it no way to say so. `onWindow(0, total)` is called once before the first window, so that the feed line goes out as transcription starts.
+- **A time is a whole millisecond,** rounded from the runtime's seconds: `normalize_transcript` refuses a fraction (Prompt 42). A word the runtime gives no end is given its start.
+- **The runtime's answer is read as an unknown value** and checked field by field: the package types it as `any`.
+- **`numThreads` is set for WebGPU too.** ONNX Runtime reads it once, when its module starts, so it cannot be set later for the fallback.
+- **Failures:** anything `loadModel` or `transcribe` throws is `E_ASR_RUNTIME`; a `RangeError`, or a message that speaks of memory, is `E_ASR_OOM`. The detail is `Load`, `Transcribe` or `Unload`, never the runtime's text.
+- **A part file is never read:** a name that ends in `.part` is refused before OPFS is asked.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **Two dependencies of the runtime are not installed: `onnxruntime-node` and `sharp`** (`pnpm.overrides` in the root `package.json`). Neither is in the browser build of the runtime. **`sharp` broke a guard of Prompt 32:** the runtime's type files import it, its own type file asks for Node's types, and with it installed `console.log(process.cwd())` in `web/src/main.tsx` passed `tsc`. Found with the drill of G 1.4, which fires again. `onnxruntime-node` is 288 MB of native binaries that a browser app never loads.
+- **`resolve.conditions` gains `onnxruntime-web-use-extern-wasm`** in `vite.config.ts`. §22.3 says nothing else changes. Without it the bundler followed a reference inside ONNX Runtime's default build and wrote a second copy of the module, 26.9 MB, to `web/dist/assets/`. With it there is one copy, under `/ort/`.
+- **Two files are copied, not every `.wasm` of the package** (it has four builds, 86 MB): the loader and the module of the `asyncify` build, which is the one the WebGPU entry loads, for either backend.
+- **The split form of D-42** (above) is a form the prompt does not name.
+- **The lookups log** that showed which files the runtime asks for was a temporary line in `model-cache-adapter.ts`, removed with the temporary Playwright case.
+
+**Checked.**
+
+- `pnpm build` passes `check-hosts` with the runtime in `web/dist`: 9 files; `ls web/dist/ort/` shows one directory, `1.31.0-dev.20260914-8d85527a0`, with the two files; `web/dist/assets/` holds no ONNX Runtime module.
+- ESLint, both `tsc` passes and `node scripts/check-file-tree.mjs` (173 files) are clean. `git diff web/eslint.config.js`: 19 lines added, none removed; the file has 377 lines.
+- The secret scan (gitleaks 8.18.4, `--no-git`) on the changed files: no finding in 14 files.
+- Lines: `whisper-runtime.ts` 180, `asr.worker.ts` 75, `word-timestamps.ts` 71, `model-cache-adapter.ts` 45, `pool.ts` 89, `vite.config.ts` 106, `check-hosts.mjs` 167; `numbers.rs` 297 above its tests.
+- The app shell, gzip: **266.0 kB**, was 120.1: the ASR worker's chunk is 145.9 kB of it. It is fetched at app start by the `modulepreload` link, as every worker script is (D-32). The limit is 400 kB (TS §13.5, an assumption).
+- `offcut_core_bg.wasm`: 459,281 bytes, was 458,236.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers; the frozen-file diff against the baseline is empty. **218 Rust, 92 Vitest, 12 Playwright** (Rust was 217; the one is the new row).
+- The temporary Playwright case, the browser profile, the two saved transcripts and the dev server are gone.
+
+**"Done when".**
+
+- [x] The three drills fired; `pnpm build` passes `check-hosts` with the runtime in `web/dist`; `ls web/dist/ort/` shows one version directory.
+- [x] The transcript carries the dollar amount as a `Usd` quantity; every runtime option name used is in this entry.
+
+**Not checked.**
+
+- **The production CSP.** Everything above ran on the dev server. Whether ONNX Runtime's threads, its `import()` of the loader and its WebAssembly start under `script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'` is TE-1.
+- **R1.** Every time here is from the development machine, whose WebGPU adapter under Playwright is the integrated Intel one (known issue 9).
+- **A cancel in the middle of a window:** the flag is read between windows only, so a cancel is seen after at most one window, 15 to 35 s here. V4 sends the first one.
+- **Whether the transcript's nine differences from Script A are the recognizer's or the speaker's.** That needs a person to listen.
+- A second run in the same worker without a reload, and memory.
+
+**Human.** Read the timing above before Prompt 44: on these numbers the small-size model will not meet E-3 on R1, and D-66 names the base-size model as the fallback. Prompt 44 measures it properly; nothing is decided here.

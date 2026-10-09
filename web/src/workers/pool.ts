@@ -3,12 +3,13 @@
 // fetches what the workers will need (D-9), which also proves in production
 // that the build, the MIME type and the CSP are right.
 //
-// V2 has the media worker. The ASR and render workers get their rows with
-// their scripts; V3 adds the audio worker.
+// V2 has the media and the ASR worker. The render worker gets its row with
+// its script; V3 adds the audio worker.
 
 import { preloadCore } from "../wasm/load-core";
+import asrWorkerUrl from "./asr.worker.ts?worker&url";
 import mediaWorkerUrl from "./media.worker.ts?worker&url";
-import type { AppFailure, FailureStage, MediaWorkerApi } from "./protocol";
+import type { AppFailure, AsrWorkerApi, FailureStage, MediaWorkerApi } from "./protocol";
 import { type Client, createClient } from "./rpc";
 
 // A use-case may import this file only, of all the workers' files (D-32).
@@ -22,6 +23,7 @@ type PoolClient<Api> = Client<Api> & { notify(method: string, params: unknown): 
 // each worker's own entry file.
 const WORKERS = {
   media: { url: mediaWorkerUrl, stage: "import" },
+  asr: { url: asrWorkerUrl, stage: "asr" },
 } as const satisfies Record<string, { url: string; stage: FailureStage }>;
 
 /** A client whose worker is created by its first call. */
@@ -50,8 +52,9 @@ function lazyClient<Api>(row: { url: string; stage: FailureStage }): PoolClient<
   ) as PoolClient<Api>;
 }
 
-export const pool: { readonly media: PoolClient<MediaWorkerApi> } = {
+export const pool: { readonly media: PoolClient<MediaWorkerApi>; readonly asr: PoolClient<AsrWorkerApi> } = {
   media: lazyClient<MediaWorkerApi>(WORKERS.media),
+  asr: lazyClient<AsrWorkerApi>(WORKERS.asr),
 };
 
 let scriptsPreloaded = false;
