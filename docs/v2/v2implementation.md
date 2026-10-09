@@ -1193,7 +1193,7 @@ export function get(): Promise<OffcutDb["entitlement"]["value"]["value"] | undef
 export function put(token: string): Promise<void>;
 ```
 
-Store `entitlement`, key `"current"`, value wrapped as `Versioned` with `schemaVersion: 1` (TS §23.1). `get` returns `undefined` for an absent record and for a record with a newer `schemaVersion` (TS §23.3). It does not parse or verify the token. `clear()` arrives in V6.
+Store `entitlement`, key `"current"`, value wrapped as `Versioned` with `schemaVersion: 1` (TS §23.1). `get` returns `undefined` for an absent record and for a record with a newer `schemaVersion` (TS §23.3). It does not parse or verify the token. `clear()` arrives in V6. **As built (Prompt 52):** a record with a newer `schemaVersion` is also removed, as TS §23.3 says and `metaGet` of V1 does.
 
 ### 15.4 `net/asset-fetch.ts` [ONLY fetch to the asset host]
 
@@ -1607,11 +1607,11 @@ export type ClipState = {
 };
 ```
 
-Actions: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()` (which also drops `out48`). `edit` is `EditState` default and never changes in V2. Feed lines are appended, never dropped (TS §14.3).
+Actions: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()` (which also drops `out48`). `edit` is `EditState` default and never changes in V2. Feed lines are appended, never dropped (TS §14.3). **As built (Prompt 52):** a tenth action, `noteFailure(failure)`, stores a failure without a change of state: section 19.4 puts a failure of the preview on this store while the clip is `ready`, and the machine has no way from `ready` to `failed`. `processing(stage, waitingModel)` is the `run` event only for a clip that is not processing yet; after that it changes the stage and the wait, not the state.
 
 ### 18.3 `state/preview-store.ts` (D-19)
 
-`PreviewStatus = "detached" | "stopped" | "playing" | "paused" | "seeking" | "locked"`. Table from TS §12.2: `detached` `attach` `stopped`; `stopped`, `paused` `play` `playing`; `playing` `pause` `paused`; `playing` `end` `stopped`; `playing`, `paused` `seek` `seeking`; `seeking` `seek_done_playing` / `seek_done_paused` `playing` / `paused`; any state `lock` `locked`; `locked` `unlock` `paused`; any state `detach` `detached`. `detached` to `playing` is absent (TS §12.3). Store: `{ status, playedOnce: boolean }` with actions `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`. V2 never fires the seek events.
+`PreviewStatus = "detached" | "stopped" | "playing" | "paused" | "seeking" | "locked"`. Table from TS §12.2: `detached` `attach` `stopped`; `stopped`, `paused` `play` `playing`; `playing` `pause` `paused`; `playing` `end` `stopped`; `playing`, `paused` `seek` `seeking`; `seeking` `seek_done_playing` / `seek_done_paused` `playing` / `paused`; any state `lock` `locked`; `locked` `unlock` `paused`; any state `detach` `detached`. `detached` to `playing` is absent (TS §12.3). Store: `{ status, playedOnce: boolean }` with actions `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`. V2 never fires the seek events. **As built (Prompt 52):** "any state" includes `locked` for `lock` and `detached` for `detach` and for `lock`: the table has 25 pairs. `playedOnce` starts again at `attached()` and at `detached()`.
 
 ### 18.4 `machines/export-machine.ts`, `state/export-store.ts` (D-18)
 

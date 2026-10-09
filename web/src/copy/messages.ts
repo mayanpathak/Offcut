@@ -118,6 +118,15 @@ export const messages = {
     waking: "Connecting to the account service…",
   },
 
+  // Why an action cannot start now (TS §12.5): the four a person can meet in
+  // V2. The others come with the room check and with accounts.
+  blockers: {
+    B_UNSUPPORTED: "This browser cannot run Offcut, so it cannot take a clip.",
+    B_PIPELINE_BUSY: "Offcut is still working on a clip. Add another when it has finished.",
+    B_EXPORT_IN_PROGRESS: "An export is running. Wait until it has finished.",
+    B_PIPELINE_NOT_READY: "The clip is not ready to export yet.",
+  },
+
   settings: {
     title: "Settings",
     backLink: "Back to Offcut",

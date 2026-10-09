@@ -49,7 +49,7 @@
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository. In a production build (entry of Prompt 44) the same machine read 62 s to 96 s on WebGPU and 98 s to 123 s on WASM | Prompt 59 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
-| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
+| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 **Since Prompt 51 the first run after `pnpm build` fails one case, the same one both times:** "landing_view is sent once" (entries of Prompts 51 and 52). Its trace shows the batch posted and not yet handed to the fake API when the 5 s of the case ran out. The request is a `keepalive` fetch, the only one the app makes; whether that is why it is slow to be intercepted under load is not known. A run made a minute later passes. `ci` retries a failed case once | Every gate |
 | 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): a caption shows it as the digit, as TS §17.2 says (entry of Prompt 45) | Prompts 43, 45, 46, 48, 50 |
 | 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word, and stays so in V2:** TE-2 (entry of Prompt 44) found that the runtime returns no probability. No score is lowered by it; a prompt that reads `confidence` reads 1. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
 | 24 | **A first transcription may be slower than the next** (entry of Prompt 44): in a new browser profile, straight after a build and the download of the model, `load` and `transcribe` took 95.5 s on WebGPU and 123.4 s on WASM; the second run took 61.9 s and 98.1 s. One pair of readings, cause not found. The bench of Prompt 59 should keep its first run apart, and E-3 at S15 should say which it reports. **Chrome makes requests of its own** (an update check, a push-message registration) while a page is open: a check that reads the browser's whole network log, and not the page's requests, sees them and must tell them apart by who started them | Prompts 57, 59 |
@@ -63,6 +63,7 @@
 | 31 | **`Client<Api>` of `rpc.ts` asks for one argument on every method,** also on one the protocol gives none: `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` fail `tsc` with "Expected 1-2 arguments, but got 0" (tried in Prompt 50 with a throwaway file). `pool.asr.unload(undefined)` compiles and does the same. A change of the type is a change of `rpc.ts`, which has 374 lines | Prompts 53, 54 |
 | 32 | **A `VideoFrame` made from a buffer of RGBA bytes is encoded with full-range brightness, and the stream does not say so** (entry of Prompt 51, TE-3): white is stored as 255, not 235, and a player shows the file with too much contrast. A frame made from the canvas is right. Any path that hands the encoder pixels from a buffer, the readback of TS §21.4 or the Canvas2D backend of the contingency, must give its frames a `colorSpace` and be checked against a file of method A | V5; any contingency of TS §19 or §21 |
 | 33 | **A page under Playwright is never hidden.** `document.visibilityState` stays `visible` with another tab in front and with the window minimised, and Playwright starts Chrome without the throttling of hidden pages (entry of Prompt 51). A test of what the app does when the tab hides (`PreviewPlayer` pauses, Prompt 55) cannot hide the page: it has to send the `visibilitychange` event itself, or drive an ordinary Chrome over its DevTools port, as TE-3 did. **Export times on D1 rise over a session,** from 28 s to about 40 s for the same clip: a reading taken late in a long run is not the machine's best, and the bench's ten runs will show it | Prompts 55, 57, 59 |
+| 34 | **What Prompts 53 to 55 build on** (entry of Prompt 52). The stores are `useClipStore`, `usePreviewStore`, `useExportStore`; a use-case calls the actions each file exports, a component reads with the hook and writes nothing. Clip: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()`, and `noteFailure(failure)` for a failure that leaves the clip `ready`. Export: `start(exportId)`, `blocked()`, `clear()`, `progress(done, total)`, `encoded()`, `finalized()`, `saved()`, `fail(failure)`, `reset()`, `setUnavailable(flag)`; `start` clears `unavailable`. Preview: `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`; `lock` and `detach` are legal in every state. **An illegal action throws `IllegalTransitionError` in a development build and in a test,** and is reported and ignored in production: a use-case must not call `failed` on a `ready` clip, `begin` on a clip that is not `idle`, or `start` on an export that is `done` (call `reset()` first). `forImport()` and `forExport()` of `state/blockers.ts` return a `BlockerCode` or `null`; `messages.blockers` has the words of four codes and is typed by its keys, not by `BlockerCode`, which `copy/` may not import. `entitlement-repo.ts`: `get()` gives `{ token, storedAt }` or `undefined`, `put(token)` | Prompts 53, 54, 55 |
 
 ---
 
@@ -2598,3 +2599,121 @@ The edit was made by a script that refuses a replacement unless its old text occ
 - **The first case of `pnpm e2e` to fail under load is now a different one each time.** Every page of the suite compiles the 6 MB render bundle at its start since Prompt 48, in six browsers at once, and the cases that wait 5 s for an event have little room left on this machine. `ci` retries a failed case once. Not a fault of a case; a cost of the preload (entry of Prompt 48).
 
 **Open, for the human.** Push `v2-build` (three commits: Prompt 50, D-69, Prompt 51) and read `ci` on pull request #2. Prompt 52 waits for green. Before Prompt 55: open item 11, how a full-range clip should look.
+
+## 2026-10-09 - The tenth and eleventh pushes: `ci` green on Prompts 49 to 51
+
+**Done by the human.** Two pushes of `v2-build`: at `1685731`, the commit of Prompt 49, and at `a146350`, the commit of Prompt 51, with Prompt 50 (`945c9a2`) and D-69 (`36c9a60`). The first had no entry of its own.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `a146350`, equal to the local branch |
+| The `ci` run on `1685731` (pull request #2, run 17) | Success, in 204 s |
+| The `ci` run on `a146350` (run 18) | Success, in 520 s. The two deploy jobs were skipped, as on every run of the branch |
+| Why run 18 took longer | One step: "Install Chrome for Playwright" took 331 s, where it took 24 s in run 17. The restore of the Cargo cache took 48 s for 23 s. Every step that runs the repository's code took the same or less: `cargo test` 21 s, "Build the WASM bundle" 36 s, Playwright 11 s |
+
+**Closes.** The push that Prompt 51 ends with. `ci` built and tested the render worker and the export loop on Linux for the first time; it exports nothing, since no case opens a session.
+
+**Not known.** Why the download of Chrome was slow on that runner: the job's log needs a login. The step downloads Chrome and its system packages on every run, so its time is the network's of that day. If it happens again, the cure is in `ci.yml`, which Prompt 58 changes anyway: use the Chrome of the runner's image, or keep the download in a cache.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 52: machines, stores, blockers, entitlement repo
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/state/machines/clip-machine.ts` | `ClipStatus` (8), `ClipEvent` (13), `CLIP_MACHINE`: the 17 pairs of TS §12.2 |
+| `web/src/state/machines/export-machine.ts` | `ExportStatus` (8), `ExportEvent` (12), `EXPORT_MACHINE`: the 16 pairs |
+| `web/src/state/clip-store.ts` | `useClipStore` with the state of §18.2, `out48` in it; `begin`, `accepted`, `rejected`, `failed`, `processing`, `pushFeed`, `ready`, `noSpeech`, `reset`; and `noteFailure` |
+| `web/src/state/preview-store.ts` | `usePreviewStore` (`status`, `playedOnce`), its table of 25 pairs inside the file (D-19); `attached`, `play`, `pause`, `ended`, `lock`, `unlock`, `detached` |
+| `web/src/state/export-store.ts` | `useExportStore` with `unavailable`; `start`, `blocked`, `clear`, `progress`, `encoded`, `finalized`, `saved`, `fail`, `reset`, `setUnavailable` |
+| `web/src/state/blockers.ts` | `BLOCKER_CODES` (eight, in the order of TS §12.5), `BlockerCode`, `forImport()`, `forExport()` |
+| `web/src/persistence/entitlement-repo.ts` | `get()` and `put(token)` on the store `entitlement`, key `"current"` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `scripts/check-copy-codes.mjs` | Reads a fourth list, `BLOCKER_CODES`, from `web/src/state/blockers.ts`; a key of `messages.ts` that starts with `B_` counts as copy; `COPY_PENDING` gains `B_STORAGE_LOW`, `B_NOT_SIGNED_IN`, `B_ENTITLEMENT_EXPIRED`, `B_NO_FREE_EXPORTS`. It now prints "BLOCKER_CODES 4 of 8. Pending: 38" |
+| `web/src/copy/messages.ts` | `blockers`: `B_UNSUPPORTED`, `B_PIPELINE_BUSY`, `B_EXPORT_IN_PROGRESS`, `B_PIPELINE_NOT_READY` |
+| `docs/v2/v2implementation.md` | §18.2, §18.3 and §15.3 say what was built (3 replacements, each applied once) |
+| `docs/v2/v2changelog.md` | This entry, and the one of the two pushes before it; known issue 34 |
+
+No dependency was added.
+
+**The three drills.** Each was undone from a copy, and the check passes after the last.
+
+| Temporary edit | `node scripts/check-copy-codes.mjs` |
+|---|---|
+| `messages.blockers.B_PIPELINE_BUSY` deleted | "B_PIPELINE_BUSY: has no copy in messages.ts and is not in COPY_PENDING.", exit 1 |
+| `B_UNSUPPORTED` added to `COPY_PENDING` | "B_UNSUPPORTED: has copy and is still in COPY_PENDING. Remove it from the list.", exit 1 |
+| A ninth code, `B_NINTH`, added to `BLOCKER_CODES` | "B_NINTH: has no copy in messages.ts and is not in COPY_PENDING.", exit 1 |
+
+**Browser check (dev).** `vite` on port 5173 with the bundles of the last build; Chrome under Playwright, headless; a script kept outside the repository that imports the modules from `/src/` and prints what it reads.
+
+| Asked | Result |
+|---|---|
+| `accepted(info)` on an `idle` clip store | `IllegalTransitionError`: "clip: "accept" is not allowed in state "idle""; the status stays `idle` and no `clipInfo` is stored |
+| Export store: `start(id)`, `clear()`, `encoded()`, `finalized()`, `saved()` | `gating`, `rendering`, `muxing`, `saving`, `done` |
+| The repo: `get()`; `put("a.b")`, then `get()` | `undefined`; `{ token: "a.b", storedAt }`, `storedAt` a number |
+| The record in IndexedDB | One, under the key `current`: `{ schemaVersion: 1, value: { token, storedAt } }` |
+| The record deleted, then `get()` | `undefined` |
+
+**Checked beyond the prompt,** in the same page:
+
+| Asked | Result |
+|---|---|
+| The pairs of the two tables, counted from the modules | 17 and 16 |
+| A clip that works: `begin`, `accepted`, `processing("probe_audio", true)`, `processing("asr", false)`, two `pushFeed`, `ready`, `reset` | `importing`, `accepted`, `processing` at `probe_audio` and waiting, `processing` at `asr`, `ready`, `idle`. In `ready`: no stage, not waiting, both feed lines in their order, `out48` kept, the clip id, source and `ClipInfo` kept. After `reset`: exactly the first state, `out48` `null` |
+| `rejected(reason)`, then `processing`; `noSpeech()`; `failed(failure)` in `processing` | `rejected` with the reason, and `processing` refused; `rejected` with `REJECT_NO_SPEECH`; `failed` with the failure, no stage left |
+| `begin` while `importing`, and while `ready`; `processing` while `importing` | Refused, each |
+| `noteFailure(failure)` on a `ready` clip | The failure is stored and the status stays `ready` |
+| `forImport()` and `forExport()`: no clip; a clip importing; a clip ready; an export in `gating` | `null` and `B_PIPELINE_NOT_READY`; `B_PIPELINE_BUSY` and `B_PIPELINE_NOT_READY`; `null` and `null`; `B_EXPORT_IN_PROGRESS` and `B_EXPORT_IN_PROGRESS` |
+| Export store: `clear()` in `rendering`; `clear()` and `start()` in `done` | Refused, each |
+| `progress(10, 100)` in `rendering`, then `encoded()` | 10 of 100; then `done` equals `total` |
+| `fail(failure)` in `rendering`; `reset()`; `start`, `blocked()`; `setUnavailable(true)` | `failed` with the failure; `idle` and empty; `idle`; the flag set, the status unchanged |
+| The preview store: `play` while `detached`; `attached`, `play`, `pause`, `play`, `ended`; `pause` while `stopped`; `lock` twice, `unlock`; `detached` twice; `lock` while `detached` | Refused; `stopped`, `playing`, `paused`, `playing`, `stopped`; refused; `locked`, `locked`, `paused`; `detached`, `detached`; `locked` |
+| A record with `schemaVersion: 2` put in by hand, then `get()` | `undefined`, and the record is gone |
+
+No console line and no page error.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **`noteFailure(failure)` is a tenth action of the clip store.** §19.4 says a failure of the preview "stores the failure on the clip store", and the clip is `ready` then. The machine has no way from `ready` to `failed`, so `failed(failure)` would be refused. `noteFailure` sets the field and leaves the status. It is not a transition and goes through no table.
+- **`processing(stage, waitingModel)` is the `run` event only for a clip that is not processing yet.** `run-pipeline.ts` calls it three times, once for each stage; on the second and third the stage and the wait change and the state does not.
+- **`pushFeed` appends in every state.** "Never dropped" has no exception in TS §14.3. `begin` and `reset` start the feed again.
+- **`lock` and `detach` are in the row of every state of the preview machine, `locked` and `detached` too.** §18.3 says "any state". So a preview that is not attached can be locked, which `start-export.ts` does when no player is on the page; `unlock` then leads to `paused`, and `control-preview.ts` detaches it again (Prompt 53).
+- **`playedOnce` starts again at `attached()` and at `detached()`.** The store does not know which clip it shows; a new canvas is a new preview.
+- **`start(exportId)` reads the clock** for `startedAt`, in milliseconds since the Unix epoch, and clears `unavailable`: an export that starts has a token.
+- **`progress` is kept only in `rendering`;** `encoded()` sets `done` to `total`.
+- **`get()` removes a record a newer build wrote,** as TS §23.3 says and `metaGet` does. §15.3 says only that it returns `undefined`.
+- **The words of the four blockers** are the agent's, from the conditions of TS §12.5. `B_PIPELINE_BUSY` says to wait and does not offer a cancel, which arrives in V4.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The dev server was `vite` alone,** not `pnpm dev`: `pnpm dev` first replaces both release bundles with development builds, and nothing of this prompt is in a bundle.
+- **The checks beyond the prompt,** and `noteFailure`, above.
+
+**Checked.**
+
+- `grep -o '"B_[A-Z_]*"' web/src/state/blockers.ts | sort -u | wc -l`: 8.
+- `pnpm --filter web exec tsc --noEmit`; ESLint on `src/state`, `src/persistence` and `src/copy`: clean. `clip-store.ts` and `export-store.ts` import `AppFailure` and `FeedLine` from `workers/protocol.ts` as types (D-27 f).
+- `node scripts/check-file-tree.mjs`: 219 files; the seven new files were in the tree of TS §5.
+- Lines: `clip-store.ts` 148, `export-store.ts` 102, `preview-store.ts` 90, `blockers.ts` 57, `clip-machine.ts` 49, `export-machine.ts` 37, `entitlement-repo.ts` 29.
+- No banned phrase in the copy: `git grep -n "never leaves\|GDPR\|DPDP\|CCPA\|SOC 2\|compliant" -- web/src/copy` prints nothing.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against `322c7d3` is empty; no test key in `web/dist`. **255 Rust** (2 ignored), **92 Vitest**, **12 Playwright**. The app shell is 284.3 kB gzipped.
+- **`pnpm e2e` needed a second run again, and it was the same case as in Prompt 51:** "landing_view is sent once". Straight after the release build 11 of 12 passed; two runs after it passed 12 of 12 each, with the same 6 workers, in 25 s. The trace of the failed run was read this time (known issue 20): the page did post its batch, at the moment the case began to wait, and the fake API had not been handed that request when the wait of 5 s ended. Nothing this prompt added is loaded by the landing page: no component reads the new stores yet. **The entry of Prompt 51 said that a different case fails each time. That was wrong: it was this case both times.**
+
+**"Done when".**
+
+- [x] The three drills fired; `grep -o '"B_[A-Z_]*"' web/src/state/blockers.ts | sort -u | wc -l` is 8.
+- [x] ESLint is clean for `src/state`: the type-only imports of `workers/protocol.ts` are accepted (D-27 f).
+
+**Not checked.**
+
+- **A production build's answer to an illegal transition:** there the attempt is reported and the state stays (V1). The check ran in a development build, where it throws.
+- **Nothing calls these stores yet** but the check. `DropZone` reads `forImport()` from Prompt 55.
+- No machine test and no `blockers.test.ts`: they are V4 and V5 (§23.1).
