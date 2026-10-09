@@ -6,7 +6,7 @@ Source documents: `docs/v2/v2implementation.md` (written **§n**; its decisions 
 
 **Recorded deviation from TS §34.1 and BP §1.3, extended to V2.** Those sections give each file its own specification and hide the rest of the repository from the implementer. `docs/v1/coding-prompts.md` accepted the multi-file format for V1 only. Using it again here is the founder's choice for V2. The per-file contract is still honoured in one way: every prompt names its files, and a signature the plan gives is implemented exactly.
 
-**Two prompts are gates.** Prompt 44 (transcription time) and Prompt 51 (render and encode time) each end with a reading on R1. A miss sends you to §24.3 before anything else is built. Prompt 44's reading was given by the founder on 2026-10-09 (D-67): that prompt takes no timing on R1.
+**Two prompts are gates.** Prompt 44 (transcription time) and Prompt 51 (render and encode time) each end with a reading on the reference machine. A miss sends you to §24.3 before anything else is built. Prompt 44's reading was given by the founder on 2026-10-09 (D-67): that prompt takes no timing on R1. **Since D-69 (2026-10-09) the reference machine of V2 is D1, the development machine:** R1 is not available. Every "R1" in Prompts 51, 59 and 60 is read as D1, the agent takes the readings there, and a reading is recorded under the name `d1`.
 
 ---
 
@@ -25,7 +25,7 @@ BASE=$(git merge-base main HEAD)                                             # t
 1. Read the plan sections and guide steps this prompt cites, and the files it touches.
 2. Search for existing types, helpers and constants before creating any. Reuse them.
 3. Verify that the previous prompts' outputs exist and behave as this prompt assumes. If not: decide whether it is a bug or an intended boundary, make the smallest compatible fix, and report it.
-4. Precedence: a decision D-18 to D-68 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
+4. Precedence: a decision D-18 to D-69 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
 
 **During implementation**
 
@@ -74,10 +74,10 @@ The agent writes files, runs commands and drives Chrome through Playwright. A da
 | Prompt 33, and after every prompt marked **Push** | `git push` (the first time `git push -u origin v2-build`, then open the draft pull request). Read the `ci` run; the next prompt waits for green | G M-1, G item 9 |
 | Prompt 38 | Choose and download the model files; run the uploads with the credentials of `.env.deploy`; or tell the agent in that prompt's message to do both | G 0.4, 4.2 |
 | Prompt 44 | None on R1: the founder's reading of E-3 stands (D-67). Push; read `ci` | G 5.6 |
-| Prompt 51 | TE-3, TE-4 and three export timings on R1 (E-4) | G 8.4, 8.5 |
+| Prompt 51 | Nothing on a second machine: TE-3, TE-4 and the three export timings are read on D1 by the agent (D-69). Push; read `ci` | G 8.4, 8.5 |
 | Prompt 55 | Watch and listen to one preview and one exported file: caption position, sound in sync, the reveal on the spoken amount | G 10.4, 10.5 |
 | Prompt 58 | Mark the pull request ready; read the Windows job and its minutes (TE-10) | G 11.5 |
-| Prompt 59 | Merge to `main`; check the deployed page on R1; read the production analytics rows; run the bench, `pnpm e2e:device` and TE-14 on R1 | G 12.2 to 12.5 |
+| Prompt 59 | Merge to `main`; check the deployed page on D1; read the production analytics rows; the bench, `pnpm e2e:device` and TE-14 run on D1 (D-69) | G 12.2 to 12.5 |
 | Prompt 60 | Read E-1 from the production database; take the M0 decision; push the tag | G 12.7 |
 | Before the page is announced | Reset the Neon password (V1 open item 36); replace the demo video (V1 known issue 33) | G 0.4 |
 
@@ -478,11 +478,11 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 - TE-4: log the entry `pickVideoConfig` returns for 1080x1920 and for 720x1280; measure the priming with the `ffprobe` line of G 8.4 and the first audio chunk's timestamp; set `AAC_PRIMING_SAMPLES` with a TE-4 comment; export again. A bitrate change goes to `encoders.ts` and `profile.rs` together, and to TS §21.2.
 - `docs/v2/experiments.md`: TE-3, TE-4 and E-4. Note that the priming is the Windows encoder's and no other platform was measured (D-65).
 
-**Validate (must fail, then revert).** Remove the `vf.close()` in `export-loop.ts` and export: `exportClip` fails with `E_INTERNAL` (D-45). **Human, on R1, with the same temporary build.** The TE-3 and TE-4 readings (at least 30 frames per second render-only; the ladder entry), then three exports: the `render_encode` median and its value normalised to 60 s; one file verified on R1. At most 112,000 ms: continue. 112,000 to 187,000: continue and record the miss. Over 187,000: stop; the Canvas2D overlay path and the 60 s and 30 fps cap (§24.3). `mux` budget: 2,500 ms. Then the agent removes the hook; push; read `ci`. **Done when.**
+**Validate (must fail, then revert).** Remove the `vf.close()` in `export-loop.ts` and export: `exportClip` fails with `E_INTERNAL` (D-45). **On D1, with the same temporary build; the agent takes the readings (D-69).** The TE-3 and TE-4 readings (at least 30 frames per second render-only; the ladder entry), then three exports: the `render_encode` median and its value normalised to 60 s; one file verified. At most 112,000 ms: continue. 112,000 to 187,000: continue and record the miss. Over 187,000: stop; the Canvas2D overlay path and the 60 s and 30 fps cap (§24.3). `mux` budget: 2,500 ms. Then the agent removes the hook. **Human.** Push; read `ci`. **Done when.**
 
 - [ ] A spike export made after `AAC_PRIMING_SAMPLES` was set passes all of checks 1 to 6; the white frame near 4.99 s is white at the same second in the output.
 - [ ] TE-3 and TE-4 are recorded with the method and the ladder entry; no build output contains the test key; G M-8 passes.
-- [ ] E-4: the R1 median is recorded and is not above 187,000 ms (Human).
+- [ ] E-4: the median on D1 is recorded and is not above 187,000 ms (D-69).
 
 ## Prompt 52 — Machines, stores, blockers, entitlement repo
 
@@ -590,20 +590,20 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 - The final-values table of G 12.1, one row at a time, with evidence: the manifest, `SAMPLE_CLIP_PATH`, the production public key, `AAC_PRIMING_SAMPLES` and the ladder, equal bitrates, the runtime options, the capture method, the test key literal and the guard.
 - After the human's merge: the commands of G 12.3 (`healthz` reports the merge commit; the three headers; `/ort/<version>/` served as `application/wasm` and immutable; zero hits for the test key in the deployed scripts).
 - The TE-14 clip with the `ffmpeg` line of G 12.5 (`-t 89.9`; it stays in `testclips/`).
-- `docs/v2/experiments.md`: E-3, E-4, TE-14 and the cold capability-check time from the numbers the human hands over, each also normalised to 60 s. Commit `bench/results/r1-<date>.json`.
+- `docs/v2/experiments.md`: E-3, E-4, TE-14 and the cold capability-check time from the numbers the human hands over, each also normalised to 60 s. Commit `bench/results/d1-<date>.json`.
 
-**Human.** `vercel env ls production` shows no `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`. Merge the pull request; watch `ci` on `main` (media job, API, wait for the version, build, guard, deploy, header check, `@smoke`). On R1, on the deployed page: the rows of G 12.3 (model from the asset host, feed, preview; export unavailable; the sample button). The analytics rows through `PROD_DATABASE_URL`, never `$DATABASE_URL`. On R1 with the keyed build: `E2E_REAL_ASSETS=1` first-run timing, `pnpm e2e:device`, `BENCH_DEVICE=r1 pnpm bench:device`, one export verified, and TE-14 (ten runs; peak under 1.5 GB; no tab crash). **If a step fails.** `wait-for-version` times out: fix the API, never deploy the web first. The guard fails: remove the variable from Vercel. The header check or `@smoke` fails after the deploy: `vercel rollback`, then fix forward. **Done when.**
+**Human.** `vercel env ls production` shows no `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`. Merge the pull request; watch `ci` on `main` (media job, API, wait for the version, build, guard, deploy, header check, `@smoke`). On R1, on the deployed page: the rows of G 12.3 (model from the asset host, feed, preview; export unavailable; the sample button). The analytics rows through `PROD_DATABASE_URL`, never `$DATABASE_URL`. On R1 with the keyed build: `E2E_REAL_ASSETS=1` first-run timing, `pnpm e2e:device`, `BENCH_DEVICE=d1 pnpm bench:device`, one export verified, and TE-14 (ten runs; peak under 1.5 GB; no tab crash). **If a step fails.** `wait-for-version` times out: fix the API, never deploy the web first. The guard fails: remove the variable from Vercel. The header check or `@smoke` fails after the deploy: `vercel rollback`, then fix forward. **Done when.**
 
 - [ ] `ci` is green on `main`; the deployed bundle holds no test key; headers, `@smoke` and isolation hold.
 - [ ] The deployed page on R1 downloads the model, shows the feed and plays the preview; five event names appear in `analytics_events` with enum and integer props only (Human).
-- [ ] `bench/results/r1-<date>.json` is committed with 10 runs; E-3, E-4 and TE-14 are recorded; `pnpm e2e:device` passed on R1 (Human).
+- [ ] `bench/results/d1-<date>.json` is committed with 10 runs; E-3, E-4 and TE-14 are recorded; `pnpm e2e:device` passed on D1 (D-69).
 
 ## Prompt 60 — Records, spec corrections, M0 gate, tag `v2`
 
 **Objective.** A verified, recorded, tagged V2, and the decision whether V3 starts (§24.3, §25.3, §26, §27; BP §4.3, §4.4; G 12.6, 12.7). **Implement.**
 
 - `docs/technicalspec.md`: every assumption V2 measured replaced by its value in §39.3; the corrections of §27 items 1, 2, 4, 7, 12 and 14; the decisions listed at the end of §27; D-65.
-- `docs/buildplan.md`: the schedule moves D-18, D-20, D-21, D-23, D-24, D-33; D-65 in §1.5, §4.4 and §12.1. `docs/product.md`: D-65 in A-7 and §20.1.
+- `docs/buildplan.md`: the schedule moves D-18, D-20, D-21, D-23, D-24, D-33; D-65 and D-69 in §1.5, §4.2 to §4.4 and §12.1. `docs/product.md`: D-65 and D-69 in A-7 and §20.1.
 - `docs/v2/v2implementation.md`: any D-n that changed during the build; in §4, `routes.tsx`, `web/tests-e2e/media.setup.ts` and `.cargo/config.toml` if Prompt 47 created it; the decisions the guide added (the short-file rule; the confidence decision, if one was taken).
 - The five audits of G 12.6: no `fetch(` outside the four files; no font outside the fonts directory; no source file over 400 lines; no TODO without a version; an empty frozen-file diff against the baseline.
 - Tick the 13 boxes of §25.3 and the 26 of §26, each against its evidence. Tick "Tagged `v2`" in this last commit.
@@ -656,7 +656,7 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 | Local database read as production | Wrong E-1 and analytics readings | 59, 60 | `PROD_DATABASE_URL`; `select current_database()` first |
 | CI seen only at the end | Ten phases of surprises on day 9 | 33 onward | Draft pull request; push at every milestone |
 | Windows runner without WebGPU or encoders | Media job cannot run | 58 | TE-10 fallback |
-| R1 not available | Neither gate can be read | 31, 44, 51, 59 | Booked before Prompt 31 |
+| R1 not available | Neither gate can be read on it | 31, 44, 51, 59 | It happened. Since D-69 the gates are read on D1, and a machine like R1 is measured after the deploy |
 
 # Architectural Invariants
 
@@ -698,7 +698,7 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 | Use-cases, stores, preview, UI (BP §4.1 D) | 52, 53, 54, 55 | Browser checks; walk-throughs |
 | `model-download.spec.ts`, `pipeline-preview.spec.ts`, `export-creator.spec.ts` (BP §4.4) | 56, 57 | 30 cases |
 | `e2e-media.yml` runs them in CI (BP §4.4) | 58 | Green job, or the TE-10 fallback |
-| ASR and render timings on R1 committed (BP §4.4, D-65) | 44, 51, 59 | `bench/results/r1-<date>.json` |
+| ASR and render timings on R1 committed (BP §4.4, D-65) | 44, 51, 59 | `bench/results/d1-<date>.json` |
 | TE-1, TE-2, TE-3, TE-4, TE-10, TE-14 recorded (BP §4.4) | 44, 51, 58, 59 | `experiments.md` |
 | Eight analytics events (BP Appendix C) | 53, 54 | `pipeline-preview` and `export-creator` event cases |
 | Deployed, server first, header check, `@smoke` (BP §1.2) | 59 | `ci` on `main`; G 12.3 |

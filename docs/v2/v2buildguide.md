@@ -13,7 +13,7 @@
 | `PS §n` | Section n of `docs/product.md` |
 | `BP §n` | Section n of `docs/buildplan.md` |
 | `V1 §n`, `V1 D-n` | Section or decision of `docs/v1/v1implementation.md` (D-1 to D-17) |
-| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66, D-67 and D-68 were added on 2026-10-09) |
+| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66, D-67, D-68 and D-69 were added on 2026-10-09) |
 | `S-n` | Build-order step S1 to S16 in §5 |
 | `TE-n`, `E-n` | Technical experiment (TS §37), product experiment (PS §19); V2 procedures are in §24.1 |
 | `INV-n` | Invariant (TS §35) |
@@ -67,7 +67,7 @@ Plan days sum to 10 (BP §0: weeks 2-3). §5 allows an earlier start; day number
 
 11. **Machine facts the first draft assumed.** The repository root is `/c/Users/Mayan/Desktop/sh2clips/offcut`, not `sh2clips` (the quick reference of the V1 guide has the same slip). `gh` is not installed: Step 0.1 installs it, and every `gh` line can also be done on the GitHub website. Python 3.13 with NumPy 2.5.3 and ffmpeg 9.0.2 are installed (item 2). The development machine is not R1 (Step 0.6). Applied in Steps 0.1, 0.2, 0.6.
 
-12. **No R2.** The founder decided on 2026-10-08 not to measure on R2 (an Apple M1 with 8 GB): no Mac is available. R1 is the only reference machine of V2, and TE-3, TE-4, E-3 and E-4 are read on it alone. The plan still names R2 in §1A (boxes 13 and 14), §5 (S15), §23.1, §24.1 (E-3, TE-3, TE-4, E-4), §25.3 (one box) and §26 (three boxes). Step 1.1 records the decision there as D-65 and rewords those lines, so that no box is left that cannot be ticked. Cost, to be written into that decision: PS §9.3 lists macOS as supported, PS §20.1 and BP §12.1 ask for a run on R2 at the launch gate, and nothing in V2 will have shown that the pipeline runs on a Mac; the AAC priming count of D-33 is measured for the Windows encoder only. Applied in Steps 0.6, 1.1, 8.4, 12.4.
+12. **No R2.** The founder decided on 2026-10-08 not to measure on R2 (an Apple M1 with 8 GB): no Mac is available. R1 is the only reference machine of V2, and TE-3, TE-4, E-3 and E-4 are read on it alone. The plan still names R2 in §1A (boxes 13 and 14), §5 (S15), §23.1, §24.1 (E-3, TE-3, TE-4, E-4), §25.3 (one box) and §26 (three boxes). Step 1.1 records the decision there as D-65 and rewords those lines, so that no box is left that cannot be ticked. Cost, to be written into that decision: PS §9.3 lists macOS as supported, PS §20.1 and BP §12.1 ask for a run on R2 at the launch gate, and nothing in V2 will have shown that the pipeline runs on a Mac; the AAC priming count of D-33 is measured for the Windows encoder only. Applied in Steps 0.6, 1.1, 8.4, 12.4. **Since D-69 (2026-10-09) R1 is not measured either:** it is not available. Every reading this guide puts on R1 (Steps 8.4 and 8.5, 12.3 to 12.5, 12.7) is taken on the development machine, D1, by the agent, and is recorded under the name `d1`; the bench file is `bench/results/d1-<date>.json`.
 
 ---
 

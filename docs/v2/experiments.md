@@ -2,7 +2,7 @@
 
 **What this is.** The outcome of every experiment V2 runs: the technical experiments TE-n of `technicalspec.md` §37 and the product experiments E-n of `product.md` §19. The procedures and thresholds are in `v2implementation.md` §24.1. The M0 gate decision (§24.3) is written at the end of this file.
 
-**How it is kept.** One entry per experiment, in the order they are run. An entry has five parts: the question, the method, the numbers, the date, the decision. A reading is recorded as measured and also normalised to 60 s (measured x 60,000 / 74,705), because the reference clip is 74.7 s long (D-64). R1 is the only reference machine (D-65); a reading taken on the development machine is labelled `dev` and never stands for E-3 or E-4.
+**How it is kept.** One entry per experiment, in the order they are run. An entry has five parts: the question, the method, the numbers, the date, the decision. A reading is recorded as measured and also normalised to 60 s (measured x 60,000 / 74,705), because the reference clip is 74.7 s long (D-64). R1 was to be the only reference machine (D-65). Since D-69 (2026-10-09) no reading is taken on R1 in V2: the gates are read on the development machine, D1, which is an Acer Aspire A715-76G: Intel Core i5-12450H (8 cores, 12 threads), 16 GB, Intel UHD Graphics and an NVIDIA GeForce GTX 1650, Windows 11. Chrome under Playwright draws with its integrated GPU. A reading taken on D1 for a gate, by the stated method, is labelled `d1`. A reading taken in passing is labelled `dev` and stands for nothing. No number in this file is R1's; the founder's reading of E-3 at S6 is of a laptop like R1.
 
 | Experiment | Prompt | State |
 |---|---|---|

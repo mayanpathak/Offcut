@@ -16,7 +16,7 @@
 |---|---|---|---|
 | 1 | **Closed on 2026-10-09.** The asset bucket's CORS policy allows `http://localhost:4173` (D-41); the entry of that date has the check | - | - |
 | 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). Prompt 33 wrote the public half of the present key into `web/src/config/entitlement-public-key.ts`. If the key is replaced, that literal and §1A item 12 must be derived again in the same change; a token signed with the new key is otherwise refused by every browser. Nothing is signed before V6 | Human | Before V6; sooner is cheaper |
-| 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 51 and 59 (Prompt 44 takes no timing on it since D-67), and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
+| 3 | **Closed by D-69 on 2026-10-09.** R1 is not available and is not booked. The gates of V2 are read on the development machine, D1; the entry of that date says what that costs. Boxes 13 and 14 of §1A are read as D1 | - | - |
 | 4 | After every prompt marked **Push**: `git push` from `offcut/` (the repository is not the `sh2clips` folder), then read the `ci` run of pull request #2. The next prompt waits for green | Human | Prompts 35, 37, 41, 44, ... |
 | 5 | Submit the merchant onboarding (TE-9) if it is not submitted. Approval can take two weeks | Human | V6 |
 | 6 | Reset the Neon password (V1 item 36) and replace the demo video (V1 item 33) | Human | Before the page is announced |
@@ -25,6 +25,7 @@
 | 9 | Read the license of the speech model before the page is announced. Offcut now serves the model files from its own asset host. The repository they were taken from states no license of its own; the model's author says the code and the weights are under the MIT License, which asks for the notice to go with copies | Human | Before the page is announced |
 | 10 | **The three-minute promise.** With the small-size model the median total for a 60 s clip on R1 is about 221 s on the numbers of D-67, and PS §20.2, §20.3, J10 and the pitch say three minutes. Change the promise or the model before the page says it to a visitor. The copy that states the time is not written yet | Human | Before the page is announced |
 | 11 | **Decide how a full-range clip should look.** The export of the reference clip has more contrast than the file: Chrome reads the webcam recording as limited-range video, in its decoder and in its own player, though the file says full range (known issue 30; entry of Prompt 50). Leave it, so that the export looks like the clip in Chrome's player; or correct it on the decode side, so that it looks like the clip in VLC and on a phone. Correcting it needs the demuxer to read the flag, which is Rust and no prompt of V2 | Human | Before Prompt 55, where a person first judges the picture |
+| 12 | **Measure on a laptop like R1 before the page promises a time** (D-69). Nothing of V2 is measured on a machine with 8 GB and an integrated GPU alone: not E-4, not TE-14's memory, and of E-3 only the founder's one reading. The founder's plan: after the final version is deployed, on testers' devices. Until then every time in `experiments.md` is D1's, and a user's may be about twice it | Human | After the deploy; before the page is announced |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -2463,3 +2464,54 @@ The cancel went through a client made for the test, in the hook: `pool` has no c
 - **A method without an argument cannot be called through `pool` as TypeScript reads it** (known issue 31): `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` are each "Expected 1-2 arguments, but got 0". Every call so far was made from a browser console or a test page, where nothing checks types. Prompts 53 and 54 are the first to write such a call in a source file.
 
 **Open, for the human.** Nothing for this prompt: Prompt 51 is the next one marked **Push**. Before it: R1 (open item 3). Before Prompt 55: the decision of open item 11.
+
+## 2026-10-09 - Outside a prompt: D-69, the gates of V2 are read on the development machine
+
+No code changed. Five documents changed, all under `docs/v2/`.
+
+**The decision (founder, 2026-10-09): D-69.** R1 is not available, and there is no second device. V2 is finished on the development machine, and the gates are read there. The founder's reasons: the build is ahead of the calendar, so there is time after the final version is deployed to try other devices and to change things on what testers report; and a user's laptop is expected to be at least as able as the founder's, which is two years old.
+
+**What the agent had said first.** Asked whether Prompt 51 could start, it answered that its own half could and that the prompt could not close without R1: the capture method, the ladder entry and the three export timings of the gate were R1's to give. The founder then decided as above.
+
+**The machine, D1.** An Acer Aspire A715-76G: Intel Core i5-12450H (8 cores, 12 threads), 16 GB, Intel UHD Graphics and an NVIDIA GeForce GTX 1650, Windows 11. Chrome under Playwright draws with the integrated GPU (known issue 9). R1 is a laptop of 2021 with 8 GB and an integrated GPU.
+
+**What it costs,** written into D-69:
+
+- **D1 is faster than R1, by about two on the one number there is.** Transcription of the reference clip took 62 to 96 s on D1 and about 150 s on the laptop like R1 of D-67.
+- **A gate that passes on D1 does not show that it passes on R1.** One that fails on D1 fails on R1 too.
+- **TE-14 is not answered.** Its question is whether the peak stays under 1.5 GB on a machine with 8 GB; D1 has 16.
+- **The product's budgets are R1's** (PS §20.2), and an 8 GB laptop with an integrated GPU is a supported device (PS §9.3, §20.1). Nothing in V2 will have run on one. The M0 decision is taken on D1's numbers and must say so. Open item 12.
+
+**Derived by the agent, not given by the founder.** Either can be set otherwise.
+
+- **The name `d1`.** A reading taken for a gate is recorded under it, and the bench file is `bench/results/d1-<date>.json`, so that no number of this machine is ever filed as R1's. `dev` stays the label of a reading taken in passing.
+- **The thresholds stay.** E-4 is still read against 112,000 ms and 187,000 ms, TE-3 against 30 frames a second, E-3 against 180,000 ms. They were set for R1; on D1 they are easier to meet.
+- **All of V2's steps on R1 move, not only Prompt 51's:** the check of the deployed page, `pnpm e2e:device`, the bench, E-3 at S15 and TE-14 of Prompt 59, and the M0 gate of Prompt 60.
+- **The agent takes the readings.** They were the human's because R1 was another machine. Pushes, the merge and the M0 decision stay the human's.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `docs/v2/v2implementation.md` | D-69 added to §2, with its costs; §0 says "D-18 to D-69" |
+| `docs/v2/coding-promptsv2.md` | The Standard Agent Block says "D-18 to D-69"; the note on the two gates; the rows of Prompts 51 and 59 in "Who does what"; Prompt 51 (the readings are taken on D1 by the agent, the push stays the human's, the third box); Prompt 59 (`BENCH_DEVICE=d1`, `d1-<date>.json`); Prompt 60 (D-69 is copied back beside D-65); the risk row "R1 not available" |
+| `docs/v2/v2buildguide.md` | The table of references names D-69; item 12 of "Read this first" says where the readings of Steps 8.4, 8.5 and 12.3 to 12.7 are taken |
+| `docs/v2/experiments.md` | "How it is kept": the machine, and the labels `d1` and `dev` |
+| `docs/v2/v2changelog.md` | This entry; open item 3 closed; open item 12 added |
+
+The edit was made by a script that refuses a replacement unless its old text occurs the stated number of times, and that writes nothing unless every replacement can be applied: 20 of 20. Each file keeps its line endings.
+
+**Not changed, and why.**
+
+- **`product.md`, `technicalspec.md`, `buildplan.md`.** They name R1 about 70 times, as the device the product is measured on. Prompt 60 copies D-65 into them, and now D-69 beside it.
+- **The other places in the three V2 documents that say "R1".** There are about a hundred. D-69 and the note on the gates say how each is read.
+- **The thresholds,** above.
+- **The founder's reading of E-3** (D-67). It is the only number of a laptop like R1 and stays on record as that.
+
+**Checked.**
+
+- `node scripts/check-file-tree.mjs` passes: the tree of TS §5 was not touched.
+- `git diff --stat`: five files, all under `docs/v2/`. The frozen-file diff against the baseline is empty.
+- The four-command gate was not run: no file that a build or a test reads was changed. The test counts are those of Prompt 50: **255 Rust, 92 Vitest, 12 Playwright**.
+
+**Open.** Open item 12: the timings on a laptop like R1, after the deploy and before the page promises a time.
