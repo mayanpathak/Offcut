@@ -24,6 +24,7 @@
 | 8 | Turn on branch protection for `main` on GitHub (Settings, Branches): require a pull request and the `ci` check. `main` is unprotected, and a push to it deploys | Human | Before Prompt 59 |
 | 9 | Read the license of the speech model before the page is announced. Offcut now serves the model files from its own asset host. The repository they were taken from states no license of its own; the model's author says the code and the weights are under the MIT License, which asks for the notice to go with copies | Human | Before the page is announced |
 | 10 | **The three-minute promise.** With the small-size model the median total for a 60 s clip on R1 is about 221 s on the numbers of D-67, and PS §20.2, §20.3, J10 and the pitch say three minutes. Change the promise or the model before the page says it to a visitor. The copy that states the time is not written yet | Human | Before the page is announced |
+| 11 | **Decide how a full-range clip should look.** The export of the reference clip has more contrast than the file: Chrome reads the webcam recording as limited-range video, in its decoder and in its own player, though the file says full range (known issue 30; entry of Prompt 50). Leave it, so that the export looks like the clip in Chrome's player; or correct it on the decode side, so that it looks like the clip in VLC and on a phone. Correcting it needs the demuxer to read the flag, which is Rust and no prompt of V2 | Human | Before Prompt 55, where a person first judges the picture |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -56,6 +57,9 @@
 | 26 | **What the later prompts build on** (entry of Prompt 46). **Detector:** `offcut_detect::detect(&transcript, &prosody, &edits, &DetectorConfig::default())` gives the events in time order; on the reference clip it must give one, the `$12k` of words 132 and 133. `event_id(kind, anchors)`. **Entitlement:** `verify_token(token, &[[u8; 32]])` gives `EntitlementClaims` or a `TokenError` (all five are `E_ENTITLEMENT_INVALID`); `export_profile(Some(&claims), now)` and `export_profile(None, now)`, with `now` as `UnixSecs` from the caller's clock; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` for `preview_profile()`. `ParsedToken` has no `Debug`, on purpose. `CREATOR_VIDEO_BITRATE` of `profile.rs` must stay equal to the one in `encoders.ts` (D-26). **Tests:** `mintEntitlementToken(o?)` and `seedEntitlement(page, token)` of `helpers/fake-api.ts`; the page must have opened the app before `seedEntitlement`, which rejects otherwise. The test public key is in the entry of Prompt 46: a build for the media suites is made with it in `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`, exported in the terminal and written in no `.env` file. **The crate `offcut-entitlement` states the version of `ed25519-dalek` itself:** when the workspace's version changes, that line changes with it. **The E2E case "a slow API shows the waking message" runs in real time** and can miss its one-second window on a busy machine; run the suite again before reading it as a fault | Prompts 48, 49, 50, 54, 56, 57, 58 |
 | 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). A glyph run is stroked first and filled over the stroke since D-68; the outline that shows is half the stroke's width. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
 | 28 | **What Prompts 50 to 53 build on** (entry of Prompt 49). `new VideoSource(session, clipInfo)`: `await source.frameAtBlocking(t)` for the export and `source.frameAt(t)` for the preview, `t` in milliseconds; **the frame stays the source's: the loop does not close it,** and it stays open until the source hands out a newer one; `source.close()` closes everything. `liveFrames.count` goes up for every frame a decoder gives out and down at every `close()` in `video-source.ts`; a frame the loop makes itself (`new VideoFrame(canvas)`) is counted and closed by the loop. One `VideoSource` can serve a preview and then an export: a time before what it holds starts decoding again. A failure is a `WorkerFailure` with `E_DECODE_VIDEO`. `await pickVideoConfig(profile)` gives the encoder configuration or throws `E_ENCODE_VIDEO`; on the development machine it is `avc1.640028`, `prefer-hardware`. `const sink = await OpfsSink.open(paths.exportTmp(id))`, given to `render.newMuxer(sink, ...)`; `await sink.close()` on success, `await sink.abort()` otherwise; one sink per path at a time. **The verifier:** `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`, with Python 3.13 first in `PATH`; it wants `yuv420p`, 2,242 frames exactly 1/30 s apart, and audio within 21.34 ms of the video. **On the reference clip:** output frames 150 and 1,946 are the two white frames; 80 output times repeat a source frame; decoding alone ran at 652 frames a second on the development machine | Prompts 50, 51, 53, 57 |
+| 29 | **What Prompts 51 to 54 build on** (entry of Prompt 50). `pool.render` exists. `openSession({ clipId, clipInfo })`, `detect({ transcript, prosody })`, `setScene({ transcript, events, edit, profile: "preview" })`, `attachPreview({ canvas }, { transfer: [canvas] })`, `exportClip({ exportId, entitlementToken, out48 }, { transfer: [out48.buffer], onProgress })`, `closeSession()`. `exportClip` answers `{ opfsPath, summary, stageTimings: [render_encode, mux] }`; its progress is one `render_encode` message for each frame, `done` from 1 to `N`, then one with `stage: "mux"`. It rejects with `E_INTERNAL` and the detail `NoSession` or `NoScene` when called too early. After an export the worker closes the `VideoSource` and makes a new one: **`previewPlay` (Prompt 53) must read the source from the module's state each time and not keep it.** `runExport` takes `canvas` and `onEncoded` beside the arguments of TS §21.1. **The drill of Prompt 51, "remove the `vf.close()`", is the line `closeFrame(vf);`** in `export-loop.ts`; it was run in Prompt 50 and fires (`FrameLeak`). `export-loop.ts` has 395 lines of the 400: method B of TE-3 needs room made first, or is tried in a temporary copy. Check 5 passes on the development machine with `AAC_PRIMING_SAMPLES = 0`. `previewClock` is dropped without an answer until Prompt 53 gives it a handler; that handler must not throw. Two exports of Prompt 50 are in `testclips/renders/`. The spike needs a profile under `fixtures/.cache/zz-profile-4173/` again: Prompt 50 removed its own | Prompts 51, 52, 53, 54 |
+| 30 | **Chrome reads a full-range clip as limited-range** when the clip carries the range flag and no colour description, as the reference clip does (entry of Prompt 50): a `VideoFrame` of it has `fullRange: false`, and the picture is drawn, previewed and exported with its brightness stretched from 16..235 to 0..255. E-4's time does not depend on it. The picture a person judges at Prompt 55 does. A `VideoDecoderConfig` takes a `colorSpace` that overrides what the browser read; `video-source.ts` gives none, and `ClipInfo` has no field to carry the flag | Prompts 55, 57; V3 |
+| 31 | **`Client<Api>` of `rpc.ts` asks for one argument on every method,** also on one the protocol gives none: `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` fail `tsc` with "Expected 1-2 arguments, but got 0" (tried in Prompt 50 with a throwaway file). `pool.asr.unload(undefined)` compiles and does the same. A change of the type is a change of `rpc.ts`, which has 374 lines | Prompts 53, 54 |
 
 ---
 
@@ -2327,3 +2331,135 @@ Nine frames were open at most: the six ahead, the one handed out, and what the d
 
 - **The verifier asks for `yuv420p`, and whether the browser's encoder writes that is not known.** The source is full-range (`yuvj420p`). If an export comes out marked full-range, check 2 fails on a file that plays everywhere. Prompt 50 shows which it is; the check is TS §27.2's and was not softened in advance.
 - **The caption lies across the speaker's mouth** in the frame that was looked at: the caption zone is rows 1,220 to 1,500 of 1,920, and the clip is a close webcam shot. The zone is TS §19.1's, an assumption for E-2; a person should look at it at Prompt 55.
+
+## 2026-10-09 - Prompt 50: export loop, render worker, first export
+
+**The first export.** The reference clip went the whole way in a production build, under the production CSP, and came out as an MP4: 1080 x 1920, 2,242 frames, 78.7 MB. The verifier passes it on all six checks, check 5 included. A Free token gives 720 x 1280, and that file passes all six too. Both files are in `testclips/renders/`, which git ignores: `p50-export-creator-1080x1920.mp4` and `p50-export-free-720x1280.mp4`.
+
+**One thing about the picture needs a decision** (open item 11, known issue 30): the export has more contrast than the source file, because Chrome reads this webcam clip as limited-range video though the file says full range. It is not a fault of the loop, and Chrome's own player shows the clip the same way.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/workers/render/export-loop.ts` | `runExport` (TS §21.3 with the fixed points of §16.8): the frame loop, the two encoders, the audio, the muxer. 395 lines |
+| `web/src/workers/render.worker.ts` | `openSession`, `detect`, `setScene`, `attachPreview`, `exportClip` (the nine steps of §16.8), `closeSession`; the five methods that wait for a later prompt. 319 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/workers/pool.ts` | The `render` row (script, stage `preview`) and `pool.render`: the table has three rows, and `preload()` adds a third `modulepreload` link |
+| `docs/v2/v2implementation.md` | §16.6 and §16.8 say what was built; §27 gains items 27 and 28, two gaps of TS §21 (5 replacements, each applied once) |
+| `docs/v2/v2changelog.md` | This entry; open item 11; known issues 29, 30 and 31 |
+
+No dependency was added. No Rust file changed.
+
+**The drill.** `import { ENTITLEMENT_PUBLIC_KEYS } from "../config/entitlement-public-key";` in `media.worker.ts`: ESLint, `boundaries/dependencies`, "There is no policy allowing dependencies from elements of type "workers" to elements of type "config"". Undone from a copy.
+
+**Browser check (preview, keyed build).** `vite build` with the test public key exported in that one shell; `vite preview` on port 4173 with the headers of `vercel.json`; the hook `zz-spike.ts`; Chrome 155.0.8059.39 under Playwright, headless, a new profile; a temporary case that ran the script of G 8.3 and printed what it read. The tokens were minted by `mintEntitlementToken` and printed nowhere.
+
+| Read | Result |
+|---|---|
+| The model | `absent`; downloaded from the asset host in 50.2 s |
+| `importAndProbe` + `extractAudio` | 1.8 s; `pcm48` has 3,585,840 samples |
+| `load` + `transcribe` + `unload`, WebGPU | 63.0 s; 157 words |
+| `openSession` + `detect` + `setScene` | 205 ms |
+| `events` | 1: `number_reveal`, `$12k`, words 132 and 133, from 62,660 ms to 63,540 ms |
+| `exportClip` with one character of the token changed | Rejects with `E_ENTITLEMENT_INVALID` (detail `Json`), stage `render_encode`. After it the directory `exports/` does not exist: nothing was written |
+| `exportClip` with the Creator token | `render_encode` 28,282 ms, `mux` 9 ms; `summary` is `{ voice_cleaned: false, captions_emphasized: 0, visual_moments: 1 }`; `exports/<id>.mp4` is there and `exports/tmp/` is empty |
+| The same with a Free token | `render_encode` 15,445 ms, `mux` 66 ms; 720 x 1280 |
+| Progress of an export | 2,243 messages: `render_encode` with `done` from 1 to 2,242, each one more than the last, then one `mux` |
+| Console lines and page errors | 0. No line with "Refused to" |
+
+These are `dev` readings and stand for nothing in E-4.
+
+**The verifier**, `python verify/verify_mp4.py <file> --profile <p> --expected-duration-ms 74705`, Python 3.13.5:
+
+| File | Printed |
+|---|---|
+| The Creator export, `--profile creator` | `PASS 1` to `PASS 6`, the line for 7 to 11, exit 0 |
+| The Free export, `--profile free` | `PASS 1` to `PASS 6`, exit 0 |
+
+**What `ffprobe` says of the Creator export.** H.264 High, `yuv420p`, 1080 x 1920, 30/1, time base 1/30,000, 2,242 frames, 74.733 s, 8.24 Mb/s; 38 keyframes, one every 60 frames; every `pts` equals its `dts`, so no frame is out of order. AAC-LC, 48,000 Hz, 2 channels, 3,504 packets of 1,024 samples, 74.752 s, 160 kb/s. `moov` is in front of `mdat`. No edit list: the priming is 0. The Free export is the same at 720 x 1280 and 4.10 Mb/s. The pixel format is what the probe before this prompt said it would be.
+
+**The pictures and the sound are the right ones, not only a valid file.** Read with `ffmpeg` and NumPy, outside the app:
+
+| Asked | Result |
+|---|---|
+| Which output frames are white | Frames 150 and 1,946, and no other, in both files: the two frames Prompt 49 worked out. Their neighbours are not white (192 and 191; 229 and 234, of 255) |
+| The sound against the source's own, sample by sample | No shift. At a shift of 0 the two differ by 0.4% of the level (median of the 1,098 windows of 50 ms that hold sound; 7.6% in the worst), which is what AAC costs. The first sample that is not silence is sample 9,052 in both |
+| The audio's length | 3,588,096 samples: `N x 1600` = 3,587,200, rounded up to whole AAC frames. 18.7 ms longer than the video |
+| Three frames, looked at | The speaker upright in the centre strip; white captions with the active word in yellow; at 63.0 s the number counting up, `$11,556` on its way to `$12k`, as the amount is spoken |
+
+**Check 5 passes with `AAC_PRIMING_SAMPLES = 0`.** The prompt allowed it to fail until Prompt 51. On the development machine the encoder's output decodes with no shift, so there is nothing to edit out here. TE-4 reads it on R1, and R1's encoder may differ.
+
+**Checked beyond the prompt,** in the same build, most of it on a 6-second cut of the clip with a hand-made transcript (186 frames, no model):
+
+| Asked | Result |
+|---|---|
+| `exportClip` before `openSession`; before `setScene`; after `closeSession` | `E_INTERNAL`, detail `NoSession`; `NoScene`; `NoSession`. Stage `render_encode` |
+| `previewPlay`, `previewPause`, `previewSeek`, `redetectSentence` | `E_INTERNAL`, `NotImplemented`, stage `preview` |
+| `notify("previewClock", ...)`, then `detect` | The worker still answers: 1 event |
+| `closeSession` twice; then `extractAudio` in the media worker; then `openSession` again | No failure; the audio again; a new session. The clip's file was given back |
+| Two exports one after the other on one session | Both written. The second is faster: 2.8 s after 7.1 s on the short clip |
+| A preview canvas attached before the exports (`attachPreview` with a canvas of the page) | Two exports written and no failure: the canvas is given back to the session after each. Not tried with a cancel |
+| Cancel at once; after 60 frames; after 185 of 186 | `{ cancelled: true }` each time, in 0.1 s, 2.7 s and 3.8 s; `exports/` gains no file and `exports/tmp/` is empty. An export after the three is written |
+| **The frame count can fail:** the line `closeFrame(vf);` taken out of the loop | `exportClip` rejects with `E_INTERNAL`, detail `FrameLeak`, stage `render_encode`; no file in `exports/`, none in `exports/tmp/`. This is the drill Prompt 51 names. Restored from a copy |
+| The verifier on the short exports, `--expected-duration-ms 6192` | Six passes, Creator and Free |
+
+The cancel went through a client made for the test, in the hook: `pool` has no cancel before V4.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **`runExport` takes two arguments more than TS §21.1 gives it.** `canvas`: method A makes each frame from the export canvas, and the signature hands the loop none. `onEncoded`, called once before `finalize()`: the handler must post the `mux` progress message and return both timings, and nothing in the signature says where one stage ends. The return type is the one of TS §21.1.
+- **The muxer is made when the first chunk of each encoder has come.** TS §21.3 and §16.8 make it "on the first video chunk", and both encode the audio after `venc.flush()`. But `Mp4Muxer::new` takes the `avcC` and the `asc` together, and the `asc` comes with the audio encoder's first chunk. Built as written, all 2,242 video chunks, 75 MB, would wait in memory for the end of the video, which TS §31 forbids. So the first 47 AAC frames, one second, are encoded before the first video frame, and the rest after `venc.flush()` as the plan says. The few chunks that come before the muxer exists wait in a list.
+- **A chunk's frame number is read from its timestamp.** Counted in the order of arrival, a chunk out of its turn would be written in the wrong place and no one would know. Read from the timestamp, the muxer refuses it (`E_MUX`, `OutOfOrder`), which is what §16.8 asks for.
+- **After both flushes the written frames are counted:** not `frame_count()` is `E_ENCODE_VIDEO`, `FrameCount`.
+- **The audio encoder is given a frame only while it holds fewer than 32.** TS §31 has a number for the video encoder's queue and none for this one. Without a bound the whole clip, 28 MB of samples, is handed over at once.
+- **A write the sink refuses is `E_STORAGE_QUOTA` or `E_STORAGE_IO`.** The muxer makes `E_MUX` (`Write`) of any throw of the sink and drops the reason. The loop keeps the sink's own error and reports that.
+- **`render_encode` starts just before `runExport` is called,** as step 4 of §16.8 has it: it includes `pickVideoConfig` and the two `configure` calls. The table of §16.8 says "start of the loop". The user waits for both.
+- **The preview is given back after every outcome,** a cancelled and a failed export too, once the scene was set to the export's profile; and only when a preview canvas is attached, as the guide says. §16.8 names the restore for a success and a failure and not for a cancel.
+- **"Close every frame" is done by closing the `VideoSource` and making a new one.** The source owns the decoded frames and has no call that drops them and stays usable. The count is read after that and before the file is moved, so a leak leaves no file. The count then starts again at 0: a leak fails the export that leaked, not every export after it.
+- **A failure while tidying up** is reported only when nothing failed before it. The first failure is the cause.
+- **`openSession` closes a session that is still open.** Otherwise the first clip's file stays locked.
+- **Stages.** `openSession`, `detect` and `setScene` fail with `detect_scene`, the stage `run-pipeline.ts` calls them in. `E_MUX` is of the stage `mux` wherever it shows. Everything else in `exportClip` is `render_encode` before `onEncoded` and `mux` after it.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`previewClock` does not answer `E_INTERNAL`: it is dropped.** It is a one-way message and nothing can answer it. A failure thrown in a one-way handler is reported with `reportError`, which reaches the page as an error of the worker, and `rpc.ts` then fails every call that is waiting with `E_WORKER_CRASH`. The other four answer `E_INTERNAL` as the prompt says.
+- **The one-way and during-preview lists are in `render.worker.ts`,** given to `serveWorker`, and not in the row of `pool.ts`: a worker may not import `pool.ts` (known issue 13). The row has the script and the stage, like the other two.
+- **`render.worker.ts` opens the clip's file with `openSource` of `media/import.ts`,** which already turns a storage failure into `E_STORAGE_IO`.
+- **The capture method and the checks beyond the prompt,** above.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit` and ESLint on `src/workers`: clean.
+- `node scripts/check-file-tree.mjs`: 212 files; both new files were in the tree of TS §5. The longest source file is now `export-loop.ts`, 395 lines.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers at the first run; the frozen-file diff against `322c7d3` is empty. **255 Rust** (2 ignored), **92 Vitest**, **12 Playwright**, as before: V2 has no test file for these (§23.1).
+- `grep -rl` for the test public key in `web/dist` after the plain build: 0 files. `check-hosts`: ok, 11 files.
+- The app shell is 284.1 kB gzipped, was 266.5: the render worker's script.
+- The hook, its import in `main.tsx`, the temporary case, the browser profile and the short clips are gone. `git grep -n "zz-spike\|zz_spike" -- web` prints nothing.
+
+**"Done when".**
+
+- [x] The first export passes verifier checks 1 to 4 and 6 (and 5); the wrong token is refused before anything is written.
+- [x] `git grep -n "zz-spike\|zz_spike" -- web` is empty; the gate build holds no test key.
+
+**Not checked.**
+
+- **R1.** Every time here is the development machine's. Its encoder is the first entry of the ladder, `avc1.640028` with hardware.
+- **That the preview draws again after an export.** The canvas is handed back without a failure; nothing can draw to it before Prompt 53.
+- **An export with the tab hidden** (TE-3), a GPU device that is lost, a disk that fills, an encoder that fails in the middle. The paths are written; none was provoked.
+- **A clip turned a quarter, or above 30 frames a second.**
+- **The exported file in a player, by a person.** The agent looked at three frames. Nobody has heard it.
+
+**Found, and not for this prompt.**
+
+- **The export has more contrast than the source file** (known issue 30, open item 11). The reference clip is marked full-range (`yuvj420p`) and carries no colour description. Chrome gives its frames `fullRange: false`, BT.709, in the decoder and in its own `<video>` element alike, so it stretches them: a wall stored at 216 is shown at 231, a shadow stored at 77 at 71, and everything stored above 235 becomes white. The renderer draws what Chrome gives, and the encoder writes that. Measured on the stored brightness of three frames: the export's is the source's own (a fit gives 0.94 times it plus 4, bent by the highlights that were cut off), where a right export would store the source's times 0.86 plus 16. `ffmpeg` and VLC read the flag and show the clip flatter. The export does match what Chrome's player shows of the source, and the preview will match the export. The fix is on the decode side: give the `VideoDecoder` a `colorSpace` with `fullRange: true` when the clip says so, which needs the demuxer to read that flag from the SPS. Nothing in V2's plan reads it.
+- **The file is not interleaved.** One second of audio, then all the video, then the rest of the audio: the order the plan encodes in. A player that reads a local file does not care. One that streams it must seek. The muxer takes samples in any order, so feeding the audio in step with the video would fix it; that is a change of §16.8.
+- **The first export of a session is slower:** 7.1 s then 2.8 s on the short clip. The bench and E-4 should say which they report.
+- **The hardware encoder writes no colour tags** (the probe before this prompt). A player assumes BT.709 for this size, which is what the pixels are.
+- **A method without an argument cannot be called through `pool` as TypeScript reads it** (known issue 31): `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` are each "Expected 1-2 arguments, but got 0". Every call so far was made from a browser console or a test page, where nothing checks types. Prompts 53 and 54 are the first to write such a call in a source file.
+
+**Open, for the human.** Nothing for this prompt: Prompt 51 is the next one marked **Push**. Before it: R1 (open item 3). Before Prompt 55: the decision of open item 11.

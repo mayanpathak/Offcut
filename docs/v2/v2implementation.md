@@ -1391,6 +1391,8 @@ Module state: the `RenderApi`, one `RenderSession`, one `VideoSource`, the previ
 
 `now` for the token is `Math.floor(Date.now() / 1000)`. This file is the only worker file that imports `config/entitlement-public-key` (D-27 c).
 
+**As built (Prompt 50):** `openSession` first closes a session that is still open, and opens the file with `openSource` of `media/import.ts`. The module state also keeps the `ClipInfo`: after every export the `VideoSource` is closed and a new one is made, which is how every decoded frame is closed. A failure of `openSession`, `detect` or `setScene` carries `stage: "detect_scene"`; one of `attachPreview` carries the worker's default, `preview`. `attachPreview` takes its size from `previewProfile()` and keeps the canvas once the attach has answered. `previewPlay`, `previewPause`, `previewSeek` and `redetectSentence` answer `E_INTERNAL` with the detail `NotImplemented` until Prompt 53. `previewClock` is one-way: nothing can answer it, and a failure thrown in a one-way handler reaches the page as a crash of the worker, so until Prompt 53 the message is dropped. The lists of one-way methods and of methods accepted beside `previewPlay` are given to `serveWorker` in this file (a worker may not import `pool.ts`).
+
 ### 16.7 `render/video-source.ts`, `render/preview-loop.ts`
 
 ```ts
@@ -1457,6 +1459,17 @@ Every failure thrown inside `exportClip` carries `stage: "render_encode"`, excep
 **Never.** Skips or repeats an output frame because of what the audio contains; trims audio or video (INV-5, INV-10); assembles the output in memory (TS §31); keeps an `EncodedVideoChunk` after copying it into the muxer.
 
 **Budget.** Render + encode at most 90 s and mux at most 2 s for a 60 s clip on R1 (PS §20.2, E-4), which is 112 s and 2.5 s for the reference clip (D-64).
+
+**As built (Prompt 50).**
+
+- **`runExport` takes two arguments more than TS §21.1 gives it:** `canvas`, the `OffscreenCanvas` the session draws to, from which method A takes each frame; and `onEncoded`, called once when both encoders are flushed and before `finalize()`. On `onEncoded` the handler posts the one progress message with `stage: "mux"` and reads the clock: `render_encode` runs from just before `runExport` is called (so it includes `pickVideoConfig` and the two `configure` calls) to that point, and `mux` from there to the end of the move.
+- **The muxer is made when the first chunk of each encoder has come,** not on the first video chunk: `Mp4Muxer::new` needs the `avcC` and the `asc` together (section 27, item 27). So that the `asc` is there early, the first 47 AAC frames, about one second of audio, are encoded before the first video frame. The rest of the audio is encoded after `venc.flush()`, as the table above says. A chunk that comes before the muxer exists waits in a list, in the order it came; on the reference clip that is a handful.
+- **A video chunk's frame number is read from its timestamp,** so a chunk that comes out of its turn is refused by the muxer with `E_MUX` (`OutOfOrder`) and is not written in the wrong place. After both flushes the count of written frames must equal `frame_count()`, else `E_ENCODE_VIDEO` (`FrameCount`); an encoder that gave no description is `NoDescription`.
+- **The audio encoder is given a frame only while it holds fewer than 32.** The last AAC frame of a clip is shorter than 1,024 samples when `N x 1600` is not a multiple of 1,024; nothing is added beyond `N x 1600`.
+- **A write the sink refuses** is reported as `E_STORAGE_QUOTA` or `E_STORAGE_IO`, not as the `E_MUX` (`Write`) the muxer makes of it.
+- **Step 7 follows every outcome,** also a cancelled and a failed export, once the scene was set to the export's profile, and only when a preview canvas is attached. A refused token changes nothing, so nothing is restored after it.
+- **The frame count is read after `runExport` has returned and the `VideoSource` is closed, before the file is moved.** Not 0: `E_INTERNAL` with the detail `FrameLeak` and the stage `render_encode`; the temporary file is removed and the count starts again at 0, so a leak fails the export that leaked and not the next one. In the loop a frame is closed by `closeFrame(vf)`, which closes it and takes it off the count.
+- **A failure while tidying up** (the sink's `abort`, the restore of the preview) is reported only when nothing failed before it.
 
 ### 16.9 `render/encoders.ts` [ONLY WebCodecs encoder configs], `render/opfs-sink.ts`
 
@@ -2283,5 +2296,7 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 24 | V1 added `CREATOR_VIDEO_BITRATE` to `encoders.ts` for the capability probe; V1's pages take paths as props; the comment on `loadCore()` rules out the main thread; a use-case may import only `pool.ts` from `workers`; `deny.toml` wrappers must name third-party parents | V1 changelog (Prompts 13, 18, 20, 23), `eslint.config.js` | D-26, D-48, D-36, D-32, section 22.1 |
 | 25 | A demuxer bound that fails at `open` would report a clip that is too long, or one with PCM audio, as corrupt. The build order had the spike before the crates it needs. The one visible event had no fallback | First draft of sections 5, 6.4 and 8.4 | D-60 as revised; S9 to S11; D-42 |
 | 26 | The reference clip of TS §26 and PS §20.2 is a 60-second 1080x1920 portrait clip; V2 uses a 74.7-second 1280x720 webcam recording | TS §26, PS §20.2 vs the founder's decision of 2026-10-08 | D-64, D-39. TS §26 gains a row for this clip when the portrait one is recorded in V3 |
+| 27 | The muxer is "created on the first video chunk (needs avcC)", but `Mp4Muxer::new` also takes the audio track's `asc`, which the audio encoder gives with its first chunk, and the audio is encoded after `venc.flush()`. Built as written, every video chunk would wait in memory for the end of the video (found in Prompt 50) | TS §21.3 vs TS §21.1 | Section 16.8 as built: the first second of audio is encoded first. Correct TS §21.3 |
+| 28 | `runExport` is given no canvas, though method A makes each frame from the export canvas, and no way to say where `render_encode` ends and `mux` begins, though the handler around it must post the `mux` progress message and return both timings (found in Prompt 50) | TS §21.1 vs TS §21.3, §21.4, §14.2 | Section 16.8 as built: the arguments `canvas` and `onEncoded`. Correct TS §21.1 |
 
 **Decisions to copy back into `technicalspec.md`:** D-25 (§10.8), D-26 (§21.1), D-27 and D-58 (§2, §7), D-28 (§7), D-29 (§19.2), D-30 (§19.2, §20.1), D-34 (§15.1), D-35 (§32), D-37 (§16.4, §24.6), D-42 (§17.1), D-45 (§21.4, INV-11), D-47 (§17.1), D-50 (§16.1), D-53 (§5), D-55 and D-46 (§5), D-59 (§10.1), D-68 (§19.2, §19.4). **Into `buildplan.md`:** the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33. **Into `product.md`:** none.
