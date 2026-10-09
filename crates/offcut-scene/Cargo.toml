@@ -6,3 +6,11 @@ publish = false
 
 [lints]
 workspace = true
+
+[dependencies]
+offcut-types = { workspace = true }
+# For `format_quantity` only (D-28).
+offcut-text = { workspace = true }
+parley = { workspace = true, features = ["std"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }

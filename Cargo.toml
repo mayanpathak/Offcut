@@ -31,6 +31,8 @@ thiserror = "2.0.21"
 # Tests only. Without its default features: no fork, no timeout, no temporary files.
 proptest = { version = "1.11.0", default-features = false }
 rubato = { version = "5.0.1", default-features = false }
+# Without `system`: no font of the machine is ever read; a scene uses the three it embeds.
+parley = { version = "0.11.1", default-features = false }
 axum = "0.8.9"
 tokio = "1.53.2"
 tower = "0.5.3"

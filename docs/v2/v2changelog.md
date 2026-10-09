@@ -48,10 +48,11 @@
 | 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository. In a production build (entry of Prompt 44) the same machine read 62 s to 96 s on WebGPU and 98 s to 123 s on WASM | Prompt 59 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
 | 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
-| 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): Prompt 45 decides how captions show it | Prompts 43, 45, 46, 48, 50 |
+| 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): a caption shows it as the digit, as TS §17.2 says (entry of Prompt 45) | Prompts 43, 45, 46, 48, 50 |
 | 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word, and stays so in V2:** TE-2 (entry of Prompt 44) found that the runtime returns no probability. No score is lowered by it; a prompt that reads `confidence` reads 1. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
 | 24 | **A first transcription may be slower than the next** (entry of Prompt 44): in a new browser profile, straight after a build and the download of the model, `load` and `transcribe` took 95.5 s on WebGPU and 123.4 s on WASM; the second run took 61.9 s and 98.1 s. One pair of readings, cause not found. The bench of Prompt 59 should keep its first run apart, and E-3 at S15 should say which it reports. **Chrome makes requests of its own** (an update check, a push-message registration) while a page is open: a check that reads the browser's whole network log, and not the page's requests, sees them and must tell them apart by who started them | Prompts 57, 59 |
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
+| 25 | **What Prompts 47 and 48 build on** (entry of Prompt 45). `build_scene(SceneInput { transcript, events, edit, clip, profile })` gives a `Scene`; `frame_at(t)` gives a `DisplayList` in pixels of the output canvas, and `crop()` the part of the source frame to show. **How a `GlyphRun` is drawn:** the glyphs by id, from the file `fonts::bytes(font)` at the weight `fonts::weight(font)` and at `size`, each at its `x`, `y` in the run's own space; filled, then stroked with `stroke.width`, a length of that same space; all of it mapped to the canvas by `transform` (`a b c d e f`). A fading reveal is between `PushLayer { opacity, clip: None }` and `PopLayer`. V2 emits no `FillRect` and no `FillPath`. Pin `vello` 0.11.0 with `wgpu` 30: it shares `skrifa` 0.44 with `parley` 0.11.1. The crate builds for `wasm32-unknown-unknown`. The font files hold addresses in their name tables: `check-hosts` reads them once they are in `offcut_render_bg.wasm` (D-38), and the bundle grows by the 3.2 MB of the fonts and by parley's text data | Prompts 47, 48 |
 
 ---
 
@@ -1592,3 +1593,148 @@ The counts are those of Prompt 43: this prompt adds no test. The gate ran before
 - [x] E-3: the founder's reading of D-67 is in `experiments.md`, about 150,000 ms, not above 180,000 ms.
 
 **Open, for the human.** Push `v2-build` (three commits: Prompt 43, D-67, Prompt 44) and read `ci` on pull request #2. Prompt 45 waits for green.
+
+## 2026-10-09 - The seventh push: `ci` green on Prompts 43 and 44
+
+**Done by the human.** `git push` of `v2-build` at `ece9d60`, the commit of Prompt 44; the commits of Prompt 43 (`98e9238`) and of D-67 (`beb0cc0`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `ece9d60`, equal to the local branch |
+| The `ci` run on `ece9d60` (pull request #2, run 14) | Success, in 179 s. The two deploy jobs were skipped, as on every run of the branch |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3`, on the API and through the web host |
+
+**Closes.** The push that Prompt 44 ends with, and the one Prompt 43 had left open. The speech runtime, the copy step of its files, the host entries and the split-number rule build and pass on Linux for the first time: `ci` had not run on any of the three commits before. Playwright passes there with its default workers.
+
+**Not shown by this run.** `ci` transcribes nothing: no case loads the model. TE-1 and the transcript were read on the development machine only (entry of Prompt 44); the media job that runs them in CI is Prompt 58.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 45: `offcut-scene`
+
+Prompts 45 and 46 were asked for in one sitting; each has its own gate and its own commit. The entry "The seventh push" above is committed with this one.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-scene/assets/fonts/Inter-Variable.ttf`, `JetBrainsMono-Variable.ttf`, `NotoEmoji-Variable.ttf` | The three variable fonts, unchanged apart from the file name |
+| `crates/offcut-scene/assets/fonts/LICENSES.md` | Where each file was taken from, its SHA-256, and the licence file shipped with each, as shipped |
+| `src/safe_area.rs` | The constants of TS §19.1: canvas 1080 x 1920 lp; insets 250, 420, 60, 120; `SAFE_AREA`, `EVENT_ZONE` (y 860 to 1180), `CAPTION_ZONE` (y 1220 to 1500), `WATERMARK_ANCHOR` |
+| `src/easing.rs` | `Easing { Linear, EaseOutCubic, BackOut }`, `ease(e, x)` |
+| `src/anim.rs` | `Track { keys, easing }`, `eval(track, t)`: the value is computed from `t` alone |
+| `src/display_list.rs` | `DisplayList` and `DrawCmd` of TS §19.2; `Rect`, `Rgba`, `PathEl`, `PositionedGlyph`, `Stroke`, `Affine`, `FontId` (D-29); the output scale of a command |
+| `src/styles.rs` | `StyleSpec`, `Case`, `spec(id)` with three arms; `Bold` and `Tech` return the Clean row |
+| `src/fonts.rs` | The three files with `include_bytes!`; `bytes(FontId)`, `weight(FontId)`; the parley contexts |
+| `src/layout.rs` | `ShapedRun`, `shape(text, font, size)` |
+| `src/framing.rs` | `crop_rect(clip, offset)`, the formula of TS §19.3 with the offset read as 0.0 on one marked line |
+| `src/captions.rs` | `CaptionWord`, `LineWord`, `Line`, `Chunk`; `words(transcript, edits)`, `chunk(words, sentences, style)`, `draw(chunk, t, style, out)` |
+| `src/events/mod.rs` | `EventTrack`, `layout(e, style)` with the four `EventParams` arms written out, `draw(track, t, out)` |
+| `src/events/number_reveal.rs` | `Track`, `layout`, `draw`, `visible_at`, and the constants of TS §19.5 |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-scene/src/lib.rs` | The ten modules; `SceneError { Font, Layout }`, `SceneInput`, `CropRect`, `Scene`, `build_scene`; `duration`, `frame_count`, `crop`, `frame_at`, `summary` |
+| `crates/offcut-scene/Cargo.toml` | `offcut-types`, `offcut-text`, `parley` (feature `std`), `serde` (`derive`), `thiserror` |
+| `Cargo.toml` | `[workspace.dependencies]`: `parley = { version = "0.11.1", default-features = false }` |
+| `Cargo.lock` | `parley` and the 15 packages it brings |
+| `docs/v2/v2implementation.md` | §11.3, §11.4, §11.5 and §11.7 say what was built (4 replacements, each applied once) |
+
+`deny.toml` was not touched: no new license, and no wrapper was needed.
+
+**Pinned.** `parley` 0.11.1, the latest release, without its default features and with `std`. It resolves `fontique` 0.11.1, `harfrust` 0.12.0, `skrifa` 0.44.0, `read-fonts` 0.41.0 and the `icu_*` crates at 2.3.
+
+**The set for Prompt 47, written down now as the prompt asks.** `vello` 0.11.0, the latest release; it asks for `wgpu ^30.0.0` (the newest 30 is 30.0.1), `peniko ^0.6.1` and `skrifa ^0.44.0`. `parley` 0.11.1 asks for `skrifa ^0.44.0` too: the one crate the two share resolves to one version. Both are above the installed Rust's minimum (1.89 and 1.88; installed 1.99).
+
+**`parley` is taken without its feature `system`.** The default reads the fonts of the machine: DirectWrite on Windows, fontconfig on Linux, which the CI runner would have had to have installed. A scene would then depend on the machine it was built on. Without it the collection holds the three embedded files and nothing else, and it is built with `system_fonts: false` as well.
+
+**The fonts.**
+
+| File | Font | Taken from | Licence |
+|---|---|---|---|
+| `Inter-Variable.ttf`, 879,708 bytes | Inter 4.1 | `InterVariable.ttf` in `Inter-4.1.zip`, release `v4.1` of `rsms/inter` | SIL OFL 1.1 (`LICENSE.txt` of the archive) |
+| `JetBrainsMono-Variable.ttf`, 303,144 bytes | JetBrains Mono 2.304 | `fonts/variable/JetBrainsMono[wght].ttf` in `JetBrainsMono-2.304.zip`, release `v2.304` of `JetBrains/JetBrainsMono` | SIL OFL 1.1 (`OFL.txt` of the archive) |
+| `NotoEmoji-Variable.ttf`, 1,982,596 bytes | Noto Emoji 3.002, monochrome | `ofl/notoemoji/NotoEmoji[wght].ttf` of `google/fonts` at commit `8b0a1d0f` | SIL OFL 1.1 (`OFL.txt` beside it) |
+
+The licence was read in each of the three files, not assumed: all three are SIL OFL 1.1, and none names a Reserved Font Name. **Noto Emoji is not taken from a release of its own project:** the repository that `google/fonts` names as its source (`googlefonts/emoji-bw`) answers "not found". The Google Fonts repository is where the variable file is published; it is pinned by commit. The version strings inside the files read 4.001, 2.304 and 3.002.
+
+**Decided here, where the plan gives a name and no shape, or is silent.**
+
+- **What a glyph run means.** A glyph's `x` and `y` are in the run's own space, from the start of its baseline; `transform` puts the run on the canvas. `size`, the glyph positions and the stroke width are lengths of that space. The output scale (`profile.width / 1080`) multiplies every length of a command and the translation of a transform, and leaves the scale part of a transform as it is; so at a width of 540 every stored length is half. TS §19.2 names the fields and not their spaces.
+- **`fonts::bytes(FontId)` and `fonts::weight(FontId)`.** A glyph id means nothing without its file and its weight: all three files are variable. `Inter700` and `JetBrainsMono700` are weight 700, `Inter900` is 900, and `NotoEmoji` is 700, the end of its axis and the weight every style asks for or more. The renderer of Prompt 47 reads both.
+- **The context is built once per thread,** on the first shaping call, and kept in a `thread_local`. §11.3 says "once per scene", and gives `shape(text, font, size)` no context to take. The signatures of §11.3, §11.5 and §11.7 are as given; the result of a shaping call does not depend on the calls before it, and the test of row 8 builds one scene with a new context and one with a used one.
+- **Which font a run used** is read from the id of its data, which is the id of the file that was registered.
+- **A missing character.** parley sets a character the style font lacks in Noto Emoji (seen with a rocket: three runs). A character both lack comes back as glyph 0: it is left out with its text, and takes no room. Seen with a Chinese character.
+- **`CaptionWord`** is `{ text, start, end, word }`; `word` is the first transcript word it stands for, which is how its sentence is found. **`Line`** is `{ words, x, baseline, width, scale }`.
+- **When a chunk is shown.** From 80 ms before its first word to 120 ms after its last, start included and end not. Where two chunks would overlap, the earlier one stays until its own last word has ended and the later one starts then, or 80 ms before its first word if that is later. Words 20 ms apart across a full stop: the first chunk ends and the second starts at the end of the first one's last word.
+- **A word too long for a line** (over 18 characters) has a line of its own.
+- **The active colour** is a yellow, `rgb(255, 214, 10)`, on white text with a dark stroke of 6 lp. The app's accent is a blue made for a light page; on video it would not read. An assumption like every value of TS §19.4 (E-2).
+- **`Case`** is in `StyleSpec`, and `chunk` applies it, so that V4 only writes the two rows.
+- **NumberReveal.** The count-up has 15 texts, one for each output frame that starts inside its 500 ms, and the display of the quantity from 500 ms on: 16 at most. It uses the style's easing. A number scales in about the middle of its own box. The fill and the stroke are the style's. The reveal is shown from the start of its first word until the fade has ended, 1,400 ms after its last word. The fade is one layer with an opacity.
+- **The label row is drawn,** at 48 lp under the number, when `label` is `Some`; the block of number and label is centred in the zone. V2's detector gives none.
+- **An event is drawn when its `enabled` is true,** or the user's override for its id is.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **A number is fitted by the widest text it shows, not by its end.** §11.7 fits the final display. `$250k` counts up through `$249,999`, which is 967 lp wide at 200 lp: it would leave the safe area for half a second, against TS §19.6. The size is the one at which every text of the count-up fits, so it does not change during the reveal. For the reference clip nothing changes: `$12k` passes `$11,480`, 771 lp.
+- **The room is 900 lp less the stroke width,** for the number and for a caption line, so that the stroke of the outermost glyph stays in the safe area too.
+- **A caption line wider than the zone is scaled down.** The limit of a line is 18 characters, and 18 wide capitals at 64 lp are 1,219 lp. The plan does not name the case; TS §19.6 forbids the result.
+- **A word that would need a third line starts a new chunk.** §11.5 limits a chunk to `max_chars_per_line x max_lines` characters; three words of 10 characters are 32 and still need three lines.
+- **`visible_at`** on a chunk and on a reveal, and **`captions::words`,** which is step 3 of `build_scene`: `lib.rs` would have held it otherwise.
+- **`crop_rect` compares the two sides in whole numbers** (`width x 16 > height x 9`), so that a 1080 x 1920 clip is exactly 9:16 and not a rounding away from it.
+- **The transcripts of the tests are built by `normalize_transcript`.** D-28 lets the crate use `offcut-text` for `format_quantity` only; that holds for the crate's code. A test that made a `Transcript` by hand would have had to write its sentences and numbers itself, and TS §10.8 makes that function the only builder.
+
+**Tests (inline): the 11 rows of §11.8.**
+
+| Row of §11.8 | Test |
+|---|---|
+| A 60,000 ms clip; a 20,033 ms clip | `tests::a_60_000_ms_clip_has_1_800_frames_and_a_20_033_ms_clip_601` (also 90 s: 2,700; the reference clip: 2,242; 0 ms and 1 ms) |
+| 12 words in one sentence, Clean | `captions::tests::twelve_words_in_one_sentence_make_chunks_of_at_most_5_words_and_2_lines_of_18_characters` (also: the order of the words; no two chunks overlap) |
+| Words at 1,000-1,300 ms and 5,000-5,300 ms | `captions::tests::words_a_pause_apart_are_two_chunks_and_nothing_shows_in_the_pause` (shown 920 to 1,420 and 4,920 to 5,420; also 349 ms against 350 ms, and a full stop) |
+| `frame_at(t)` inside a chunk | `captions::tests::inside_a_chunk_exactly_one_glyph_run_uses_the_active_colour` (none between two words) |
+| NumberReveal `$10k`, span 2,000-2,400 ms | `events::number_reveal::tests::ten_thousand_dollars_counts_up_holds_and_goes`: nothing at 1,900; `$0` at 2,000; `$4,880` at 2,100; `$10k` from 2,500; half faded at 3,700; nothing at 3,800 and 3,900 (also a number that scales in, and a label) |
+| A NumberReveal whose display cannot fit at 96 lp | `events::number_reveal::tests::a_number_that_cannot_fit_at_96_lp_is_dropped`: `summary().visual_moments` is 0 and no frame draws it (also `$250k`, made smaller, with every text of its count-up in the room) |
+| Every command of every frame of the above | `tests::every_command_of_every_frame_is_inside_the_safe_area`: 300 frames with captions, a line of 18 wide capitals, a word of 20 characters, and three reveals |
+| `build_scene` twice, all frames | `tests::two_builds_of_one_input_draw_the_same_frames` (also a frame asked for again, out of order) |
+| 1920x1080 clip, any offset | `framing::tests::a_1920x1080_clip_is_cropped_to_its_centre_strip_at_any_offset` (five offsets; a square) |
+| 1080x1920 clip | `framing::tests::a_1080x1920_clip_keeps_the_whole_frame` (also 900 x 1920: top and bottom go) |
+| Profile width 540 | `tests::at_a_profile_width_of_540_every_coordinate_is_half`: the size, the stroke width, and where every glyph lands |
+
+**The three drills.** Each was undone from a copy.
+
+| Temporary edit | What fired |
+|---|---|
+| `wgpu = "*"` in `offcut-scene` | `check-file-tree`: "offcut-scene: resolves wgpu, which a pure crate must not use (TS §7)". `cargo deny check bans`: "crate 'wgpu = 30.0.1' is explicitly banned", and the same for `web-sys`, `js-sys` and `wasm-bindgen` |
+| A `HashMap` in `captions.rs` | **Nothing fires,** as the prompt expects: `clippy.toml` has no `disallowed-types` entry, and the file is frozen in V2. The crate was read for it instead: `grep -c HashMap` is 0 in every file |
+| A `.ttf` copied to `web/public/zz.ttf` | The font `grep` of G 6.1 prints 4 lines |
+
+**Checked.**
+
+- `cargo test -p offcut-scene`: 11 passed. `cargo clippy -p offcut-scene --all-targets -- -D warnings`: clean.
+- `node scripts/check-file-tree.mjs`: 188 files; `offcut-scene` is checked as a pure crate and its edge to `offcut-text` is within the graph. `cargo deny check`: advisories, bans, licenses, sources ok.
+- `cargo check -p offcut-scene --target wasm32-unknown-unknown` passes, and the tree for that target holds no browser or randomness crate. Not asked for; Prompt 48 builds on it.
+- The font `grep`: 3 files, all under `crates/offcut-scene/assets/fonts/`.
+- Lines above the test module: `captions.rs` 288, `number_reveal.rs` 235, `display_list.rs` 180, `lib.rs` 150, `fonts.rs` 129, `layout.rs` 109.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers; the frozen-file diff against the baseline is empty. **229 Rust, 92 Vitest, 12 Playwright** (Rust was 218; the eleven are new).
+- The app is unchanged: no bundle holds the crate before Prompt 48. The app shell is 266.0 kB, as after Prompt 43.
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-scene` passes the 11 rows; clippy is clean; `check-file-tree` accepts `offcut-scene` to `offcut-text`.
+- [x] `git ls-files | grep -ci "\.\(ttf\|otf\|woff2\?\)$"` is 3 once the files are committed, all under `crates/offcut-scene/assets/fonts/`.
+
+**Not checked.**
+
+- **How long a scene takes to build.** The budget is 1.25 s for the reference clip on R1 (D-64). Nothing was timed: a pure crate may not read a clock, and a reading on this machine, natively, says little about WASM on R1. The bench of Prompt 58 reads it.
+- **What the frames look like.** No pixel is drawn before Prompt 47; the positions were checked by numbers only. The colours and sizes are assumptions until a person looks (Prompt 55, E-2).
+- **The size the crate adds to `offcut_render.wasm`:** 3.2 MB of fonts, and the text data parley brings. Read in Prompt 48.
+
+**Found, and not for this prompt.**
+
+- **A caption shows a number spoken as one small word as a digit.** Row 2's twelve words hold "three", and the caption says "3" (TS §17.2: a caption shows the display of a number in place of its words). On the reference clip "three reasons" becomes "3 reasons". Known issue 22 left the choice to this prompt; the spec is followed, and a rule that keeps small numbers as words belongs to V3's number rules.
+- **The display of a number has no punctuation.** "$10,000." is shown as `$10k`: the full stop that was part of the word is gone. Keeping it means knowing which characters of a word belong to the number, which is `offcut-text`'s to say (TS §6), not the scene's.
+- **The caption and the reveal show the amount at once:** `$12k` in the caption line and `$12k` large above it. TS does not say that a caption leaves out what a reveal shows.

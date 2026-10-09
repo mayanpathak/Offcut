@@ -905,7 +905,7 @@ Copy `SceneInput`, `build_scene`, the `Scene` methods and `CropRect` of TS §19.
 
 ### 11.3 `fonts.rs`, `layout.rs`
 
-`fonts.rs` embeds the three files of `assets/fonts/` with `include_bytes!` and builds the parley font context once per scene. `layout.rs`:
+`fonts.rs` embeds the three files of `assets/fonts/` with `include_bytes!` and builds the parley font context once per thread, on the first shaping call (as built, Prompt 45: `shape` takes no context, so a context per scene has nowhere to be passed; every scene of a worker uses the one context, which is built without the fonts of the machine). It also exports `bytes(FontId)` and `weight(FontId)`: the file a font id stands for, and the value of its weight axis, which the renderer needs to draw a glyph id. `layout.rs`:
 
 ```rust
 pub struct ShapedRun { pub font: FontId, pub size: f32, pub glyphs: Vec<PositionedGlyph>, pub width: f32,
@@ -930,7 +930,7 @@ pub struct Affine { pub m: [f32; 6] }                                           
 pub enum   FontId { Inter700, Inter900, JetBrainsMono700, NotoEmoji }           // closed; order is part of snapshots
 ```
 
-V2 emits `Inter700` and `NotoEmoji` only. The enum is complete now so V4's snapshots never see a renumbering.
+V2 emits `Inter700` and `NotoEmoji` only. The enum is complete now so V4's snapshots never see a renumbering. **As built (Prompt 45):** a glyph's `x` and `y` are in the run's own space, measured from the start of its baseline, and `transform` puts the run on the canvas. `size`, the glyph positions and the stroke width are lengths of that space; the output scale multiplies them and the translation of the transform, and leaves the scale part of the transform as it is.
 
 ### 11.5 `captions.rs`
 
@@ -940,7 +940,7 @@ pub fn chunk(words: &[CaptionWord], sentences: &[Sentence], style: &StyleSpec) -
 pub fn draw(chunk: &Chunk, t: TimeMs, style: &StyleSpec, out: &mut Vec<DrawCmd>);
 ```
 
-Chunking and timing are TS §19.4 verbatim: a new chunk at a sentence boundary, at a gap of `CHUNK_GAP = 350 ms` or more, when the characters would exceed `max_chars_per_line x max_lines`, or at `max_words`. A chunk is visible from its first word start minus 80 ms to its last word end plus 120 ms, clamped so chunks never overlap. Lines are centred in `CAPTION_ZONE` and broken greedily at `max_chars_per_line`. The active word (`start <= t < end`) is drawn in `active_color`; the rest in the fill color, with the style's stroke. A pause between two words draws nothing early (TS §19.7). The KeywordPop scale is V4.
+Chunking and timing are TS §19.4 verbatim: a new chunk at a sentence boundary, at a gap of `CHUNK_GAP = 350 ms` or more, when the characters would exceed `max_chars_per_line x max_lines`, or at `max_words`. A chunk is visible from its first word start minus 80 ms to its last word end plus 120 ms, clamped so chunks never overlap. Lines are centred in `CAPTION_ZONE` and broken greedily at `max_chars_per_line`. **As built (Prompt 45):** a word that would need one line more than `max_lines` starts a new chunk, which is how the character limit of a chunk is kept; a line that is wider than the zone (18 wide capitals at 64 lp are 1,219 lp) is scaled down to fit it; a number whose words carry an edit is shown as its words. The active word (`start <= t < end`) is drawn in `active_color`; the rest in the fill color, with the style's stroke. A pause between two words draws nothing early (TS §19.7). The KeywordPop scale is V4.
 
 ### 11.6 `framing.rs` [ONLY crop rectangle]
 
@@ -961,7 +961,7 @@ pub fn draw(track: &EventTrack, t: TimeMs, out: &mut Vec<DrawCmd>);
 
 | Phase | Rule |
 |---|---|
-| Fit | Shape the final display at 200 lp. Wider than 900 lp: scale the size down to fit. Below 96 lp: return `None` (TS §19.7) |
+| Fit | Shape the final display at 200 lp. Wider than 900 lp: scale the size down to fit. Below 96 lp: return `None` (TS §19.7). **As built (Prompt 45):** the size is the one at which the widest text of the reveal fits, the count-up texts included (`$250k` counts up through `$249,999`, which is 967 lp wide at 200 lp), and the room is 900 lp less the stroke width |
 | Enter | At `span.start`. Integer value of at least 10: count-up from 0 over 500 ms, displayed value `round(lerp(0, value, ease(x)))` formatted by `format_quantity(v, &unit)`. Otherwise scale 0.8 to 1.0 over 200 ms |
 | Body | Centred in `EVENT_ZONE`; unit inline (it is part of the display string). The label row at 48 lp is drawn only when `label` is `Some`, which V2 never produces |
 | Exit | Hold to `span.end + 1,200 ms`; fade over 200 ms |
