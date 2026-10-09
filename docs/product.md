@@ -780,6 +780,8 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | **p90 budget (promise: under 3 minutes)** | **180 s** (about 49% headroom over the median) |
 | First run, model download | ≤ 90 s: a 260 MB model at 25 Mbps (A-8) takes 260 × 8 ÷ 25 = 83 s, plus about 5 s initialization = 88 s, leaving a margin of 2 s |
 
+**Status on 2026-10-09 (D-67 of `docs/v2/v2implementation.md`).** The transcription budget is not met by the speech model V2 uses, the small-size one: about 150 s on an R1-class laptop for the 74.7 s reference clip, which is about 120 s for 60 s. The founder accepts that for the quality of the transcript, up to 145 s for 60 s. The budgets above stay the targets. On these numbers the median total is 3 + 120 + 2 + 4 + 90 + 2 = 221 s, so the three-minute promise does not hold until the model or the promise changes.
+
 ### 20.3 Critical-path arithmetic for the end-to-end promise
 
 "About three minutes" = 180 s p90. The stages above are sequential in the worst case: 3 + 20 + 2 + 4 + 90 + 2 = 121 s median, leaving 59 s of headroom. Transcription and the voice chain can run in parallel, which improves the median, but the promise does not assume it.
@@ -790,7 +792,7 @@ These budgets and the three-minute promise are for the 60-second reference clip.
 
 | If this misses | Fallback | Decision time |
 |---|---|---|
-| ASR median > 40 s on R1 | Ship the smaller model with stronger caption edit UX; keep cloud fallback as P1 trigger | M0 (end of week 3) and re-check at M2 |
+| ASR median > 145 s on R1 for a 60 s clip (the founder's decision of 2026-10-09, D-67 of `docs/v2/v2implementation.md`; the line was 40 s) | Ship the smaller model with stronger caption edit UX; keep cloud fallback as P1 trigger | M0 (end of week 3) and re-check at M2 |
 | Render + encode > 150 s on R1 | Canvas2D overlay path instead of Vello readback; cap input at 60 s and 30 fps | M0 and M1 |
 | Denoise exceeds the CPU budget | Loudness normalization + high-pass only | M1 |
 | Corpus pass rate < 90% at week 8 | Cut the least-valuable P0 inputs from the supported list (e.g. 60 fps input) rather than slipping launch | Week 8 |

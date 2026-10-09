@@ -1931,9 +1931,9 @@ transcribe(pcm16):
 - WebGPU backend produces NaN logits on a driver: detected as empty output with non-silent audio (RMS above -50 dBFS) → automatic retry on `wasm`, backend reported in `stage_timing.asr_backend`.
 - Hallucinated text over silence at clip end: not removed automatically at MVP; the user hides such words in the caption editor. E-10 counts occurrences and decides whether a filter is needed (§39).
 
-**Acceptance.** Median transcription at most 20 s for the reference clip on R1 (PS §20.2, E-3). WER at most 12% and median caption edits at most 8 per 60 s on the 20-clip set (E-10). First-run download plus initialization at most 90 s at 25 Mbps (PS §20.2). Second session skips the download (PS §20.1); `model-download.spec.ts`. No request to a host outside §24.1; `privacy-network.spec.ts`.
+**Acceptance.** Median transcription at most 20 s for the reference clip on R1 (PS §20.2, E-3; a target that the small-size model of V2 does not meet, accepted up to 145 s for 60 s by D-67 of `docs/v2/v2implementation.md`). WER at most 12% and median caption edits at most 8 per 60 s on the 20-clip set (E-10). First-run download plus initialization at most 90 s at 25 Mbps (PS §20.2). Second session skips the download (PS §20.1); `model-download.spec.ts`. No request to a host outside §24.1; `privacy-network.spec.ts`.
 
-**Contingency (PS §20.4).** ASR median above 40 s on R1 → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
+**Contingency (PS §20.4).** ASR median above 145 s for a 60 s clip on R1 (D-67; the line was 40 s) → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
 **Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker.
 
@@ -3010,7 +3010,7 @@ The PS totals assume sequential stages; ASR and the voice chain run in parallel 
 
 | Miss | Action | Decided at |
 |---|---|---|
-| ASR median above 40 s on R1 | Smaller model; stronger caption editing; cloud fallback remains a P1 trigger | M0, re-checked at M2 |
+| ASR median above 145 s for a 60 s clip on R1 (D-67; was 40 s) | Smaller model; stronger caption editing; cloud fallback remains a P1 trigger | M0, re-checked at M2 |
 | Render + encode above 150 s on R1 | Canvas2D overlay path; cap input at 60 s and 30 fps | M0 and M1 |
 | Denoise exceeds the audio budget | High-pass + loudness only | M1 |
 | Corpus pass rate under 90% at week 8 | Remove the least valuable accepted input rather than slip launch | Week 8 |

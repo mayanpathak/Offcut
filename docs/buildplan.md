@@ -288,7 +288,7 @@ No product code. Everything here is free.
 |---|---|---|---|
 | TE-1 | Does the ASR runtime load only from OPFS, make zero third-party requests and return word timestamps in a worker? | Zero requests outside the two hosts; timestamps for the reference clip; WebGPU and WASM backends both run | Second runtime behind the same `whisper-runtime.ts` interface |
 | TE-2 | Is a per-word confidence available? | Yes, at no more than 10% time cost | `Confidence(1.0)` for all words |
-| E-3 | ASR time on R1 | Median at most 20 s; p90 total at most 180 s | Over 40 s: ship a smaller model (base-size first, then tiny-size), stronger caption editing |
+| E-3 | ASR time on R1 | Median at most 20 s; p90 total at most 180 s | Over 145 s for a 60 s clip (D-67 of the V2 plan; was 40 s): ship a smaller model (base-size first, then tiny-size), stronger caption editing |
 | TE-3 | Vello on WebGPU in a worker on an `OffscreenCanvas`; which frame-capture method is faster; hidden tab | Correct frame every time; at least 30 frames/s render-only on R1; works hidden | Other capture method, then the Canvas2D backend |
 | TE-4 | Which H.264/AAC configs work on R1 and R2 | A ladder entry supported on both; A/V offset within one frame | Next ladder entry; silent pre-roll for AAC priming |
 | E-4 | Render + encode time on R1 | At most 90 s | Over 150 s: Canvas2D overlay path; cap input at 60 s and 30 fps |
@@ -302,7 +302,7 @@ This is the one point where the right answer may be to stop. Decide from three r
 | Reading | Continue | Apply the fallback, then continue | Stop |
 |---|---|---|---|
 | E-1 waitlist | At least 1,000 visitors and at least 5% join | Under 1,000 visitors: inconclusive, keep going and keep measuring. 3-5%: rewrite the pitch once and re-run | Under 3% again after the rewrite, with at least 1,000 visitors |
-| E-3 ASR on R1 | Median at most 20 s | 20-40 s: ship and record the miss. Over 40 s: smaller model | Still failing after the fallback makes cloud transcription launch-blocking (PS §19), which the 0 USD rule cannot fund: treat as a stop |
+| E-3 ASR on R1 | Median at most 20 s | 20-145 s for a 60 s clip: ship and record the miss (D-67 of the V2 plan; the band ended at 40 s). Over 145 s: smaller model | Still failing after the fallback makes cloud transcription launch-blocking (PS §19), which the 0 USD rule cannot fund: treat as a stop |
 | E-4 render + encode on R1 | At most 90 s | 90-150 s: ship and record. Over 150 s: Canvas2D path, 60 s / 30 fps cap | No path under budget |
 
 ### 4.4 Exit checklist
@@ -733,7 +733,7 @@ Also measure a 90-second clip. It has no budget; it is expected at about 1.5x, a
 
 | If a budget is missed | Action |
 |---|---|
-| ASR median above 40 s | Smaller model; stronger caption editing |
+| ASR median above 145 s for a 60 s clip (D-67 of the V2 plan; was 40 s) | Smaller model; stronger caption editing |
 | Render + encode above 150 s | Canvas2D overlay path; cap input at 60 s and 30 fps |
 | Denoise exceeds the audio budget | High-pass, loudness and limiter only |
 | App shell over 400 kB | Lazy-load `/account`, `/settings`, `/legal` |

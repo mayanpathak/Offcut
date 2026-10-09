@@ -13,7 +13,7 @@
 | `PS §n` | Section n of `docs/product.md` |
 | `BP §n` | Section n of `docs/buildplan.md` |
 | `V1 §n`, `V1 D-n` | Section or decision of `docs/v1/v1implementation.md` (D-1 to D-17) |
-| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66 was added on 2026-10-09) |
+| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66 and D-67 were added on 2026-10-09) |
 | `S-n` | Build-order step S1 to S16 in §5 |
 | `TE-n`, `E-n` | Technical experiment (TS §37), product experiment (PS §19); V2 procedures are in §24.1 |
 | `INV-n` | Invariant (TS §35) |
@@ -899,13 +899,13 @@ Copy `web/dist` to R1's clone (`web/dist`), then on R1:
 pnpm install --frozen-lockfile && pnpm -C web exec vite preview   # http://localhost:4173
 ```
 
-Download the model once with the hook, then run the Step 5.4 script five times (reload between runs; it times `load` + `transcribe`, D-35). Write to `docs/v2/experiments.md`: the five values, the median, the median normalised to 60 s (`x 60000 / 74705`), backend, Chrome version, date.
+**Since D-67 this step is not run:** the founder's reading of 2026-10-09 (about 150,000 ms on an R1-class laptop) stands for E-3 here, and it is in `docs/v2/experiments.md`. The step as written, for a later reading: download the model once with the hook, then run the Step 5.4 script five times (reload between runs; it times `load` + `transcribe`, D-35). Write to `docs/v2/experiments.md`: the five values, the median, the median normalised to 60 s (`x 60000 / 74705`), backend, Chrome version, date.
 
 | Median on R1 (reference clip) | Do |
 |---|---|
 | At most 25,000 ms | Continue |
-| 25,000 to 50,000 ms | Continue; record the miss |
-| Over 50,000 ms | **Stop.** §24.3: smaller model, new manifest (repeat Steps 4.2-4.4), re-measure |
+| 25,000 to 180,000 ms (D-67; was 50,000) | Continue; record the miss |
+| Over 180,000 ms (D-67; was 50,000) | **Stop.** §24.3: smaller model, new manifest (repeat Steps 4.2-4.4), re-measure |
 
 Remove the hook on the development machine:
 
@@ -929,9 +929,9 @@ grep -c "TE-1\|TE-2\|E-3" docs/v2/experiments.md          # >= 3
 |---|---|---|
 | TE-1 | `vite preview`, Network | Zero requests outside the app origin while loading and transcribing, both backends |
 | Dollar amount | Transcript | A `Usd` span with display `$12k` (directly or through the D-42 form), its words at a confidence of 0.80 or more, or the decision of Step 5.5 recorded |
-| E-3 | `experiments.md` | Five R1 values, median at most 50,000 ms, the column it fell in |
+| E-3 | `experiments.md` | The founder's reading (D-67), at most 180,000 ms, the column it fell in |
 
-Pass: the command block is green, TE-1 and TE-2 each have a recorded outcome (pass or fallback taken), the transcript carries the dollar amount as a `Usd` quantity, and the R1 median is recorded and not above 50,000 ms.
+Pass: the command block is green, TE-1 and TE-2 each have a recorded outcome (pass or fallback taken), the transcript carries the dollar amount as a `Usd` quantity, and the R1 reading of D-67 is recorded and not above 180,000 ms.
 
 Commit: `"V2 S6: offcut-text, ASR worker, ORT copy step, chunk-scoped host entries; TE-1, TE-2, first E-3"`. Do not begin Phase 6 until this passes.
 
@@ -1722,8 +1722,8 @@ python verify/verify_mp4.py <an export made on this device> --profile creator --
 
 | Record in `docs/v2/experiments.md` | From | Threshold (reference clip, D-64) |
 |---|---|---|
-| E-3: `asr` median and p90 | `stages.asr` | Median at most 25,000 ms on R1 |
-| E-3 total: `total.p90` + 5,000 ms audio-chain allowance | `total` | At most 224,000 ms |
+| E-3: `asr` median and p90 | `stages.asr` | Target 25,000 ms on R1; accepted up to 180,000 ms (D-67) |
+| E-3 total: `total.p90` + 5,000 ms audio-chain allowance | `total` | At most 379,000 ms (D-67; was 224,000) |
 | E-4: `render_encode` median and p90 | `stages.render_encode` | At most 112,000 ms on R1 |
 | `probe_audio`, `detect_scene`, `mux` medians | `stages` | 3,700; 1,250; 2,500 ms (recorded, not gated) |
 | Each value normalised to 60 s | `x 60000 / 74705` | - |

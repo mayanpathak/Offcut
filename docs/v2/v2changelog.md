@@ -16,13 +16,14 @@
 |---|---|---|---|
 | 1 | **Closed on 2026-10-09.** The asset bucket's CORS policy allows `http://localhost:4173` (D-41); the entry of that date has the check | - | - |
 | 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). Prompt 33 wrote the public half of the present key into `web/src/config/entitlement-public-key.ts`. If the key is replaced, that literal and §1A item 12 must be derived again in the same change; a token signed with the new key is otherwise refused by every browser. Nothing is signed before V6 | Human | Before V6; sooner is cheaper |
-| 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 44, 51 and 59, and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
+| 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 51 and 59 (Prompt 44 takes no timing on it since D-67), and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
 | 4 | After every prompt marked **Push**: `git push` from `offcut/` (the repository is not the `sh2clips` folder), then read the `ci` run of pull request #2. The next prompt waits for green | Human | Prompts 35, 37, 41, 44, ... |
 | 5 | Submit the merchant onboarding (TE-9) if it is not submitted. Approval can take two weeks | Human | V6 |
 | 6 | Reset the Neon password (V1 item 36) and replace the demo video (V1 item 33) | Human | Before the page is announced |
 | 7 | The file `.env.local` in the repository root holds one line with no name, a test-mode API key. Git ignores the file and no program reads that line. Move it into `.env.deploy` under a name | Human | Any time |
 | 8 | Turn on branch protection for `main` on GitHub (Settings, Branches): require a pull request and the `ci` check. `main` is unprotected, and a push to it deploys | Human | Before Prompt 59 |
 | 9 | Read the license of the speech model before the page is announced. Offcut now serves the model files from its own asset host. The repository they were taken from states no license of its own; the model's author says the code and the weights are under the MIT License, which asks for the notice to go with copies | Human | Before the page is announced |
+| 10 | **The three-minute promise.** With the small-size model the median total for a 60 s clip on R1 is about 221 s on the numbers of D-67, and PS §20.2, §20.3, J10 and the pitch say three minutes. Change the promise or the model before the page says it to a visitor. The copy that states the time is not written yet | Human | Before the page is announced |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -44,7 +45,7 @@
 | 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
-| 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s and a fallback line of 50 s on R1 (E-3). If Prompt 44 reads over 50 s on R1, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompt 44 |
+| 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompt 44 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
 | 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
 | 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): Prompt 45 decides how captions show it | Prompts 43, 45, 46, 48, 50 |
@@ -1464,3 +1465,58 @@ The CSP was not touched: it names neither host, and a request to one would be re
 - A second run in the same worker without a reload, and memory.
 
 **Human.** Read the timing above before Prompt 44: on these numbers the small-size model will not meet E-3 on R1, and D-66 names the base-size model as the fallback. Prompt 44 measures it properly; nothing is decided here.
+
+## 2026-10-09 - Outside a prompt: D-67, a transcription time of up to 180 s is accepted
+
+No code changed. Eight documents changed, all under `docs/`.
+
+**The decision (founder, 2026-10-09): D-67.** The small-size model stays. A transcription time of up to 180 s on R1 for the reference clip is accepted in V2; the target stays 25 s and is recorded as missed; the base-size model is the fallback above 180 s, where the line had been 50 s. The founder's reason: a user can wait a minute or two longer for a better transcript. **E-3 at S6 is read from the founder's own reading,** about 150 s on an R1-class laptop, and Prompt 44 takes no timing on R1.
+
+**What the agent had said first.** After Prompt 43 it reported 65 s on WebGPU and 102 s on WASM on the development machine and expected the small-size model to miss E-3 on R1. Asked whether speed mattered, it advised to compare the two model sizes on the same clip, for errors and for time, before deciding, because nothing has yet shown that the small-size model's transcript is the better one: the transcript of Prompt 43 differs from the script in nine places, and the base-size model has never been run. The founder decided without that comparison.
+
+**The three answers the numbers come from** (asked before anything was written).
+
+| Asked | Answered |
+|---|---|
+| What was the 150-second reading? | An R1-class laptop, 8 GB and an integrated GPU; `load` and `transcribe` of the reference clip |
+| The new line above which the fallback applies | 180 s for the reference clip |
+| How E-3 is recorded | As done now, from that one reading; Prompt 44 skips the timing on R1 |
+
+**Derived by the agent from those answers, not given by the founder.** For a 60 s clip the line is 145 s (180 x 60 / 74.7), which is what the three specs now say where they said 40 s. The p90 total of E-3 is read against 379 s for the reference clip (224 - 25 + 180). Both follow by arithmetic; either can be set otherwise.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `docs/v2/v2implementation.md` | D-67 added to §2, with its costs; §0 says "D-18 to D-67". D-64, D-66, §16.5 and the E-3 rows of §24.1 and §24.3 follow it. 7 replacements |
+| `docs/v2/coding-promptsv2.md` | The Standard Agent Block says "D-18 to D-67". Prompt 44: no timing on R1; its "Done when" box asks for the founder's reading, at most 180,000 ms. The note on the two gates and the row of "Who does what" say so. 5 replacements |
+| `docs/v2/v2buildguide.md` | The table of references; Step 5.6 (not run since D-67; its table reads 25,000 to 180,000 and over 180,000); Milestone 5; the two E-3 rows of Step 12.4. 8 replacements |
+| `docs/product.md` | §20.4: the fallback applies above 145 s for a 60 s clip. §20.2: a status note, which says that the transcription budget is not met and that the three-minute promise does not hold on these numbers |
+| `docs/technicalspec.md` | §16: the acceptance line names D-67; the contingency applies above 145 s. §30: the same row |
+| `docs/buildplan.md` | §4 (the E-3 row and the gate row) and §11: 145 s where they said 40 s |
+| `docs/v2/experiments.md` | The record of E-3 at S6, with what was and was not recorded |
+| `docs/v2/v2changelog.md` | This entry; open item 3 rewritten; open item 10 added; known issue 18 corrected |
+
+The edit of the six specification files was made by a script that refuses a replacement unless its old text occurs exactly once, and that writes nothing unless every replacement can be applied: 28 of 28. Each file keeps its line endings.
+
+**Not changed, and why.**
+
+- **The targets of PS §20.2** (20 s of transcription, 121 s median, 180 s p90) and the promise built on them. They are the product's targets; D-67 says that one of them is missed and accepted. A status note says what follows. Whether the promise or the model changes is open item 10.
+- **The pitch and J10,** which say three minutes. The same open item.
+- **E-4 and its bands.** D-67 is about transcription only.
+- **The reading of S15** (Prompt 59: `pnpm bench:device` on R1, ten runs, the bench file of §26). It is still taken.
+- **No code.** `MODEL_DTYPE`, the manifest and the files on the asset host are those of Prompts 38 and 43.
+
+**What the record of E-3 lacks,** by the founder's choice and said in `experiments.md`: the median of five runs; the backend; the version of Chrome; the build that was run. **The agent does not know what was run on that laptop:** the commit of Prompt 43, the first one that can transcribe, had not been pushed when the reading was reported, so the laptop cannot have had it from GitHub. If the reading came from another program that runs the same model, it does not include what Offcut adds to the time (word timestamps, three windows with an overlap) or its settings.
+
+**Checked.**
+
+- `node scripts/check-file-tree.mjs` passes: the tree of TS §5 was not touched.
+- `git diff --stat`: eight files, all under `docs/`. The frozen-file diff against the baseline is empty.
+- `grep -n "50,000\|25-50 s\|above 40 s\|> 40 s" docs/` finds the old limits only where a sentence says what they were, and two numbers that are not limits of E-3.
+- The four-command gate was not run: no file that a build or a test reads was changed. The test counts are those of Prompt 43: **218 Rust, 92 Vitest, 12 Playwright**.
+
+**Open.**
+
+- The S15 reading on R1, and TE-14: the estimate of the ASR phase is 40 MB under the memory budget (D-66).
+- Whether the small-size model's transcript is better than the base-size model's. Nothing has compared them.

@@ -6,7 +6,7 @@ Source documents: `docs/v2/v2implementation.md` (written **§n**; its decisions 
 
 **Recorded deviation from TS §34.1 and BP §1.3, extended to V2.** Those sections give each file its own specification and hide the rest of the repository from the implementer. `docs/v1/coding-prompts.md` accepted the multi-file format for V1 only. Using it again here is the founder's choice for V2. The per-file contract is still honoured in one way: every prompt names its files, and a signature the plan gives is implemented exactly.
 
-**Two prompts are gates.** Prompt 44 (transcription time) and Prompt 51 (render and encode time) each end with a reading on R1. A miss sends you to §24.3 before anything else is built.
+**Two prompts are gates.** Prompt 44 (transcription time) and Prompt 51 (render and encode time) each end with a reading on R1. A miss sends you to §24.3 before anything else is built. Prompt 44's reading was given by the founder on 2026-10-09 (D-67): that prompt takes no timing on R1.
 
 ---
 
@@ -25,7 +25,7 @@ BASE=$(git merge-base main HEAD)                                             # t
 1. Read the plan sections and guide steps this prompt cites, and the files it touches.
 2. Search for existing types, helpers and constants before creating any. Reuse them.
 3. Verify that the previous prompts' outputs exist and behave as this prompt assumes. If not: decide whether it is a bug or an intended boundary, make the smallest compatible fix, and report it.
-4. Precedence: a decision D-18 to D-66 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
+4. Precedence: a decision D-18 to D-67 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
 
 **During implementation**
 
@@ -73,7 +73,7 @@ The agent writes files, runs commands and drives Chrome through Playwright. A da
 | Before Prompt 31 | Install `gh` and run `gh auth login` (or plan to use the GitHub website). Add the origin `http://localhost:4173` to the asset bucket's CORS policy. Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render (its private half was exposed in a chat on 2026-10-08); if you replace it, tell the agent, so that Prompt 33 derives the public half again. Submit the merchant onboarding (TE-9) if it is not submitted. Book R1 and set it up | G 0.1, 0.3, 0.4, 0.6 |
 | Prompt 33, and after every prompt marked **Push** | `git push` (the first time `git push -u origin v2-build`, then open the draft pull request). Read the `ci` run; the next prompt waits for green | G M-1, G item 9 |
 | Prompt 38 | Choose and download the model files; run the uploads with the credentials of `.env.deploy`; or tell the agent in that prompt's message to do both | G 0.4, 4.2 |
-| Prompt 44 | Five transcription timings on R1 (E-3) | G 5.6 |
+| Prompt 44 | None on R1: the founder's reading of E-3 stands (D-67). Push; read `ci` | G 5.6 |
 | Prompt 51 | TE-3, TE-4 and three export timings on R1 (E-4) | G 8.4, 8.5 |
 | Prompt 55 | Watch and listen to one preview and one exported file: caption position, sound in sync, the reveal on the spoken amount | G 10.4, 10.5 |
 | Prompt 58 | Mark the pull request ready; read the Windows job and its minutes (TE-10) | G 11.5 |
@@ -382,11 +382,11 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 - TE-2: if the runtime gives a per-token probability, wire `confidence` as its mean per word in `word-timestamps.ts`.
 - `docs/v2/experiments.md`: TE-1, TE-2 and E-3, each with question, method, numbers, date, decision.
 
-**Browser check (preview; needs the CORS origin `http://localhost:4173`).** Record every request of the page and its workers while the model loads and the clip is transcribed, once with `backend: "webgpu"` and once with `"wasm"`. TE-1 passes when every request goes to `localhost:4173`, no console line starts "Refused to", and both backends return a transcript. TE-2 passes when probabilities are present at no more than 10% extra time; otherwise `confidence` stays 1.0. With probabilities on, read the confidence of the words of the dollar span: each must be 0.80 or more. Below that no event is created and V2 shows nothing: stop, and record the choice as a V2 decision in §2 (TE-2 read as failed for V2, or the clip recorded again). The threshold is not lowered. **Stop rules.** A request to any other host, or a CSP refusal: TE-1 failed; second runtime behind the same `whisper-runtime.ts` interface (TS §16 contingency). Never add a CSP host. **Human, on R1.** G 5.6: five runs of `load` + `transcribe`, the median, the median normalised to 60 s. At most 25,000 ms: continue. 25,000 to 50,000: continue and record the miss. Over 50,000: stop; smaller model, Prompts 38 to 40 again, re-measure. Then push and read `ci`. **Done when.**
+**Browser check (preview; needs the CORS origin `http://localhost:4173`).** Record every request of the page and its workers while the model loads and the clip is transcribed, once with `backend: "webgpu"` and once with `"wasm"`. TE-1 passes when every request goes to `localhost:4173`, no console line starts "Refused to", and both backends return a transcript. TE-2 passes when probabilities are present at no more than 10% extra time; otherwise `confidence` stays 1.0. With probabilities on, read the confidence of the words of the dollar span: each must be 0.80 or more. Below that no event is created and V2 shows nothing: stop, and record the choice as a V2 decision in §2 (TE-2 read as failed for V2, or the clip recorded again). The threshold is not lowered. **Stop rules.** A request to any other host, or a CSP refusal: TE-1 failed; second runtime behind the same `whisper-runtime.ts` interface (TS §16 contingency). Never add a CSP host. **Human.** E-3 is not timed on R1 in this prompt: the founder's reading of 2026-10-09 stands (D-67; about 150,000 ms for the reference clip, against a line of 180,000 ms; it is in `experiments.md`). Push and read `ci`. **Done when.**
 
 - [ ] TE-1 and TE-2 each have a recorded outcome, pass or fallback taken; the dollar span's confidence is 0.80 or more, or the decision is recorded.
 - [ ] The hook is gone: `git grep -n "zz-spike" -- web/src` is empty; G M-5 passes.
-- [ ] E-3: five R1 values and the median are in `experiments.md`, and the median is not above 50,000 ms (Human).
+- [ ] E-3: the founder's reading of D-67 is in `experiments.md`, and it is not above 180,000 ms.
 
 ## Prompt 45 — `offcut-scene`
 

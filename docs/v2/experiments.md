@@ -9,7 +9,7 @@
 | TE-7 re-check (ranged requests to the asset host, with the real model files) | 38 | Run on 2026-10-09: passed |
 | TE-1 (no request outside the closed host list during transcription) | 44 | Not run |
 | TE-2 (word probabilities at no more than 10% extra time) | 44 | Not run |
-| E-3 (transcription time on R1) | 44, 59 | Not run |
+| E-3 (transcription time on R1) | 44, 59 | S6: the founder's reading of 2026-10-09, about 150 s, accepted (D-67). S15: not run |
 | TE-3 (frame capture method; render-only speed) | 51 | Not run |
 | TE-4 (encoder ladder entry; AAC priming) | 51 | Not run |
 | E-4 (render and encode time on R1) | 51, 59 | Not run |
@@ -46,3 +46,26 @@
 **Decision.** Passed. The asset host stays; no file is split. The largest single file is under the 150 MB that V1's TE-7 tested, so its record needs no correction (known issue 18 of `v2changelog.md` is closed).
 
 **Not read.** The billing page of the host: whether an egress charge appears is the human's to look at. The host's terms say egress is free (V1's TE-7).
+
+## E-3, at S6: transcription time on R1 (the founder's reading)
+
+**Question.** Does local transcription of the reference clip stay inside its time budget on R1 (PS §19, §24.1)?
+
+**Method.** Not the method of §24.1. The founder gave one reading on 2026-10-09 and decided that it stands for E-3 at this step (D-67). What the founder reported: `load` and `transcribe` of the reference clip on an R1-class laptop, 8 GB of memory and an integrated GPU. Not recorded: the build that was run, the backend (WebGPU or WASM), the version of Chrome, the number of runs. The procedure of §24.1 asks for the median of five runs with those four things written down; none of that was done, by the founder's choice.
+
+**Numbers.**
+
+| Read | Value |
+|---|---|
+| `load` + `transcribe`, reference clip (74,705 ms), R1-class laptop, as reported | about 150,000 ms |
+| Normalised to 60 s (x 60,000 / 74,705) | about 120,500 ms |
+| The target (D-64) | 25,000 ms: missed |
+| The line above which the fallback applies | 180,000 ms since D-67 (it was 50,000 ms): not reached |
+
+For comparison, `dev` readings of Prompt 43, which stand for nothing here: 65,000 ms on WebGPU and 102,000 ms on WASM with four threads, on the development machine.
+
+**Date.** Reported on 2026-10-09.
+
+**Decision.** Continue with the small-size model (D-66) and record the miss: the reading falls in the middle column of §24.3 as D-67 redrew it. The base-size model stays the fallback above 180,000 ms. Prompt 44 takes no timing on R1. The reading of S15 (`pnpm bench:device` on R1, ten runs, Prompt 59) is still to be taken and is judged against the same line.
+
+**What this reading does not show.** That the time is the same on another R1-class machine, or on a second run; which backend a user's browser will get; anything about the quality of the transcript, which no experiment has compared between the two model sizes.
