@@ -45,11 +45,12 @@
 | 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
-| 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompt 44 |
+| 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository. In a production build (entry of Prompt 44) the same machine read 62 s to 96 s on WebGPU and 98 s to 123 s on WASM | Prompt 59 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
 | 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
 | 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): Prompt 45 decides how captions show it | Prompts 43, 45, 46, 48, 50 |
-| 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word:** TE-2 (Prompt 44) wires the real figure in `whisper-runtime.ts` and `word-timestamps.ts`; the package's word-timestamp path returns no probability by itself, so that is work, not a switch. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
+| 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word, and stays so in V2:** TE-2 (entry of Prompt 44) found that the runtime returns no probability. No score is lowered by it; a prompt that reads `confidence` reads 1. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
+| 24 | **A first transcription may be slower than the next** (entry of Prompt 44): in a new browser profile, straight after a build and the download of the model, `load` and `transcribe` took 95.5 s on WebGPU and 123.4 s on WASM; the second run took 61.9 s and 98.1 s. One pair of readings, cause not found. The bench of Prompt 59 should keep its first run apart, and E-3 at S15 should say which it reports. **Chrome makes requests of its own** (an update check, a push-message registration) while a page is open: a check that reads the browser's whole network log, and not the page's requests, sees them and must tell them apart by who started them | Prompts 57, 59 |
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 
 ---
@@ -1520,3 +1521,74 @@ The edit of the six specification files was made by a script that refuses a repl
 
 - The S15 reading on R1, and TE-14: the estimate of the ASR phase is 40 MB under the memory budget (D-66).
 - Whether the small-size model's transcript is better than the base-size model's. Nothing has compared them.
+
+## 2026-10-09 - Prompt 44: TE-1, TE-2, first E-3 (gate)
+
+**The gate says go.** TE-1 passed on both backends. TE-2 did not pass and its agreed fallback is taken. E-3 at S6 is the founder's reading of D-67, about 150,000 ms against a line of 180,000 ms, already in `experiments.md`; this prompt took no timing on R1.
+
+**Before the prompt.** `v2-build` was two commits ahead of GitHub: Prompt 43 (`98e9238`) and D-67 (`beb0cc0`) had not been pushed, so `ci` has not run on either. The last green run is #13, on `792662f` (Prompt 42).
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `docs/v2/experiments.md` | The records of TE-1 and TE-2; their two rows of the table |
+| `docs/technicalspec.md` | §39.3 item 7: the outcome of TE-2 (the place §24.1 names) |
+| `web/src/workers/asr/word-timestamps.ts` | One comment line: the confidence is 1 because the recognizer returns no figure, not "until it is read" |
+| `docs/v2/v2changelog.md` | This entry; known issues 18 and 23 corrected; known issue 24 added |
+
+No other code changed. The hook `web/src/zz-spike.ts`, its import in `main.tsx`, the temporary Playwright case, one temporary line in `whisper-runtime.ts`, the browser profile and Chrome's network log were made for the experiments and are gone: `git status --porcelain` showed nothing before the first edit of this entry.
+
+**TE-1: passed.** A production build under the CSP of `vercel.json`, served by `vite preview` at `http://localhost:4173`; Chrome 155.0.8059.39, headless; two runs, each on WebGPU and on WASM.
+
+| Read | WebGPU | WASM |
+|---|---|---|
+| Requests of the page and its workers from `load` to `unload` | 7 and 8, all to `localhost:4173` | 8 and 8, all to `localhost:4173` |
+| Console lines, page errors | 0 | 0 |
+| The transcript | 157 words, equal to `fixtures/speech/README.md` | The same |
+| The amount | `$12k`, words 132 and 133 | The same |
+| `load` + `transcribe`, run 1 and run 2 (`dev`) | 95.5 s, 61.9 s | 123.4 s, 98.1 s |
+
+The requests are the two worker scripts, `offcut_core_bg.wasm` twice, the two files under `/ort/<version>/`, the clip the test handed over, and the app's own `POST /api/v1/events`. The three thread workers of ONNX Runtime start from the `.mjs` file on the app's origin, none from a `blob:` address. The model came from the asset host once (31 requests, 70.8 s) and from OPFS after that.
+
+**A second record, and what it showed.** Chrome's own network log of the whole browser, read for the same time windows: 9 requests to `localhost:4173` in each, started by the app's origin, and 3 to hosts of Google (an update check and the push-message registration), each marked by the log as started by no page. Those are the browser's own and are in no record of the page or its workers. They are written into `experiments.md` so that nobody later reads "no request" as "the browser is silent": TE-1 is about what Offcut asks for.
+
+**TE-2: not passed; `confidence` stays 1.0.** The runtime computes the probability of each token it picks and does not return it: the last lines of its generation loop are a `TODO` for `scores` and `logits`, `output_scores` is declared and read nowhere, and the result of the speech pipeline has `text` and `chunks`, each chunk `text` and `timestamp`. Seen in the source and in the running build: with `output_scores: true` the fields were the same in 6 of 6 windows. The fallback of §24.1 was agreed in advance, so this is no new decision. The dollar span has a confidence of 1.0.
+
+**What that costs.** Nothing in V2 lowers a score for a word the recognizer was unsure of. V3's detector multiplies by word confidence (TS §17.4) and will multiply by 1 unless TE-2 is run again there. `experiments.md` says how a probability could be had and why it was not built: a `logits_processor` gives one per token, and nothing the package exports says which tokens make which word.
+
+**The option names** (§24.1 asks for them here). They are those of the entry of Prompt 43, and they hold in a production build under the CSP: `env.allowRemoteModels = false`, `env.allowLocalModels = true`, `env.fetch` set to a function that refuses, `env.useBrowserCache`, `env.useFSCache` and `env.useWasmCache` all `false`, `env.useCustomCache = true` with `env.customCache`, `env.backends.onnx.wasm.wasmPaths = { mjs, wasm }` under `/ort/<version>/`, `wasm.proxy = false`, `wasm.numThreads` from 1 to 4; `pipeline("automatic-speech-recognition", modelId, { device, dtype })`; the call option `return_timestamps: "word"`.
+
+**Seen and not explained.** The first transcription in a new browser profile was slower than the second, by about half on WebGPU and a quarter on WASM. It followed a build and the download of the model, which may be all of it. Known issue 24.
+
+**Gate.**
+
+| Step | Result |
+|---|---|
+| `git status --porcelain \| grep -c "zz[-_]"` | 0 |
+| `env \| grep -c VITE_ENTITLEMENT_TEST_PUBLIC_KEY` | 0 |
+| `pnpm check` | Green |
+| `pnpm test` | Green: **218 Rust** (2 ignored, as before), **92 Vitest** |
+| `pnpm build` | Green; `check-hosts: ok`, 9 files in `web/dist`, the only host is the asset host |
+| `pnpm e2e` | Green: **12 Playwright**, with the 6 workers of the default, in 26 s |
+| The frozen-file diff against `322c7d3` | Empty |
+
+The counts are those of Prompt 43: this prompt adds no test. The gate ran before its own two tables were written into this entry; nothing else changed after it.
+
+**Milestone 5 (G M-5).**
+
+| Command | Result |
+|---|---|
+| `cargo test -p offcut-text` | 12 passed, 0 failed |
+| `pnpm check`, `pnpm build` | Green (the gate above) |
+| `ls web/dist/ort/` | One directory, `1.31.0-dev.20260914-8d85527a0` |
+| The removal check: `git grep` for the hook's two marks in `web/src` | No output |
+| The count of lines of `experiments.md` that name TE-1, TE-2 or E-3 (at least 3) | 15 |
+
+**Done when.**
+
+- [x] TE-1 and TE-2 each have a recorded outcome: TE-1 passed, TE-2's fallback taken. The dollar span's confidence is 1.0.
+- [x] The hook is gone: `git grep -n "zz-spike" -- web/src` is empty; G M-5 passes.
+- [x] E-3: the founder's reading of D-67 is in `experiments.md`, about 150,000 ms, not above 180,000 ms.
+
+**Open, for the human.** Push `v2-build` (three commits: Prompt 43, D-67, Prompt 44) and read `ci` on pull request #2. Prompt 45 waits for green.

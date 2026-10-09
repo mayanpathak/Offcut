@@ -3508,7 +3508,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 4. Mobile detection via `navigator.userAgentData.mobile` (§3) — E-8 data at M2.2.
 5. `MAX_FILE_SIZE` read as 500,000,000 bytes; `INPUT_FPS_TOLERANCE`; `MIN_WORDS`; `MAX_RECENT_CLIPS` (§10.2) — M1.1, E-2, M2.1.
 6. First video track used when several exist; fragmented MP4 rejected (§15.4) — TE-12.
-7. Per-word ASR confidence (§16.4) — TE-2. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
+7. Per-word ASR confidence (§16.4) — TE-2. Run on 2026-10-09 (`docs/v2/experiments.md`): the runtime of V2 returns no probability, so every word has `Confidence(1.0)` and detector scores do not use ASR confidence. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
 8. Non-English speech and multiple speakers are not detected at import; these two PS §9.4 constraints have copy but no rejection test (§15.4) — E-2, E-10.
 9. Sentence segmentation constants (§17.2) — E-10.
 10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7.

@@ -52,7 +52,7 @@ const within = (ms: number, durationMs: number): number => Math.min(Math.max(ms,
 /**
  * Words in order, inside the clip, none starting before the one before it
  * ended, and none shorter than `ASR_MIN_WORD` where the next word allows.
- * The confidence is 1 until the recognizer's own figure is read (TE-2).
+ * The confidence is 1: the recognizer returns no figure of its own (TE-2).
  */
 export function postProcess(words: RawWord[], durationMs: DurMs): RawWord[] {
   const placed: RawWord[] = [];
