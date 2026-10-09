@@ -17,15 +17,17 @@ import type {
   EditState,
   ExportId,
   Prosody,
+  TimeMs,
   Transcript,
   UnixSecs,
 } from "../gen/domain";
 import { move, OpfsError, paths } from "../persistence/opfs";
 import { loadRender, type RenderApi, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
-import type { FailureStage, RenderWorkerApi, StageTiming } from "./protocol";
+import type { ClockSync, FailureStage, RenderWorkerApi, StageTiming } from "./protocol";
 import { runExport } from "./render/export-loop";
 import { OpfsSink } from "./render/opfs-sink";
+import { runPreview } from "./render/preview-loop";
 import { liveFrames, VideoSource } from "./render/video-source";
 import { CANCELLED, type Handlers, type JobContext, serveWorker, toAppFailure, WorkerFailure } from "./rpc";
 
@@ -45,6 +47,10 @@ let open: Session | undefined;
 let scene: { transcript: Transcript; events: DetectedEvent[]; edit: EditState } | undefined;
 /** The canvas of the page's player, once it is attached. */
 let previewCanvas: OffscreenCanvas | undefined;
+/** The page's audio clock as the page last told it, and the preview loop that follows it. */
+let clock: ClockSync | undefined;
+let stopPreview = false;
+let previewLoop: Promise<unknown> | undefined;
 
 /**
  * What was thrown, as the failure a handler throws, with the stage it
@@ -267,12 +273,68 @@ async function exportClip(
   return result;
 }
 
+/**
+ * The time on the clip that sounds now: where the audio was when the page
+ * last said so, and what has passed since. The page's clock and this
+ * worker's count from different starts; the sum of start and time passed is
+ * the same moment in both (TS §20.2).
+ */
+function previewTime(): TimeMs {
+  if (clock === undefined) {
+    return 0 as TimeMs;
+  }
+  const since = performance.timeOrigin + performance.now() - clock.epochMs;
+  return Math.max(0, clock.audioMs + since) as TimeMs;
+}
+
+/** Draws the preview until the clip ends or `previewPause` stops it. Answers when the loop has returned. */
+async function previewPlay(p: { clock: ClockSync }): Promise<void> {
+  const state = opened();
+  if (scene === undefined || previewCanvas === undefined) {
+    throw new WorkerFailure("E_INTERNAL", scene === undefined ? "NoScene" : "NoCanvas");
+  }
+  clock = p.clock;
+  stopPreview = false;
+  const loop = runPreview(state.session, state.source, previewTime, () => stopPreview);
+  previewLoop = loop;
+  let closed = false;
+  try {
+    await loop;
+  } finally {
+    previewLoop = undefined;
+    // The last frame stays on the canvas; no decoded frame stays open (INV-11).
+    closed = closeFrames(state);
+  }
+  if (!closed) {
+    throw new WorkerFailure("E_INTERNAL", "FrameLeak");
+  }
+}
+
+/**
+ * One-way: nobody waits for an answer, and a failure thrown here would
+ * reach the page as a crash of the worker. It only notes the time.
+ */
+function previewClock(p: { clock: ClockSync }): void {
+  clock = p.clock;
+}
+
+/** Stops the loop and answers when it has returned, however it ended: its failure is `previewPlay`'s to report. */
+async function previewPause(): Promise<void> {
+  stopPreview = true;
+  await previewLoop?.then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
 /** Idempotent. */
 function closeSession(): void {
   const state = open;
   open = undefined;
   scene = undefined;
   previewCanvas = undefined;
+  stopPreview = true;
+  clock = undefined;
   if (state === undefined) {
     return;
   }
@@ -289,24 +351,15 @@ function notYet(): never {
   throw new WorkerFailure("E_INTERNAL", "NotImplemented");
 }
 
-/**
- * One-way: nobody waits for an answer, and a failure thrown here would
- * reach the page as a crash of the worker. Until the preview loop reads the
- * clock, the message is dropped.
- */
-function previewClock(): void {
-  // Nothing reads the clock yet.
-}
-
 const handlers: Handlers<RenderWorkerApi> = {
   openSession,
   detect,
   redetectSentence: notYet,
   setScene,
   attachPreview,
-  previewPlay: notYet,
+  previewPlay,
   previewClock,
-  previewPause: notYet,
+  previewPause,
   previewSeek: notYet,
   exportClip,
   closeSession,

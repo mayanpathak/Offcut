@@ -60,10 +60,11 @@
 | 28 | **What Prompts 50 to 53 build on** (entry of Prompt 49). `new VideoSource(session, clipInfo)`: `await source.frameAtBlocking(t)` for the export and `source.frameAt(t)` for the preview, `t` in milliseconds; **the frame stays the source's: the loop does not close it,** and it stays open until the source hands out a newer one; `source.close()` closes everything. `liveFrames.count` goes up for every frame a decoder gives out and down at every `close()` in `video-source.ts`; a frame the loop makes itself (`new VideoFrame(canvas)`) is counted and closed by the loop. One `VideoSource` can serve a preview and then an export: a time before what it holds starts decoding again. A failure is a `WorkerFailure` with `E_DECODE_VIDEO`. `await pickVideoConfig(profile)` gives the encoder configuration or throws `E_ENCODE_VIDEO`; on the development machine it is `avc1.640028`, `prefer-hardware`. `const sink = await OpfsSink.open(paths.exportTmp(id))`, given to `render.newMuxer(sink, ...)`; `await sink.close()` on success, `await sink.abort()` otherwise; one sink per path at a time. **The verifier:** `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`, with Python 3.13 first in `PATH`; it wants `yuv420p`, 2,242 frames exactly 1/30 s apart, and audio within 21.34 ms of the video. **On the reference clip:** output frames 150 and 1,946 are the two white frames; 80 output times repeat a source frame; decoding alone ran at 652 frames a second on the development machine | Prompts 50, 51, 53, 57 |
 | 29 | **What Prompts 51 to 54 build on** (entry of Prompt 50). `pool.render` exists. `openSession({ clipId, clipInfo })`, `detect({ transcript, prosody })`, `setScene({ transcript, events, edit, profile: "preview" })`, `attachPreview({ canvas }, { transfer: [canvas] })`, `exportClip({ exportId, entitlementToken, out48 }, { transfer: [out48.buffer], onProgress })`, `closeSession()`. `exportClip` answers `{ opfsPath, summary, stageTimings: [render_encode, mux] }`; its progress is one `render_encode` message for each frame, `done` from 1 to `N`, then one with `stage: "mux"`. It rejects with `E_INTERNAL` and the detail `NoSession` or `NoScene` when called too early. After an export the worker closes the `VideoSource` and makes a new one: **`previewPlay` (Prompt 53) must read the source from the module's state each time and not keep it.** `runExport` takes `canvas` and `onEncoded` beside the arguments of TS §21.1. The frame in the loop is closed by `closeFrame(vf);`; without that line an export fails with `FrameLeak` (run in Prompts 50 and 51). **`export-loop.ts` has 396 lines of the 400.** Since Prompt 51 the capture method is method A and `AAC_PRIMING_SAMPLES` is a measured 0. `previewClock` is dropped without an answer until Prompt 53 gives it a handler; that handler must not throw. Two exports of Prompt 50 are in `testclips/renders/`. A check that needs the model makes its own profile under `fixtures/.cache/zz-profile-4173/`: Prompts 50 and 51 removed theirs. `vite build` alone takes a second when the two bundles are built already, so a keyed build for a check needs no `pnpm build:wasm` unless Rust changed | Prompts 51, 52, 53, 54 |
 | 30 | **Chrome reads a full-range clip as limited-range** when the clip carries the range flag and no colour description, as the reference clip does (entry of Prompt 50): a `VideoFrame` of it has `fullRange: false`, and the picture is drawn, previewed and exported with its brightness stretched from 16..235 to 0..255. E-4's time does not depend on it. The picture a person judges at Prompt 55 does. A `VideoDecoderConfig` takes a `colorSpace` that overrides what the browser read; `video-source.ts` gives none, and `ClipInfo` has no field to carry the flag | Prompts 55, 57; V3 |
-| 31 | **`Client<Api>` of `rpc.ts` asks for one argument on every method,** also on one the protocol gives none: `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` fail `tsc` with "Expected 1-2 arguments, but got 0" (tried in Prompt 50 with a throwaway file). `pool.asr.unload(undefined)` compiles and does the same. A change of the type is a change of `rpc.ts`, which has 374 lines | Prompts 53, 54 |
+| 31 | **Closed in Prompt 53:** the type takes no argument for a method that has none. It was: **`Client<Api>` of `rpc.ts` asks for one argument on every method,** also on one the protocol gives none: `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` fail `tsc` with "Expected 1-2 arguments, but got 0" (tried in Prompt 50 with a throwaway file). `pool.asr.unload(undefined)` compiles and does the same. A change of the type is a change of `rpc.ts`, which has 374 lines | Prompts 53, 54 |
 | 32 | **A `VideoFrame` made from a buffer of RGBA bytes is encoded with full-range brightness, and the stream does not say so** (entry of Prompt 51, TE-3): white is stored as 255, not 235, and a player shows the file with too much contrast. A frame made from the canvas is right. Any path that hands the encoder pixels from a buffer, the readback of TS §21.4 or the Canvas2D backend of the contingency, must give its frames a `colorSpace` and be checked against a file of method A | V5; any contingency of TS §19 or §21 |
 | 33 | **A page under Playwright is never hidden.** `document.visibilityState` stays `visible` with another tab in front and with the window minimised, and Playwright starts Chrome without the throttling of hidden pages (entry of Prompt 51). A test of what the app does when the tab hides (`PreviewPlayer` pauses, Prompt 55) cannot hide the page: it has to send the `visibilitychange` event itself, or drive an ordinary Chrome over its DevTools port, as TE-3 did. **Export times on D1 rise over a session,** from 28 s to about 40 s for the same clip: a reading taken late in a long run is not the machine's best, and the bench's ten runs will show it | Prompts 55, 57, 59 |
 | 34 | **What Prompts 53 to 55 build on** (entry of Prompt 52). The stores are `useClipStore`, `usePreviewStore`, `useExportStore`; a use-case calls the actions each file exports, a component reads with the hook and writes nothing. Clip: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()`, and `noteFailure(failure)` for a failure that leaves the clip `ready`. Export: `start(exportId)`, `blocked()`, `clear()`, `progress(done, total)`, `encoded()`, `finalized()`, `saved()`, `fail(failure)`, `reset()`, `setUnavailable(flag)`; `start` clears `unavailable`. Preview: `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`; `lock` and `detach` are legal in every state. **An illegal action throws `IllegalTransitionError` in a development build and in a test,** and is reported and ignored in production: a use-case must not call `failed` on a `ready` clip, `begin` on a clip that is not `idle`, or `start` on an export that is `done` (call `reset()` first). `forImport()` and `forExport()` of `state/blockers.ts` return a `BlockerCode` or `null`; `messages.blockers` has the words of four codes and is typed by its keys, not by `BlockerCode`, which `copy/` may not import. `entitlement-repo.ts`: `get()` gives `{ token, storedAt }` or `undefined`, `put(token)` | Prompts 53, 54, 55 |
+| 35 | **What Prompts 54 to 57 build on** (entry of Prompt 53). `usecases/control-preview.ts`: `attach(canvas, out48)` (the canvas is handed over for good: an element can be attached once), `play()`, `pause()`, `detach()`, `lockForExport()`, `unlockAfterExport()`. `play()` resolves when the preview is playing; it needs a click before it the first time, or the browser keeps the `AudioContext` silent and `play()` does not resolve. All six do nothing when there is nothing to do, and none throws for a failure of the worker: that is stored with `noteFailure` on the clip store. `start-export.ts` calls `lockForExport()` before `exportClip` and `unlockAfterExport()` after it, whatever the outcome. **The worker refuses `exportClip`, `closeSession` and every other call while `previewPlay` runs** (`E_INTERNAL`, `Busy`): pause or lock first. `preview_played` is tracked in `control-preview.ts`, once for each `attach`. On D1 the loop drew 30 frames a second with under 1% late and at most 17 ms from the audio's time. `rpc.ts` has 377 lines and `render.worker.ts` 372 | Prompts 54, 55, 56, 57 |
 
 ---
 
@@ -2717,3 +2718,117 @@ No console line and no page error.
 - **A production build's answer to an illegal transition:** there the attempt is reported and the state stays (V1). The check ran in a development build, where it throws.
 - **Nothing calls these stores yet** but the check. `DropZone` reads `forImport()` from Prompt 55.
 - No machine test and no `blockers.test.ts`: they are V4 and V5 (§23.1).
+
+## 2026-10-10 - Prompt 53: preview loop, preview handlers, `control-preview`
+
+**The preview plays.** With the reference clip taken to a scene by hand, `attach` and a click on play draw the clip with its captions as its audio sounds; a pause holds the picture; a second play goes on from there.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/workers/render/preview-loop.ts` | `runPreview(session, source, clock, isStopped)` and `PreviewStats` (TS §20.1, §20.2). 81 lines |
+| `web/src/usecases/control-preview.ts` | `attach`, `play`, `pause`, `detach`, `lockForExport`, `unlockAfterExport`; the one `AudioContext`; `toTimeMs`, the one cast to `TimeMs` (D-59). 206 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/workers/render.worker.ts` | The real `previewPlay`, `previewClock` and `previewPause`; the clock, the stop flag and the running loop in the module's state; `closeSession` sets the stop flag. `redetectSentence` and `previewSeek` still answer `E_INTERNAL`. 372 lines |
+| `web/src/workers/rpc.ts` | The type `Client<Api>`: a method the protocol gives no argument is called with none. No line that runs changed. 377 lines |
+| `docs/v2/v2implementation.md` | §15.6, §16.6, §16.7 and §19.4 say what was built (4 replacements, each applied once) |
+| `docs/v2/v2changelog.md` | This entry; known issue 31 closed, 35 added |
+
+No dependency was added.
+
+**Browser check (dev, model cached).** `vite` on port 5173 with the bundles of the last build; Chrome 155 under Playwright, headless, a new profile; a script kept outside the repository. The model was downloaded once (45.7 s), the clip transcribed (64.8 s, 157 words) and taken to a scene with `pool`; then a canvas of 540 x 960 was put on the page, with two buttons, because a play must follow a click.
+
+| Asked | Result |
+|---|---|
+| `attach(canvas, out48)` | Answers in 388 ms; the preview is `stopped` |
+| A click on play; two screenshots of the canvas 1 s apart | They differ. Neither is one flat colour: 3,685 and 3,501 different colours in a sample of each |
+| A click on pause; two screenshots 500 ms apart | Identical. The preview is `paused`. No failure is stored on the clip store |
+| A click on play again; screenshots | The picture differs from the paused one and goes on changing: it resumes |
+
+**The loop keeps up.** `previewPlay` returns nothing, so for this reading one temporary line made it return the loop's `PreviewStats`; it is gone. The reference clip, a hand-made scene, the clock run from the page as `control-preview.ts` runs it:
+
+| Played | Frames drawn | Late | Largest drift |
+|---|---|---|---|
+| 10 s from the start | 298 | 2 | 10 ms |
+| 10 s from 10 s | 299 | 1 | 17 ms |
+| 5 s from 40 s, a jump ahead | 150 | 1 | 17 ms |
+| 3 s from 4 s, a jump back | 89 | 1 | 16 ms |
+| 5 s from 60 s, the clock told once and never again | 149 | 1 | 17 ms |
+| From 73 s to the end of the clip | 51; the loop returned by itself after 1,750 ms, which is the 1,733 ms that were left | 1 | 17 ms |
+
+TS §20.3 asks for a drift of at most 80 ms and at most 5% of the frames late. These are 17 ms and under 1%, on D1. The one late frame of each play is the first: nothing is decoded yet. A pause was answered in 6 to 18 ms.
+
+**Checked beyond the prompt.**
+
+| Asked | Result |
+|---|---|
+| `play()` with nothing attached; `previewPlay` sent to a worker that has no canvas | Nothing happens; `E_INTERNAL`, detail `NoCanvas` |
+| A click on play while playing; two `pause()` at once | Still `playing`, one loop; `paused`, no failure |
+| `lockForExport()`; `play()` while locked; `unlockAfterExport()`; a click on play | `locked`; still `locked`; `paused`; it plays on from where it was |
+| `lockForExport()` while playing | `locked`: the play was paused first. Then `paused` |
+| `detect` on the worker after the plays | It answers |
+| `detach()`, twice; `play()` after it | `detached`, `playedOnce` false; nothing happens |
+| A 6-second clip played to its end | `stopped` 6,227 ms after the click, for a clip of 6,192 ms; the picture is still after it; no failure |
+| A click on play after the end | It plays from the start |
+| `preview_played` in the batches the page posted | 2, one for each preview that was attached; the first was played three times and the second twice. The event is `{ "name": "preview_played" }`, with no `props` |
+| **A pause while the page is hidden** (an ordinary Chrome with its window minimised, driven over its DevTools port: known issue 33) | Answered in 4 ms, the loop returned, no failure. The same for a play that was started while hidden |
+| Two screenshots looked at | The speaker in the centre strip, the caption in white with a dark outline, and on the short clip `$12k` large above "We made $12k in sales." |
+
+No console line and no page error in any of it.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **The end of the clip is the scene's frame count.** TS §20.2 ends the loop "if t >= clip duration", and `runPreview` is given no duration. The loop ends when the clock reaches frame `session.frame_count()`, which is the clip's end rounded up to a whole frame.
+- **A step of the loop waits for the next animation frame, or for 100 ms when none comes.** TS says "per requestAnimationFrame". If a hidden page's worker got none, the loop would not see its stop flag, and `previewPause` would not answer until the page is shown again. In the Chrome tried here a pause in a minimised window was answered in 4 and 6 ms, sooner than the 100 ms would explain, so its worker seems to get animation frames still; the 100 ms are for a browser that gives none.
+- **Nothing is drawn while no frame was ever decoded.** "Reuse the last frame" has nothing to reuse on the first step of a play. It is counted late.
+- **After every play the worker closes the `VideoSource` and makes a new one,** as after an export, and then reads the frame count: not 0 is `E_INTERNAL`, `FrameLeak` (D-45). The picture stays on the canvas; a play after a pause decodes again from the keyframe before its time, which took one late frame in every reading above.
+- **`previewPlay` without a scene or without a canvas is `E_INTERNAL`,** `NoScene` or `NoCanvas`.
+- **`previewPause` answers when the loop has returned, however it ended.** A failure of the loop is the answer of `previewPlay`, and is reported once.
+- **`play()` resolves when the preview is playing, not when it ends.** §19.4 gives `play(): Promise<void>` and does not say which. A button cannot wait 90 s for its click to finish. What follows the end, `ended()` and the stop of the sound, runs when the worker's loop returns.
+- **`pause()` waits for the worker before the store says `paused`,** the order §19.4 writes. A play clicked in between finds the preview still `playing` and does nothing; otherwise it would ask the worker for a second loop while the first has not returned, which the worker refuses.
+- **`attach` first detaches a preview that is attached.** One `AudioContext` at a time.
+- **A failure of `attachPreview` or of `previewPause` is stored like one of `previewPlay`:** on the clip store, with `noteFailure` (Prompt 52). After a failed play the preview is detached, as §19.4 says.
+- **`unlockAfterExport()` detaches a preview that has no canvas.** The table of TS §12.2 leads from `locked` to `paused` only, and `start-export.ts` locks also when no player is on the page.
+- **`preview_played` is sent on the first play after each `attach`.** The store's `playedOnce` starts again there (Prompt 52).
+- **The audio goes into the `AudioBuffer` with `getChannelData(0).set(out48)`:** one copy, which D-51 counted.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`rpc.ts` was changed, which the prompt does not name** (known issue 31). `pool.render.previewPause()` did not compile: the type `Client<Api>` of Prompt 37 asked for one argument on every method. `control-preview.ts` is the first source file to call a method without one. The fix is in the type alone; `pool.asr.unload()` and `pool.render.closeSession()` compile now too. `rpc.ts` has 377 lines, 23 short of the limit, and V4 adds to it (known issue 16).
+- **The dev server was `vite` alone,** not `pnpm dev`, as in Prompt 52: the release bundles of the last build were used as they were.
+- **The readings of the loop, and the checks beyond the prompt.**
+
+**Checked.**
+
+- `grep -c "previewPlay\|previewClock\|previewPause" web/src/workers/render.worker.ts`: 10. `grep -c "redetectSentence\|previewSeek"`: 3; both still answer `E_INTERNAL`.
+- `pnpm --filter web exec tsc --noEmit`; ESLint on `src/workers` and `src/usecases`: clean. The one cast to `TimeMs` in `control-preview.ts` is the last `return` of `toTimeMs`, which is where the rule of D-59 allows it; `control-preview.ts` imports `ClockSync` from `workers/protocol.ts` as a type (D-27 f).
+- `node scripts/check-file-tree.mjs`: 221 files; both new files were in the tree of TS §5.
+- Lines: `control-preview.ts` 206, `preview-loop.ts` 81, `render.worker.ts` 372, `rpc.ts` 377.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against `322c7d3` is empty; no test key in `web/dist`. **255 Rust** (2 ignored), **92 Vitest**, **12 Playwright**. The app shell is 284.6 kB gzipped.
+- **`pnpm e2e` needed a second run, for the third gate in a row, and this time it was worse:** straight after the release build the six cases that start first each ran into the case's limit of 30 s, and the other six passed. That is the picture of known issue 20, a machine with too little to spare. Two runs after it passed 12 of 12 each, with the same 6 workers, in 42 s and 31 s, where a rested machine takes 25 s. The machine had 4.4 GB of 15.7 free, with a disk scanner, two other browsers and the editor running beside the gate, after several hours of builds and exports. The landing page loads nothing this prompt added: no file imports `control-preview.ts` yet, and a worker's script is fetched at the start and run only when a clip arrives. `ci` is the check on a clean machine; it has not run on Prompts 52 and 53.
+- The script of the check, the browser profile, the short clip, the screenshots and the temporary line in `render.worker.ts` are gone. `git status` showed the four files of this prompt and nothing else before the gate.
+
+**"Done when".**
+
+- [x] The three preview results hold; `grep -c "previewPlay\|previewClock\|previewPause" web/src/workers/render.worker.ts` is at least 3.
+- [x] `tsc` and ESLint are clean for `src/workers` and `src/usecases`.
+
+**Not checked.**
+
+- **By ear.** Headless Chrome plays to no loudspeaker. That the sound and the picture agree was read from the clock: the frame drawn lay at most 17 ms from the audio's time. Nobody has heard it; Prompt 55 is where a person does.
+- **A preview, then an export, then a preview.** The dev server ran without the test key, so no export could be made in this check. Prompt 54's check makes one with a player attached.
+- **The preview in a production build under the CSP.** The check ran on the dev server. `AudioContext` and the worker's animation frames need nothing the CSP names.
+- **A real `PreviewPlayer`.** The canvas and the buttons were the check's own.
+- **R1** (D-69). The numbers are D1's, with a 720p source.
+
+**Found, and not for this prompt.**
+
+- **`PreviewStats` reaches nobody.** `runPreview` returns it and `previewPlay` answers `void`, as the protocol says. V4's `preview-sync.spec.ts` is to assert the drift and the late frames (TS §20.3) and will need a way to read them: a field of the protocol, which is frozen, or a second answer.
+- **A paused preview keeps no decoded frame,** so the first frame after a resume comes one step late. It shows as one late frame in 150. If V4's seek wants the frame at once, the source must be kept across a pause, and the frame count of D-45 read another way.
+
+**Open, for the human.** Nothing: Prompt 54 is the next one marked **Push**.

@@ -25,10 +25,13 @@ export type CallOptions = {
   onJob?: (jobId: JobId) => void;
 };
 
+// A method the protocol gives no argument is called with none.
 export type Client<Api> = {
-  [M in keyof Api]: Api[M] extends (p: infer P) => Promise<infer R>
-    ? (p: P, o?: CallOptions) => Promise<R | Cancelled>
-    : never;
+  [M in keyof Api]: Api[M] extends () => Promise<infer R>
+    ? (p?: undefined, o?: CallOptions) => Promise<R | Cancelled>
+    : Api[M] extends (p: infer P) => Promise<infer R>
+      ? (p: P, o?: CallOptions) => Promise<R | Cancelled>
+      : never;
 };
 
 export type JobContext = {

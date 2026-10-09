@@ -1277,6 +1277,8 @@ Worker side (`serveWorker`):
 
 `toAppFailure`: a thrown `{ code, detail, stage? }` object keeps its code, and its `stage` when present, else the worker's default stage from the pool table; a thrown object already shaped like `AppFailure` passes through; an `Error` whose message starts with `E_WORKER_CRASH` (the panic hook, V1 §8) gives `E_WORKER_CRASH`; anything else gives `E_INTERNAL`. `retryable` follows the "Retryable" column of TS §11.2, held as one table in this file. `detail` carries the thrown value's `detail` or the error's name; it is shown only in dev builds and is never sent anywhere (TS §11.1).
 
+**As built (Prompt 53):** in `Client<Api>` a method the protocol gives no argument, such as `unload()`, `previewPause()` and `closeSession()`, is called with none; the type above asked for one on every method.
+
 **Never.** Copies a buffer that could be transferred. Throws across the boundary for a rejection (`{ rejected }` is a result). Swallows a failure. Progress throttling (10 per second) is V4; V2 handlers post at most once per cancellation point.
 
 ### 15.7 `workers/pool.ts`
@@ -1394,6 +1396,8 @@ Module state: the `RenderApi`, one `RenderSession`, one `VideoSource`, the previ
 
 **As built (Prompt 50):** `openSession` first closes a session that is still open, and opens the file with `openSource` of `media/import.ts`. The module state also keeps the `ClipInfo`: after every export the `VideoSource` is closed and a new one is made, which is how every decoded frame is closed. A failure of `openSession`, `detect` or `setScene` carries `stage: "detect_scene"`; one of `attachPreview` carries the worker's default, `preview`. `attachPreview` takes its size from `previewProfile()` and keeps the canvas once the attach has answered. `previewPlay`, `previewPause`, `previewSeek` and `redetectSentence` answer `E_INTERNAL` with the detail `NotImplemented` until Prompt 53. `previewClock` is one-way: nothing can answer it, and a failure thrown in a one-way handler reaches the page as a crash of the worker, so until Prompt 53 the message is dropped. The lists of one-way methods and of methods accepted beside `previewPlay` are given to `serveWorker` in this file (a worker may not import `pool.ts`).
 
+**As built (Prompt 53):** `previewPlay` without a scene or without a canvas is `E_INTERNAL` (`NoScene`, `NoCanvas`). When its loop has returned, the worker closes the `VideoSource` and makes a new one, as after an export, and then reads the frame count: not 0 is `E_INTERNAL` with the detail `FrameLeak` (D-45). `previewClock` notes the time and does nothing else. `previewPause` sets the stop flag and answers when the loop has returned, however it ended: a failure of the loop is the answer of `previewPlay`. `closeSession` also sets the stop flag.
+
 ### 16.7 `render/video-source.ts`, `render/preview-loop.ts`
 
 ```ts
@@ -1417,7 +1421,7 @@ export interface DemuxerHandle {                       // D-30; satisfied by Ren
 
 The decoder's error callback rejects the pending `frameAtBlocking` and makes the next `frameAt` throw, both with `E_DECODE_VIDEO`. **As built (Prompt 49):** a jump makes a new `VideoDecoder` and closes the old one, so that an output of the old one can be told from the new one's and is closed unseen; one decoder is alive at a time. Which frames are closed goes by ownership and not by "`t` minus one frame": of the decoded frames at or before the time asked for only the latest is kept, and the frame that was handed out stays open until a newer one is handed out. The reference clip has gaps of 48 ms between frames, so the frame of a time can be older than one output frame. A jump ahead starts again only when the keyframe of the new time was not fed yet, and a step back of less than 100 ms does not start again: `frameAt` answers `null` for it. The queue limit counts frames after the time asked for. The source never closes a frame it has handed out as the "current" frame until a newer one replaces it; the loop that received it does not close it either.
 
-`runPreview(session, source, clock, isStopped)`: TS §20.2 verbatim, per `requestAnimationFrame` in the worker. `clock()` = `audioMs + (performance.timeOrigin + performance.now() - epochMs)`. Ends when `t >= clip duration` (resolve, the preview goes to `stopped`) or when `isStopped()` (resolve). A late frame reuses the last frame and counts in `PreviewStats.late`. No resize rule in V2 (V4). The loop never drives time: the audio clock is the master (TS §20.3).
+`runPreview(session, source, clock, isStopped)`: TS §20.2 verbatim, per `requestAnimationFrame` in the worker. `clock()` = `audioMs + (performance.timeOrigin + performance.now() - epochMs)`. Ends when `t >= clip duration` (resolve, the preview goes to `stopped`) or when `isStopped()` (resolve). A late frame reuses the last frame and counts in `PreviewStats.late`. No resize rule in V2 (V4). The loop never drives time: the audio clock is the master (TS §20.3). **As built (Prompt 53):** the loop is given no duration, so it ends when the clock reaches frame `session.frame_count()`. A step waits for the next animation frame, or for 100 ms when none comes, so that a stop is seen in a page whose worker gets no animation frame. While no frame was ever decoded nothing is drawn, and the step counts as late.
 
 ### 16.8 `render/export-loop.ts` and the `exportClip` handler
 
@@ -1736,7 +1740,7 @@ export function unlockAfterExport(): void;               // locked to paused
 | `detach` | `pause` if playing; close the `AudioContext`; `previewStore.detached()` |
 | `lockForExport`, `unlockAfterExport` | `pause` if playing, then `previewStore.lock()`; `previewStore.unlock()` (TS §12.2, §12.4) |
 
-`clock = { audioMs, epochMs: performance.timeOrigin + performance.now() }`. The first `play` follows a user gesture, which unlocks the `AudioContext` (TS §20.3). `seek` is V4. A failure of `previewPlay` stores the failure on the clip store and detaches.
+`clock = { audioMs, epochMs: performance.timeOrigin + performance.now() }`. The first `play` follows a user gesture, which unlocks the `AudioContext` (TS §20.3). `seek` is V4. A failure of `previewPlay` stores the failure on the clip store and detaches. **As built (Prompt 53):** the failure is stored with the clip store's `noteFailure`, which leaves the clip `ready`; a failure of `attachPreview` or of `previewPause` is stored the same way. `play()` resolves when the preview is playing, not when it ends. `pause()` waits for the worker before the store says `paused`, so a play in between does nothing. `attach` first detaches a preview that is attached. `unlockAfterExport()` detaches a preview that has no canvas, which `locked` to `paused` would otherwise leave paused. `preview_played` is sent on the first play after each `attach`.
 
 ### 19.5 `start-export.ts` (C-9, C-10; no gate yet)
 
