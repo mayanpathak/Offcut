@@ -177,14 +177,9 @@ impl Overlay {
                             y: glyph.y,
                         })
                     };
-                    // Filled, then stroked: the order of the display list (TS §19.2).
-                    self.scene
-                        .draw_glyphs(&face.data)
-                        .font_size(*size)
-                        .normalized_coords(&face.coords)
-                        .transform(affine(transform))
-                        .brush(color(*fill))
-                        .draw(Fill::NonZero, glyphs());
+                    // The stroke first and the fill over it (D-68): a stroke
+                    // lies half inside the outline, and drawn last it
+                    // would cover that much of each letter.
                     if let Some(stroke) = stroke {
                         let style = kurbo::Stroke::new(f64::from(stroke.width));
                         self.scene
@@ -195,6 +190,13 @@ impl Overlay {
                             .brush(color(stroke.color))
                             .draw(&style, glyphs());
                     }
+                    self.scene
+                        .draw_glyphs(&face.data)
+                        .font_size(*size)
+                        .normalized_coords(&face.coords)
+                        .transform(affine(transform))
+                        .brush(color(*fill))
+                        .draw(Fill::NonZero, glyphs());
                 }
                 DrawCmd::PushLayer { opacity, clip } => {
                     let clip = clip.as_ref().map_or(whole, rect);

@@ -25,7 +25,7 @@ BASE=$(git merge-base main HEAD)                                             # t
 1. Read the plan sections and guide steps this prompt cites, and the files it touches.
 2. Search for existing types, helpers and constants before creating any. Reuse them.
 3. Verify that the previous prompts' outputs exist and behave as this prompt assumes. If not: decide whether it is a bug or an intended boundary, make the smallest compatible fix, and report it.
-4. Precedence: a decision D-18 to D-67 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
+4. Precedence: a decision D-18 to D-68 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
 
 **During implementation**
 
@@ -422,7 +422,7 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 
 - Pin `vello` and the exact `wgpu` it depends on (default features off, WebGPU backend only); the `web-sys` features the crate needs. `cargo tree -d -p offcut-render` shows no duplicated `wgpu`, `peniko` or `skrifa`. Add the `cargo deny` wrappers it names and record each.
 - Settle the unstable-API flag with the test of G 7.1. With the locked `web-sys` (0.3.106) the types need no flag. If the wasm32 check fails on a `wgpu` item that mentions `VideoFrame`, the flag goes on the `RUSTFLAGS` line of `scripts/build-wasm.sh`; a `.cargo/config.toml` alone never reaches the bundle.
-- `gpu.rs` (one adapter, one device; device-lost sets a flag the next `render` reports), `shaders/video.wgsl` and `video_pass.rs` (axes swapped for `R90`/`R270`; `crop` in display coordinates; the frame import behind `#[cfg(target_arch = "wasm32")]`), `vello_backend.rs` (fill, then stroke; fonts by `FontId`), `composite.rs` (premultiplied alpha), `lib.rs` (`Renderer::new`, `resize`, `render`; `pub use offcut_scene as scene;`; `RenderError` with six variants). It never closes a `VideoFrame`.
+- `gpu.rs` (one adapter, one device; device-lost sets a flag the next `render` reports), `shaders/video.wgsl` and `video_pass.rs` (axes swapped for `R90`/`R270`; `crop` in display coordinates; the frame import behind `#[cfg(target_arch = "wasm32")]`), `vello_backend.rs` (the stroke, then the fill over it, D-68; fonts by `FontId`), `composite.rs` (premultiplied alpha), `lib.rs` (`Renderer::new`, `resize`, `render`; `pub use offcut_scene as scene;`; `RenderError` with six variants). It never closes a `VideoFrame`.
 
 **Not yet.** `render_to_image`, `golden_frames.rs` (V4). No V2 test runs this crate natively. **Done when.**
 

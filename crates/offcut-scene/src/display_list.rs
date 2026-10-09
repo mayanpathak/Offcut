@@ -38,6 +38,8 @@ pub struct PositionedGlyph {
     pub y: f32,
 }
 
+/// The outline of a glyph run. `width` is the whole width of the stroke, half
+/// of it on each side of the glyph's edge.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Stroke {
     pub width: f32,
@@ -78,7 +80,9 @@ pub enum DrawCmd {
         path: Vec<PathEl>,
         color: Rgba,
     },
-    /// Filled, then stroked. `text` is kept for the Canvas2D seam.
+    /// Stroked first, then filled over the stroke (D-68): the half of the
+    /// stroke that lies outside each glyph is what shows. `text` is kept for
+    /// the Canvas2D seam.
     GlyphRun {
         font: FontId,
         size: f32,

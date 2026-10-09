@@ -54,7 +54,7 @@
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 | 25 | **What Prompts 47 and 48 build on** (entry of Prompt 45). `build_scene(SceneInput { transcript, events, edit, clip, profile })` gives a `Scene`; `frame_at(t)` gives a `DisplayList` in pixels of the output canvas, and `crop()` the part of the source frame to show. **How a `GlyphRun` is drawn:** the glyphs by id, from the file `fonts::bytes(font)` at the weight `fonts::weight(font)` and at `size`, each at its `x`, `y` in the run's own space; filled, then stroked with `stroke.width`, a length of that same space; all of it mapped to the canvas by `transform` (`a b c d e f`). A fading reveal is between `PushLayer { opacity, clip: None }` and `PopLayer`. V2 emits no `FillRect` and no `FillPath`. Pin `vello` 0.11.0 with `wgpu` 30: it shares `skrifa` 0.44 with `parley` 0.11.1. The crate builds for `wasm32-unknown-unknown`. The font files hold addresses in their name tables: `check-hosts` reads them once they are in `offcut_render_bg.wasm` (D-38), and the bundle grows by the 3.2 MB of the fonts and by parley's text data | Prompts 47, 48 |
 | 26 | **What the later prompts build on** (entry of Prompt 46). **Detector:** `offcut_detect::detect(&transcript, &prosody, &edits, &DetectorConfig::default())` gives the events in time order; on the reference clip it must give one, the `$12k` of words 132 and 133. `event_id(kind, anchors)`. **Entitlement:** `verify_token(token, &[[u8; 32]])` gives `EntitlementClaims` or a `TokenError` (all five are `E_ENTITLEMENT_INVALID`); `export_profile(Some(&claims), now)` and `export_profile(None, now)`, with `now` as `UnixSecs` from the caller's clock; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` for `preview_profile()`. `ParsedToken` has no `Debug`, on purpose. `CREATOR_VIDEO_BITRATE` of `profile.rs` must stay equal to the one in `encoders.ts` (D-26). **Tests:** `mintEntitlementToken(o?)` and `seedEntitlement(page, token)` of `helpers/fake-api.ts`; the page must have opened the app before `seedEntitlement`, which rejects otherwise. The test public key is in the entry of Prompt 46: a build for the media suites is made with it in `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`, exported in the terminal and written in no `.env` file. **The crate `offcut-entitlement` states the version of `ed25519-dalek` itself:** when the workspace's version changes, that line changes with it. **The E2E case "a slow API shows the waking message" runs in real time** and can miss its one-second window on a busy machine; run the suite again before reading it as a fault | Prompts 48, 49, 50, 54, 56, 57, 58 |
-| 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). **Captions are mostly stroke** as the display list is drawn now (entry of Prompt 48): look before Prompt 55. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
+| 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). A glyph run is stroked first and filled over the stroke since D-68; the outline that shows is half the stroke's width. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
 
 ---
 
@@ -2129,3 +2129,66 @@ No console line and no page error in any of it.
 - **6 MB at app start.** The render bundle is fetched by every visitor of the landing page, whether a clip follows or not. D-9 decided that for a bundle of 177 kB. Half of the bundle is the three fonts, and Noto Emoji alone is 2.0 MB for a fallback no transcript has needed. Not a V2 exit criterion; a question for before the page is announced.
 
 **Open, for the human.** Push `v2-build` (two commits: Prompt 47 and Prompt 48) and read `ci` on pull request #2. Prompt 49 waits for green. The run will be longer than the last: `wgpu` and Vello are built natively for the tests and for wasm32 for the bundle.
+
+## 2026-10-09 - The ninth push: `ci` green on Prompts 47 and 48
+
+**Done by the human.** `git push` of `v2-build` at `69fec96`, the commit of Prompt 48; the commit of Prompt 47 (`1a411b1`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `69fec96`, equal to the local branch |
+| The `ci` run on `69fec96` (pull request #2, run 16) | Success, in 304 s: 35 steps passed, 2 skipped, none failed. The two deploy jobs were skipped, as on every run of the branch |
+| The steps that grew | `cargo test` 54 s; "Build the WASM bundle" 87 s, now two bundles; `cargo clippy` 24 s. The whole run took 204 s on the push before |
+| Steps that ran on new code | The secret scan, `cargo clippy` and `cargo test` (255) with `wgpu` and Vello built natively, `cargo deny` with the four new wrappers, the file tree, the hosts check with the six new entries on the render bundle, Playwright: all success |
+| Pull request #2 | Open, draft, no conflict with `main` |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3`; `main` is at `322c7d3` |
+
+**Closes.** The push that Prompt 48 ends with, and what the entries of Prompts 47 and 48 left for Linux: `wgpu` without a graphics backend builds and tests natively there; the render bundle builds for wasm32 with the CLI of the workflow; `check-hosts` passes on the bundle built there, so the six literals are the same six; Playwright passes with its default workers, with the page now compiling both bundles at its start.
+
+**Not shown by this run.** `ci` draws nothing: no case opens a session. The frames of Prompt 48 were read on the development machine only.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Outside a prompt: D-68, a glyph run is stroked first and filled over it
+
+**The decision (founder, 2026-10-09): D-68.** A glyph run is drawn with its stroke first and its fill over the stroke. The agent recommended it after the first frames of Prompt 48, where a caption was mostly stroke; the founder agreed.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-render/src/vello_backend.rs` | The two draws of a glyph run change places: the stroke, then the fill. Nothing else |
+| `crates/offcut-scene/src/display_list.rs` | Two comments: what order a glyph run is drawn in, and that a stroke's width is its whole width, half on each side of the glyph's edge |
+| `docs/v2/v2implementation.md` | D-68 added to §2; §0 says "D-18 to D-68"; the row of `vello_backend.rs` in §12; D-68 joins the decisions to copy back into TS |
+| `docs/technicalspec.md` | §19.4: one sentence, the order and what shows of a stroke |
+| `docs/v2/coding-promptsv2.md` | The Standard Agent Block says "D-18 to D-68"; Prompt 47 names the new order |
+| `docs/v2/v2buildguide.md` | The table of references names D-68; the row of `vello_backend.rs` in Step 7.2 |
+| `docs/v2/v2changelog.md` | This entry; known issue 27 corrected |
+
+The documents were edited by a script that refuses a replacement unless its old text occurs exactly once, and that writes nothing unless every replacement can be applied: 8 of 8, and the row of D-68. Each file keeps its line endings. The display list itself is unchanged: `DrawCmd::GlyphRun` has the same fields, and no test of `offcut-scene` reads the order.
+
+**Measured, before and after.** The same scene as in the entry of Prompt 48 (six words with `$12` `,000`, at 2,600 ms), drawn by the rebuilt bundle in Chrome through a temporary worker and read back. The picture under the text was another one this time, a grey with a lighter band, so that white and dark both show against it; the counts are of the text's own colours.
+
+| Canvas | Zone | Fill first (Prompt 48) | Stroke first (now) |
+|---|---|---|---|
+| 540 x 960 | Caption: white, dark, yellow | 260, 4,083, 68 | 2,015, 1,031, 689 |
+| 540 x 960 | Reveal: white, dark | 5,231, 3,561 | 7,597, 740 |
+| 1080 x 1920 | Caption: white, dark, yellow | 1,563, 18,391, 514 | 8,747, 7,185, 3,099 |
+| 1080 x 1920 | Reveal: white, dark | 21,733, 15,512 | 31,190, 5,663 |
+
+No white pixel outside the two zones, as before.
+
+**Looked at.** The worker also handed the frame back as a picture, and the agent read it: white letters with a thin dark outline, "sales." in yellow, `$12k` large above the caption, both centred on the middle of the safe area. It is the first frame of the output anybody has looked at. It is not committed.
+
+**What it costs.** The outline that shows is the outer half of the stroke: 3 lp of the 6 lp that TS §19.4 gives the Clean style. If the outline should be heavier, that is a change of the style's number, in `styles.rs`, and not of the order.
+
+**Checked.**
+
+- `cargo clippy` on `offcut-render` and `offcut-scene`, natively and for wasm32: clean. `cargo test` on both: 2 and 12 passed.
+- The bundle: `offcut_render_bg.wasm` is 6,029,652 bytes, was 6,029,674.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers at the first run; the frozen-file diff against the baseline is empty. **255 Rust, 92 Vitest, 12 Playwright**, as after Prompt 48.
+- The temporary worker and the temporary Playwright case are deleted.
+
+**Not checked.** The outline on a real video frame, and at the size a phone shows it: Prompt 55 is where a person looks.

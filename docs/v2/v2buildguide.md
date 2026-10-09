@@ -13,7 +13,7 @@
 | `PS §n` | Section n of `docs/product.md` |
 | `BP §n` | Section n of `docs/buildplan.md` |
 | `V1 §n`, `V1 D-n` | Section or decision of `docs/v1/v1implementation.md` (D-1 to D-17) |
-| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66 and D-67 were added on 2026-10-09) |
+| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66, D-67 and D-68 were added on 2026-10-09) |
 | `S-n` | Build-order step S1 to S16 in §5 |
 | `TE-n`, `E-n` | Technical experiment (TS §37), product experiment (PS §19); V2 procedures are in §24.1 |
 | `INV-n` | Invariant (TS §35) |
@@ -1095,7 +1095,7 @@ cargo deny check                              # add the wrappers it names (for e
 |---|---|---|---|
 | 1 | `src/gpu.rs` | §12 | One adapter, one device; device-lost sets a flag the next `render` reports |
 | 2 | `src/shaders/video.wgsl`, `src/video_pass.rs` | §12, TS §19.7 | Axes swapped for `R90`/`R270`; `crop` is in display coordinates |
-| 3 | `src/vello_backend.rs` | §12 | Glyph fill, then stroke; fonts by `FontId` from `offcut-scene`'s bytes |
+| 3 | `src/vello_backend.rs` | §12 | Glyph stroke, then the fill over it (D-68); fonts by `FontId` from `offcut-scene`'s bytes |
 | 4 | `src/composite.rs` | §12 | Premultiplied-alpha blend of the overlay |
 | 5 | `src/lib.rs` | §12, D-61 | `pub use offcut_scene as scene;`. Never closes a `VideoFrame`. `RenderError` has 6 variants |
 

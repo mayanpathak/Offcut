@@ -2205,7 +2205,7 @@ KeywordPop word: scale 1.0 → 1.25 → 1.10 over 180 ms from its start, style.p
 | Bold | Inter 900 | 84 | Upper | 12 chars x 2 lines, 3 words | White fill, 10 lp stroke, active word accent, word-by-word pop | Back-out, 140 ms |
 | Tech | JetBrains Mono 700 | 56 | As spoken | 22 chars x 2 lines, 5 words | Rounded dark panel at 85% opacity, green active word, block cursor | Linear, 80 ms |
 
-Same layout rules for all three (PS §12.2). Fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them; `cargo deny` plus a CI grep assert no other font files exist.
+Same layout rules for all three (PS §12.2). A glyph run is stroked first and filled over the stroke, so the outline that shows is the outer half of the stroke width (v2implementation D-68). Fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them; `cargo deny` plus a CI grep assert no other font files exist.
 
 ### 19.5 Event visuals (PS §12.2)
 
