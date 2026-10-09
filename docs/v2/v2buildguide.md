@@ -13,7 +13,7 @@
 | `PS §n` | Section n of `docs/product.md` |
 | `BP §n` | Section n of `docs/buildplan.md` |
 | `V1 §n`, `V1 D-n` | Section or decision of `docs/v1/v1implementation.md` (D-1 to D-17) |
-| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66, D-67, D-68 and D-69 were added on 2026-10-09) |
+| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66, D-67, D-68 and D-69 were added on 2026-10-09, D-70 on 2026-10-10) |
 | `S-n` | Build-order step S1 to S16 in §5 |
 | `TE-n`, `E-n` | Technical experiment (TS §37), product experiment (PS §19); V2 procedures are in §24.1 |
 | `INV-n` | Invariant (TS §35) |
