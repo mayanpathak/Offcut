@@ -4,6 +4,7 @@
 import { initAnalytics, track } from "../analytics/client";
 import { env } from "../config/env";
 import type { AnonId } from "../gen/domain";
+import * as modelManager from "../models/model-manager";
 import { wake } from "../net/api-client";
 import { metaGet, metaSet } from "../persistence/db";
 import { META_KEYS } from "../persistence/schema";
@@ -83,9 +84,12 @@ async function run(): Promise<void> {
     if (!preloaded.ok) {
       track({ name: "client_error", props: { error_code: preloaded.failure.code, stage: preloaded.failure.stage } });
     }
+
+    // 8. What of the speech model is on this device. Nothing waits for the
+    //    answer, and a storage that cannot be read counts as no model.
+    void modelManager.inspect();
   }
 
-  // V2: modelManager.inspect()
   // V7: restoreClip()
 }
 

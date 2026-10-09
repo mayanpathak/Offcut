@@ -50,7 +50,7 @@
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository. In a production build (entry of Prompt 44) the same machine read 62 s to 96 s on WebGPU and 98 s to 123 s on WASM | Prompt 59 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
-| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 **Since Prompt 51 the first run after `pnpm build` fails one case, the same one both times:** "landing_view is sent once" (entries of Prompts 51 and 52). Its trace shows the batch posted and not yet handed to the fake API when the 5 s of the case ran out. The request is a `keepalive` fetch, the only one the app makes; whether that is why it is slow to be intercepted under load is not known. A run made a minute later passes. `ci` retries a failed case once | Every gate |
+| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 **Since Prompt 51 the first run after `pnpm build` fails one case, the same one both times:** "landing_view is sent once" (entries of Prompts 51 and 52). Its trace shows the batch posted and not yet handed to the fake API when the 5 s of the case ran out. The request is a `keepalive` fetch, the only one the app makes; whether that is why it is slow to be intercepted under load is not known. A run made a minute later passes. `ci` retries a failed case once. **In the gate of Prompt 54 the six cases that start first ran 25 to 37 s, against the 30 s a case may take, in run after run, with 3.5 to 5.7 GB free:** a build without that prompt's change did the same, and both were back at 8 to 17 s ten minutes later. `--workers=3` passed at once. When the six first cases are slow, wait or use three workers before reading it as a fault | Every gate |
 | 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): a caption shows it as the digit, as TS §17.2 says (entry of Prompt 45) | Prompts 43, 45, 46, 48, 50 |
 | 23 | **What Prompt 44 and the later prompts build on** (entry of Prompt 43). `pool.asr.load({ modelId, backend })` answers `{ backend }`; `pool.asr.transcribe({ pcm16 }, { transfer: [pcm16.buffer], onProgress })` answers `{ ok: Transcript }` or `{ rejected: "NoSpeech" }`; `pool.asr.unload()` answers when the sessions are disposed. The pool has two rows. **`confidence` is 1 for every word, and stays so in V2:** TE-2 (entry of Prompt 44) found that the runtime returns no probability. No score is lowered by it; a prompt that reads `confidence` reads 1. **The dev server reloads the page once** the first time a browser loads the ASR worker after an install (Vite prepares the runtime): a temporary Playwright case fails with "Execution context was destroyed" and passes when run again. `whisper-runtime.ts` sets the runtime up so that it cannot make a request; the 13 literals it brings into the build are listed in `scripts/check-hosts.mjs`, each for one file, and **a new version of the runtime may bring others**: `pnpm build` then fails until each has an entry with its reason. The amount of the reference clip is words 132 and 133, `$12` and `,000`; the expected transcript is in `fixtures/speech/README.md` | Prompts 44, 45, 46, 54, 56, 57 |
 | 24 | **A first transcription may be slower than the next** (entry of Prompt 44): in a new browser profile, straight after a build and the download of the model, `load` and `transcribe` took 95.5 s on WebGPU and 123.4 s on WASM; the second run took 61.9 s and 98.1 s. One pair of readings, cause not found. The bench of Prompt 59 should keep its first run apart, and E-3 at S15 should say which it reports. **Chrome makes requests of its own** (an update check, a push-message registration) while a page is open: a check that reads the browser's whole network log, and not the page's requests, sees them and must tell them apart by who started them | Prompts 57, 59 |
@@ -67,6 +67,7 @@
 | 34 | **What Prompts 53 to 55 build on** (entry of Prompt 52). The stores are `useClipStore`, `usePreviewStore`, `useExportStore`; a use-case calls the actions each file exports, a component reads with the hook and writes nothing. Clip: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()`, and `noteFailure(failure)` for a failure that leaves the clip `ready`. Export: `start(exportId)`, `blocked()`, `clear()`, `progress(done, total)`, `encoded()`, `finalized()`, `saved()`, `fail(failure)`, `reset()`, `setUnavailable(flag)`; `start` clears `unavailable`. Preview: `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`; `lock` and `detach` are legal in every state. **An illegal action throws `IllegalTransitionError` in a development build and in a test,** and is reported and ignored in production: a use-case must not call `failed` on a `ready` clip, `begin` on a clip that is not `idle`, or `start` on an export that is `done` (call `reset()` first). `forImport()` and `forExport()` of `state/blockers.ts` return a `BlockerCode` or `null`; `messages.blockers` has the words of four codes and is typed by its keys, not by `BlockerCode`, which `copy/` may not import. `entitlement-repo.ts`: `get()` gives `{ token, storedAt }` or `undefined`, `put(token)` | Prompts 53, 54, 55 |
 | 35 | **What Prompts 54 to 57 build on** (entry of Prompt 53). `usecases/control-preview.ts`: `attach(canvas, out48)` (the canvas is handed over for good: an element can be attached once), `play()`, `pause()`, `detach()`, `lockForExport()`, `unlockAfterExport()`. `play()` resolves when the preview is playing; it needs a click before it the first time, or the browser keeps the `AudioContext` silent and `play()` does not resolve. All six do nothing when there is nothing to do, and none throws for a failure of the worker: that is stored with `noteFailure` on the clip store. `start-export.ts` calls `lockForExport()` before `exportClip` and `unlockAfterExport()` after it, whatever the outcome. **The worker refuses `exportClip`, `closeSession` and every other call while `previewPlay` runs** (`E_INTERNAL`, `Busy`): pause or lock first. `preview_played` is tracked in `control-preview.ts`, once for each `attach`. On D1 the loop drew 30 frames a second with under 1% late and at most 17 ms from the audio's time. `rpc.ts` has 377 lines and `render.worker.ts` 372 | Prompts 54, 55, 56, 57 |
 | 36 | **`web/src/workers/render/video-source.ts` has 399 lines of the 400** since D-70 was built, and it is now the longest source file. V4 adds `prefetch` and the seek to this file: room must be made first, and the place to take it from is the handling of the colour range, which could move into a file of its own with a line in the tree of TS §5. **An export of a full-range clip is now less contrasty than every export before 2026-10-10:** a check that compares a new file with an old one, or with a number written down before that date, sees the difference. `DemuxerHandle` has five methods; a test double of it needs `video_full_range()` | V4; Prompts 56, 57 |
+| 37 | **What Prompts 55 to 58 build on** (entry of Prompt 54). `importClip(file, source)` resolves when the clip is accepted, rejected or failed, and the pipeline runs on after that: a caller reads the clip store, not the promise. `importSampleClip()` fetches 35 MB before the clip store leaves `idle`, and says nothing meanwhile; a second call joins the first. `dismissClip()` does nothing for a clip that is `idle`, being imported or being processed, and nothing while an export runs; it stops a preview that plays, closes the session, removes the clip's directory and resets an export that is over. `startExport(clipId)` resolves when the export is over, however it ended; with no token it sets `unavailable` and changes nothing else. All of them return without a word when a blocker stands: the component shows the blocker's copy from `forImport()` or `forExport()`. **While the model downloads** the clip is `processing` at `probe_audio` with `waitingModel: true`. **A promise of these calls that rejects is a fault of the code,** never a failure of the device: those are in the stores. **For the suites:** `exports/` holds `<exportId>.mp4` and an empty directory `tmp/`, and does not exist after an export that was refused; `stage_timing` for `asr` is sent for a clip without speech too; `model_download` is sent only when files were downloaded; one `preview_played` for each `attach`. `git grep -n "V3: \|V7: " -- web/src/usecases` prints 5 lines, one of them V1's | Prompts 55, 56, 57, 58 |
 
 ---
 
@@ -2975,3 +2976,151 @@ The `avcC` bytes in the tests are the settings of a stream; they hold nothing of
 
 - **Chrome reads no colour information from an H.264 stream in this decoder,** not the range and not the matrix, whatever the stream says. D-70 corrects the range. Telling the decoder the stream's own matrix as well would need the reader to return the description, and a way to say it in the terms of the decoder's configuration.
 - **`video-source.ts` is at 399 lines** (known issue 36).
+
+## 2026-10-10 - The twelfth and thirteenth pushes: `ci` green on Prompts 52 and 53 and on D-70
+
+**Done by the human.** Two pushes of `v2-build`: at `e09ede7`, the commit of Prompt 53, with Prompt 52 (`ff5f962`); and at `477b589`, the commit that built D-70, with its decision (`796b87d`).
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `477b589`, equal to the local branch |
+| The `ci` run on `e09ede7` (pull request #2, run 19) | Success |
+| The `ci` run on `477b589` (run 20) | Success |
+
+**Closes.** The line "`ci` ... has not run on Prompts 52 and 53" of the entry of Prompt 53. The times of the two runs were not read.
+
+**Changed.** This file only. The entry was written with the commit of Prompt 54.
+
+## 2026-10-10 - Prompt 54: use-cases: pipeline, import, export, app start
+
+**One call each way.** `importClip(file, "user")` takes the reference clip from a file to a clip that is `ready`, with its transcript, its one event and its audio. `startExport(clipId)`, with a seeded Creator token, ends in a downloaded MP4 of 1080 x 1920 that passes the verifier's six checks. Nothing on a page calls either yet: that is Prompt 55.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/usecases/run-pipeline.ts` | `runPipeline(clipId)`: the 12 steps of §19.3; the wait for the model, with `model_download`; `startTimer(clipId)`. 298 lines |
+| `web/src/usecases/import-clip.ts` | `importClip` (9 steps), `importSampleClip`, `dismissClip`, `newClipId`, the one cast to `ClipId` (D-59). 210 lines |
+| `web/src/usecases/start-export.ts` | `startExport(clipId)`: the 11 steps of §19.5; `newExportId`, a UUID of version 7 and the one cast to `ExportId`; `planOf`; the download. 218 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/usecases/start-app.ts` | Step 8: `void modelManager.inspect();`, inside the branch of a supported browser, after step 7; the import of the model manager. The marker `// V2: modelManager.inspect()` is gone. 102 lines |
+| `docs/v2/v2implementation.md` | §19.2, §19.3 and §19.5 say what was built; §27 gains items 29, 30 and 31 (4 edits) |
+| `docs/v2/v2changelog.md` | This entry, and the one of the two pushes before it; known issue 37; a line in known issue 20 |
+
+No dependency was added. No Rust file, no worker and no store changed.
+
+**The three drills.** Each was undone from a copy, and ESLint is clean after the last.
+
+| Temporary edit | ESLint |
+|---|---|
+| `import { startExport } from "./start-export";` in `run-pipeline.ts` | `boundaries/dependencies`: "There is no policy allowing dependencies from elements of type "usecases" to elements of type "usecases"" |
+| A second cast, `"x" as ClipId`, in `import-clip.ts` | `no-restricted-syntax`: "In this file one cast is allowed: to ClipId, in the last return of newClipId() (D-59). Every other value must arrive already typed" |
+| `fetch("/x")` in `start-export.ts` | `no-restricted-globals`: "Unexpected use of 'fetch'. fetch is not available here. Network requests go through net/http.ts or net/asset-fetch.ts" |
+
+**Browser check (dev).** `vite` on port 5173 with the bundles of the last build, started with the test public key in the environment of that one process; Chrome under Playwright, headless, a new profile under `fixtures/.cache/`; a temporary case, `zz-p54.spec.ts`, that imports the modules from `/src/`, calls them and prints what it reads; the fake API of the E2E helpers, so every analytics batch could be read. The key was worked out from the seed in `fake-api.ts` and printed nowhere; the tokens were minted by `mintEntitlementToken`.
+
+The four results the prompt names:
+
+| Asked | Result |
+|---|---|
+| `importClip(file, "user")`, the model cached | `ready` after 60.4 s. `events.length` 1; `feed` is `transcribing`, then `event_found` with `$12k`; `out48.length` 3,585,840; 157 words, 157 entries of prosody. Requests from the call to `ready`: one, `POST /api/v1/events`, and no other of any kind |
+| `startExport(clipId)` with no `entitlement` record | `unavailable: true`; the status stays `idle`; the directory `exports/` does not exist; no `export_started` is sent |
+| `startExport(clipId)` with a seeded Creator token | `done`, 2,242 of 2,242 frames. The download is named `offcut-20261010-0158.mp4`, 78,965,811 bytes. `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`: `PASS 1` to `PASS 6`, exit 0 |
+| `dismissClip()` | The clip store is `idle`, `out48` is `null`; `clips/` is empty |
+
+What the stores and the analytics said on the way:
+
+| Asked | Result |
+|---|---|
+| The model store after the app's start, in a new profile | `absent`: step 8 ran. After a reload with the model on the device: `ready` |
+| The first import, with no model on the device | The clip is `processing` at `probe_audio` with `waitingModel: true` while the model store says `downloading`; then `asr`, `detect_scene`, `ready`. 110 s in all. `model_download { outcome: "ok", duration_ms: 47975, resumed: false }` |
+| The events of the cached import | `clip_accepted { duration_bucket: "lte90", orientation: "landscape", source: "user" }`; `stage_timing` for `probe_audio` (623 ms), `asr` (59,805 ms, `asr_backend: "webgpu"`) and `detect_scene` (18 ms); `pipeline_done { total_ms: 60538, n_number: 1, n_list: 0, n_from_to: 0, n_keyword: 0 }`. No `model_download`, none for `audio_chain` |
+| OPFS after `ready` | `clips/<id>/source`, 35,201,023 bytes, and `clips/<id>/out48.f32`, 14,343,360 bytes, which is 3,585,840 x 4 |
+| The Creator export, started while a preview played | The preview store is `locked` while the export renders and `paused` after it. `export_started { profile: "creator" }`; `stage_timing` for `render_encode` (25,454 ms) and `mux` (19 ms); `export_done` with `total_ms: 25535`, `profile: "creator"`, `events_kept: 1`, `style: "clean"`, the other counts 0 and both flags `false`. Requests during it: one, `POST /api/v1/events`. `exports/` holds `<exportId>.mp4` and an empty `tmp/` |
+| The export's id | `01a1225a-4e4b-70f8-83ea-782f754964a5`: the version is 7, the variant `10`, and the first 48 bits are the time |
+| A click on play after the export | It plays: two screenshots of the canvas 1 s apart differ, and no failure is stored |
+| The eight events of §1.1 | All eight were sent in this run: `clip_accepted`, `model_download`, `stage_timing`, `pipeline_done`, `preview_played`, `export_started`, `export_done`, `export_failed` |
+
+No console line of the kind error or warning and no page error in that run.
+
+**Checked beyond the prompt,** in the same run and in a second one with a 12-second cut of the clip and a silent 8-second one:
+
+| Asked | Result |
+|---|---|
+| A second export, with a Free token | `done`; the file is 720 x 1280, 40,060,567 bytes, and passes the six checks with `--profile free`. Its id is new, and `exports/` holds this file alone: the Creator file is gone (D-40) |
+| A token signed with another key | The export is `failed` with `E_ENTITLEMENT_INVALID`, stage `render_encode`; `export_started`, then `export_failed { error_code: "E_ENTITLEMENT_INVALID", stage: "render_encode" }`; `exports/` does not exist; the preview is `paused` again, not locked |
+| `dismissClip()` while the preview plays | `idle`; the failed export is gone from the export store; `clips/` is empty. The worker's loop was stopped first, so the close was not refused |
+| A text file named `x.mp4` | `rejected` with `REJECT_CONTAINER`; `clips/` is empty; no event. The next `importClip`, on top of the rejected clip, works |
+| `importSampleClip()` called twice at once | One request to the asset host; `clip_accepted` with `source: "sample"`, once; the clip is `processing` |
+| `importClip` called twice at once | One clip, one `clip_accepted` |
+| A 12-second clip with no amount in it | `ready` with 0 events and 28 words; the feed is `transcribing` alone; `pipeline_done` with four zeros; `duration_bucket: "lt30"` |
+| A clip with no sound | `rejected` with `REJECT_NO_SPEECH`; `clips/` is empty; `stage_timing` for `probe_audio` and `asr`, no `pipeline_done` |
+| The model's files removed from OPFS while the store says `ready` | The clip is `failed` with `E_ASR_RUNTIME`, detail `Load`, stage `asr`; its directory stays until `dismissClip()`, after which `clips/` is empty. The runtime writes two warnings to the console. After a reload the model store says `absent` |
+| An export whose `out48.f32` was removed, asked for twice at once | One export: `failed` with `E_STORAGE_IO`, stage `storage`; one `export_started` and one `export_failed`; the preview, which had no canvas, is `detached` again |
+| `startExport` again after that failure | The store goes from `failed` through `idle` to a new export, which fails the same way |
+| `startExport` with the id of another clip; `dismissClip()` with no clip | Nothing happens, each |
+
+**Decided here, where the plan is silent or cannot be built as written.** Each is in §19 of the plan now.
+
+- **`run-pipeline.ts` exports `startTimer(clipId)`.** Step 5 of `importClip` starts a timer that `runPipeline` reads, and the plan gives it no home: `runPipeline(clipId)` carries no time and the clip store has no field for one.
+- **`dismissClip` sends `previewPause` before `closeSession`.** The plan resets the store and closes the session. But the player is detached by its component, which runs after the reset, and the worker does one job at a time: a close that arrives beside a running preview is refused, the clip's file stays locked, and its directory cannot be removed. `previewPause` is accepted beside a preview and answers when the loop has returned.
+- **`dismissClip` does nothing for a clip that is `idle`, being imported or being processed, and nothing while an export runs.** The machine has no `reset` from those states, and a session cannot be closed under a pipeline or an export. It asks `forImport()`, which is where those conditions are.
+- **`dismissClip` resets an export that is `done` or `failed`.** It was the dismissed clip's; the next clip would otherwise show it.
+- **The blockers are asked a second time after a wait:** in `importClip` after the old clip is dismissed, in `startExport` after the token is read from the database. Two clicks would otherwise both pass the first check.
+- **`startExport` and `runPipeline` look at the clip id they are given.** `startExport` returns when it is not the clip in the store; `runPipeline` throws.
+- **Every failed export goes the way of step 8:** `fail`, `export_failed`, `unlockAfterExport()`. The plan names the three for step 8 and only `fail(E_STORAGE_IO)` for steps 7 and 10, which would leave the preview locked.
+- **The two sweeps remove the directory itself,** `clips/` and `exports/`. That removes every entry, and no path is built outside `opfs.ts`.
+- **One wait for one download of the model,** shared by clips that overlap, and `model_download` is tracked when the download ends, also when the clip failed meanwhile. A download counts as having happened when the manager reported progress or failed.
+- **After a failure of `load` or `transcribe`, `unload()` runs and its own failure is dropped.** The first failure is the one stored.
+- **`stage_timing` for `asr` is sent for a clip without speech too.** The stage ran.
+- **A feed line is made for an event of any kind.** §25.4 says a kind that V3 detects shows a line at once, and the plan gives `display` for a NumberReveal only. The other three are the `to` quantity of a FromTo, the count of a ListReveal and the word of a KeywordPop. V2 produces none of them; V3 should confirm them against the copy of Prompt 55.
+- **A job that answers `{ cancelled: true }` is a failure with `E_INTERNAL`.** Nothing sends a cancel before V4.
+- **Something thrown that is no failure of a worker, of the model or of the storage** is stored as `E_INTERNAL`, and thrown again: the page shows the stub, and a fault of the code still reaches the console.
+- **`importSampleClip`:** a call made while another fetches gets the same promise; a body that breaks off counts as `offline`; on a failure, a clip that arrived meanwhile is left alone.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`git grep -n "V3: \|V7: " -- web/src/usecases | wc -l` is 5, not 4.** The four of this prompt are there: two `V3:` lines in `run-pipeline.ts`, one `V7:` line each in `import-clip.ts` and `start-export.ts`, each naming §25. The fifth is `// V7: restoreClip()` in `start-app.ts`, which V1 wrote. The guide's count did not include it (§27, item 31).
+- **`start-app.ts` gained two lines,** the call and the import of the model manager; the prompt says one.
+- **One dev server, started with the test key, served all four results.** The prompt starts a keyed server for the third only. The first, second and fourth do not depend on the key.
+- **The dev server was `vite` alone,** not `pnpm dev`, as in Prompts 52 and 53.
+- **The caps of TS §22.6 are a constant in two files,** `run-pipeline.ts` and `start-export.ts`: 3,600,000 ms and 10,000. A use-case may not import another, and the generated file holds only `MAX_EVENTS_PER_BATCH`.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit`; ESLint on `src/usecases`: clean. The three new files import `AppFailure` from `workers/protocol.ts` as a type (D-27 f); `import-clip.ts` imports `net/asset-fetch` (D-27 a) and `run-pipeline.ts` (D-58); `start-export.ts` imports `control-preview.ts` (D-58).
+- `git grep -n "file\.name\|webkitRelativePath" -- web/src`: nothing, with the new files added.
+- `node scripts/check-file-tree.mjs`: 225 files; the three new files were in the tree of TS §5.
+- G M-9: `tsc`, ESLint on the whole of `web`, Vitest and `pnpm check` green; the frozen web files are unchanged. `grep -c "media.worker\|asr.worker\|render.worker" web/src/workers/pool.ts` prints 4, where the guide expects 3: the three rows, and the comment in line 6, whose words "render worker" the unescaped dot of the pattern also matches. With the dots escaped it prints 3. `pool.ts` was not touched, and the count was 4 before this prompt.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build` and `pnpm e2e` green; the frozen-file diff against `322c7d3` is empty; no file of `web/dist` holds the test key. **262 Rust** (2 ignored), **92 Vitest**, **12 Playwright**. The app shell is 286.8 kB gzipped, was 284.8: the model manager is now loaded at the start.
+- **`pnpm e2e` failed three times straight after the build, and it was not this change.** One case of 12 timed out, then six, then two; each time the cases were among the six that start first, and they ran 25 to 37 s against a limit of 30 s. The suite was then run on a build without the change to `start-app.ts` and with it, in turns: without, three runs of which one failed the same way; with, three slow runs; then without and with twice more, and no case took longer than 17 s in any of those four. With 3 workers the changed build passed 12 of 12 in 15 s. The gate's own run, after a new `pnpm build`, passed 12 of 12 in 23.6 s with 6 workers. The machine had 3.5 to 5.7 GB free and two other browsers open; a model had been downloaded and three clips exported in the minutes before (known issue 20).
+- Both temporary cases, the browser profile, the two downloads, the two cut clips and `web/test-results` are gone. `git status` shows the five files of this prompt and nothing else.
+
+**"Done when".**
+
+- [x] The four browser results hold; `git grep -n "V3: \|V7: " -- web/src/usecases | wc -l` is 5: the four of this prompt, and V1's marker in `start-app.ts`.
+- [x] `git grep -n "file\.name\|webkitRelativePath" -- web/src` is empty; the three drills fired; G M-9 passes.
+
+**Not checked.**
+
+- **The download under the production CSP.** The check ran on the dev server, as the prompt says. The click on an anchor with a `blob:` address has not run under the CSP of `vercel.json`; Prompt 55's walk-through in a keyed production build is where it does.
+- **A real page.** No component calls these functions yet. That a player's own `detach()` and `dismissClip()` get along was reasoned and tried with a canvas of the check, not with `PreviewPlayer`.
+- **A download of the model that fails, or goes on from bytes on the device:** `model_download` with `failed`, `hash_mismatch` or `resumed: true`. A sample clip that cannot be fetched. A full disk, a lost GPU device, a worker that crashes.
+- **By eye and by ear.** The exported files were verified, not watched.
+- **INV-12 by a test.** `unload()` is awaited before `openSession` on every path; nothing in V2 asserts it (Prompt 57 notes the same).
+- **R1** (D-69). Every time here is D1's, on a dev server, and stands for nothing in E-3 or E-4.
+
+**Found, and not for this prompt.**
+
+- **While the sample clip is fetched, no store says so.** The plan has the clip store go to `importing` only when the 35 MB are here, so the landing page stays as it is for that long, and a click on the button shows nothing. Prompt 55 wires the button and will meet it.
+- **`assertNever` has no home.** `run-pipeline.ts` has one of its own; `ProcessingFeed.tsx` needs it twice in Prompt 55, and TS §11.3 asks for it in every such `switch`.
+- **Model files that vanish behind the store's back** (the browser clears the site's data while the page is open) leave the model store at `ready` until a reload, and every import fails with `E_ASR_RUNTIME` until then.
+- **The first six Playwright cases of a run are slow on D1 whenever the machine has been busy,** near or over the 30 s a case may take. `ci` runs them with a retry. Prompt 58 changes the Playwright config anyway.
+
+**Open, for the human.** Push `v2-build` and read `ci` (open item 4): Prompt 55 waits for green.
