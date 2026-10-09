@@ -46,7 +46,8 @@
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host is the 214,647,815-byte set of the small-size English model** (D-66; entry of Prompt 38): the 4-bit encoder and the mixed 4-bit and 16-bit decoder. **Whether it runs on both backends is not known before Prompt 43.** Its decoder computes in 16-bit floats, which the WebGPU backend needs a device feature for and the WASM backend may not run; TE-1 needs both. The other set that fits the limit is the 8-bit pair, 251,728,328 bytes. Its decoder is one file of 156,794,981 bytes: if that set replaces this one, steps 2 and 3 of Prompt 38 are repeated, and the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected with a range check on that file. The downloaded files are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompts 43, 44 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
-| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed | Every gate |
+| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12 | Every gate |
+| 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 
 ---
 
@@ -982,3 +983,96 @@ The other five cases: every request names the manifest path and a range; a file 
 - [x] ESLint is clean for `src/models` and `src/state`. Edge D-27 d proves its positive side. **Edge f is first used in Prompt 40,** by `model-manager.ts`: neither file of this prompt needs the `AppFailure` type, and an import that nothing uses fails lint.
 
 **Not checked.** The store against a real download, and the hash with the real SHA-256: both are the browser check of Prompt 40.
+
+## 2026-10-09 - Prompt 40: model manager, download panel, copy
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/models/model-manager.ts` | `inspect`, `ensureReady`, `cacheInfo`, `clear` with the signatures of TS §16.2; `ModelFailure`, the `Error` with a `failure: AppFailure` that `ensureReady` rejects with. The one cast is in `toBytes()` |
+| `web/src/ui/components/ModelDownloadPanel.tsx` | The J4 panel: the sentence with the size, a progress bar, the time remaining, the "checking" line, and the words of the three model failures. It reads the model store and calls nothing |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/copy/messages.ts` | `modelDownload.body(sizeMb)`, `.progress(etaSecs)`, `.verifying`; `errors.E_MODEL_DOWNLOAD`, `E_MODEL_HASH`, `E_MODEL_STORAGE`, each with title, body and action |
+| `scripts/check-copy-codes.mjs` | Those three codes leave `COPY_PENDING`: 34 pending, was 37 (D-57, V1 D-13) |
+| `web/src/ui/styles/components.module.css` | Three classes: `modelPanel`, `progressTrack`, `progressBar` |
+| `docs/v2/v2implementation.md` | §17.1 and §17.3 say what was built (2 replacements, each applied once) |
+
+**Browser check (dev, persistent profile).** `vite` on port 5173; Chrome under Playwright with a profile in `fixtures/.cache/zz-profile-5173/`, made new for each run; the model files come from the real asset host. Two runs: the first went through the four scenarios, and the second repeated the interrupted download with exact counts, because the first run's request filter also counted two files of the dev server and its "30%" was closed at 23%.
+
+| Asked | Result |
+|---|---|
+| A cold download shows only 206 responses from the asset host and ends `ready` | 32 requests to the asset host over the two halves of the second run, **all 206** (11 before the page was closed, 21 after). First run, in one go: 31 requests, the number of 8 MiB ranges of the seven files; the store went `unknown`, `absent`, `downloading`, `verifying`, `ready`; **62.9 s** for 214,647,815 bytes, hashing included |
+| OPFS `models/asr-en-v1/` holds plain names and no `.part` | `config.json` 2,203; `decoder_model_merged_q4f16.onnx` 145,776,485; `encoder_model_q4.onnx` 66,178,491; `generation_config.json` 1,956; `preprocessor_config.json` 339; `tokenizer.json` 2,405,679; `tokenizer_config.json` 282,662. No `.part` |
+| After a reload `inspect()` gives `ready` with zero model requests | `ready`; 0 requests to the asset host for a model file; `ensureReady` returns without one call of `onProgress` |
+| The page closed at about 30% of a second cold download; reopened; `ensureReady`: the first `Range` starts at the `.part` size | Closed at 31.3% (67,111,067 bytes counted). Reopened: `config.json` final and `decoder_model_merged_q4f16.onnx.part` of **75,497,472** bytes, nine parts of 8 MiB. `inspect()` gives `partial`. The first request is `Range: bytes=75497472-83886079`. The download ends `ready` with seven final files |
+| One hex digit of a manifest `sha256` changed | Done on `preprocessor_config.json` (339 bytes), with its final file removed first so that it is downloaded again: one request, 206; the store goes `partial`, `downloading`, `verifying`, `failed` with `E_MODEL_HASH`; `ensureReady` rejects with a `ModelFailure` whose `failure` is `{ code: "E_MODEL_HASH", stage: "model", retryable: true }`; **no final file and no `.part` exists for that name**. The digit restored (`git diff --quiet` on the manifest passes): one request, and `ready` again, from `failed` |
+
+Not asked, and read in the same runs:
+
+| Read | Result |
+|---|---|
+| The hash is the real SHA-256 | Yes: `verifyAndFinalize` ran with the stream of `offcut_core.wasm` on the main thread, and seven files matched the hashes that `sha256sum` wrote into the manifest in Prompt 38. The unit tests of Prompt 39 used a stand-in |
+| The store and the caller see the same count | In 10 of 10 calls of `onProgress` the store's `done` was the `done` of the call |
+| Time remaining | `null` at first, then 71, 57, 48, 47, 52 s in the first run |
+| `cacheInfo()` | `{ modelId: "asr-en-v1", modelVersion: "small.en-timestamped-q4-q4f16@80853938", bytes: 214647815 }` |
+| `clear()` | `models/` is empty; the store goes `ready` to `absent`; `inspect()` gives `absent` |
+| Persistent storage | Asked for once: `meta` holds `persistRequested: true`. Chrome's answer was `false` (`navigator.storage.persisted()`), as expected for a page nobody has used; the download does not depend on it |
+
+**The two drills.** Each was undone from a copy.
+
+| Temporary edit | What fired |
+|---|---|
+| `E_MODEL_HASH` back in `COPY_PENDING` | `check-copy-codes`: "E_MODEL_HASH: has copy and is still in COPY_PENDING. Remove it from the list." Exit 1 |
+| `150 MB` typed into `modelDownload.body` in place of the parameter | No rule about digits: ESLint fired on the parameter that was now unused (`no-unused-vars`), which is a rule about something else |
+| The same, with the parameter still used ("at most 150 MB" added to the sentence) | **Nothing fires:** ESLint and `check-copy-codes` are clean. V1 has no tool for a typed-in digit before `messages.test.ts` (V8). The gap is as G 4.5 says |
+
+The new strings were read for a digit: none. The size and the time are parameters.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **The key `persistRequested` is written in `model-manager.ts` as a string of its own,** with a comment that names `META_KEYS.persistRequested`. The prompt asks for the guard by that name, which is in `persistence/schema.ts`; edge D-27 e lets the model manager import `persistence/db.ts` only, and `db.ts` (frozen) does not hand the key on. A sixteenth lint entry would have reopened a V1 contract that this prompt does not name. Cost: the name is in two files. If they ever differ, the browser is asked once more; nothing else reads the key. To settle when the specs are corrected (Prompt 60): widen edge e to `schema.ts`, or leave the copy.
+- **`ModelFailure`** is the "`Error` that has a `failure: AppFailure` field" of §17.1. `retryable` is true for the four codes of `ModelError` (TS §11.2) and false for `E_INTERNAL`, which is what any other error becomes.
+- **An abort rejects with the abort itself,** not with a `ModelFailure`: no error code means "the user stopped it". The store goes to `partial` (`net_fail`). V4 sends the first abort.
+- **`ensureReady` inspects first when the store is still `unknown`,** so that `start` is a legal transition. `inspect()` writes to the store on its first call only; later calls answer and leave the store alone.
+- **A file counts as final when a file of its final name has its manifest size.** That is the rule of `inspect()` (§17.1), used again in `ensureReady`.
+- **`done` starts at the bytes on disk** (final files, and each part up to the size of its file) and never passes `total`.
+- **The time remaining** is worked out from the oldest sample that is at least 5 s old, or from the start while the download is younger than that.
+- **`cacheInfo().bytes` counts part files too:** it is what the model takes on the device.
+- **`clear()` tells the store only from `ready` or `partial`,** the two states `cleared` is legal in.
+- **The directory of all models** is the parent of `paths.modelDir(modelId)`: `opfs.ts` has no function for it (ten functions, TS §23.1), and no other file builds a path.
+- **The panel shows the words of a failure** only for the three codes that have copy for it (D-57); for any other code it shows the sentence and the bar, and the page's stub says the rest (Prompt 55).
+- **The bar's label** is the sentence above it (`aria-labelledby`): §20.3 gives the panel three strings, and none is a label.
+- **The size shown is 210 MB:** 214,647,815 bytes, in units of 1,000,000, to the nearest 10 (TS §16.1). PS §10 J4 says "about 250 MB", which is the limit of D-66 and not this set.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The wrong-hash check changes the hash of the smallest file** and removes that one file first, so that 339 bytes are downloaded and not the whole model. The prompt does not say which file.
+- **`import { http } from "../net/http";` in `model-manager.ts`** (G 4.4) was not repeated: the same drill fired in `download.ts` in Prompt 39, and the rule is one rule for the layer.
+
+**Checked.**
+
+- `node scripts/check-copy-codes.mjs`: ok, `ERROR_CODES` 9 of 29 with copy (was 6), pending 34 (was 37).
+- `pnpm --filter web exec eslint .` and both `tsc` passes are clean. `model-manager.ts` uses edge D-27 d (the store, the manifest), e (`persistence/db.ts`) and f (the type `AppFailure`). The panel is mounted nowhere, and lints and type-checks.
+- Lines: `model-manager.ts` 233, `ModelDownloadPanel.tsx` 78, `messages.ts` 207.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **193 Rust, 92 Vitest**, as after Prompt 39.
+- **`pnpm e2e` is green as the gate runs it:** 12 of 12 with Playwright's 6 workers, in 26 s. **12 Playwright.** The six failures of Prompt 39's gate did not come back, with nothing changed for them (known issue 20). This run holds the code of both prompts, so the whole gate is now green on the code of Prompt 39 as well. With `--workers=3`: 12 of 12.
+- The app shell, gzip: 118.6 kB, was 118.2: the new copy and the three classes. The model manager and the panel are not in it yet: `start-app.ts` calls `inspect()` from Prompt 54 on, and the panel is mounted in Prompt 55.
+- The temporary Playwright case, the browser profile and the dev server are gone; the manifest is as committed.
+
+**"Done when".**
+
+- [x] The four browser results hold; `node scripts/check-copy-codes.mjs` passes with three fewer pending codes.
+- [x] Edge D-27 e is used and lints clean; the panel lints and type-checks without being mounted.
+
+**Not checked.**
+
+- **A full disk** (`E_MODEL_STORAGE`) and **three failed tries** (`E_MODEL_DOWNLOAD`) in a browser: both have unit tests (Prompt 39) and E2E cases in `model-download.spec.ts` (Prompt 56).
+- **The panel on a page.** It is mounted in Prompt 55; until then nobody has seen it.
+- The download on R1, and on a slower line than this one (about 27 Mbit/s).
+
+**Human.** Push; read `ci`. Prompts 39 and 40 are not marked **Push**; two commits are waiting, and Prompt 41 ends with one.

@@ -1475,6 +1475,8 @@ Signatures: TS §16.2 verbatim.
 | `cacheInfo()` | `{ modelId, modelVersion, bytes }` where `bytes` is the sum of the sizes of the files present |
 | `clear()` | Removes `models/`; store `cleared`. No V2 caller (V7, V8) |
 
+As built (Prompt 40): the error `ensureReady` rejects with is a `ModelFailure`; an abort rejects with the abort itself and leaves the store `partial`; `ensureReady` calls `inspect()` first while the store is `unknown`, and `inspect()` writes to the store on its first call only. The `meta` key is the string `"persistRequested"` written in `model-manager.ts`: edge D-27 e reaches `persistence/db.ts` and not `persistence/schema.ts`, where `META_KEYS` is.
+
 `onProgress` receives `{ done, total, etaSecs }`: `done` counts bytes already on disk at the start plus bytes received; `etaSecs` is `null` for the first 2 s, then remaining bytes divided by the mean rate of the last 5 s.
 
 ### 17.2 `download.ts`
@@ -1515,6 +1517,8 @@ Algorithm, TS §16.3:
 | Quota | `fail_storage` | `failed(E_MODEL_STORAGE)` |
 | Hash mismatch | `hash_bad` | `failed(E_MODEL_HASH)` |
 | All files verified | `hash_ok` | `ready` |
+
+As built (Prompt 39): six of the seven files are checked while the store still says `downloading`. A wrong hash of one of them is stored as `last_byte` followed by `hash_bad`. From `verifying`, `hash_bad` is also what a storage failure goes through, and the state holds the real code. The 14 pairs are unchanged.
 
 ---
 

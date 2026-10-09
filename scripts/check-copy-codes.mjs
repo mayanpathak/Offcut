@@ -38,10 +38,8 @@ const COPY_PENDING = [
   "REJECT_FRAME_RATE",
   "REJECT_DECODE_UNSUPPORTED",
   "REJECT_NO_SPEECH",
-  // Every error but the six a person can meet in V1: due by V7.
-  "E_MODEL_DOWNLOAD",
-  "E_MODEL_HASH",
-  "E_MODEL_STORAGE",
+  // Every error but the six a person can meet in V1 and the three of the
+  // model download, written in V2: due by V7.
   "E_STORAGE_QUOTA",
   "E_STORAGE_IO",
   "E_DECODE_AUDIO",

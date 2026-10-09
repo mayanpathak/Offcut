@@ -93,6 +93,33 @@
   color: var(--color-problem);
 }
 
+/* --- ModelDownloadPanel --------------------------------------------------- */
+
+.modelPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.progressTrack {
+  height: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+/* The component sets --progress on the bar; no style attribute is written. */
+.progressBar {
+  width: var(--progress, 0%);
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.3s linear;
+}
+
 /* --- WhatLeavesTable ------------------------------------------------------ */
 
 .tables {
