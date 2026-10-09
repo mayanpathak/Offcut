@@ -27,6 +27,10 @@ const ENV_LOCAL = resolve(ROOT, "web/.env.local");
 const ASR_CHUNK = /^assets\/asr\.worker-[\w-]+\.js$/;
 const ORT_MODULE = /^ort\/[^/]+\/ort-wasm-simd-threaded\.asyncify\.wasm$/;
 const ORT_OPERATOR_TEXT = "text of an operator's description compiled into ONNX Runtime; the module makes no request";
+// The render bundle. It holds the sources of Vello's shaders as text, which it
+// hands to the GPU's shader compiler; an address in one of them is in a comment.
+const RENDER_MODULE = /^assets\/offcut_render_bg-[\w-]+\.wasm$/;
+const VELLO_SHADER_COMMENT = "an address in a comment of one of Vello's shader sources, which the module holds as text; the module makes no request";
 
 /**
  * URL literals in the bundle that are never requested. Each entry is the
@@ -62,6 +66,14 @@ const NON_NETWORK_LITERALS = [
   { prefix: "https://github.com/google/re2/wiki/Syntax", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
   { prefix: "https://ieeexplore.ieee.org/document/1163711", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
   { prefix: "https://arxiv.org/abs/1502.03167", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+
+  // offcut_render.wasm (v2implementation D-38). Each is the whole literal.
+  { prefix: "https://skia.org/docs/dev/design/conical/", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://raphlinus.github.io/graphics/2020/04/21/blurred-rounded-rects.html", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/gfx-rs/naga/issues/1930", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/linebender/vello/issues/1061", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/google/skia/blob/30bba741989865c157c7a997a0caebe94921276b/src/opts/SkRasterPipeline_opts.h#L5859", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://en.wikipedia.org/wiki/Carry-less_product", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
 ];
 
 const URL_LITERAL = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/g;

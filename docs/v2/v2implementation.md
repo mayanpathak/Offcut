@@ -1090,13 +1090,13 @@ export type CoreApi = {
 }
 ```
 
-- `export_profile_from_token`: each array element must be a 32-byte `Uint8Array`, others are skipped. `verify_token` then `export_profile(Some(&claims), now)`. Any `TokenError` gives `{ code: "E_ENTITLEMENT_INVALID", detail: <variant> }`. The audio track is always 48,000 Hz, 2 channels (TS §21.2).
+- `export_profile_from_token`: each array element must be a 32-byte `Uint8Array`, others are skipped. A `now_unix_secs` that is not a finite number is `{ code: "E_INTERNAL", detail: "Now" }` (as built, Prompt 48: read as a number it would be the year 1970, when no token has run out). `verify_token` then `export_profile(Some(&claims), now)`. Any `TokenError` gives `{ code: "E_ENTITLEMENT_INVALID", detail: <variant> }`. The audio track is always 48,000 Hz, 2 channels (TS §21.2).
 - `JsMuxSink` calls `sink.writeAt(offset, data)` on the object it was given (an `OpfsSink`). A throw becomes `IoError::Write`.
 - `MuxError` gives `{ code: "E_MUX", detail }`.
 
 ### 13.5 `session.rs`
 
-Copy `RenderSession` of TS §19.2 verbatim, and add the four methods that make it a `DemuxerHandle` (D-30):
+Copy `RenderSession` of TS §19.2 verbatim, and add the four methods that make it a `DemuxerHandle` (D-30). **As built (Prompt 48):** `open` has the signature of TS §19.2 and is not exported, because JavaScript cannot pass a `ClipInfo` or a `JsRandomAccess`; the export is `open_session(clip: JsValue, source: FileSystemSyncAccessHandle)`, which reads the two and calls it. `attach_canvas` is an `async fn` that takes the size as two `u32`, and JavaScript gets the promise of it. `render_frame` takes the time as `u32` milliseconds. Before a scene is set `frame_count()` is 0 and `summary()` is `null`. The four methods:
 
 ```rust
 #[wasm_bindgen] impl RenderSession {
@@ -1227,7 +1227,7 @@ export function preloadRender(): Promise<void>;     // fetch + WebAssembly.compi
 export function loadRender(): Promise<RenderApi>;   // instantiates from the cached Module
 ```
 
-Same construction as `load-core.ts` (V1 §11.9): glue from `web/src/wasm/pkg/render/`, the `.wasm` as a Vite `?url` asset. The main thread calls only `preloadRender`; only `render.worker` calls `loadRender`.
+Same construction as `load-core.ts` (V1 §11.9): glue from `web/src/wasm/pkg/render/`, the `.wasm` as a Vite `?url` asset. **As built (Prompt 48):** `RenderSession` is the module's own class with the types of its three untyped methods written out (`set_scene`, `summary`, `read_video_sample`), and `Mp4MuxerHandle` is the module's class. Their method names are the module's, which is what section 16.7 reads a session through. A JavaScript object's keys are strings, so the word edits of `detect` and of a scene input are read by the binding as text keys and turned into word numbers there. The main thread calls only `preloadRender`; only `render.worker` calls `loadRender`.
 
 ### 15.6 `workers/rpc.ts`
 

@@ -42,7 +42,7 @@
 | 12 | `proptest` writes a folder `proptest-regressions/` beside the crate when a property fails. It is not in the tree of TS §5: delete it once the failure is fixed, or the file-tree check fails | Prompts 35, 36, 41 |
 | 13 | **How code in a worker is written** (entry of Prompt 37). A failure with a name is thrown as `new WorkerFailure(code, detail, stage?)` from `workers/rpc.ts`: ESLint refuses a thrown plain object, and `toAppFailure` reads the error's `code`. A handler that saw its cancel flag returns `CANCELLED`. `ctx.isCancelled` and `ctx.progress` are passed on as `() => ctx.isCancelled()`, never unbound. A worker posts with `postMessage(message, { transfer })`; `serveWorker` does it and finds the `Float32Array`s and `OffscreenCanvas`es of a result itself. The lists `oneWay` and `duringPreview` are given to `serveWorker` in the worker's entry file: a worker may not import `pool.ts` | Prompts 43, 50, 53 |
 | 14 | **A new worker gets one line in `pool.ts`:** `import url from "./<name>.worker.ts?worker&url"`, a row in `WORKERS` (script, stage) and a client in `pool`. That form gives the built script's URL, which the `modulepreload` link and `new Worker` both use; `new URL("./x.worker.ts", import.meta.url)` outside `new Worker(...)` would ship the TypeScript source as an asset | Prompts 43, 50 |
-| 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
+| 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model. **Done in Prompt 48:** `session.rs` has it | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host runs on both backends** (entry of Prompt 43): the 214,647,815-byte set of the small-size English model, a 4-bit encoder and a 4-bit decoder with 16-bit floats. The runtime asks for its seven files and for nothing else. **It is slow:** on the development machine `load` and `transcribe` took 65 s on WebGPU and 102 s on WASM for the 74.7 s reference clip, against a target of 25 s on R1 (E-3). Since D-67 the fallback line is 180 s, and the founder's reading on an R1-class laptop is about 150 s. If a later reading on R1 is over 180 s, D-66 names the base-size model: steps 2 and 3 of Prompt 38 again with its files (the 4-bit pair is 145,199,758 bytes), `MODEL_DTYPE` in `whisper-runtime.ts` to match their names, and the transcript of `fixtures/speech/README.md` taken again. The files of the small-size set are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository. In a production build (entry of Prompt 44) the same machine read 62 s to 96 s on WebGPU and 98 s to 123 s on WASM | Prompt 59 |
@@ -54,6 +54,7 @@
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 | 25 | **What Prompts 47 and 48 build on** (entry of Prompt 45). `build_scene(SceneInput { transcript, events, edit, clip, profile })` gives a `Scene`; `frame_at(t)` gives a `DisplayList` in pixels of the output canvas, and `crop()` the part of the source frame to show. **How a `GlyphRun` is drawn:** the glyphs by id, from the file `fonts::bytes(font)` at the weight `fonts::weight(font)` and at `size`, each at its `x`, `y` in the run's own space; filled, then stroked with `stroke.width`, a length of that same space; all of it mapped to the canvas by `transform` (`a b c d e f`). A fading reveal is between `PushLayer { opacity, clip: None }` and `PopLayer`. V2 emits no `FillRect` and no `FillPath`. Pin `vello` 0.11.0 with `wgpu` 30: it shares `skrifa` 0.44 with `parley` 0.11.1. The crate builds for `wasm32-unknown-unknown`. The font files hold addresses in their name tables: `check-hosts` reads them once they are in `offcut_render_bg.wasm` (D-38), and the bundle grows by the 3.2 MB of the fonts and by parley's text data | Prompts 47, 48 |
 | 26 | **What the later prompts build on** (entry of Prompt 46). **Detector:** `offcut_detect::detect(&transcript, &prosody, &edits, &DetectorConfig::default())` gives the events in time order; on the reference clip it must give one, the `$12k` of words 132 and 133. `event_id(kind, anchors)`. **Entitlement:** `verify_token(token, &[[u8; 32]])` gives `EntitlementClaims` or a `TokenError` (all five are `E_ENTITLEMENT_INVALID`); `export_profile(Some(&claims), now)` and `export_profile(None, now)`, with `now` as `UnixSecs` from the caller's clock; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` for `preview_profile()`. `ParsedToken` has no `Debug`, on purpose. `CREATOR_VIDEO_BITRATE` of `profile.rs` must stay equal to the one in `encoders.ts` (D-26). **Tests:** `mintEntitlementToken(o?)` and `seedEntitlement(page, token)` of `helpers/fake-api.ts`; the page must have opened the app before `seedEntitlement`, which rejects otherwise. The test public key is in the entry of Prompt 46: a build for the media suites is made with it in `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`, exported in the terminal and written in no `.env` file. **The crate `offcut-entitlement` states the version of `ed25519-dalek` itself:** when the workspace's version changes, that line changes with it. **The E2E case "a slow API shows the waking message" runs in real time** and can miss its one-second window on a busy machine; run the suite again before reading it as a fault | Prompts 48, 49, 50, 54, 56, 57, 58 |
+| 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). **Captions are mostly stroke** as the display list is drawn now (entry of Prompt 48): look before Prompt 55. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
 
 ---
 
@@ -1979,3 +1980,152 @@ Only `offcut-render` depends on `vello` or `wgpu`.
 **Found, and not for this prompt.**
 
 - **Stroked after it is filled, a caption's letters get thinner.** The display list says fill, then stroke, and the renderer draws in that order (TS §19.2, §12). A stroke lies half inside the outline: at 64 lp with a stroke of 6 lp, 3 lp of dark cover each edge of the white letter. Captions on video are usually stroked first and filled over it. Nobody has seen a frame yet; this is for the look at Prompt 55 and for E-2, and it is one swap in `vello_backend.rs` if the order of the list is changed.
+
+## 2026-10-09 - Prompt 48: `offcut-wasm-render`, bundle, loader, preload
+
+**REOPENED V1 CONTRACT: `scripts/check-hosts.mjs`** (D-38). Six entries, each one whole literal, each allowed in the render bundle only. Nothing was loosened for a file that had passed before.
+
+**The first frames.** The prompt asks for no drawing, and nothing had drawn a pixel since Prompt 45. A temporary worker drove the new bundle in Chrome and read the canvas back: the crop is exact to the pixel, a frame marked `R90` is shown turned a quarter clockwise, the captions and the `$12k` reveal are drawn in their zones and nowhere else, and a second canvas at 1080 x 1920 works on the same device. The table is below.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-wasm-render/src/detect_api.rs` | The export `detect(transcript, prosody, edits)`, with `DetectorConfig::default()` |
+| `crates/offcut-wasm-render/src/profile_api.rs` | `export_profile_from_token(token, public_keys, now_unix_secs)`, `preview_profile()` |
+| `crates/offcut-wasm-render/src/mux_api.rs` | `Mp4MuxerHandle` with `new`, `add_video_sample`, `add_audio_sample`, `finalize`; the private `JsMuxSink` |
+| `crates/offcut-wasm-render/src/session.rs` | `RenderSession` with the methods of TS §19.2 and the four of §13.5; the export `open_session`; the private `JsRandomAccess` with its window of 1 MiB (known issue 15) |
+| `web/src/wasm/load-render.ts` | `RenderApi`, `RenderSession`, `Mp4MuxerHandle`, `SceneInput`, `VideoSample`; `preloadRender()`, `loadRender()` (§15.5) |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-wasm-render/src/lib.rs` | The four modules; the panic hook and `init` of V1; `failure`, `to_plain`, `to_js`, `from_js`, `word_edits` |
+| `crates/offcut-wasm-render/Cargo.toml` | `offcut-types`, `offcut-render`, `offcut-detect`, `offcut-mp4`, `offcut-entitlement`, `wasm-bindgen`, `wasm-bindgen-futures`, `js-sys`, `web-sys` (four features), `serde`, `serde-wasm-bindgen`; dev `serde_json`. Not `offcut-scene` (D-61) |
+| `Cargo.toml` | `[workspace.dependencies]`: `offcut-detect`, `offcut-render`, `offcut-entitlement` (paths); `wasm-bindgen-futures = "0.4.79"` |
+| `Cargo.lock` | The edges of the crate. No package is new |
+| `scripts/build-wasm.sh` | `BUNDLES` is `offcut-wasm-core:core offcut-wasm-render:render`. The `RUSTFLAGS` line is unchanged |
+| `scripts/check-hosts.mjs` | `RENDER_MODULE`, `VELLO_SHADER_COMMENT`, six entries |
+| `web/src/workers/pool.ts` | `preload()` fetches and compiles both bundles, side by side |
+| `docs/v2/v2implementation.md` | §13.4, §13.5 and §15.5 say what was built (3 replacements, each applied once) |
+
+`deny.toml` was not touched: the crate was a wrapper already, and `wasm-bindgen-futures` too.
+
+**Pinned.** `wasm-bindgen-futures` 0.4.79, the release that goes with `wasm-bindgen` 0.2.129 and the one the lock already held for `wgpu`. An `async fn` export needs it (D-54).
+
+**The bundle.** `web/src/wasm/pkg/render/offcut_render_bg.wasm` is **6,029,674 bytes** after `wasm-opt`, 2,861,729 gzipped; 3,165,448 of them are the three fonts. `offcut_core_bg.wasm` is 459,281, as before. The crate in `Cargo.lock` and the CLI are both `wasm-bindgen` 0.2.129. The release build of the bundle took 2 min 19 s on the development machine. The app shell is 266.6 kB gzipped, was 266.0: the glue of the second bundle.
+
+**Every visitor now downloads the render bundle at app start,** 2.9 MB compressed: `preload()` fetches both (D-9, §15.7). It was 177 kB for the core bundle alone.
+
+**The six entries of `check-hosts.mjs`.** `pnpm build` failed with 17 findings, six literals, all in `offcut_render_bg-*.wasm`. Each was found in the source it comes from before it was listed: five in `fine.wgsl` and one in `draw_leaf.wgsl` of `vello_shaders` 0.11.0. They are comments in Vello's shader sources, which the module holds as text for the GPU's shader compiler.
+
+| Literal | In |
+|---|---|
+| `https://skia.org/docs/dev/design/conical/` | `draw_leaf.wgsl` |
+| `https://raphlinus.github.io/graphics/2020/04/21/blurred-rounded-rects.html` | `fine.wgsl` |
+| `https://github.com/gfx-rs/naga/issues/1930` | `fine.wgsl` |
+| `https://github.com/linebender/vello/issues/1061` | `fine.wgsl` |
+| `https://github.com/google/skia/blob/30bb...6b/src/opts/SkRasterPipeline_opts.h#L5859` | `fine.wgsl` |
+| `https://en.wikipedia.org/wiki/Carry-less_product` | `fine.wgsl` |
+
+**No entry for the fonts, and why.** D-38 expected addresses from the fonts' name tables. They are in the module (`https://rsms.me/`, `https://github.com/JetBrains/JetBrainsMono`, `http://www.google.com/get/noto/`), but a name table holds its text with two bytes to a character, and `check-hosts` reads a file byte by byte: it does not see them. An entry that matches nothing would be noise. They are text of a font file; nothing requests them.
+
+**The three drills.** Each was undone from a copy.
+
+| Temporary edit | What fired |
+|---|---|
+| `offcut-scene` as a dependency of `offcut-wasm-render` | `check-file-tree`: "offcut-wasm-render may not depend on offcut-scene (TS §7)". `cargo deny check bans`: "crate 'offcut-scene = 0.1.0' is explicitly banned" |
+| `offcut-dsp` as a dependency | `check-file-tree`: "offcut-wasm-render may not depend on offcut-dsp (TS §7)"; `cargo deny` bans it too |
+| The `chunk` of the last new entry pointed at `offcut_core_bg-` | `check-hosts`, 1 problem: `web/dist/assets/offcut_render_bg-Wuppzrxx.wasm: https://en.wikipedia.org/wiki/Carry-less_product` |
+
+**The review of `profile_api.rs`: checked.** The token is the first argument of `export_profile_from_token` and is used once, as the first argument of `verify_token`. It is in no `format!`, no error and no returned value: the `detail` of a failure is one of five fixed names, and the function returns the profile, which holds nothing of the token.
+
+**Browser check (dev).** `vite` on port 5173; a temporary Playwright case.
+
+| Asked | Result |
+|---|---|
+| Both `offcut_core_bg` and `offcut_render_bg` are fetched once at app start | One `fetch` of each. (The dev server also serves one small module per bundle, the `?url` import that names the file; in a build that is a string) |
+| `crossOriginIsolated` | `true` |
+
+Not asked: the same on the production build under `vite preview`, with the headers of `vercel.json`. Both files answer 200 as `application/wasm`, once each; `crossOriginIsolated` is `true`; no console line.
+
+**The drive of the bundle, not asked for** (dev server; a temporary module worker, `zz-render.worker.ts`; Chrome under Playwright, headless, adapter `intel / gen-12lp`). The reference clip was written to OPFS and opened on a sync handle. The frame drawn was a test picture of the clip's size, made in the worker: magenta left of the centre strip, cyan right of it, the strip red above and blue below, a green square in the strip's top-left corner. The canvas was read back through a 2D canvas.
+
+| Asked | Result |
+|---|---|
+| `detect` on six words with `$12` `,000` | One event: `number_reveal`, words 2 to 4, `$12k`, id `"2892511656290198329"` (a string), confidence 1 |
+| `detect` with an edit of another word; of a word of the number | 1 event; 0 |
+| `detect` with a key that is no word number; with a transcript of another shape | `{ code: "E_INTERNAL", detail: "Edits" }`; `detail: "Transcript"` |
+| `previewProfile()` | `preview`, 540 x 960, no watermark, bitrates 0 |
+| `exportProfileFromToken` with the Creator token of the tests; the same token 116 days later; the Free token | `creator` 1080 x 1920 at 8,000,000 and 160,000; `free` 720 x 1280 with the watermark; `free` |
+| Keys `[3 bytes, a string, the key]` | `creator`: the first two are passed over |
+| Another key; no key; one character of the token changed | `E_ENTITLEMENT_INVALID`, `detail: "Signature"`, three times |
+| `"abc"` as the token; `NaN` as the time | `E_ENTITLEMENT_INVALID`, `Format`; `E_INTERNAL`, `Now` |
+| A muxer with two video samples and one audio sample | `finalize()` returns 262,344, which is where the last write ended; the file starts with `ftyp`; 9 writes reached the sink |
+| A frame out of its turn; a sink without `writeAt`; a sink that throws | `E_MUX` `OutOfOrder`; `E_INTERNAL` `Sink`; `E_MUX` `Write` |
+| `openSession` on the reference clip | 2,246 video samples; `avcC` of 41 bytes; sample 0 is a keyframe of 91,736 bytes at 0; the keyframe at or before 30 s is sample 896, as `ffprobe` said in Prompt 35; a sample past the end is `E_DECODE_VIDEO` |
+| Before a scene | `frame_count()` 0, `summary()` `null`; `render_frame` is `E_INTERNAL` `NoScene` |
+| After `set_scene`, before a canvas | 2,242 frames; `visual_moments` 1; `render_frame` is `E_INTERNAL` `NoCanvas` |
+| `attach_canvas(canvas, 540, 960)`, the first | 63 ms: the adapter, the device, Vello's shaders |
+
+| Frame | Read back |
+|---|---|
+| At 2,600 ms, 540 x 960 | Red above, blue below; the pixel in the top-left corner is the green square; **no magenta and no cyan pixel anywhere.** Event zone: 5,231 white pixels and 3,561 of the stroke's colour, the `$12k`. Caption zone: 260 white, 4,083 dark and 68 yellow pixels, the two lines with "sales." active. No white or yellow pixel outside the two zones |
+| At 1,700 ms | The count-up: 8,395 white pixels in the event zone, a wider text; the caption's active word is the number |
+| At 3,700 ms and at 9,000 ms | The frame alone: no pixel of the overlay. The path without an overlay pass draws the video |
+| With word 5 hidden and the event switched off by its id | `visual_moments` 0; nothing in the event zone; a caption with no active word |
+| A second canvas, 1080 x 1920, with the Creator profile | The same picture at twice the size: 21,733 white pixels in the event zone. 30 frames were handed to the GPU in 55 ms, which says the calls are cheap and nothing about the render time |
+| The frame after all of it | Still open: its `displayWidth` reads 1280. Nothing closed it |
+| A clip that says `R90`, the same stored frame | Magenta on top, cyan below, each 328 rows of 540 pixels: the stored frame's left and right bands, 34.2% of its width each. The stored frame's bottom is the display's left |
+
+No console line and no page error in any of it.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **`open_session` is the export, and `RenderSession::open` is not.** TS §19.2 gives `open(clip: ClipInfo, source: JsRandomAccess)`, and JavaScript can pass neither type. `open` keeps that signature; the export takes a `JsValue` and the sync handle, reads them and calls it.
+- **`attach_canvas` is an `async fn`,** with the size as two `u32`. TS §19.2 writes `-> js_sys::Promise` with `&mut self`; a renderer is made by awaiting, and the session must be written to afterwards. JavaScript gets the same promise. **While it is pending the session cannot be used:** another call on it throws. The render worker awaits it.
+- **`render_frame` takes the time as `u32` milliseconds,** and the width and height of every call are plain numbers: the unit types are Rust's.
+- **Before a scene is set** `frame_count()` is 0 and `summary()` is `null`.
+- **A JavaScript object's keys are strings.** `{ 3: "text" }` reaches Rust as the key `"3"`, and the converter does not read a number out of a string. The binding reads word edits with text keys and turns each into a word number: digits only, as JavaScript writes a number. Any other key is `E_INTERNAL`. This holds for `detect` and for the `edit` of a scene input, and it was needed for neither in V2, where no word is edited; it was tried with one.
+- **An argument of another shape** is `E_INTERNAL` with the argument's name as `detail`: `Transcript`, `Prosody`, `Edits`, `ClipInfo`, `SceneInput`, `Sink`, `Now`. The caller is the app's own worker.
+- **A time that is not a finite number is refused.** Read as a number it would be 0, the year 1970, when no token has run out yet.
+- **A file that does not open in `open`** is `E_STORAGE_IO` when it cannot be read and `E_INTERNAL` otherwise: the clip was accepted before a session is opened, so it is never a rejection.
+- **`read_video_sample` fails with `E_DECODE_VIDEO`,** as `read_audio_sample` does with `E_DECODE_AUDIO`.
+- **`RenderSession` in TypeScript is the module's own class** with the types of `set_scene`, `summary` and `read_video_sample` written out; the names are the module's, because §16.7 reads a session through `video_description`, `read_video_sample` and the other two.
+- **`preload()` starts both downloads at once** and answers when both are compiled.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **Six entries, none for a font** (above). The prompt names two kinds of literal, "font name table, dependency error text"; what the build named is a third, shader comments.
+- **`Renderer::set_canvas` of Prompt 47 is what a second `attach_canvas` calls,** where §13.5 says "a new surface on the same device, then `resize`". It is that, in one call.
+- **The drive of the bundle** and the check on the production build, neither asked for.
+- **Five inline tests,** none asked for: the crash message; the word-edit keys; the names of the three kinds of failure this crate maps (token, muxer, renderer). All run natively.
+
+**Checked.**
+
+- G M-7: `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace` 0 failed; `pnpm build:wasm` writes `pkg/core` and `pkg/render`; `pnpm check` green; `pnpm build` green, `check-hosts` passes with the render bundle in `web/dist` (10 files); `ls web/dist/assets | grep -c "offcut_render_bg-.*\.wasm$"` is 1.
+- `cargo clippy -p offcut-wasm-render --target wasm32-unknown-unknown -- -D warnings`: clean. `pnpm --filter web exec tsc --noEmit` and ESLint on `src/wasm` and `src/workers`: clean.
+- `node scripts/check-file-tree.mjs`: 205 files. `cargo deny check`: ok. `sh scripts/check-gen-clean.sh`: no diff.
+- Lines above the test module: `session.rs` 341, `mux_api.rs` 122, `lib.rs` 116, `profile_api.rs` 70, `detect_api.rs` 23; `load-render.ts` 118, `pool.ts` 90, `check-hosts.mjs` 179.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build`, `pnpm e2e` green, the last one with Playwright's 6 workers at the first run; the frozen-file diff against the baseline is empty. **255 Rust, 92 Vitest, 12 Playwright** (Rust was 250; the five are new).
+- The two temporary files and the dev server are gone: `git grep -n "zz-render" -- web crates scripts` prints nothing.
+
+**"Done when".**
+
+- [x] `pnpm build:wasm` writes both bundles; the `wasm-bindgen` crate and CLI versions are equal (0.2.129); the render bundle's size is in this entry.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass; `ls web/dist/assets | grep -c "offcut_render_bg-.*\.wasm$"` is 1; G M-7 passes.
+
+**Not checked.**
+
+- **A real video frame.** The frame of the drive was made from a canvas. A frame out of a `VideoDecoder` reaches the renderer in Prompt 49 and Prompt 50.
+- **The renderer under the production CSP.** The drive ran on the dev server; only the preload ran on the production build. Prompt 50 runs an export there.
+- **How long a frame takes to render** (TE-3, Prompt 51), and the scene build on R1.
+- **R1 and Linux.** The adapter was the integrated Intel GPU of the development machine. `ci` builds the bundle on Linux for the first time; it draws nothing.
+
+**Found, and not for this prompt.**
+
+- **A caption is mostly stroke.** At 540 x 960 the caption of the drive has 260 white pixels and 4,083 of the stroke's colour: the stroke, drawn after the fill, covers most of each letter (entry of Prompt 47). At 1080 x 1920 it is 1,563 to 18,391. The large number is less affected: 5,231 to 3,561. This is what the display list asks for; it wants eyes before Prompt 55, and probably the stroke first and the fill over it.
+- **6 MB at app start.** The render bundle is fetched by every visitor of the landing page, whether a clip follows or not. D-9 decided that for a bundle of 177 kB. Half of the bundle is the three fonts, and Noto Emoji alone is 2.0 MB for a fallback no transcript has needed. Not a V2 exit criterion; a question for before the page is announced.
+
+**Open, for the human.** Push `v2-build` (two commits: Prompt 47 and Prompt 48) and read `ci` on pull request #2. Prompt 49 waits for green. The run will be longer than the last: `wgpu` and Vello are built natively for the tests and for wasm32 for the bundle.

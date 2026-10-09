@@ -1470,6 +1470,20 @@ dependencies = [
 [[package]]
 name = "offcut-wasm-render"
 version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "offcut-detect",
+ "offcut-entitlement",
+ "offcut-mp4",
+ "offcut-render",
+ "offcut-types",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
 
 [[package]]
 name = "once_cell"

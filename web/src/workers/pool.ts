@@ -7,6 +7,7 @@
 // its script; V3 adds the audio worker.
 
 import { preloadCore } from "../wasm/load-core";
+import { preloadRender } from "../wasm/load-render";
 import asrWorkerUrl from "./asr.worker.ts?worker&url";
 import mediaWorkerUrl from "./media.worker.ts?worker&url";
 import type { AppFailure, AsrWorkerApi, FailureStage, MediaWorkerApi } from "./protocol";
@@ -74,14 +75,14 @@ function preloadScripts(): void {
 }
 
 /**
- * Fetches and compiles what the workers will need. A failure here means the
- * bundle could not be loaded: the same failure as a worker script that
- * cannot be loaded (TS §14.4).
+ * Fetches and compiles what the workers will need: both WASM bundles, and
+ * the worker scripts. A failure here means a bundle could not be loaded: the
+ * same failure as a worker script that cannot be loaded (TS §14.4).
  */
 export async function preload(): Promise<{ ok: true } | { ok: false; failure: AppFailure }> {
   preloadScripts();
   try {
-    await preloadCore();
+    await Promise.all([preloadCore(), preloadRender()]);
     return { ok: true };
   } catch {
     return { ok: false, failure: { code: "E_WORKER_CRASH", stage: "import", retryable: true } };

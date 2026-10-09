@@ -22,7 +22,10 @@ offcut-api-types = { path = "crates/offcut-api-types" }
 offcut-mp4 = { path = "crates/offcut-mp4" }
 offcut-dsp = { path = "crates/offcut-dsp" }
 offcut-text = { path = "crates/offcut-text" }
+offcut-detect = { path = "crates/offcut-detect" }
 offcut-scene = { path = "crates/offcut-scene" }
+offcut-render = { path = "crates/offcut-render" }
+offcut-entitlement = { path = "crates/offcut-entitlement" }
 serde = "1.0.229"
 serde_json = "1.0.151"
 ts-rs = "12.0.1"
@@ -58,6 +61,8 @@ wasm-bindgen = "=0.2.129"
 js-sys = "0.3.106"
 web-sys = "0.3.106"
 serde-wasm-bindgen = "0.6.5"
+# The release that goes with that wasm-bindgen: an `async fn` export needs it.
+wasm-bindgen-futures = "0.4.79"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
