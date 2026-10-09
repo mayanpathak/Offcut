@@ -14,7 +14,7 @@
 
 | # | Item | Who | Needed by |
 |---|---|---|---|
-| 1 | Add the origin `http://localhost:4173` to the CORS policy of the asset bucket (D-41). On 2026-10-08 the bucket answers for the app origin and for `http://localhost:5173` only | Human | Prompt 44 |
+| 1 | **Closed on 2026-10-09.** The asset bucket's CORS policy allows `http://localhost:4173` (D-41); the entry of that date has the check | - | - |
 | 2 | Decide whether to replace `ENTITLEMENT_SIGNING_KEY` in Render: its private half was shown in a chat on 2026-10-08 (`v1changelog.md`). Prompt 33 wrote the public half of the present key into `web/src/config/entitlement-public-key.ts`. If the key is replaced, that literal and §1A item 12 must be derived again in the same change; a token signed with the new key is otherwise refused by every browser. Nothing is signed before V6 | Human | Before V6; sooner is cheaper |
 | 3 | R1, a 2021-class Windows laptop with 8 GB and an integrated GPU: book it for the days of Prompts 44, 51 and 59, and set it up once (G 0.6: Node, pnpm, Chrome, Python 3 with NumPy, `ffmpeg`; a clone; the reference clip copied by hand). Boxes 13 and 14 of §1A stay open until then. Both gates are read on R1 and on no other machine | Human | Prompt 44 |
 | 4 | After every prompt marked **Push**: `git push` from `offcut/` (the repository is not the `sh2clips` folder), then read the `ci` run of pull request #2. The next prompt waits for green | Human | Prompts 35, 37, 41, 44, ... |
@@ -44,6 +44,7 @@
 | 15 | **`offcut-wasm-render` needs the same read-ahead window in its own `JsRandomAccess`** (D-30 gives each binding crate its own): one call into the browser per video sample costs about 0.4 ms. The one in `offcut-wasm-core/src/media_api.rs` is the model | Prompt 48 |
 | 16 | `web/src/workers/rpc.ts` has 374 lines, of which 45 are the two tables. V4 adds the progress throttle, the cancel timeout and the restart to this file and has 26 lines for them before the limit of 400 | V4 |
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
+| 18 | **The speech model is the small-size English one and the limit is 260,000,000 bytes** (D-66; entry of 2026-10-09). Three sets of one candidate source were measured on that date, each with its five configuration files: 214,647,815 bytes (4-bit encoder, mixed 4-bit and 16-bit decoder), 251,728,328 (the 8-bit pair) and 302,289,470 (the 4-bit pair, over the limit). Which of the first two runs on both backends is not known before Prompt 43. The decoder of the 8-bit pair is one file of 156,794,981 bytes: if that set is taken, the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected in Prompt 38, with the range check on that file | Prompts 38, 43, 44 |
 
 ---
 
@@ -695,3 +696,87 @@ Both temporary files are deleted.
 **Not checked.** A cancel in the middle of a copy or of a decode: the one cancel tested arrives before the first chunk. The quota path (`E_STORAGE_QUOTA`): no full disk was made. Both have tests in V4 and V7 (`rpc.test.ts`, `failure-recovery.spec.ts`).
 
 **Human.** Push; read `ci` (open item 4).
+
+## 2026-10-09 - The third push: `ci` green on Prompt 37
+
+**Done by the human.** `git push` of `v2-build` at `3d2c244`, the commit of Prompt 37.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `3d2c244`, equal to the local branch |
+| The `ci` run on `3d2c244` (pull request #2, run 10) | Success. Job `ci`: 2.7 minutes. `deploy-api` and `deploy-web`: skipped |
+| Pull request #2 | Open, draft, no conflict with `main` |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3` |
+
+**Closes.** The push that Prompt 37 ends with. G M-3 holds on Linux: the worker chunk builds there, and the hosts check passes with it.
+
+**Changed.** This file only. The entry was written with the next commit, not on the day of the run.
+
+## 2026-10-09 - Outside a prompt: the CORS origin; D-66, the small-size speech model
+
+No code changed. Seven documents changed, all under `docs/`.
+
+**Done by the human.** The origin `http://localhost:4173` was added to the CORS policy of the asset bucket, in the host's dashboard (open item 1, D-41).
+
+**Read by the agent.** `curl` with `Range: bytes=0-1023` on the demo video of the asset host, once per origin.
+
+| `Origin` sent | Status | `Access-Control-Allow-Origin` | Exposed headers |
+|---|---|---|---|
+| `http://localhost:4173` | 206 | `http://localhost:4173` | `Accept-Ranges`, `Content-Length`, `Content-Range` |
+| `http://localhost:5173` | 206 | `http://localhost:5173` | The same three |
+| `https://offcut-one.vercel.app` | 206 | `https://offcut-one.vercel.app` | The same three |
+| `https://example.com` | 206 | None: a browser refuses the answer | None |
+
+The preflight (`OPTIONS`, `Access-Control-Request-Method: GET`, `Access-Control-Request-Headers: range`) from `http://localhost:4173` answers 204 and allows `GET, HEAD` and the header `range`. Open item 1 is closed.
+
+**The decision (founder, 2026-10-09): D-66.** The V2 speech model is the small-size English model, not the base-size one, and the model files may total 260,000,000 bytes, not 150,000,000. The founder's reason: a better transcript is worth a larger download and a longer wait. The agent had advised to start with the base-size model and to compare the two on R1 at Prompt 44; the founder decided otherwise.
+
+**Why 260,000,000.** It is the largest size that keeps the first-run budget of PS §20.2, which is not changed: 260 x 8 / 25 = 83 s of download at 25 Mbps, plus 5 s of initialization, is 88 s of the 90 s allowed.
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `docs/product.md` | §10 J4: the copy says "about 250 MB". §20.2: the first-run line is worked for a 260 MB model (88 s) |
+| `docs/technicalspec.md` | §16.1: the small-size model is the default candidate, base-size the first fallback and tiny-size the second; `totalBytes` at most 260 MB, 260,000,000 bytes. §16, contingency: the smaller model is base-size first. §31: the estimate of the model session is 1,200 MB and the ASR phase about 1.46 GB (both assumptions; TE-14 measures); the disk line says 260 MB |
+| `docs/buildplan.md` | §4: the manifest total; the E-3 fallback names base-size first |
+| `docs/v2/v2implementation.md` | D-66 added to §2, with its costs; §0 says "D-18 to D-66". D-41, §3.3, §15.1, §23.3 and the E-3 row of §24.1 follow it. 7 replacements |
+| `docs/v2/coding-promptsv2.md` | The Standard Agent Block says "D-18 to D-66". Prompt 38: the small-size model, 260,000,000 in step 2 and in its "Done when" box. Prompt 56: the size of the download the setup test waits for |
+| `docs/v2/v2buildguide.md` | The table of references names D-66. Steps 0.4, 4.2 and 11.1, Milestone 4 and table (c): the model and the number |
+| `docs/v2/v2changelog.md` | Open item 1 closed; known issue 18 added; the two entries of this date |
+
+The edit was made by a script that refuses a replacement unless its old text occurs exactly once, and that writes nothing unless every replacement can be applied: 28 of 28. Each file keeps its line endings.
+
+**Not changed, and why.**
+
+- **No file outside `docs/`.** No source file, script or workflow holds the number 150,000,000: `web/src`, `crates`, `server`, `scripts` and `.github` were searched. The first code that holds the limit is the manifest assertion of `download.test.ts` (Prompt 39), which reads it from §23.3.
+- **`modelId` stays `asr-en-v1`.** Paths, tests and prompts name it.
+- **The bands of E-3 (§24.3).** The founder said on this date that a transcription time above the 25 s target does not stop V2. The plan already says so: 25 to 50 s is "continue and record the miss". Over 50 s still means the smaller model, which is now the base-size one. No new number was given for that line, so none was written.
+- **The TE-7 lines that say "a file of 150 MB"** (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan, BP §3): they describe what was tested. Whether a larger single file is uploaded depends on the set Prompt 38 takes (known issue 18).
+- **The typed-in `150 MB` of Prompt 40 and G 4.5.** It is a sample string for a drill, not the limit.
+- **The render figures of TS §31** that happen to be 150 MB, the V1 documents and `v2implementation-notes.md`.
+
+**What was measured for the decision.** File sizes from the listing of one candidate source, `onnx-community/whisper-small.en_timestamped`, read on this date; each total includes the five configuration files (2,692,839 bytes).
+
+| Set | Encoder | Decoder | Total | First run at 25 Mbps |
+|---|---|---|---|---|
+| 4-bit encoder, mixed 4-bit and 16-bit decoder | 66,178,491 | 145,776,485 | 214,647,815 | 74 s |
+| The 8-bit pair | 92,240,508 | 156,794,981 | 251,728,328 | 86 s |
+| The 4-bit pair | 66,178,491 | 233,418,140 | 302,289,470 | 102 s: over the limit and over the budget |
+
+For comparison, the 4-bit pair of the base-size model is 145,199,758 bytes. The model's own documentation gives 244 million parameters and a relative speed of about 4 for small, 74 million and about 7 for base.
+
+**Checked.**
+
+- `node scripts/check-file-tree.mjs` passes: the tree of TS §5 was not touched.
+- `git diff --stat`: seven files, all under `docs/`. The frozen-file diff against the baseline is empty.
+- `git grep -n "150,000,000\|150000000"` finds the old limit in two places only, both of which describe the change: this file, and D-66 of the plan ("the limit was 150,000,000").
+- The four-command gate was not run: no file that a build or a test reads was changed. The test counts are those of Prompt 37: **193 Rust, 76 Vitest, 12 Playwright**.
+
+**Open.**
+
+- Prompt 38 chooses the file set (known issue 18). Nothing was downloaded or uploaded.
+- E-3 is more likely to miss its 25 s target, and the ASR phase is estimated 40 MB under the memory budget. Both are read on R1 (Prompts 44 and 59).
+- TS §16.1 had made the small-size model depend on a word error rate above 12% (E-10). That rate has not been measured for either model.

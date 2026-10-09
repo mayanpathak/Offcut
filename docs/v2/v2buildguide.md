@@ -13,7 +13,7 @@
 | `PS §n` | Section n of `docs/product.md` |
 | `BP §n` | Section n of `docs/buildplan.md` |
 | `V1 §n`, `V1 D-n` | Section or decision of `docs/v1/v1implementation.md` (D-1 to D-17) |
-| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it) |
+| `D-n` | Decision D-18 to D-64 in §2 (and D-65, once Step 1.1 has added it; D-66 was added on 2026-10-09) |
 | `S-n` | Build-order step S1 to S16 in §5 |
 | `TE-n`, `E-n` | Technical experiment (TS §37), product experiment (PS §19); V2 procedures are in §24.1 |
 | `INV-n` | Invariant (TS §35) |
@@ -149,7 +149,7 @@ If the signing key in Render was replaced since 2026-10-08, derive the public ha
 | Account | Do now | Keep for later |
 |---|---|---|
 | Asset host (chosen in TE-7) | Add CORS origin `http://localhost:4173` beside the app origin and `http://localhost:5173` (D-41) | The upload credentials `scripts/upload-assets.sh` already uses |
-| Model source (§3.3) | Start downloading the base-size English model files with word-timestamp support, quantized so the set stays at or under 150,000,000 bytes (TS §16.1). The model card must state the export returns cross-attention outputs; without them TE-1 fails on timestamps | The local folder; hashes are taken in Step 4.2 |
+| Model source (§3.3) | Start downloading the small-size English model files (D-66) with word-timestamp support, quantized so the set stays at or under 260,000,000 bytes (TS §16.1). The model card must state the export returns cross-attention outputs; without them TE-1 fails on timestamps | The local folder; hashes are taken in Step 4.2 |
 | GitHub | Settings, Billing: note the Actions minute allowance and the Windows multiplier for this repository's visibility | Needed for TE-10 in Step 11.5 |
 | **Merchant of record (TE-9)** | **Long lead, carried over from V1: if onboarding is not submitted, submit it today.** Approval can take two weeks and V6 needs it (BP §2) | Nothing in V2 |
 | Neon (V1 open item 36) | Reset the database password before the page is announced; put the new string into `DATABASE_URL` in Render and into `PROD_DATABASE_URL` in `.env.deploy`, nowhere else | Step 12.3 reads production through `PROD_DATABASE_URL` (item 10) |
@@ -649,7 +649,7 @@ bash scripts/upload-assets.sh 2>&1 | head -5          # the usage line: use its 
 
 ```bash
 cd <model folder>
-wc -c * | tail -1                             # total <= 150000000 (TS §16.1). Larger: pick a smaller quantization before uploading
+wc -c * | tail -1                             # total <= 260000000 (TS §16.1, D-66). Larger: pick a smaller quantization before uploading
 sha256sum * > /tmp/model.sha256 && cat /tmp/model.sha256   # one 64-hex line per file
 cd -
 ```
@@ -753,7 +753,7 @@ Remove the line; `git grep -n zz_mux` prints nothing.
 cargo test -p offcut-mp4 -p offcut-dsp        # ok, 0 failed
 pnpm -C web exec vitest run                   # all files passed, download.test.ts with 16 cases
 pnpm check && pnpm build                      # green
-node -e "const m=require('./web/src/config/model-manifest.json');const s=m.files.reduce((a,f)=>a+f.bytes,0);console.log(m.modelId,s===m.totalBytes,s<=150000000)"   # asr-en-v1 true true
+node -e "const m=require('./web/src/config/model-manifest.json');const s=m.files.reduce((a,f)=>a+f.bytes,0);console.log(m.modelId,s===m.totalBytes,s<=260000000)"   # asr-en-v1 true true
 git grep -n "zz_mux"                          # (no output)
 ```
 
@@ -1536,7 +1536,7 @@ The plan gives this phase half a day (S14). Thirty E2E cases, two workflows and 
 | Order | File | Section | Watch for |
 |---|---|---|---|
 | 1 | `web/tests-e2e/helpers/fixtures.ts` | §23.4, D-39, D-41 | Adds `routeAssets`, `dropClip`, `ensureModelCached`, `opfsList`, `sourceDurationMs`, `referenceClip`, and `fillAssetCache()`, which downloads what `fixtures/.cache/` lacks and checks each hash. `dropClip` names the file `clip.mp4`. `sourceDurationMs` and the verifier call start `ffprobe` and `python` from PATH (item 2b) |
-| 2 | `web/tests-e2e/media.setup.ts` | Item 6b | New file, added to TS §5 and §4 in this commit. One Playwright setup test that calls `fillAssetCache()`, with its timeout raised for a 150 MB download. The config has no `globalSetup` |
+| 2 | `web/tests-e2e/media.setup.ts` | Item 6b | New file, added to TS §5 and §4 in this commit. One Playwright setup test that calls `fillAssetCache()`, with its timeout raised for a download of up to 260 MB. The config has no `globalSetup` |
 | 3 | `web/playwright.config.ts` | §22.3 | Projects `media-setup` (`testMatch` of `media.setup.ts`), `media` (3 suites, `channel: "chrome"`, 300 s, `dependencies: ["media-setup"]`) and `bench` (`testDir: "../bench"`, headed, the same dependency). `non-media` gets a `testMatch` of `landing.spec.ts`, which it does not have today, and no dependency, so `pnpm e2e` and the Linux job never download the model |
 | 4 | Root `package.json` | §22.2 | Scripts `e2e:media`, `e2e:device`, `bench:device` (`verify` exists since Step 8.1) |
 | 5 | `fixtures/speech/README.md` | §23.7, §25.3 | The expected transcript and expected events of Step 5.4, final |
@@ -1965,4 +1965,4 @@ The first draft was written without the machine and without `v1buildguide.md` an
 | Worker probe (Step 1.8) | Not in §5 | Phase 1 | Proves the riskiest platform assumptions on day 1, under the production CSP |
 | Pull request | S14 | Draft at Milestone 1, marked ready in Step 11.5 | `ci.yml` does not run on a branch without one |
 | TE-3 and TE-4 readings | S11, on R1 and R2 | The R1 session of Step 8.5 | No R2 (item 12); the temporary build must still be on R1 when they are taken |
-| Download of the test assets | `globalSetup` (§22.3) | Setup project `media-setup` (Step 11.1) | Keeps `pnpm e2e` and the Linux job free of a 150 MB download |
+| Download of the test assets | `globalSetup` (§22.3) | Setup project `media-setup` (Step 11.1) | Keeps `pnpm e2e` and the Linux job free of a download of up to 260 MB |

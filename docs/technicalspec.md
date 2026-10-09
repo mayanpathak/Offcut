@@ -1861,7 +1861,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
   "totalBytes": 0 }
 ```
 
-Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): base-size English model (default candidate), small-size English model (if E-10 WER exceeds 12%), tiny-size English model (PS §20.4 fallback). Constraint: `totalBytes` at most 150 MB (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
+Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
 
 ### 16.2 Interfaces
 
@@ -1933,7 +1933,7 @@ transcribe(pcm16):
 
 **Acceptance.** Median transcription at most 20 s for the reference clip on R1 (PS §20.2, E-3). WER at most 12% and median caption edits at most 8 per 60 s on the 20-clip set (E-10). First-run download plus initialization at most 90 s at 25 Mbps (PS §20.2). Second session skips the download (PS §20.1); `model-download.spec.ts`. No request to a host outside §24.1; `privacy-network.spec.ts`.
 
-**Contingency (PS §20.4).** ASR median above 40 s on R1 → ship the tiny-size model and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
+**Contingency (PS §20.4).** ASR median above 40 s on R1 → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
 **Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker.
 
@@ -3042,10 +3042,10 @@ Memory and GPU objects are the scarce resources: the minimum supported device re
 
 | Phase | Component | Estimate |
 |---|---|---|
-| ASR | Model session and runtime | 700 MB |
+| ASR | Model session and runtime (small-size model; the 700 MB estimated for the base-size files, scaled by file size) | 1,200 MB |
 | ASR | `pcm16` + `pcm48` + chain working copies (5.8 + 17.3 + 34.6 MB, derived) | 58 MB |
 | ASR | App shell, `offcut_core.wasm` heaps in three workers | 200 MB |
-| ASR | **Phase total** | **about 0.96 GB** |
+| ASR | **Phase total** | **about 1.46 GB** |
 | Render | `offcut_render.wasm` heap, fonts, scene | 150 MB |
 | Render | Decoded frame queue: 8 x 1920 x 1080 x 4 B (derived) | 66 MB |
 | Render | Overlay + target textures at 1080x1920 (2 x 8.3 MB, derived) and Vello atlases | 80 MB |
@@ -3054,7 +3054,7 @@ Memory and GPU objects are the scarce resources: the minimum supported device re
 | Render | **Phase total** | **about 0.56 GB** |
 | Any | **Peak (phases do not overlap, §12.4)** | **under 1.5 GB budget** |
 
-Disk: source up to 500 MB (PS §9.4), model up to 150 MB (PS §10 J4), audio 17.3 MB, export up to 91.8 MB (§21.2) per clip; `quota.ts` enforces eviction (§23.3).
+Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.3 MB, export up to 91.8 MB (§21.2) per clip; `quota.ts` enforces eviction (§23.3).
 
 ---
 

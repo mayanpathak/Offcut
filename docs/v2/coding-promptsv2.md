@@ -25,7 +25,7 @@ BASE=$(git merge-base main HEAD)                                             # t
 1. Read the plan sections and guide steps this prompt cites, and the files it touches.
 2. Search for existing types, helpers and constants before creating any. Reuse them.
 3. Verify that the previous prompts' outputs exist and behave as this prompt assumes. If not: decide whether it is a bug or an intended boundary, make the smallest compatible fix, and report it.
-4. Precedence: a decision D-18 to D-65 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
+4. Precedence: a decision D-18 to D-66 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
 
 **During implementation**
 
@@ -298,13 +298,13 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 **Objective.** The speech model and the sample clip sit on the asset host under hashed names, and the app can fetch a range of one (§15.1, §15.4, D-39, D-62; G 4.1–4.3; TE-7 re-check). **Implement, in this order.**
 
 1. `scripts/upload-assets.sh` (D-62): the folder argument may be `media`, `models` or `models/<modelId>` (one more segment of lower-case letters, digits and hyphens); the content-type table gains a row for each extension of the model's files. Names keep their hash segment.
-2. **Human, or the agent when this prompt's message says so.** Model files into a folder outside the repository: the base-size English model with word timestamps, an export that returns cross-attention outputs, quantized so that `wc -c` totals at most 150,000,000 bytes (TS §16.1). `sha256sum` of each. Upload each to `models/asr-en-v1` and the reference clip to `media`, credentials from `.env.deploy` for that command only, never printed. Keep every printed path.
+2. **Human, or the agent when this prompt's message says so.** Model files into a folder outside the repository: the small-size English model (D-66) with word timestamps, an export that returns cross-attention outputs, quantized so that `wc -c` totals at most 260,000,000 bytes (TS §16.1). `sha256sum` of each. Upload each to `models/asr-en-v1` and the reference clip to `media`, credentials from `.env.deploy` for that command only, never printed. Keep every printed path.
 3. `web/src/config/model-manifest.json`: the shape of TS §16.1; `modelId` `"asr-en-v1"`; each `path` is a printed path, each `bytes` from `wc -c`, each `sha256` from `sha256sum`, written by a one-off command and never typed by hand; `totalBytes` is their sum. No generator script is added to the tree.
 4. `web/src/net/asset-fetch.ts`: `SAMPLE_CLIP_PATH` (the printed path) and `fetchAsset` (the table of §15.4: `credentials: "omit"`, no query, one `Range` header, no retry, no `ErrorCode`).
 
 **Validate (must fail, then revert).** The three bad folder arguments of G 4.1 (`models/../media`, `models/ASR_EN`, `models/asr-en-v1/extra`) exit non-zero with nothing uploaded. **TE-7.** The two `curl` lines of G 4.2 on the largest file: `206 8388608`; the immutable cache header; the three exposed headers. Record it in `experiments.md`. **Browser check (dev).** `fetchAsset(SAMPLE_CLIP_PATH, { range: 0–1023 })` gives `[true, 206]`, with no cookie and no query string; offline it gives `cause: "offline"`. **Note.** Which files the runtime asks for is only certain in Prompt 43. If it asks for one the manifest lacks, repeat steps 2 and 3. **Done when.**
 
-- [ ] The manifest total is at most 150,000,000 and equals the sum of `files[].bytes`; every `path` starts with `models/asr-en-v1/`.
+- [ ] The manifest total is at most 260,000,000 and equals the sum of `files[].bytes`; every `path` starts with `models/asr-en-v1/`.
 - [ ] TE-7 is recorded; the ranged fetch from the dev page answers 206.
 
 ## Prompt 39 — Model machine, store, downloader
@@ -546,7 +546,7 @@ Each prompt ends with the SAB gate. The "Done when" boxes are what is specific t
 **Objective.** The media suites can run from one command without touching `pnpm e2e` (§22.2, §22.3, §23.4, §23.6, D-39, D-41, D-63; G 11.1, 11.2 row 1). **New file in the tree:** `web/tests-e2e/media.setup.ts` (add it to TS §5 and §4 in this commit). **Implement.**
 
 - `helpers/fixtures.ts`: `routeAssets` (answers asset-host URLs from `fixtures/.cache/` and `referenceClip()`, honours `Range`, records; with `E2E_REAL_ASSETS=1` it only records), `dropClip` (names the file `clip.mp4`), `ensureModelCached`, `opfsList`, `sourceDurationMs`, `referenceClip`, and `fillAssetCache()` (downloads what the cache lacks from the asset host and checks each SHA-256).
-- `media.setup.ts`: one Playwright setup test that calls `fillAssetCache()`, its timeout raised for a 150 MB download. The config has no `globalSetup`.
+- `media.setup.ts`: one Playwright setup test that calls `fillAssetCache()`, its timeout raised for a download of up to 260 MB. The config has no `globalSetup`.
 - `web/playwright.config.ts`: projects `media-setup`, `media` (the three suites, `channel: "chrome"`, 300 s, `dependencies: ["media-setup"]`) and `bench` (`testDir: "../bench"`, headed, the same dependency); `non-media` gets `testMatch` of `landing.spec.ts` and no dependency.
 - Root `package.json`: `e2e:media`, `e2e:device`, `bench:device`.
 - `model-download.spec.ts`: the 8 cases of §23.6. Every media suite calls `installFakeApi`.

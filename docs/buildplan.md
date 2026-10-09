@@ -247,7 +247,7 @@ No product code. Everything here is free.
 
 | Create | Purpose |
 |---|---|
-| `web/src/config/model-manifest.json` | Paths, sizes, SHA-256 of the model files; total at most 150 MB |
+| `web/src/config/model-manifest.json` | Paths, sizes, SHA-256 of the model files; total at most 260 MB |
 | `scripts/upload-assets.sh` | Uploads content-hashed model files to the asset host chosen in TE-7 |
 | `web/src/models/model-manager.ts`, `download.ts`, `download.test.ts` | `inspect`, `ensureReady`; ranged, resumable download in 8 MiB parts; hash verify (TS §16.3) |
 | `web/src/state/model-store.ts`, `state/machines/model-machine.ts` | Model state machine (TS §12.2) |
@@ -288,7 +288,7 @@ No product code. Everything here is free.
 |---|---|---|---|
 | TE-1 | Does the ASR runtime load only from OPFS, make zero third-party requests and return word timestamps in a worker? | Zero requests outside the two hosts; timestamps for the reference clip; WebGPU and WASM backends both run | Second runtime behind the same `whisper-runtime.ts` interface |
 | TE-2 | Is a per-word confidence available? | Yes, at no more than 10% time cost | `Confidence(1.0)` for all words |
-| E-3 | ASR time on R1 | Median at most 20 s; p90 total at most 180 s | Over 40 s: ship the tiny-size model, stronger caption editing |
+| E-3 | ASR time on R1 | Median at most 20 s; p90 total at most 180 s | Over 40 s: ship a smaller model (base-size first, then tiny-size), stronger caption editing |
 | TE-3 | Vello on WebGPU in a worker on an `OffscreenCanvas`; which frame-capture method is faster; hidden tab | Correct frame every time; at least 30 frames/s render-only on R1; works hidden | Other capture method, then the Canvas2D backend |
 | TE-4 | Which H.264/AAC configs work on R1 and R2 | A ladder entry supported on both; A/V offset within one frame | Next ladder entry; silent pre-roll for AAC priming |
 | E-4 | Render + encode time on R1 | At most 90 s | Over 150 s: Canvas2D overlay path; cap input at 60 s and 30 fps |
