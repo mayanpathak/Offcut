@@ -10,9 +10,9 @@
 | TE-1 (no request outside the closed host list during transcription) | 44 | Run on 2026-10-09: passed, on WebGPU and on WASM |
 | TE-2 (word probabilities at no more than 10% extra time) | 44 | Run on 2026-10-09: not passed, the runtime returns no probability. Fallback taken: `confidence` is 1.0 for every word |
 | E-3 (transcription time on R1) | 44, 59 | S6: the founder's reading of 2026-10-09, about 150 s, accepted (D-67). S15: not run |
-| TE-3 (frame capture method; render-only speed) | 51 | Not run |
-| TE-4 (encoder ladder entry; AAC priming) | 51 | Not run |
-| E-4 (render and encode time on R1) | 51, 59 | Not run |
+| TE-3 (frame capture method; render-only speed) | 51 | Run on 2026-10-09 on D1: passed. Method A; 130 frames a second or more render-only; an export with the page hidden passes |
+| TE-4 (encoder ladder entry; AAC priming) | 51 | Run on 2026-10-09 on D1: passed. `avc1.640028` with hardware at both sizes; no priming |
+| E-4 (render and encode time; on D1 since D-69) | 51, 59 | S11: run on 2026-10-09 on D1, median 29,641 ms against 112,000 ms: continue. S15: not run |
 | TE-10 (the Windows media job in CI: does it run, and its minutes) | 58 | Not run |
 | TE-14 (memory on a 90 s 1080p60 clip, ten runs) | 59 | Not run |
 | E-1 (waitlist: visitors and joins) | 60 | Not run |
@@ -137,3 +137,87 @@ The second record, Chrome's network log of run 2 (46 requests in the whole log):
 **What follows.** A score in V2 is never lowered by how sure the recognizer was: a number it heard wrongly is shown with the same weight as one it heard well, and V3's detector, which multiplies every score by word confidence (TS §17.4), multiplies by 1. The caption editor is where a wrong word is put right.
 
 **A way to a probability that was not taken.** The runtime lets a caller pass a `logits_processor`, which sees the scores of every step and could keep the probability of the token that greedy decoding then picks. That gives a probability per token. It does not give one per word: the pipeline returns words with no token ids, and the grouping of tokens into words is done inside the tokenizer by methods the package does not export. Matching the two lists from outside would be a guess that can be wrong without a sign. Not built in V2. For V3: call the model and the tokenizer without the pipeline, or take a version of the runtime that returns `scores`, and run TE-2 again.
+
+## TE-3: the frame capture method, the render speed, a hidden page
+
+**Question.** Does the renderer draw a correct frame every time, to an `OffscreenCanvas` in a worker; which way of taking the frame off the canvas should the export use; does it render at 30 frames a second or more without the encoder; does an export finish with the page hidden (§24.1)?
+
+**Method.** On D1 (D-69). A production build with the test public key, served by `vite preview` at `http://localhost:4173` with the headers of `vercel.json`; Chrome 155.0.8059.39 under Playwright, headless, WebGPU adapter `intel gen-12lp`; the reference clip, 2,242 frames, the Creator profile, 1080 x 1920. Temporary code in `export-loop.ts` and `render.worker.ts`, removed afterwards, added a second capture path and a pass that renders without encoding.
+
+- **Method A:** `new VideoFrame(canvas)` straight after the draw.
+- **Method B, as tried:** a readback of the pixels through the browser. The canvas is drawn onto a 2D canvas, the bytes are read with `getImageData`, and the frame is made from that buffer of RGBA bytes. This is not the `copyTextureToBuffer` of TS §21.4: that one sits inside the Rust renderer and would have had to be written for the trial. Both hand the encoder a buffer of RGBA bytes.
+- **Ten frames** (0, 150, 300, 600, 900, 1,200, 1,500, 1,890, 1,946, 2,241) were decoded from one export of each method with `ffmpeg` and their stored brightness compared pixel by pixel.
+- **Render only:** every frame decoded and drawn, no `VideoFrame` made and no encoder fed; then one pixel of the canvas read, which returns when the GPU has finished everything it was handed. A second pass also made and closed a `VideoFrame` for every frame.
+- **Hidden:** an ordinary Chrome 155, with a window, started by hand and driven over its DevTools port: a page under Playwright always counts as focused and visible, and Playwright starts Chrome with the throttling of hidden pages switched off. The window was minimised 0.3 s after the export began.
+
+**Numbers.**
+
+| Read | Result |
+|---|---|
+| Method A, `render_encode`, three exports in one session | 30,943 ms, 28,566 ms, 35,596 ms |
+| Method B, `render_encode`, two exports | 81,417 ms, 79,140 ms: 2.8 times method A |
+| The verifier on one export of each | Six passes, both |
+| The ten frames, B against A as stored | They differ by 8 to 20 of 255 on average. A's stored brightness is 0.859 times B's plus 16.0, on every one of the ten: B's file holds brightness from 0 to 255, A's from 16 to 235, and neither stream carries a range flag |
+| The ten frames, with B's brightness brought to 16..235 | The same pictures: 0.05 to 0.72 of 255 apart on average; at most 0.15% of the pixels differ by more than 8 |
+| The white frames in an export of method A | Frames 150 and 1,946, and no other |
+| Render only, two passes | 15,054 ms and 17,202 ms for 2,242 frames: 149 and 130 frames a second |
+| Render and capture, no encoder | 20,499 ms: 109 frames a second |
+| Hidden: `document.visibilityState` | `hidden` from 0.3 s after the start to the end: 19 of 19 samples, taken every 2 s |
+| Hidden: the export | `render_encode` 35,097 ms, `mux` 27 ms; all 2,243 progress messages reached the hidden page; the verifier passes the file on all six checks; white frames at 150 and 1,946 |
+
+**Date.** 2026-10-09, on D1.
+
+**Decision.** Passed. **Method A.** It is the faster of the two by 2.8, and it is the one whose file is right: a frame made from a buffer of RGBA bytes is encoded with full-range brightness into a stream that does not say so, which a player shows with too much contrast. The method is named in `export-loop.ts` and in TS §21.4. No Canvas2D backend is needed.
+
+**What this does not show.** R1, or any machine but D1 (D-69). The `copyTextureToBuffer` readback itself was not built or timed; it could be faster than the readback tried here, and it would give the encoder the same kind of buffer. A page that Chrome has frozen or discarded after a long time in the background. A GPU other than the integrated one.
+
+## TE-4: the encoder ladder entry and the AAC priming
+
+**Question.** Which entry of the ladder does this machine encode with, at both sizes; does the export pass the verifier; how many samples does the AAC encoder put in front of the audio (§24.1, D-33)?
+
+**Method.** On D1, in the same build and browser as TE-3. `pickVideoConfig` was read inside the render worker, for a Creator and for a Free export. The audio encoder's first and last chunk were read in the loop. The guide's `ffprobe` line (G 8.4) was run on an export. The decoded sound of an export was laid over the decoded sound of the source, sample by sample, with `ffmpeg` and NumPy.
+
+**Numbers.**
+
+| Read | Result |
+|---|---|
+| The ladder entry at 1080 x 1920 and 8,000,000 b/s | `avc1.640028`, `prefer-hardware`: the first entry |
+| The ladder entry at 720 x 1280 and 4,000,000 b/s | The same entry |
+| The video as written | H.264 High, `yuv420p`, no B-frames; 8.24 Mb/s and 4.10 Mb/s |
+| The audio encoder's first chunk | Timestamp 0, duration 21,333 microseconds, 427 bytes |
+| Its chunks | 3,504, for 3,503.1 AAC frames of input: none in front. The last has the timestamp 74,730,666 |
+| `ffprobe`: `start_time`, `start_pts`; the first three packets | 0, 0; `pts` 0, 1,024, 2,048, each 1,024 long |
+| The decoded sound against the source's | No shift. At a shift of 0 the two differ by 0.4% of the level (the median of 1,098 windows of 50 ms; 7.6% in the worst). The first sample that is not silence is sample 9,052 in both |
+| Audio against video | The audio is 18.7 ms longer: `N x 1600` samples rounded up to whole AAC frames. Within one video frame |
+| The verifier | Six passes on every export that was kept: six Creator, two Free |
+
+**Date.** 2026-10-09, on D1.
+
+**Decision.** Passed. The ladder keeps its order and the two bitrates stay. **`AAC_PRIMING_SAMPLES` is 0, now as a measured value:** the encoder puts nothing in front, so the muxer writes no edit list. `encoders.ts` says so.
+
+**What this does not show.** The priming is the Windows encoder's, on D1. No other platform and no other machine was measured (D-65, D-69): an encoder that does put samples in front would shift the sound by that much, and check 5 would not always see it, because it compares lengths. The software entries of the ladder were not exported with. Playback on a phone is M2.5.
+
+## E-4, at S11: render and encode time on D1
+
+**Question.** Does rendering and encoding the reference clip stay inside its budget (PS §19, §24.1)? Since D-69 it is read on D1.
+
+**Method.** The code of Prompt 51 as committed, with the temporary hook and the test public key; `vite preview`, the production headers; Chrome 155 under Playwright, headless. Three Creator exports of the reference clip, each in a page that was just loaded, so with new workers, as a visitor's first export is. The time is the worker's own `render_encode` of `stageTimings`: from just before the loop is called to the end of the audio encoder's flush. The transcript was the one made once, earlier in the session.
+
+**Numbers.**
+
+| Read | Value |
+|---|---|
+| `render_encode`, the three exports | 28,286 ms, 29,641 ms, 37,631 ms |
+| Median | **29,641 ms** |
+| Normalised to 60 s (x 60,000 / 74,705) | 23,807 ms |
+| The target for the reference clip (D-64) | 112,000 ms: met. The reading is a quarter of it |
+| `mux`, the three exports | 55 ms, 85 ms, 91 ms; median 85 ms, against 2,500 ms |
+| The verifier on the three files | Six passes each |
+
+Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Prompt 50); 30,943, 28,566 and 35,596 ms (TE-3); 38,820 ms for a fourth export in the third page; 35,097 ms with the page hidden; and 41,182, 43,067 and 39,455 ms in a Chrome with a window, the first tries at the hidden-page check, in which the page stayed visible. Twelve Creator exports in all, from 28.3 s to 43.1 s. A Free export, 720 x 1280: 15,445 ms in Prompt 50, 27,735 and 30,697 ms later in this session.
+
+**Date.** 2026-10-09, on D1.
+
+**Decision.** Continue: the reading falls in the first column of §24.3. No fallback is applied. The reading of S15 (`pnpm bench:device`, ten runs, Prompt 59) is still to be taken.
+
+**What this reading does not show.** R1. The line is 3.8 times this reading, and D1 was about twice as fast as the one laptop like R1 at transcribing; nothing says what the factor is for drawing and encoding, which lean on the GPU and its encoder and not on the processor. **The time rose as the session went on,** by a third to a half from the first export to the last, and the Free export's time doubled; the cause was not looked for. Decoding here is of a 720p source, which is cheaper than a 1080 x 1920 phone clip (D-64).

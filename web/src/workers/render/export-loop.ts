@@ -4,9 +4,10 @@
 // at n / 30 s, whatever the audio holds. No frame is left out or shown twice
 // and no sample of the audio is removed (INV-5, INV-8, INV-10).
 //
-// The frames are captured with method A of TS §21.4: `new VideoFrame(canvas)`
-// straight after the draw. The choice between it and a texture readback is
-// this file's alone (TE-3).
+// The frames are captured with method A of TS §21.4, `new VideoFrame(canvas)`
+// straight after the draw. TE-3 chose it over a readback of the pixels, which
+// took 2.8 times as long and wrote full-range brightness into a stream that
+// does not say so. The choice is this file's alone.
 
 import { type Bytes, type ExportProfile, LIMITS, type TimeMs } from "../../gen/domain";
 import { loadRender, type Mp4MuxerHandle, type RenderSession } from "../../wasm/load-render";

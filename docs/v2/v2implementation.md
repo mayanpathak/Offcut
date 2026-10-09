@@ -1439,7 +1439,7 @@ The decoder's error callback rejects the pending `frameAtBlocking` and makes the
 |---|---|
 | Frame count | `N = session.frame_count()` |
 | Per frame | `isCancelled()`; `t = n x 1000 / 30` (integer); `frame = await source.frameAtBlocking(t)`; `session.render_frame(frame, t)`; `vf = new VideoFrame(canvas, { timestamp: n x 1_000_000 / 30, duration: 33_333 })`; wait while `encodeQueueSize > ENCODE_QUEUE_MAX`; `encode(vf, { keyFrame: n % KEYFRAME_INTERVAL_FRAMES === 0 })`; `vf.close()` in `finally`; `onProgress(n + 1, N)` |
-| Capture | Method A above unless TE-3 chose method B (texture readback); the choice is local to this file (TS §21.4) |
+| Capture | Method A above unless TE-3 chose method B (texture readback); the choice is local to this file (TS §21.4). **As built (Prompt 51):** TE-3 chose method A |
 | Muxer | Created on the first video chunk, from `metadata.decoderConfig.description` (the `avcC`); the audio `asc` comes from the first audio chunk's `decoderConfig.description`. Chunks that arrive before the muxer exists are queued (at most the first few) |
 | Video chunks | `add_video_sample(bytes, index, chunk.type === "key")` in arrival order. V2 assumes arrival order equals frame order; a mismatch surfaces as `E_MUX` (`OutOfOrder`) and is the V5 `ctts` work |
 | Audio | After `venc.flush()`: pad `out48` with zeros to `N x 1600` samples (never remove one); build 2-channel `f32-planar` `AudioData` in 1,024-sample frames (mono duplicated), timestamps `i x 1024 x 1e6 / 48000`; `aenc.flush()`. Each chunk goes to `add_audio_sample(bytes, pts, duration)` with `pts = chunk.timestamp - AAC_PRIMING_SAMPLES x 1e6 / 48000` (D-33) |
@@ -1477,7 +1477,7 @@ Every failure thrown inside `exportClip` carries `stage: "render_encode"`, excep
 ```ts
 // encoders.ts: added in V2
 export const ENCODE_QUEUE_MAX = 4;                                             // TS §21.3, §31
-export const AAC_PRIMING_SAMPLES: number;                                      // 0 until TE-4 records the value (D-33)
+export const AAC_PRIMING_SAMPLES: number;                                      // 0: TE-4 measured no priming, on D1 (D-33, D-69)
 export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // TS §21.1
 ```
 

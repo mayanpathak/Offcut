@@ -54,9 +54,11 @@ export const ENCODE_QUEUE_MAX = 4;
 /**
  * The samples the AAC encoder puts before the first one it was given. The
  * muxer takes them out of the presentation with an edit list (D-33).
- * 0 until TE-4 has measured it. (assumption, TE-4)
+ * TE-4 measured none: the encoder's first chunk has the timestamp 0, and the
+ * decoded sound of an export lies on the source's with no shift. That is the
+ * Windows encoder on D1; no other was measured (D-65, D-69).
  */
-export const AAC_PRIMING_SAMPLES: number = 0;
+export const AAC_PRIMING_SAMPLES: number = 0; // TE-4: measured
 
 /**
  * The configuration an export of this profile is encoded with: the first
