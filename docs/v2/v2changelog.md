@@ -1076,3 +1076,118 @@ The new strings were read for a digit: none. The size and the time are parameter
 - The download on R1, and on a slower line than this one (about 27 Mbit/s).
 
 **Human.** Push; read `ci`. Prompts 39 and 40 are not marked **Push**; two commits are waiting, and Prompt 41 ends with one.
+
+## 2026-10-09 - The fifth push: `ci` green on Prompts 39 and 40
+
+**Done by the human.** `git push` of `v2-build` at `1204389`, the commit of Prompt 40; the commit of Prompt 39 (`7534d13`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `1204389`, equal to the local branch |
+| The `ci` run on `1204389` (pull request #2, run 12) | Success. Job `ci`: 2.5 minutes, 35 steps passed, 2 skipped, none failed. `deploy-api` and `deploy-web`: skipped |
+| Steps that ran on new code | Vitest (92, with the 16 of `download.test.ts`), the copy check (34 pending), ESLint and both `tsc` steps with the model manager and the panel, the secret scan, Playwright: all success |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3` |
+
+**Closes.** The question the gate of Prompt 39 left open (known issue 20): on a clean Linux machine Playwright passes with its default workers. The six time-outs of that gate were the development machine.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 41: MP4 muxer
+
+Prompts 41 and 42 were asked for in one sitting; each has its own gate and its own commit.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-mp4/src/mux.rs` | `MuxSink`, `VideoTrackSpec`, `AudioTrackSpec` and `Mp4Muxer<S>` with the four signatures of TS §21.1; `MemSink`; `MOOV_RESERVE` |
+| `crates/offcut-mp4/src/mux_boxes.rs` | One writer per box: `ftyp`, the headers of `free` and `mdat`, `mvhd`, `tkhd`, `edts` with its `elst`, `mdhd`, `hdlr`, `vmhd`, `smhd`, `dinf`, the two `stsd` (`avc1` with `avcC`, `mp4a` with `esds`), `stts`, `stss`, `stsc`, `stsz`, `co64`, and the containers `stbl`, `mdia` and `trak`. No `udta`, no rotation, no `ctts` |
+| `crates/offcut-mp4/tests/mux_roundtrip.rs` | The 12 cases of §23.2, one of them proptest |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-mp4/src/lib.rs` | `pub mod mux;` and `mod mux_boxes;`; the first lines say the crate also writes |
+| `docs/v2/v2implementation.md` | §6.8 and §23.2 say what was built (2 replacements, each applied once) |
+
+No dependency was added.
+
+**The file, as written.** `ftyp` (24 bytes, brands `isom` and `mp42`); the 256 KiB kept for `moov`; `mdat` with a 64-bit size, then the samples in the order they arrive. `finalize` writes the size of `mdat`, puts `moov` at the start of the reserve and a `free` box over what is left.
+
+| Call | As built |
+|---|---|
+| `new` | `BadConfig` for an empty `avcc` or `asc`, a width or height of 0 or over 65,535, a sample rate other than 48,000, a channel count other than 2. Checked before the first write: a refused configuration writes nothing |
+| `add_video_sample` | `OutOfOrder` unless `frame` is the number of frames so far; `BadConfig` when frame 0 is not a keyframe, and nothing is recorded, so the frame can be given again. A chunk holds 15 frames |
+| `add_audio_sample` | `OutOfOrder` when `pts` goes back. The duration is kept in ticks of 1/48,000 s, to the nearest. A first `pts` below 0 is the priming length, to the nearest tick. A chunk holds 24 samples |
+| `finalize` | `MoovOverflow` when `moov` is larger than the reserve, or leaves 1 to 7 bytes, which no `free` box fits. Returns the size of the file |
+
+**The 12 cases of §23.2.**
+
+| Row of §23.2 | Test |
+|---|---|
+| 90 video samples and 141 audio samples, muxed then demuxed | `ninety_frames_and_141_audio_samples_come_back_byte_for_byte` |
+| The same file probed | `the_file_probes_as_h264_at_30_fps_with_aac_at_48_khz` |
+| Box order | `the_boxes_are_ftyp_then_moov_then_mdat` |
+| `finalize()` return value | `finalize_returns_the_length_of_the_file` |
+| First audio sample with `pts = -21,333` | `a_first_audio_sample_before_0_becomes_an_edit_of_its_length` |
+| First audio `pts = 0` | `a_first_audio_sample_at_0_writes_no_edit` |
+| 2,700 video samples of 3,000 bytes and 4,220 audio samples | `ninety_seconds_fit_the_space_kept_for_moov` |
+| Frame 1 first; frame 0 twice | `a_frame_out_of_its_turn_is_out_of_order` (also audio that goes back) |
+| First video sample not a keyframe | `a_first_frame_that_is_not_a_keyframe_is_a_bad_configuration` |
+| Empty `avcc`; 44,100; 1 channel | `an_empty_avcc_another_sample_rate_or_one_channel_is_a_bad_configuration` (also an empty `asc` and a width of 0) |
+| proptest | `any_frames_with_any_sizes_and_keyframes_come_back`: 48 cases of 1 to 300 frames of 1 to 2,000 bytes with any keyframe pattern after the first, and 0 to 40 audio samples |
+| Video metadata | `the_video_track_has_its_size_no_rotation_and_no_user_data` (also: no `udta`, `meta` or `ilst` at any depth; the six tables of the video track and no `ctts`) |
+
+**Second opinion: `ffprobe` 9.0.2,** on the bytes of the first case, written for the check to `target/zz_mux.mp4`, and on the same clip with a first audio `pts` of -21,333.
+
+| Read | No priming | Priming of 1,024 ticks |
+|---|---|---|
+| Video | `h264`, 1080x1920, 30/1, time base 1/30000, **90 frames**, 3.000 s | The same |
+| Audio | `aac`, LC, 48,000 Hz, 2 channels, time base 1/48000, **141 frames**, 3.008 s | The same, **2.987 s**, start time 0: the edit is read |
+| Top-level boxes | `ftyp` 24, `moov` 4,299, `free` 257,845, `mdat` 130,853 | - |
+
+The payloads are random, so `ffprobe` reports that it cannot decode them, as G 4.6 expects; it reports no fault of the structure. The line that wrote the files is gone, and so are the files: `git grep -n zz_mux -- crates web scripts` prints nothing.
+
+**The size of `moov` for 90 s** (2,700 frames, 4,220 audio samples), measured with a temporary line: 31,723 bytes when one track is written after the other, and **100,383 bytes when the two are written in turns**, where most samples are a chunk of their own. The reserve is 262,144.
+
+**Decided here, where the plan is silent or cannot be built as written.**
+
+- **A chunk also ends when the other track writes.** §6.8 starts a chunk every 15 or 24 samples; the samples of a chunk must lie one after the other in the file, and the two tracks write into one `mdat`. `stsc` holds one record wherever the number of samples in a chunk changes.
+- **`MuxSink` is implemented for `&mut S` as well.** `finalize(self)` consumes the muxer and its sink with it, and the tests, like G 4.6, read the sink afterwards. The binding of Prompt 48 may own its sink or lend it.
+- **What is left of the reserve is a `free` box,** so the top-level order is `ftyp`, `moov`, `free`, `mdat`.
+- **The reserve is written as 256 KiB of zeros,** not skipped over: no file system has to fill a hole.
+- **`frame_count_hint` sizes one table,** up to 8,192 entries, and limits nothing.
+- **Durations.** A track's length in the movie timescale is rounded to the nearest millisecond. The audio track's `tkhd` and its `elst` both give the length without the priming; its `mdhd` gives all of it.
+- **Small fixed values:** track ids 1 and 2; `hdlr` with an empty name; language undetermined; the `esds` holds stream id 0, object type 0x40, and no bit rates; `tkhd` flags "enabled, in the movie".
+- **A sample of more than 4 GiB** is `BadConfig`: `stsz` holds 32 bits.
+- **Audio that is not one run of equal frames** is written as it is given: `stts` holds one run per change of duration.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The demuxed priming frame reports -21,334 microseconds, not -21,333** (§23.2). 1,024 ticks of 1/48,000 s are 21,333.3 microseconds, and the demuxer rounds a time down (§6.5, as built in Prompt 35). The test says -21,334, and §23.2 of the plan says so now. The `elst` holds 1,024, as the row asks.
+- **`mux_roundtrip.rs` starts with the same `#![allow(...)]` of four lints as V1's two integration test files.** `clippy.toml` lets a test function unwrap and index; a helper function in a `tests/` file is not a test function to clippy. No lint is switched off for code that ships.
+- **The writers of `trak`, `mdia` and `stbl` are in `mux_boxes.rs`.** With them in `mux.rs` that file had 392 lines, and V5 adds `ctts` to it. Now: `mux.rs` 355, `mux_boxes.rs` 263.
+
+**Checked.**
+
+- `cargo test -p offcut-mp4`: lib 17 passed, `mux_roundtrip` 12 passed. `cargo clippy -p offcut-mp4 --all-targets -- -D warnings`: clean. `cargo deny check`: ok.
+- `node scripts/check-file-tree.mjs`: 164 files; the three new files were in the tree of TS §5 since Prompt 31.
+- G M-4: `cargo test -p offcut-mp4 -p offcut-dsp` green; Vitest green with `download.test.ts` at 16 cases; `pnpm check` and `pnpm build` green; the manifest line prints `asr-en-v1 true true` (against 260,000,000, D-66); `git grep -n zz_mux` empty. Its three browser checks are those of Prompt 40.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **205 Rust, 92 Vitest** (Rust was 193; the 12 are new).
+- **`pnpm e2e`, as the gate runs it, passed 11 of 12 in two runs.** The case that failed both times is "the settings link leads to the table of what leaves the device": it timed out at 30 s. It is the longest case, with about forty checks one after the other, and it takes 6 s when the machine is free. With `--workers=3`: **12 of 12**, in 20 s. This is known issue 20 again, on a machine that had just compiled the workspace. Nothing of this prompt is in the app: the muxer is exported by no bundle before Prompt 48, and `landing.spec.ts` is unchanged. Nothing was changed to make the suite pass; the `ci` run of the next push is the check.
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-mp4`: lib and `mux_roundtrip` pass; box order is `ftyp`, `moov`, `mdat`, with a `free` box between the last two.
+- [x] `ffprobe` agreed; `git grep -n zz_mux` is empty; G M-4 passes.
+
+**Not checked.**
+
+- **Real encoder output.** The payloads are random bytes; the first H.264 and AAC chunks reach the muxer in Prompt 50, and `verify/verify_mp4.py` reads the result.
+- **The priming length of a real encoder** (TE-4, Prompt 51): the mechanism is tested with 1,024 ticks.
+- The time `finalize` takes on R1 (budget 2.5 s, D-64).
+
+**Human.** Push; read `ci`. This prompt is marked **Push**.

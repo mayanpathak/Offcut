@@ -573,6 +573,8 @@ Copy `MuxSink`, `VideoTrackSpec`, `AudioTrackSpec` and the `Mp4Muxer<S>` signatu
 
 `moov` contents (`mux_boxes.rs` holds one writer per box and nothing else): `mvhd` (timescale 1,000; duration = the longer track; creation and modification time 0); a video `trak` with `tkhd` (identity matrix, width and height), `mdhd`, `hdlr` `vide`, `vmhd`, `dinf`, and `stbl` with `stsd` (`avc1` + `avcC`), `stts` (one run, delta 1,000), `stss`, `stsc`, `stsz`, `co64`; an audio `trak` with `smhd` and `stbl` with `stsd` (`mp4a` + `esds` wrapping the `AudioSpecificConfig`), `stts`, `stsc`, `stsz`, `co64`, and an `edts`/`elst` with `media_time` = the priming length when it is non-zero and `segment_duration` = the track duration minus priming. No `udta`, no title, no location, no rotation (verifier checks 2 and 11).
 
+As built (Prompt 41): a chunk also ends when the other track writes, because the samples of a chunk must lie one after the other in `mdat`; `stsc` holds one record wherever the number of samples in a chunk changes. What is left of the reserve after `moov` is a `free` box, so the order of the top-level boxes is `ftyp`, `moov`, `free`, `mdat`. `MuxSink` is also implemented for `&mut S`: a caller keeps its sink when `finalize` consumes the muxer. The writers of `trak`, `mdia` and `stbl` are in `mux_boxes.rs` with those of the other boxes.
+
 **Never.** Buffers sample payloads in memory: each `add_*` writes through the sink at once (TS §31). Reads a clock: timestamps in the file are 0.
 
 **Budget.** Mux + finalize at most 2 s for a 60 s clip on R1 (PS §20.2), which is 2.5 s for the reference clip (D-64); read from `stageTimings`.
@@ -1902,7 +1904,7 @@ Fixtures are built in the test: an arbitrary non-empty `avcc`, a 2-byte AAC-LC 4
 | The same file probed | H.264 with the given `avcC` string; 30,000 `FpsMilli`; not VFR; one video and one audio track; AAC, 48,000 Hz, 2 channels; `Mp4` |
 | Box order | `ftyp`, then `moov`, then `mdat` (faststart) |
 | `finalize()` return value | Equals the sink length |
-| First audio sample with `pts = -21,333` us | `elst.media_time` is 1,024 (rounded to the nearest tick); the demuxed audio sample 0 reports `pts = -21,333` and sample 1 reports 0 (D-33) |
+| First audio sample with `pts = -21,333` us | `elst.media_time` is 1,024 (rounded to the nearest tick); the demuxed audio sample 0 reports `pts = -21,334` and sample 1 reports 0 (D-33). As built (Prompt 41): 1,024 ticks before 0 are 21,333.3 microseconds, and the demuxer rounds a time down (section 6.5) |
 | First audio `pts = 0` | No `edts` box in the audio track |
 | 2,700 video samples of 3,000 bytes and 4,220 audio samples | `finalize` succeeds; `moov` ends before the `mdat` header; duration 90,000 ms |
 | `add_video_sample` with frame 1 first; frame 0 twice | `OutOfOrder` |

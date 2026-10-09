@@ -1,8 +1,11 @@
-//! MP4 and MOV: the structure of a file, read through [`reader::RandomAccess`].
-//! Nothing here decodes or encodes a sample, and no file is read whole.
+//! MP4 and MOV: the structure of a file, read through [`reader::RandomAccess`]
+//! and written through [`mux::MuxSink`]. Nothing here decodes or encodes a
+//! sample, and no file is read or held whole.
 
 pub mod boxes;
 pub mod demux;
+pub mod mux;
+mod mux_boxes;
 pub mod probe;
 pub mod reader;
 pub mod sample_table;
