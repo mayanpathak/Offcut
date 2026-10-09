@@ -18,7 +18,12 @@ export interface DemuxerHandle {
   read_video_sample(index: number): { data: Uint8Array; ptsUs: number; durationUs: number; isKeyframe: boolean };
   /** The number of the last keyframe at or before `tMs`. */
   keyframe_at_or_before(tMs: number): number;
+  /** Whether the clip's video says it uses the whole brightness range, 0 to 255. */
+  video_full_range(): boolean;
 }
+
+/** What the decoder of a clip had to be told of its colours (D-70): kept for later sources of the same clip. */
+const toldColours = new WeakMap<DemuxerHandle, VideoColorSpaceInit>();
 
 /**
  * The `VideoFrame`s that are open. Every code path that obtains one adds 1,
@@ -58,8 +63,9 @@ function asFailure(thrown: unknown): WorkerFailure {
 
 export class VideoSource {
   readonly #demuxer: DemuxerHandle;
-  readonly #config: VideoDecoderConfig;
+  #config: VideoDecoderConfig;
   readonly #count: number;
+  readonly #fullRange: boolean;
 
   #decoder: VideoDecoder | undefined;
   /** Goes up with every new decoder: an output of an old one is closed unseen. */
@@ -94,11 +100,14 @@ export class VideoSource {
     // exchanged for a clip that is shown turned a quarter.
     const turned = info.rotation === "r90" || info.rotation === "r270";
     const description = demuxer.video_description();
+    const colorSpace = toldColours.get(demuxer);
+    this.#fullRange = demuxer.video_full_range();
     this.#config = {
       codec: info.video_codec_string,
       codedWidth: turned ? info.display_height : info.display_width,
       codedHeight: turned ? info.display_width : info.display_height,
       ...(description === undefined ? {} : { description }),
+      ...(colorSpace === undefined ? {} : { colorSpace }),
     };
   }
 
@@ -247,7 +256,7 @@ export class VideoSource {
     const decoder = new VideoDecoder({
       output: (frame) => {
         liveFrames.count += 1;
-        if (generation !== this.#generation) {
+        if (generation !== this.#generation || this.#toldFullRange(frame)) {
           this.#release(frame);
           return;
         }
@@ -273,6 +282,34 @@ export class VideoSource {
     });
     decoder.configure(this.#config);
     this.#decoder = decoder;
+  }
+
+  /**
+   * A clip that says it is full-range is drawn so (D-70). The browser may
+   * decode it as limited-range, and obeys only a whole colour space: so the
+   * decoder is told the range with the colours the browser assumed, and
+   * decoding starts again, once for a clip. Returns whether it did.
+   */
+  #toldFullRange(frame: VideoFrame): boolean {
+    const assumed = frame.colorSpace;
+    if (!this.#fullRange || assumed.fullRange === true || this.#config.colorSpace !== undefined) {
+      return false;
+    }
+    const colorSpace: VideoColorSpaceInit = {
+      fullRange: true,
+      matrix: assumed.matrix ?? "bt709",
+      primaries: assumed.primaries ?? "bt709",
+      transfer: assumed.transfer ?? "bt709",
+    };
+    toldColours.set(this.#demuxer, colorSpace);
+    this.#config = { ...this.#config, colorSpace };
+    try {
+      this.#restart(this.#wantUs);
+      this.#feed();
+    } catch (thrown) {
+      this.#fail(thrown);
+    }
+    return true;
   }
 
   /** Gives the decoder samples while it has room and too few frames are decoded ahead. */

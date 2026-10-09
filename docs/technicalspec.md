@@ -291,6 +291,7 @@ offcut/
 │   │   │   ├── sample_table.rs        stts/ctts/stsc/stsz/stco/co64/stss/elst resolution
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
+│   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
 │   │   │   ├── validate.rs            [ONLY] validate_probe(): PS §9.4 limits -> RejectReason
 │   │   │   ├── mux.rs                 Mp4Muxer (faststart)
 │   │   │   └── mux_boxes.rs           box writers for the muxer (v2implementation D-55)

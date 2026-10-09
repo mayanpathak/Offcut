@@ -26,7 +26,7 @@
 | 10 | **The three-minute promise.** With the small-size model the median total for a 60 s clip on R1 is about 221 s on the numbers of D-67, and PS §20.2, §20.3, J10 and the pitch say three minutes. Change the promise or the model before the page says it to a visitor. The copy that states the time is not written yet | Human | Before the page is announced |
 | 11 | **Closed by D-70 on 2026-10-10.** A full-range clip is drawn as its file states: the fix on the decode side was chosen. Building it is open item 13 | - | - |
 | 12 | **Measure on a laptop like R1 before the page promises a time** (D-69). Nothing of V2 is measured on a machine with 8 GB and an integrated GPU alone: not E-4, not TE-14's memory, and of E-3 only the founder's one reading. The founder's plan: after the final version is deployed, on testers' devices. Until then every time in `experiments.md` is D1's, and a user's may be about twice it | Human | After the deploy; before the page is announced |
-| 13 | **Build D-70,** outside a prompt: the range flag read from the `avcC` in Rust, one more method on `RenderSession`, `colorSpace` in the decoder's configuration of `video-source.ts`; then an export of the reference clip whose stored brightness is the source's times 0.86 plus 16. Not started: the founder asked for no code change on the day of the decision | Agent, on the founder's word | Before Prompt 55 |
+| 13 | **Closed on 2026-10-10.** D-70 is built: the entry of that date has the measurements | - | - |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -60,12 +60,13 @@
 | 27 | **What Prompts 49 to 54 build on** (entries of Prompts 47 and 48). `const render = await loadRender()` in the render worker; the main thread calls `preloadRender()` only, through `pool.preload()`. `render.detect(transcript, prosody, {})`; `render.previewProfile()`; `render.exportProfileFromToken(token, keys, now)`, which throws `{ code: "E_ENTITLEMENT_INVALID", detail }`; `render.newMuxer(sink, { width, height, avcc, frameCountHint }, asc)` with `add_video_sample(data, frame, isKeyframe)`, `add_audio_sample(data, ptsUs, durationUs)` and `finalize()`, which returns the bytes and frees the muxer. `const session = await render.openSession(clipInfo, syncHandle)`; `session.set_scene({ transcript, events, edit, profile })`; **`await session.attach_canvas(canvas, width, height)`, and no other call on the session until it has answered;** `session.render_frame(frame, tMs)`; `frame_count()`, `summary()`; `video_description()`, `video_sample_count()`, `read_video_sample(i)` (`{ data, ptsUs, durationUs, isKeyframe }`), `keyframe_at_or_before(tMs)`; `session.free()`, then close the sync handle. The session closes no frame. A failure is thrown as the plain object `{ code, detail }`. **A canvas can be read back in a worker** by drawing it on a 2D `OffscreenCanvas` straight after `render_frame`, and a frame for a check can be made with `new VideoFrame(canvas, { timestamp })`: the drive of Prompt 48 did both. A `web_sys::VideoFrame` has two clones (entry of Prompt 47). A glyph run is stroked first and filled over the stroke since D-68; the outline that shows is half the stroke's width. The render bundle is 6.0 MB and every release build of it takes about two minutes | Prompts 49, 50, 51, 53, 54, 55 |
 | 28 | **What Prompts 50 to 53 build on** (entry of Prompt 49). `new VideoSource(session, clipInfo)`: `await source.frameAtBlocking(t)` for the export and `source.frameAt(t)` for the preview, `t` in milliseconds; **the frame stays the source's: the loop does not close it,** and it stays open until the source hands out a newer one; `source.close()` closes everything. `liveFrames.count` goes up for every frame a decoder gives out and down at every `close()` in `video-source.ts`; a frame the loop makes itself (`new VideoFrame(canvas)`) is counted and closed by the loop. One `VideoSource` can serve a preview and then an export: a time before what it holds starts decoding again. A failure is a `WorkerFailure` with `E_DECODE_VIDEO`. `await pickVideoConfig(profile)` gives the encoder configuration or throws `E_ENCODE_VIDEO`; on the development machine it is `avc1.640028`, `prefer-hardware`. `const sink = await OpfsSink.open(paths.exportTmp(id))`, given to `render.newMuxer(sink, ...)`; `await sink.close()` on success, `await sink.abort()` otherwise; one sink per path at a time. **The verifier:** `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`, with Python 3.13 first in `PATH`; it wants `yuv420p`, 2,242 frames exactly 1/30 s apart, and audio within 21.34 ms of the video. **On the reference clip:** output frames 150 and 1,946 are the two white frames; 80 output times repeat a source frame; decoding alone ran at 652 frames a second on the development machine | Prompts 50, 51, 53, 57 |
 | 29 | **What Prompts 51 to 54 build on** (entry of Prompt 50). `pool.render` exists. `openSession({ clipId, clipInfo })`, `detect({ transcript, prosody })`, `setScene({ transcript, events, edit, profile: "preview" })`, `attachPreview({ canvas }, { transfer: [canvas] })`, `exportClip({ exportId, entitlementToken, out48 }, { transfer: [out48.buffer], onProgress })`, `closeSession()`. `exportClip` answers `{ opfsPath, summary, stageTimings: [render_encode, mux] }`; its progress is one `render_encode` message for each frame, `done` from 1 to `N`, then one with `stage: "mux"`. It rejects with `E_INTERNAL` and the detail `NoSession` or `NoScene` when called too early. After an export the worker closes the `VideoSource` and makes a new one: **`previewPlay` (Prompt 53) must read the source from the module's state each time and not keep it.** `runExport` takes `canvas` and `onEncoded` beside the arguments of TS §21.1. The frame in the loop is closed by `closeFrame(vf);`; without that line an export fails with `FrameLeak` (run in Prompts 50 and 51). **`export-loop.ts` has 396 lines of the 400.** Since Prompt 51 the capture method is method A and `AAC_PRIMING_SAMPLES` is a measured 0. `previewClock` is dropped without an answer until Prompt 53 gives it a handler; that handler must not throw. Two exports of Prompt 50 are in `testclips/renders/`. A check that needs the model makes its own profile under `fixtures/.cache/zz-profile-4173/`: Prompts 50 and 51 removed theirs. `vite build` alone takes a second when the two bundles are built already, so a keyed build for a check needs no `pnpm build:wasm` unless Rust changed | Prompts 51, 52, 53, 54 |
-| 30 | **Decided on 2026-10-10 (D-70): the decoder is to be told the range; not built yet (open item 13).** **Chrome reads a full-range clip as limited-range** when the clip carries the range flag and no colour description, as the reference clip does (entry of Prompt 50): a `VideoFrame` of it has `fullRange: false`, and the picture is drawn, previewed and exported with its brightness stretched from 16..235 to 0..255. E-4's time does not depend on it. The picture a person judges at Prompt 55 does. A `VideoDecoderConfig` takes a `colorSpace` that overrides what the browser read; `video-source.ts` gives none, and `ClipInfo` has no field to carry the flag | Prompts 55, 57; V3 |
+| 30 | **Closed on 2026-10-10: D-70 is built, and a full-range clip is drawn and exported with its own brightness.** It was: **Chrome reads a full-range clip as limited-range** when the clip carries the range flag and no colour description, as the reference clip does (entry of Prompt 50): a `VideoFrame` of it has `fullRange: false`, and the picture is drawn, previewed and exported with its brightness stretched from 16..235 to 0..255. E-4's time does not depend on it. The picture a person judges at Prompt 55 does. A `VideoDecoderConfig` takes a `colorSpace` that overrides what the browser read; `video-source.ts` gives none, and `ClipInfo` has no field to carry the flag | Prompts 55, 57; V3 |
 | 31 | **Closed in Prompt 53:** the type takes no argument for a method that has none. It was: **`Client<Api>` of `rpc.ts` asks for one argument on every method,** also on one the protocol gives none: `pool.asr.unload()`, `pool.render.closeSession()` and `pool.render.previewPause()` fail `tsc` with "Expected 1-2 arguments, but got 0" (tried in Prompt 50 with a throwaway file). `pool.asr.unload(undefined)` compiles and does the same. A change of the type is a change of `rpc.ts`, which has 374 lines | Prompts 53, 54 |
 | 32 | **A `VideoFrame` made from a buffer of RGBA bytes is encoded with full-range brightness, and the stream does not say so** (entry of Prompt 51, TE-3): white is stored as 255, not 235, and a player shows the file with too much contrast. A frame made from the canvas is right. Any path that hands the encoder pixels from a buffer, the readback of TS §21.4 or the Canvas2D backend of the contingency, must give its frames a `colorSpace` and be checked against a file of method A | V5; any contingency of TS §19 or §21 |
 | 33 | **A page under Playwright is never hidden.** `document.visibilityState` stays `visible` with another tab in front and with the window minimised, and Playwright starts Chrome without the throttling of hidden pages (entry of Prompt 51). A test of what the app does when the tab hides (`PreviewPlayer` pauses, Prompt 55) cannot hide the page: it has to send the `visibilitychange` event itself, or drive an ordinary Chrome over its DevTools port, as TE-3 did. **Export times on D1 rise over a session,** from 28 s to about 40 s for the same clip: a reading taken late in a long run is not the machine's best, and the bench's ten runs will show it | Prompts 55, 57, 59 |
 | 34 | **What Prompts 53 to 55 build on** (entry of Prompt 52). The stores are `useClipStore`, `usePreviewStore`, `useExportStore`; a use-case calls the actions each file exports, a component reads with the hook and writes nothing. Clip: `begin(clipId, source)`, `accepted(info)`, `rejected(reason)`, `failed(failure)`, `processing(stage, waitingModel)`, `pushFeed(line)`, `ready({ transcript, prosody, events, out48 })`, `noSpeech()`, `reset()`, and `noteFailure(failure)` for a failure that leaves the clip `ready`. Export: `start(exportId)`, `blocked()`, `clear()`, `progress(done, total)`, `encoded()`, `finalized()`, `saved()`, `fail(failure)`, `reset()`, `setUnavailable(flag)`; `start` clears `unavailable`. Preview: `attached()`, `play()`, `pause()`, `ended()`, `lock()`, `unlock()`, `detached()`; `lock` and `detach` are legal in every state. **An illegal action throws `IllegalTransitionError` in a development build and in a test,** and is reported and ignored in production: a use-case must not call `failed` on a `ready` clip, `begin` on a clip that is not `idle`, or `start` on an export that is `done` (call `reset()` first). `forImport()` and `forExport()` of `state/blockers.ts` return a `BlockerCode` or `null`; `messages.blockers` has the words of four codes and is typed by its keys, not by `BlockerCode`, which `copy/` may not import. `entitlement-repo.ts`: `get()` gives `{ token, storedAt }` or `undefined`, `put(token)` | Prompts 53, 54, 55 |
 | 35 | **What Prompts 54 to 57 build on** (entry of Prompt 53). `usecases/control-preview.ts`: `attach(canvas, out48)` (the canvas is handed over for good: an element can be attached once), `play()`, `pause()`, `detach()`, `lockForExport()`, `unlockAfterExport()`. `play()` resolves when the preview is playing; it needs a click before it the first time, or the browser keeps the `AudioContext` silent and `play()` does not resolve. All six do nothing when there is nothing to do, and none throws for a failure of the worker: that is stored with `noteFailure` on the clip store. `start-export.ts` calls `lockForExport()` before `exportClip` and `unlockAfterExport()` after it, whatever the outcome. **The worker refuses `exportClip`, `closeSession` and every other call while `previewPlay` runs** (`E_INTERNAL`, `Busy`): pause or lock first. `preview_played` is tracked in `control-preview.ts`, once for each `attach`. On D1 the loop drew 30 frames a second with under 1% late and at most 17 ms from the audio's time. `rpc.ts` has 377 lines and `render.worker.ts` 372 | Prompts 54, 55, 56, 57 |
+| 36 | **`web/src/workers/render/video-source.ts` has 399 lines of the 400** since D-70 was built, and it is now the longest source file. V4 adds `prefetch` and the seek to this file: room must be made first, and the place to take it from is the handling of the colour range, which could move into a file of its own with a line in the tree of TS §5. **An export of a full-range clip is now less contrasty than every export before 2026-10-10:** a check that compares a new file with an old one, or with a number written down before that date, sees the difference. `DemuxerHandle` has five methods; a test double of it needs `video_full_range()` | V4; Prompts 56, 57 |
 
 ---
 
@@ -2878,3 +2879,99 @@ The edit was made by a script that refuses a replacement unless its old text occ
 - The four-command gate was not run: no file that a build or a test reads was changed. The test counts are those of Prompt 53: **255 Rust, 92 Vitest, 12 Playwright**.
 
 **Open.** Open item 13, before Prompt 55.
+
+## 2026-10-10 - Outside a prompt: D-70 built, a full-range clip keeps its brightness
+
+**The founder's word (2026-10-10): "build it now".** Open item 13 is closed. An export of the reference clip now stores the brightness the recording has, and its highlights are no longer cut to white.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-mp4/src/sps.rs` | `full_range(avcc) -> Option<bool>`: whether an H.264 stream says it uses the whole brightness range. 189 lines above its test module. **New in the tree of TS §5**, added there and in §4 of the plan in this commit |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-mp4/src/lib.rs` | `pub mod sps;` |
+| `crates/offcut-wasm-render/src/session.rs` | `RenderSession::video_full_range()`, a fifth method beside the four of D-30 |
+| `web/src/workers/render/video-source.ts` | `DemuxerHandle.video_full_range()`; `VideoSource` tells the decoder the range when a frame it decoded says limited-range, and decodes again. 399 lines |
+| `docs/technicalspec.md` | §5: the line of `sps.rs` in the tree |
+| `docs/v2/v2implementation.md` | §4 (the tree), a new §6.10, §13.5, §16.7, and the row of D-70 (6 edits, each applied once) |
+| `docs/v2/v2changelog.md` | This entry; open item 13 and known issue 30 closed; known issue 36 |
+
+No frozen type changed and no dependency was added: the flag travels as one more method of the session.
+
+**Two things the probes showed, which changed how it is built.** Both were tried on Chrome 155 before a line was written, with scripts outside the repository.
+
+| Asked | Found |
+|---|---|
+| Does the decoder obey a colour space that names the range alone, `{ fullRange: true }`? | No. The frame still says `fullRange: false` and the picture is still stretched. It obeys when all four of range, matrix, primaries and transfer are given |
+| Does Chrome read the range by itself when the stream also describes its colours? | No. Five streams, full and limited, described and not, BT.709 and BT.601: every frame came out as `fullRange: false`, BT.709. D-70 had expected the fault only in a stream without a description |
+
+So the rule is: **when the stream says full-range and a frame comes out of the decoder as limited-range, the decoder is told the range, together with the matrix, primaries and transfer that frame had, and decoding starts again from the same place.** It happens once for a clip, on its first frame; what was told is kept, and a source made later for the same clip starts with it. A browser that reads the range by itself is never told anything.
+
+**Measured: the stored brightness of an export against its source.** Three clips, each exported at 1080 x 1920 in a keyed production build under the CSP; three frames of each; blocks of the top half of the picture, above the captions, compared on the brightness plane as stored.
+
+| Clip | A right export stores | Before | Now |
+|---|---|---|---|
+| The reference clip: full-range, no description | source x 0.859 + 16 | x 0.940 + 4, on average 6.9 of 255 from the right value and up to 15; everything above 235 cut off | x 0.860 + 15.4, on average 0.6 from the right value; the source's 251 is stored as 232 |
+| The same picture as a full-range stream that describes its colours (libx264, High) | source x 0.859 + 16 | not exported before | x 0.860 + 15.4, 0.5 from the right value |
+| The same picture as a limited-range stream | the source's own values | not exported before | x 1.001 - 0.6, 0.5 from the right value: unchanged, as it must be |
+
+The remaining half a step of 255 is what encoding twice costs.
+
+| Also read | Result |
+|---|---|
+| The verifier on the three exports | Six passes each |
+| The white frames of the reference export | Frames 150 and 1,946, and no other; their neighbours are now 188 and 187, 223 and 228, where they were 192 and 191, 229 and 234 |
+| The preview of each clip, 1.5 s, then the canvas read where the wall is | Played, no failure; 208, 210 and 210 of 255 for the three clips, which are one picture |
+| A second export on the same session | Written: the decoder starts with what it was told |
+| `render_encode` of the reference clip | 38,933 ms and 37,738 ms, on a machine that had been at work for hours; 28 to 43 s before the change (entry of Prompt 51). The change costs the decoding of one frame, once for a clip |
+
+The reference export is kept beside the one of Prompt 50, in `testclips/renders/`, which git ignores: `d70-export-creator-1080x1920.mp4` and `p50-export-creator-1080x1920.mp4`. Played one after the other they show the difference.
+
+**The reader in Rust.** The flag is one bit of the sequence parameter set, behind fields of varying length: the chroma format and the scaling lists of the High profiles, the picture order count, the cropping, the aspect ratio. `sps.rs` reads those only to get past them, after taking out the bytes that guard a start code. Seven inline tests:
+
+| Test | With |
+|---|---|
+| The reference clip says full range | Its `avcC`, 41 bytes |
+| Full range in every profile, and behind a written-out aspect ratio | Three streams of libx264: High with a colour description, Constrained Baseline, High with a 15:16 aspect ratio |
+| Limited range is not full range | High, `color_range=tv` |
+| A stream that does not say gives `None` | libx264 with nothing asked; an export of Offcut itself, from the browser's hardware encoder |
+| The flag behind scaling lists, fields and cropping | A parameter set written bit by bit in the test: no encoder at hand puts scaling lists into the sequence parameter set |
+| The guard bytes are left out | `00 00 03 01` |
+| Bytes that are no parameter set | Empty, cut off at every length, the wrong NAL type, all zeros, all ones: `None`, and no panic |
+
+The `avcC` bytes in the tests are the settings of a stream; they hold nothing of a picture.
+
+**Decided here.**
+
+- **The decoder is told only after a frame showed that it is needed,** and with that frame's colours. D-70 said the matrix, primaries and transfer "stay what the browser assumes"; the browser's assumption cannot be asked for, only seen on a frame. Guessing it in the code, BT.709 above a size and BT.601 below, would have been a second rule to keep in step with the browser.
+- **`None` from the reader means "leave it to the decoder".** A stream that says nothing is not touched, and neither is one the reader cannot follow.
+- **Where the frame names no matrix, primaries or transfer, BT.709 is given.** The browser obeys nothing less than all four.
+- **`video_full_range()` is a method of the session,** not a field of `ClipInfo`, which is frozen.
+
+**Differs from D-70 as written.** The decision named a stream "that states the range and no colour description". The fault is wider, and the rule covers the wider case. The row of D-70 says so now.
+
+**Checked.**
+
+- `cargo test -p offcut-mp4 sps`: 7 passed. `cargo clippy` on `offcut-mp4` and `offcut-wasm-render`, all targets, `-D warnings`: clean.
+- `pnpm --filter web exec tsc --noEmit` and ESLint on `src/workers`, with the rebuilt bundle: clean.
+- `node scripts/check-file-tree.mjs`: 222 files; `sps.rs` is in the tree.
+- The render bundle is 6,033,574 bytes, was 6,029,652.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build` and `pnpm e2e` green, the last one with Playwright's 6 workers at the first run, in 33 s; the frozen-file diff against `322c7d3` is empty; no test key in `web/dist`. **262 Rust** (2 ignored; it was 255, the seven are new), **92 Vitest**, **12 Playwright**. The app shell is 284.8 kB gzipped.
+- The hook, its import in `main.tsx`, the temporary Playwright case, the browser profile, the two clips made for the check and their exports are gone. `git status` showed the files of this change and nothing else before the gate.
+
+**Not checked.**
+
+- **By eye.** The brightness was measured, not looked at. The two files are there to be played.
+- **A browser that reads the range by itself.** None was at hand; there the rule does nothing.
+- **A full-range clip whose colours are not BT.709.** Chrome assumed BT.709 also for a stream described as BT.601, and the rule keeps the browser's assumption: the brightness is right, and the colours of such a clip may be a little off, as they were before.
+- **A clip turned a quarter, HEVC, a second machine.** HEVC is refused at import.
+
+**Found, and not for this change.**
+
+- **Chrome reads no colour information from an H.264 stream in this decoder,** not the range and not the matrix, whatever the stream says. D-70 corrects the range. Telling the decoder the stream's own matrix as well would need the reader to return the description, and a way to say it in the terms of the decoder's configuration.
+- **`video-source.ts` is at 399 lines** (known issue 36).

@@ -9,6 +9,7 @@ mod mux_boxes;
 pub mod probe;
 pub mod reader;
 pub mod sample_table;
+pub mod sps;
 pub mod validate;
 
 use thiserror::Error;

@@ -304,6 +304,16 @@ impl RenderSession {
         self.demuxer.video_decoder_description().map(<[u8]>::to_vec)
     }
 
+    /// Whether the clip's video says it is full-range. A decoder that reads
+    /// it as limited-range must be told so (v2implementation D-70). `false`
+    /// also when the stream does not say.
+    pub fn video_full_range(&self) -> bool {
+        self.demuxer
+            .video_decoder_description()
+            .and_then(offcut_mp4::sps::full_range)
+            == Some(true)
+    }
+
     pub fn video_sample_count(&self) -> u32 {
         self.demuxer.video_sample_count()
     }
