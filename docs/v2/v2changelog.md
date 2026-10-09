@@ -1871,3 +1871,111 @@ The licence was read in each of the three files, not assumed: all three are SIL 
 - **The scene and the detector disagree by 150 ms on when a number is on the screen.** The detector keeps two numbers apart by windows that start 150 ms before the first word (§9.2); the scene shows a number from the first word (§11.7, "Enter: at `span.start`"). The detector's window is the wider one, so nothing overlaps.
 
 **Open, for the human.** Push `v2-build` (two commits: Prompt 45 and Prompt 46) and read `ci` on pull request #2. Prompt 47 waits for green.
+
+## 2026-10-09 - The eighth push: `ci` green on Prompts 45 and 46
+
+**Done by the human.** `git push` of `v2-build` at `9a00b52`, the commit of Prompt 46; the commit of Prompt 45 (`89fea78`) went with it.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `9a00b52`, equal to the local branch |
+| The `ci` run on `9a00b52` (pull request #2, run 15) | Success, in 204 s: 35 steps passed, 2 skipped, none failed. The two deploy jobs were skipped, as on every run of the branch |
+| Steps that ran on new code | The secret scan (the test seed, the two test tokens, the font files), `cargo clippy`, `cargo deny` (with `parley` and what it brings), `cargo test` (247), the file tree with the three new pure crates, Playwright: all success |
+| Pull request #2 | Open, draft, no conflict with `main` |
+| Production | Unchanged: `/api/v1/healthz` reports `322c7d3`; `main` is at `322c7d3` |
+
+**Closes.** The push that Prompt 46 ends with, and what its entry and the entry of Prompt 45 left for Linux: `parley` builds there without its `system` feature and so without fontconfig; the font files and `LICENSES.md` pass the file tree and the secret scan; the history with the seed and the tokens holds no finding; Playwright passes with its default workers, the real-time waitlist case included. The run took 204 s, where run 14 took 179 s: the new crates compile in it.
+
+**Changed.** This file only. The entry was written with the next commit.
+
+## 2026-10-09 - Prompt 47: `offcut-render`
+
+Prompts 47 and 48 were asked for in one sitting; each has its own gate and its own commit. The entry "The eighth push" above is committed with this one.
+
+**The flag: not needed.** No `--cfg=web_sys_unstable_apis`, no `.cargo/config.toml`, and `scripts/build-wasm.sh` is as it was. The test of G 7.1: in the locked `web-sys` (0.3.106) the types `VideoFrame` and `OffscreenCanvas` carry no gate (the count is 0 for both), and `cargo check -p offcut-render --target wasm32-unknown-unknown` passes with `video_pass.rs` written and importing a frame. In `wgpu` 30 the variant that takes a `VideoFrame` is not gated either.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-render/src/gpu.rs` | `Gpu`: one instance, one adapter, one device and queue, the surface of the canvas and its configuration; the device-lost flag; `resize`, `set_canvas`, `target` |
+| `crates/offcut-render/src/shaders/video.wgsl` | One vertex shader (a triangle over the whole target) and two fragment shaders: `video`, the frame through its placement, and `over`, the overlay |
+| `crates/offcut-render/src/video_pass.rs` | `VideoPass`: the frame's texture, the copy of a `VideoFrame` into it, `placement(crop, rotation, frame)`, the draw; the helpers both pipelines share |
+| `crates/offcut-render/src/vello_backend.rs` | `Overlay`: a display list to a `vello::Scene`, command by command, rendered into the overlay texture |
+| `crates/offcut-render/src/composite.rs` | `Compositor`: one render pass to the canvas, the frame and then the overlay, and the present |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-render/src/lib.rs` | The four modules; `pub use offcut_scene as scene;` (D-61); `RenderError` with six variants; `Renderer` with `new`, `resize`, `render` of TS §19.2, and `set_canvas` |
+| `crates/offcut-render/Cargo.toml` | `offcut-types`, `offcut-scene`, `thiserror`, `vello` (feature `wgpu`), `wgpu` (features `std`, `webgpu`, `wgsl`), `web-sys` (features `OffscreenCanvas`, `VideoFrame`) |
+| `Cargo.toml` | `[workspace.dependencies]`: `offcut-scene` (path), `vello`, `wgpu`, both with `default-features = false` |
+| `Cargo.lock` | 46 packages: `vello`, `wgpu`, the shader compiler and what they bring |
+| `deny.toml` | Four wrappers, all third-party crates (below) |
+| `crates/offcut-scene/src/layout.rs` | `normalized_coords(FontId)`, and one test for it (see "Differs") |
+| `docs/v2/v2implementation.md` | §12 says what was built (1 replacement, applied once) |
+
+**Pinned.** `vello` 0.11.0 and `wgpu` 30.0.1, the pair written down in Prompt 45; `parley` stays at 0.11.1. `vello` asks for `wgpu ^30.0.0`, and 30.0.1 is the one `wgpu` in the lock: `cargo tree -d -p offcut-render` names no `wgpu`, no `peniko` and no `skrifa` twice. `wgpu` asks for `wasm-bindgen` 0.2.127 or later and `web-sys` 0.3.104 or later: the pins of the workspace (0.2.129, 0.3.106) did not move, and the CLI still matches. No license was added to `deny.toml`.
+
+**`wgpu` has the browser's WebGPU as its only backend.** Without its default features no Vulkan, Metal, DirectX or OpenGL backend is built. The crate still compiles natively, for `cargo clippy --workspace` and `cargo test --workspace`; a renderer made there answers `NoAdapter`, before `wgpu` is asked for an instance, which it would refuse with a panic when no backend is built.
+
+**The wrappers added to `deny.toml`,** each named by `cargo deny check`:
+
+| Banned crate | New wrappers | Why |
+|---|---|---|
+| `wgpu` | `vello` | Vello renders through it |
+| `web-sys`, `js-sys` | `wgpu`, `wgpu-types` | They hold browser objects (a canvas, a video frame) when built for wasm |
+| `wasm-bindgen` | `wgpu` | The same |
+
+Only `offcut-render` depends on `vello` or `wgpu`.
+
+**Decided here, where the plan is silent.**
+
+- **Where a point of the target lies in the frame** is six numbers, worked out on the CPU by `placement(crop, rotation, frame)` and given to the shader. `crop` is in display pixels, as TS §19.7 says; the display size is the stored frame's, with its sides exchanged for `R90` and `R270`. `R90` is a frame shown turned a quarter clockwise, which is what the probe reads from the matrix `0 1 -1 0`.
+- **The size of a frame** is its `displayWidth` and `displayHeight`, which is what the browser's external copy copies. A frame with a size of 0 (a closed one) is `FrameImport`.
+- **No colour is converted.** The frame's texture and the overlay's are `Rgba8Unorm` with sRGB-encoded values, and the surface is given a format that does not convert on writing.
+- **The adapter is asked for with no power preference:** the browser picks it, as it does for the rest of the page. A request for the fast GPU of a machine with two could put the renderer on another GPU than the one that decodes the video.
+- **The device is asked for with the default limits and no feature,** as Vello's own helper does without its optional ones.
+- **Vello is set up for one antialiasing method,** area, which is the one a frame is rendered with.
+- **A `PushLayer` without a clip** is clipped to the whole target. A pop without a push is ignored, and a layer left open is closed at the end of the list, so that no list can reach into the next frame.
+- **A canvas of 0 by 0** is `Surface`.
+- **A second canvas whose format is another one** than the first is `Surface`: the pipelines are built for one format.
+- **Which surface texture states are which error:** lost is `DeviceLost`; a timeout, an occluded or outdated surface and a validation fault are `Surface`.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`offcut_scene::layout::normalized_coords(FontId)` is new, in a file of Prompt 45.** Vello draws a glyph of a variable font at given axis coordinates, and has to be told them: a glyph id alone is the outline at the font's default weight, 400, and not the 700 it was measured at. Vello does not hand on the crate that works coordinates out of a weight, and the prompt names no such dependency. The scene crate already has them: they are what parley shaped with. It returns them per font: `[0, 8848]` for `Inter700`, `[0, 16384]` for `Inter900`, `[9585]` for `JetBrainsMono700`, `[16384]` for `NotoEmoji`. One test, the twelfth of that crate.
+- **`Renderer::set_canvas`,** which TS §19.2 does not have. §13.5 has a session attach a canvas more than once ("a new surface on the same device, then `resize`"), and a surface is made from a canvas.
+- **The frame's texture is not made in `new`** (§12: "textures are created in `new` and `resize` only"). `new` is given the output size, not the source's. It is made for the first frame and kept: a clip has one frame size.
+- **A frame with an empty display list draws no overlay,** and Vello is not run for it.
+- **Two inline tests,** where §12 says no V2 test runs this crate natively. Neither needs a GPU. One is the placement for the four rotations and two crops. The other reads `video.wgsl` with the shader compiler the browser build uses: the file is valid, and each entry point uses the bindings its pipeline gives it and no other. Without it the first fault of the shader would show in Prompt 50.
+- **Both fragment shaders are in `shaders/video.wgsl`.** The tree of TS §5 has one shader file.
+
+**A trap, for whoever touches `video_pass.rs`.** `frame.clone()` on a `web_sys::VideoFrame` is the browser's `VideoFrame.clone()`: a new frame, which somebody must close. `wgpu` takes the frame by value, so the file passes `Clone::clone(frame)`, Rust's clone of the handle: a second reference to the same object, which closes nothing when dropped. The first draft had the other one; the compiler showed it, because the browser's returns a `Result`.
+
+**Checked.**
+
+- `cargo check -p offcut-render --target wasm32-unknown-unknown` passes; so does `cargo clippy` for that target, which lints the code that exists in the browser only.
+- `cargo clippy -p offcut-render --all-targets -- -D warnings`, natively: clean. `cargo test -p offcut-render`: 2 passed.
+- `cargo deny check`: advisories, bans, licenses, sources ok. `node scripts/check-file-tree.mjs`: 200 files; the edge `offcut-render` to `offcut-scene` is within the graph.
+- Lines above the test module: `video_pass.rs` 317, `vello_backend.rs` 235, `gpu.rs` 166, `lib.rs` 126, `composite.rs` 121.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **250 Rust, 92 Vitest** (Rust was 247: two in `offcut-render`, one in `offcut-scene`).
+- **`pnpm e2e`, as the gate runs it, passed 11 of 12 in its first two runs and 12 of 12 in the third; with `--workers=3` it passed 12 of 12 in between.** The case that failed both times is "the settings link leads to the table of what leaves the device", the longest one: it ran out of its 30 s while the six cases that start first took 24 to 29 s each, where they take 3 to 6 s on a free machine. This is known issue 20, on a machine that had just built `wgpu` and Vello natively and was running a disk scan beside the suite. The app that was served is the build of Prompt 46, file for file (the same content-hashed names): the renderer is in no bundle before Prompt 48, and no file of the suite changed. Nothing was changed between the runs. **12 Playwright**; the `ci` run of the next push is the check on a clean machine.
+
+**"Done when".**
+
+- [x] `cargo check -p offcut-render --target wasm32-unknown-unknown` and native `cargo clippy -p offcut-render --all-targets -- -D warnings` both pass.
+- [x] The flag outcome and the three pinned versions are in this entry: no flag; `vello` 0.11.0, `wgpu` 30.0.1, `parley` 0.11.1.
+
+**Not checked.**
+
+- **No pixel was drawn in this prompt.** The crate compiles for the browser and its shader is valid; whether an adapter, a device, the copy of a frame, Vello and the pass work together shows when a browser runs it.
+- **Linux.** `wgpu` without a backend compiled natively on Windows; the `ci` run builds it on Linux for the first time, and will take longer: the native test build of this crate alone took 78 s here.
+- The render time on R1 (TE-3, Prompt 51).
+
+**Found, and not for this prompt.**
+
+- **Stroked after it is filled, a caption's letters get thinner.** The display list says fill, then stroke, and the renderer draws in that order (TS §19.2, §12). A stroke lies half inside the outline: at 64 lp with a stroke of 6 lp, 3 lp of dark cover each edge of the white letter. Captions on video are usually stroked first and filled over it. Nobody has seen a frame yet; this is for the look at Prompt 55 and for E-2, and it is one swap in `vello_backend.rs` if the order of the list is changed.

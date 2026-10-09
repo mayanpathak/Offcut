@@ -22,6 +22,7 @@ offcut-api-types = { path = "crates/offcut-api-types" }
 offcut-mp4 = { path = "crates/offcut-mp4" }
 offcut-dsp = { path = "crates/offcut-dsp" }
 offcut-text = { path = "crates/offcut-text" }
+offcut-scene = { path = "crates/offcut-scene" }
 serde = "1.0.229"
 serde_json = "1.0.151"
 ts-rs = "12.0.1"
@@ -33,6 +34,11 @@ proptest = { version = "1.11.0", default-features = false }
 rubato = { version = "5.0.1", default-features = false }
 # Without `system`: no font of the machine is ever read; a scene uses the three it embeds.
 parley = { version = "0.11.1", default-features = false }
+# The renderer's pair: `wgpu` is the release `vello` 0.11 is built on. Without
+# default features, so that no native graphics backend is built: the browser's
+# WebGPU is the only one, and `offcut-render` turns it on.
+vello = { version = "0.11.0", default-features = false }
+wgpu = { version = "30.0.1", default-features = false }
 axum = "0.8.9"
 tokio = "1.53.2"
 tower = "0.5.3"

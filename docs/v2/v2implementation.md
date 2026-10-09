@@ -1012,7 +1012,7 @@ pub enum RenderError { NoAdapter, DeviceRequest, DeviceLost, Surface, FrameImpor
 | `composite.rs` | Draws the video pass, then the overlay with premultiplied-alpha blending, to the surface texture, and presents |
 | `lib.rs` | `Renderer::new`, `resize` (reallocates the overlay and target only when the size changes, TS §31), `render`; `pub use offcut_scene as scene;` (D-61) |
 
-One device per `Renderer`; textures are created in `new` and `resize` only. **Budget:** TE-3 requires at least 30 frames per second render-only on R1 (section 24). No test in V2 runs this crate natively.
+One device per `Renderer`; textures are created in `new` and `resize` only. **As built (Prompt 47):** the texture a frame is copied into is the one exception: it is made when the first frame comes, and again only for a frame of another size, because its size is the source's and `new` is not told it. `Renderer` has one call more than TS §19.2, `set_canvas(canvas, width, height)`, for the second canvas a session attaches (section 13.5). A frame whose display list is empty draws no overlay. Vello writes straight alpha into the overlay texture; the overlay's fragment shader premultiplies it and the pipeline blends it as premultiplied. Both fragment shaders are in `shaders/video.wgsl`, the one shader file of the tree. The weight of a variable font reaches Vello as the axis coordinates that `offcut_scene::layout::normalized_coords(FontId)` returns. The adapter is asked for with no power preference. **Budget:** TE-3 requires at least 30 frames per second render-only on R1 (section 24). No test in V2 runs this crate natively.
 
 ---
 
