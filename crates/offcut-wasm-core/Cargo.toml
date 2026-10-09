@@ -15,6 +15,7 @@ workspace = true
 offcut-types = { workspace = true }
 offcut-mp4 = { workspace = true }
 offcut-dsp = { workspace = true }
+offcut-text = { workspace = true }
 wasm-bindgen = { workspace = true }
 js-sys = { workspace = true }
 # The synchronous OPFS handle the demuxer reads through.

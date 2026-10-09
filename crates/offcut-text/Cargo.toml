@@ -6,3 +6,8 @@ publish = false
 
 [lints]
 workspace = true
+
+[dependencies]
+offcut-types = { workspace = true }
+# For `RawWord`, which arrives from JavaScript.
+serde = { workspace = true, features = ["derive"] }

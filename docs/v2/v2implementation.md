@@ -652,6 +652,8 @@ pub fn normalize_transcript(raw: Vec<RawWord>, model_version: &str) -> Transcrip
 4. `numbers`: tokenize; at each token index call `parse_quantity`; on `Some((n, q))` push `NormalizedSpan { words: range of the n tokens' words, quantity: q }` and skip `n` tokens.
 5. Return `Transcript { words, sentences, numbers, model_version }`. This is the only constructor of a `Transcript`.
 
+As built (Prompt 42): `deny_unknown_fields` refuses an extra field when a `RawWord` is read from JSON, and has no effect in the browser, where `serde-wasm-bindgen` reads the four fields it knows by name and never sees another. There the TypeScript type `RawWord` of `load-core.ts` is what keeps the shape. A time that is not a whole number of milliseconds, or a missing field, is refused on both paths.
+
 ### 8.2 `tokenize.rs` (D-42)
 
 ```rust
@@ -683,6 +685,8 @@ pub fn format_quantity(value: f64, unit: &Unit) -> String;               // the 
 | Spelled cardinal from zero to 999,999 built from units, teens, tens, "hundred", "thousand", with an optional "and" | "ten thousand", "two hundred and fifty" | value, `Unit::None`; consumes every token of the phrase |
 
 **Not parsed until V3** (TS §17.2): millions and above, "point" decimals, the suffixes k, m, b and "grand", currency words (but see the conditional form below) and other currency symbols, "percent" as a word, multipliers, units from `units_lex.rs`. A token sequence V2 cannot parse returns `None`; it never returns a guess.
+
+As built (Prompt 42): a tens word and a units word may be one hyphenated token (`forty-two`); eleven to nineteen may stand before "hundred" ("fifteen hundred" is 1,500, and takes no "thousand" after it); an "and" that no number follows is not consumed; a cardinal followed by the word "point" returns `None`, so that "three point five" is not read as 3. A `Digits` token with both a `$` and a `%` returns `None`.
 
 **Conditional form (D-42).** Added only if the S6 transcript of the reference clip shows its dollar amount without a `$`: a number of the table above followed by the token `dollar` or `dollars` gives `Unit::Usd` and consumes that token too (`12,000 dollars`, "twelve thousand dollars"). Record in `v2changelog.md` whether it was added. V3's currency words then start from this row.
 

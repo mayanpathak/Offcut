@@ -46,7 +46,8 @@
 | 17 | A temporary Playwright case that waits for `networkidle` can hang: the start page streams the demo video from the asset host. Wait for what the case needs instead | Every browser check |
 | 18 | **The model on the asset host is the 214,647,815-byte set of the small-size English model** (D-66; entry of Prompt 38): the 4-bit encoder and the mixed 4-bit and 16-bit decoder. **Whether it runs on both backends is not known before Prompt 43.** Its decoder computes in 16-bit floats, which the WebGPU backend needs a device feature for and the WASM backend may not run; TE-1 needs both. The other set that fits the limit is the 8-bit pair, 251,728,328 bytes. Its decoder is one file of 156,794,981 bytes: if that set replaces this one, steps 2 and 3 of Prompt 38 are repeated, and the TE-7 lines that say "a file of 150 MB" (`scripts/check-external-facts.mjs`, TS §37, §24.1 of the plan) are corrected with a range check on that file. The downloaded files are in `C:\Users\Mayan\offcut-models\asr-en-v1`, outside the repository | Prompts 43, 44 |
 | 19 | **What Prompts 39, 40 and 43 build on** (entry of Prompt 38). `fetchAsset(path, { range?, signal })` returns `{ ok: true, status: 200 \| 206, response }` or `{ ok: false, cause, status? }` and reads no body. On the asset host: a range that ends past the end of a file answers 206 with the bytes that exist, and `Content-Range` gives the real last byte and the total; a path that does not exist answers 404 with the CORS headers, so it arrives as `cause: "status"`, not `"offline"`; with no `Range` header the answer is 200. The manifest lists seven files, the two large ones second and third; a stored name is `<stem>.<16 hex>.<extension>`. The plain names of the two large files, `encoder_model_q4.onnx` and `decoder_model_merged_q4f16.onnx`, are the ones the runtime is expected to ask for when each half is given its precision (4-bit; 4-bit with 16-bit floats). Not confirmed before Prompt 43 | Prompts 39, 40, 43 |
-| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12 | Every gate |
+| 20 | **`pnpm e2e` can fail on the development machine when it is short of memory** (entry of Prompt 39). Playwright starts 6 browsers at once; with about 3 GB free the six cases that start first time out in the capability check of the start page, and the other six pass. `pnpm --filter web exec playwright test --project=non-media --workers=3` passes. Before reading such a failure as a fault of the code, close other browsers and run again, or run with fewer workers; the `ci` run is the check on a clean machine. `playwright.config.ts` was not changed. The gate of Prompt 40, an hour later and with 6 workers, passed 12 of 12. It came back once more, in the gate of Prompt 41, right after the workspace had been compiled (one case, the longest, timed out twice), and was gone in the gate of Prompt 42 | Every gate |
+| 22 | **What the later prompts build on** (entries of Prompts 41 and 42). **Muxer:** `Mp4Muxer::new(sink, video, audio)`, `add_video_sample`, `add_audio_sample`, `finalize`; a sink may be owned or lent (`&mut sink`); the samples of the two tracks may come in any order between each other, and the `moov` of a 90 s clip written in turns took 100 kB of the 256 KiB kept for it (32 kB written one track after the other). `mux.rs` has 355 lines and `mux_boxes.rs` 263; V5 adds `ctts`. **Text:** `core.normalizeTranscript(raw, modelId)` takes `{ text, startMs, endMs, confidence }[]` with **whole milliseconds** (1.5 is refused) and returns a plain `Transcript`. In the browser an extra field of a raw word is ignored, not refused. A confidence comes back as a 32-bit value (0.98 reads 0.9800000190734863), which matters to anything that compares it with 0.80 exactly. `offcut_text::tokenize(words, edits)` and `parse_quantity(tokens)` are what `offcut-detect` reads; `format_quantity(value, &unit)` is the one formatter `offcut-scene` may call. The `dollars` form of D-42 is not in: Prompt 43 adds it, with its row of §8.5, only if the recognizer writes the amount without a `$`. A lone cardinal in words is a quantity ("one" is 1): Prompt 45 decides how captions show it | Prompts 43, 45, 46, 48, 50 |
 | 21 | **What the later prompts build on** (entries of Prompts 39 and 40). `inspect()` answers `absent`, `partial` or `ready` and tells the store on its first call; `start-app.ts` calls it as step 8 (Prompt 54). `ensureReady(onProgress, signal)` resolves on `ready` and rejects with a `ModelFailure`, whose `failure` is the `AppFailure` (`stage: "model"`), or with the abort itself when the signal aborted; a use-case imports `ModelFailure` from `models/model-manager.ts`. `useModelStore` holds `{ status, done, total, etaSecs, error? }`; its actions are called by the model manager only. `<ModelDownloadPanel />` takes no props and reads the store; `EditorPage` mounts it (Prompt 55). In OPFS the model is seven files with plain names under `models/asr-en-v1/`, which is where the cache adapter of Prompt 43 reads them. A cold download took 63 s on the development machine's line; the E2E helper `ensureModelCached` (Prompt 56) must fill OPFS from `fixtures/.cache/`, not from the asset host. In a test, a `Bytes` cannot be made by a cast: `download.test.ts` shows one way to get typed values | Prompts 43, 52, 54, 55, 56 |
 
 ---
@@ -1191,3 +1192,104 @@ The payloads are random, so `ffprobe` reports that it cannot decode them, as G 4
 - The time `finalize` takes on R1 (budget 2.5 s, D-64).
 
 **Human.** Push; read `ci`. This prompt is marked **Push**.
+
+## 2026-10-09 - Prompt 42: `offcut-text` and its binding
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `crates/offcut-text/src/tokenize.rs` | `TokenKind`, `Token`, `tokenize(words, edits)` (§8.2, D-42) |
+| `crates/offcut-text/src/sentences.rs` | `segment_sentences`, `SENTENCE_GAP` (700 ms), `SENTENCE_MAX_WORDS` (40, declared and not used before V3) |
+| `crates/offcut-text/src/numbers.rs` | `parse_quantity` and `format_quantity` (§8.4); `parse_decimal`, which the tokenizer also uses to tell a number in digits |
+| `crates/offcut-text/src/normalize.rs` | `RawWord`, `normalize_transcript`: the only place a `Transcript` is built |
+| `crates/offcut-wasm-core/src/text_api.rs` | The export `normalize_transcript(raw, model_version)` |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `crates/offcut-text/src/lib.rs` | The four modules, and the names of TS §17.1 exported at the root |
+| `crates/offcut-text/Cargo.toml` | `offcut-types`, `serde` with `derive`. Nothing else |
+| `crates/offcut-wasm-core/Cargo.toml`, `src/lib.rs` | The dependency `offcut-text`; `mod text_api;`, the third module |
+| `Cargo.toml` | `[workspace.dependencies]`: `offcut-text` (path) |
+| `Cargo.lock` | The two new edges |
+| `web/src/wasm/load-core.ts` | `CoreApi.normalizeTranscript(raw, modelVersion)`; the type `RawWord` |
+| `docs/v2/v2implementation.md` | §8.1 and §8.4 say what was built (2 replacements, each applied once) |
+
+No third-party dependency was added, and `deny.toml` was not touched: `offcut-wasm-core` was already a wrapper of `offcut-text`.
+
+**Tests (inline): the 11 unconditional rows of §8.5.**
+
+| Row of §8.5 | Test |
+|---|---|
+| `"$10,000."` | `tokenize::a_dollar_amount_with_a_full_stop_is_a_digits_token_and_a_punct_token` |
+| `"40%"` | `numbers::forty_percent_is_one_digits_token_with_its_sign` |
+| "ten thousand" | `numbers::ten_thousand_in_words_is_two_tokens_and_10_000` |
+| "two hundred and fifty" | `numbers::two_hundred_and_fifty_is_four_tokens` |
+| "three" | `numbers::three_is_3_with_no_unit` (also the whole range from zero to 999,999, and words that are not a number) |
+| "ten million", "three point five", "2k" | `numbers::what_v3_will_read_is_not_guessed_at` |
+| `$10,000`; `$1,500`; `$950` | `numbers::dollars_are_short_only_in_whole_thousands` (also every display rule of §8.4) |
+| An edit replacing word 3 with `""` | `tokenize::an_edit_that_empties_a_word_leaves_no_token_for_it` |
+| "Hi.", "There", "now" | `sentences::a_full_stop_and_a_pause_of_700_ms_each_end_a_sentence` (also 699 ms against 700 ms) |
+| An empty-text word and a confidence of 1.4 | `normalize::a_word_without_text_is_dropped_and_a_confidence_of_1_4_becomes_1` |
+| Same raw words twice | `normalize::the_same_raw_words_twice_give_equal_transcripts` |
+
+One test more, in `offcut-wasm-core`: `text_api::a_raw_word_is_read_in_camel_case_and_nothing_else`, which reads a `RawWord` from JSON natively.
+
+**Browser check (dev),** which the prompt does not ask for: `vite` on port 5173, a temporary Playwright case that calls `(await loadCore()).normalizeTranscript(...)` on nine raw words.
+
+| Read | Result |
+|---|---|
+| The value returned | A plain object with the field names of the generated `Transcript`: `words` (`text`, `start_ms`, `end_ms`, `confidence`), `sentences`, `numbers`, `model_version` |
+| The numbers | `$12,000` is `{ value: 12000, unit: "usd", display: "$12k" }` over words 2 to 3; "ten thousand" is `{ value: 10000, unit: "none", display: "10,000" }` over words 4 to 6 |
+| The sentences | Two: words 0 to 7, which end with a full stop, and the word after it |
+| The word with no text; a confidence of 1.4; one of `NaN` | Dropped; 1; 1 |
+| The same words twice | The same JSON |
+| No words | `{ words: [], sentences: [], numbers: [], model_version }` |
+| A time of 1.5 ms; a string in place of the array; a word with only its text | Each throws the plain object `{ code: "E_INTERNAL", detail: "RawWords" }` |
+| **A word with a fifth field** | **Not refused** (see "Differs") |
+
+A confidence comes back as the 32-bit value it is kept in: 0.98 reads as 0.9800000190734863.
+
+**Decided here, where the plan is silent.**
+
+- **One `Punct` token per punctuation character.** "..." is three tokens.
+- **Punctuation is anything that is not a letter or a digit,** at the two ends of a run of characters only. What is inside stays: `10,000`, `3.5`, `don't`, `forty-two`.
+- **An edit may hold several words;** each becomes a token with the index of the word that was edited.
+- **A number in digits:** digits, with groups of exactly three after each comma and at most three before the first, and at most one point with digits on both sides. `1,00` and `10,0000` are not numbers.
+- **`$40%`** is one `Digits` token and no quantity.
+- **A cardinal in words** is read from at most 11 tokens, the length of the longest one below a million. `forty-two` is one token and is read. Eleven to nineteen may stand before "hundred": "fifteen hundred" is 1,500, with no "thousand" after it.
+- **An "and" that no number follows is not consumed:** "two hundred and then" is 200 in two tokens.
+- **A cardinal followed by the word "point" is `None`,** which is what makes "three point five" `None` as row 6 asks, while "ten million" stays 10 in one token.
+- **`format_quantity`:** a value that is not finite is written `0`; a value that rounds to zero has no minus sign; the part before the point is grouped also when there are decimals (`1,234.5`). The match names all 20 units, so a unit added later does not compile until it has a rule.
+- **A confidence of `-inf` becomes 0 and of `+inf` 1;** `NaN` becomes 1, as §8.1 says.
+- **A span's words** run from the word of its first token to the word of its last, so a number spoken in four words covers four.
+- **A failure of the binding** is `{ code: "E_INTERNAL", detail: "RawWords" }`: the caller is the app's own worker, and a wrong shape is its fault.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`deny_unknown_fields` has no effect in the browser.** `RawWord` carries the attribute, and read from JSON an extra field is refused (the test in `offcut-wasm-core`). Through `serde-wasm-bindgen` it is not: that crate reads the four fields a struct names from the JavaScript object and never looks at another. The check on the dev page showed it. Nothing was added to refuse it by hand: the binding crate holds no rule of its own (TS §2), and the TypeScript type `RawWord` is what the one caller is compiled against. §8.1 of the plan says so now.
+- **The conditional `dollars` form of D-42 is not added,** as the prompt says. Prompt 43 reads how the recognizer writes the amount.
+
+**Checked.**
+
+- `cargo test -p offcut-text`: 11 passed. `cargo clippy -p offcut-text -p offcut-wasm-core --all-targets -- -D warnings`: clean.
+- `pnpm build:wasm`: `offcut_core_bg.wasm` is 458,236 bytes after `wasm-opt`, was 372,699. `wasm-bindgen` is 0.2.129 in `Cargo.lock` and from the CLI. `tsc --noEmit` and ESLint on `src/wasm` are clean.
+- `node scripts/check-file-tree.mjs`: 169 files; `offcut-text` is checked as a pure crate, and the edge `offcut-wasm-core` to `offcut-text` is within the graph of TS §7. `cargo deny check`: advisories, bans, licenses, sources ok.
+- `pnpm gen:types && sh scripts/check-gen-clean.sh`: no diff. `RawWord`, `Token` and `TokenKind` are not shared types (D-31).
+- Lines above the test module: `numbers.rs` 262, `tokenize.rs` 87, `normalize.rs` 82, `sentences.rs` 40.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test` and `pnpm build` green; the frozen-file diff against the baseline is empty. **217 Rust, 92 Vitest** (Rust was 205: eleven in `offcut-text`, one in `offcut-wasm-core`).
+- **`pnpm e2e` is green as the gate runs it:** 12 of 12 with Playwright's 6 workers, in 41 s. **12 Playwright.** With `--workers=3`: 12 of 12. This run holds the code of Prompt 41 too, so the whole gate is green on the muxer as well; the one time-out of that prompt's gate did not come back (known issue 20).
+- The app shell, gzip: 120.1 kB, was 118.6: the media worker's chunk is 7.5 kB, was 6.0, with the glue of the new export.
+
+**"Done when".**
+
+- [x] `cargo test -p offcut-text` passes the 11 rows; `pnpm build:wasm` and `tsc` are clean.
+- [x] `node scripts/check-file-tree.mjs` and `cargo deny check` accept the edge `offcut-wasm-core` to `offcut-text`.
+
+**Not checked.** The words of a real recognizer: Prompt 43. How it writes the twelve thousand dollars of the reference clip decides whether D-42's conditional form is needed.
+
+**Found, and not for this prompt.** A cardinal in words is read wherever it stands, as row 5 of §8.5 asks ("three" is 3), so the "one" of "this one is better" is a quantity too, with the display `1`. Captions show a quantity's display in place of its words (TS §17.2). Whether a lone small number in words should be shown as a digit is a question for the captions of Prompt 45 and for V3's rules, not for the parser.
+
+**Human.** Push; read `ci`. Prompt 41 is marked **Push**; this commit goes with it.

@@ -5,10 +5,19 @@
 // ./pkg/core/ (not in git). Vite serves the .wasm file from the app's own
 // origin under a content-hashed name, as `application/wasm`.
 
-import { type Bytes, type ClipInfo, type Hz, type ProbeInfo, REJECT_REASONS, type RejectReason } from "../gen/domain";
+import {
+  type Bytes,
+  type ClipInfo,
+  type Hz,
+  type ProbeInfo,
+  REJECT_REASONS,
+  type RejectReason,
+  type Transcript,
+} from "../gen/domain";
 import initCore, {
   core_version,
   type DemuxerHandle,
+  normalize_transcript,
   open_demuxer,
   probe_and_validate,
   resample,
@@ -18,6 +27,9 @@ import coreWasmUrl from "./pkg/core/offcut_core_bg.wasm?url";
 
 /** One compressed audio frame, with its place on the clip's timeline in microseconds. */
 export type AudioSample = { data: Uint8Array; ptsUs: number; durationUs: number };
+
+/** One word as the recognizer returned it (TS §16.2). The times are whole milliseconds. */
+export type RawWord = { text: string; startMs: number; endMs: number; confidence: number };
 
 /** A file the demuxer has opened. `free()` gives its memory in the module back. */
 export type CoreDemuxer = {
@@ -34,7 +46,6 @@ export type CoreDemuxer = {
 /**
  * What the module offers. A rejection is a value; a failure is thrown as the
  * plain object `{ code, detail }` the module made (TS §11.1, §11.3).
- * V2 adds `normalizeTranscript` with the text crate.
  */
 export type CoreApi = {
   coreVersion(): string;
@@ -45,6 +56,8 @@ export type CoreApi = {
     decodeSupported: boolean,
   ): { ok: ClipInfo } | { rejected: RejectReason };
   resample(input: Float32Array, from: Hz, to: Hz): Float32Array;
+  /** The transcript of these words: their sentences, and the numbers that were spoken. */
+  normalizeTranscript(raw: readonly RawWord[], modelVersion: string): Transcript;
   newSha256(): { update(chunk: Uint8Array): void; finalizeHex(): string };
 };
 
@@ -118,6 +131,7 @@ const api: CoreApi = {
     return probe_and_validate(handle, fileSize, decodeSupported) as { ok: ClipInfo } | { rejected: RejectReason };
   },
   resample: (input, from, to) => resample(input, from, to),
+  normalizeTranscript: (raw, modelVersion) => normalize_transcript(raw, modelVersion) as Transcript,
   newSha256() {
     const stream = new Sha256Stream();
     return {

@@ -1,11 +1,12 @@
-//! JavaScript bindings for the core WASM bundle: the exports of the media
-//! and hashing crates, and the conversion of their values. This crate
+//! JavaScript bindings for the core WASM bundle: the exports of the media,
+//! text and hashing crates, and the conversion of their values. This crate
 //! installs the panic hook and reports its version. It holds no product rule
 //! and does not branch on a domain value beyond decoding an argument and
 //! mapping an error to a code (TS §2).
 
 mod hash_api;
 mod media_api;
+mod text_api;
 
 use std::panic::{self, PanicHookInfo};
 use std::sync::Once;

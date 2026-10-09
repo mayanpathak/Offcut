@@ -1072,6 +1072,10 @@ version = "0.1.0"
 [[package]]
 name = "offcut-text"
 version = "0.1.0"
+dependencies = [
+ "offcut-types",
+ "serde",
+]
 
 [[package]]
 name = "offcut-types"
@@ -1091,6 +1095,7 @@ dependencies = [
  "js-sys",
  "offcut-dsp",
  "offcut-mp4",
+ "offcut-text",
  "offcut-types",
  "serde",
  "serde-wasm-bindgen",
