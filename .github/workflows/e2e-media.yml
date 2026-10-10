@@ -1,12 +1,19 @@
-# The media suites of technicalspec.md §33, step 10: the reference clip is
-# taken through the pipeline, previewed and exported in Chrome on Windows, and
-# each exported file is checked by verify/verify_mp4.py (v2implementation
-# §22.5, D-44).
+# The media suites of technicalspec.md §33, step 10, as far as a hosted
+# runner can run them: the cases tagged @no-gpu, which are the download of
+# the speech model and the import of the sample clip, in Chrome on Windows.
 #
-# ci.yml calls it once its own steps have passed, and before any deploy. It
+# A hosted runner has no graphics card. Its Chrome can be given a software
+# adapter, and the app then runs; but a clip took more than 20 minutes to
+# process there, twice, against a minute and a half on a machine with a
+# graphics processor (TE-10, docs/v2/experiments.md). So the cases that need
+# a processed clip, the pipeline with its preview and the export with the
+# verifier, are not run here: `pnpm e2e:media` on the development machine,
+# all 30 cases, is the gate for them before every merge (v2implementation
+# D-72).
+#
+# ci.yml calls this once its own steps have passed, and before any deploy. It
 # builds nothing: it takes the web/dist that ci.yml built with the E2E test
-# key, so that the Rust and WASM build is not paid for a second time on a
-# Windows runner.
+# key (D-44).
 #
 # It uploads one thing, and only when a case failed: the Playwright report.
 # Never an exported file, and never a trace (the media project records none).
@@ -35,17 +42,15 @@ env:
   # there; the app then refuses to run. With these two it names the software
   # adapter of Windows, "microsoft warp" (read on the runner, 2026-10-10).
   E2E_CHROME_ARGS: "--enable-unsafe-webgpu --ignore-gpu-blocklist"
-  # That adapter draws with the processor, and the runner has 4 cores: a
-  # long wait of the suites may take this many times what it takes on a
-  # machine with a graphics processor.
-  E2E_TIMEOUT_SCALE: "5"
+  # The runner has 4 cores and no graphics processor: a long wait of a
+  # case may take this many times what it takes on the development machine.
+  E2E_TIMEOUT_SCALE: "3"
 
 jobs:
   media:
     runs-on: windows-latest
-    # A first measure, generous on purpose: how long the suites take without
-    # a graphics card is what the next runs have to show (TE-10).
-    timeout-minutes: 120
+    # The eight cases took about five minutes on the runner, and its tools three.
+    timeout-minutes: 30
 
     # The default shell of a Windows runner is PowerShell; every step here is
     # written for bash, as in ci.yml.
@@ -125,17 +130,11 @@ jobs:
           path: fixtures/.cache
           key: e2e-assets-${{ hashFiles('web/src/config/model-manifest.json', 'web/src/net/asset-fetch.ts') }}
 
-      # --- 10.4 The suites, against `vite preview` ---------------------------
-      # In two steps, so that the log says how long each half takes on this
-      # runner and one half's failure does not hide the other's result. No
-      # retry: a case that fails here has a reason, and a second try of a
-      # group is one more clip through the pipeline.
-      - name: Playwright, the model download and the pipeline
-        run: pnpm e2e:media --retries=0 model-download pipeline-preview
-
-      - name: Playwright, the export
-        if: ${{ !cancelled() }}
-        run: pnpm e2e:media --retries=0 export-creator
+      # --- 10.4 The cases a runner can run, against `vite preview` ------------
+      # The setup project runs first, whatever is selected: it stops the step
+      # at once, with the reason, if Chrome here cannot run the app.
+      - name: Playwright, the media cases that need no graphics card
+        run: pnpm e2e:media --grep @no-gpu
 
       # --- 10.5 What is kept of a failed run ---------------------------------
       # The report: the names of the cases and what failed. Not

@@ -13,7 +13,7 @@
 | TE-3 (frame capture method; render-only speed) | 51 | Run on 2026-10-09 on D1: passed. Method A; 130 frames a second or more render-only; an export with the page hidden passes |
 | TE-4 (encoder ladder entry; AAC priming) | 51 | Run on 2026-10-09 on D1: passed. `avc1.640028` with hardware at both sizes; no priming |
 | E-4 (render and encode time; on D1 since D-69) | 51, 59 | S11: run on 2026-10-09 on D1, median 29,641 ms against 112,000 ms: continue. S15: not run |
-| TE-10 (the Windows media job in CI: does it run, and its minutes) | 58 | The minutes: read on 2026-10-10, a public repository pays none. The job: in `ci.yml` since 2026-10-10, **not run yet**; its first run is the push of Prompt 58 |
+| TE-10 (the Windows media job in CI: does it run, and its minutes) | 58 | Run four times on 2026-10-10. The runner lacks WebGPU alone; with two arguments the app starts there; a clip takes more than 20 minutes. **Decided (D-72): the job runs the 8 cases that need no processed clip, and D1 runs all 30 before a merge.** The minutes: a public repository pays none |
 | TE-14 (memory on a 90 s 1080p60 clip, ten runs) | 59 | Not run |
 | E-1 (waitlist: visitors and joins) | 60 | Not run |
 | M0 gate decision | 60 | Not taken |
@@ -245,11 +245,14 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 | WebGPU on the runner | **None as Chrome starts:** `UNSUPPORTED_WEBGPU`, no adapter and no fallback adapter. 4 cores, 16 GB |
 | **Chrome's arguments: the arguments of TE-10** | **`--enable-unsafe-webgpu --ignore-gpu-blocklist`:** the adapter is then "microsoft warp", the software renderer of Windows. `--enable-unsafe-webgpu` alone: none. `--use-webgpu-adapter=swiftshader`, in three combinations: none |
 | The H.264 and the AAC encoder on the runner | **Both there.** H.264: the two software entries of the ladder; no hardware entry. AAC: decode and encode |
-| The suites on "microsoft warp" | **Not known yet.** The arguments are in `e2e-media.yml` since 2026-10-10, with every long wait stretched five times. D1 cannot be made to name that adapter, so the next run is the first reading |
+| The fourth run, 2026-10-10 (run 38058976108, commit `fbdb3d0`), Chrome with the arguments of TE-10, every long wait five times as long | **The app starts.** The seven cases of the model download passed, 2.6 to 21.5 s each and 2.1 min for the one that waits out the retries; "sample clip" passed, 11.3 s. **A clip was not processed in 20 minutes, twice:** "loading and transcribing" failed after 20.2 min with "Transcribing…" on the page and no player, and the pipeline's group waited 20 minutes more for a player or a failure and got neither. 45.2 min for the step. Which backend ran the speech model is not known: no clip got ready to say it |
+| The suites on "microsoft warp", before that run | **Not known yet.** The arguments are in `e2e-media.yml` since 2026-10-10, with every long wait stretched five times. D1 cannot be made to name that adapter, so the next run is the first reading |
 
 **Date.** 2026-10-10 for the allowance. The run: open.
 
-**Decision.** Not taken, and since 2026-10-10 it is plain that it is not the choice G 11.5 lays out. Whatever the runner lacks, two exports of the reference clip cannot be drawn without a graphics card in a time a pull request waits for, and the fallback of §22.5, the job "on `main`", would put that wait, or that failure, before every deploy. The choices are in open item 15 of `v2changelog.md`; the founder takes one. The table below is what G 11.5 says, kept for the record:
+**Decision, 2026-10-10: D-72.** The job stays on pull requests and on `main` and runs the 8 cases that take no clip through the whole pipeline, `pnpm e2e:media --grep @no-gpu`, with Chrome started with the arguments of TE-10. The 22 others are run on D1, `pnpm e2e:media` on a build with the test key, before every merge. The founder chose this over taking the job out of CI, and over one more experiment with the speech model forced onto WASM. Still to read: the job green as it is now, and its minutes.
+
+**How the decision came about.** Before the fourth run it was already plain that it is not the choice G 11.5 lays out. Whatever the runner lacks, two exports of the reference clip cannot be drawn without a graphics card in a time a pull request waits for, and the fallback of §22.5, the job "on `main`", would put that wait, or that failure, before every deploy. The choices are in open item 15 of `v2changelog.md`; the founder takes one. The table below is what G 11.5 says, kept for the record:
 
 | Outcome of the first run | Then |
 |---|---|

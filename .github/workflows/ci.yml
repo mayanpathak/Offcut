@@ -1,7 +1,9 @@
 # The gates of technicalspec.md §33, steps 1 to 10, on every pull request and
 # on main. Steps 1 to 9 are the same commands as `pnpm check`, `pnpm test`,
 # `pnpm build` and `pnpm e2e` locally, in the order of the spec. Step 10 is
-# `pnpm e2e:media`, in Chrome on Windows (e2e-media.yml).
+# the part of `pnpm e2e:media` that a runner without a graphics card can
+# run, in Chrome on Windows (e2e-media.yml); the whole of it is run on the
+# development machine before a merge (v2implementation D-72).
 #
 # On main only, after step 10 has passed, steps 11 to 15 deploy: first the
 # API, then the web app, always in that order. The server rejects fields it

@@ -36,6 +36,15 @@ export async function flushAnalytics(page: Page): Promise<void> {
 }
 
 /**
+ * The tag of a media case that takes no clip through the whole pipeline, and
+ * so passes on a machine without a graphics card: the hosted runner of CI
+ * runs the cases that carry it, `--grep @no-gpu`, and no other. Processing a
+ * clip there takes longer than a pull request can wait (v2implementation
+ * D-72); every case, tagged or not, runs on a development machine.
+ */
+export const NO_GPU = "@no-gpu";
+
+/**
  * How long a wait for the pipeline or for an export may take on this machine.
  * The suites are written for a machine with a graphics processor. One without,
  * like the hosted runner of CI, draws with the processor and is several times

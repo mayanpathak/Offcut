@@ -5,6 +5,10 @@
 //
 // A case starts with nothing on the device unless it says otherwise: every
 // test has a browser context, and so a file system, of its own.
+//
+// The cases of the download itself take no clip through the pipeline, and
+// are the ones a machine without a graphics card runs too (`NO_GPU`, D-72).
+// The last case transcribes a whole clip, and is not among them.
 
 import { statSync } from "node:fs";
 
@@ -22,6 +26,7 @@ import {
   flushAnalytics,
   modelManifest,
   opfsList,
+  NO_GPU,
   opfsSize,
   patient,
   referenceClip,
@@ -107,7 +112,7 @@ async function modelDownloadEvent(page: Page, api: FakeApi): Promise<unknown> {
   return api.eventsOf("model_download").at(-1);
 }
 
-test("first run: the panel says what is downloaded, its bar moves, and the feed follows", async ({ page }) => {
+test("first run: the panel says what is downloaded, its bar moves, and the feed follows", { tag: NO_GPU }, async ({ page }) => {
   const { api } = await openEditor(page);
   await dropClip(page, referenceClip());
 
@@ -128,7 +133,7 @@ test("first run: the panel says what is downloaded, its bar moves, and the feed 
   expect(api.eventsOf("model_download")).toHaveLength(1);
 });
 
-test("requests: every model request is a GET for one range, with no cookie, no query and no body", async ({ page, context }) => {
+test("requests: every model request is a GET for one range, with no cookie, no query and no body", { tag: NO_GPU }, async ({ page, context }) => {
   // What the page and its workers ask any host for, besides what the route of the asset host records.
   const everywhere: string[] = [];
   context.on("request", (request) => everywhere.push(request.url()));
@@ -161,7 +166,7 @@ test("requests: every model request is a GET for one range, with no cookie, no q
   expect(sizes.reduce((sum, bytes) => sum + bytes, 0)).toBe(modelManifest.totalBytes);
 });
 
-test("an interrupted download goes on from the bytes it has", async ({ page, context }) => {
+test("an interrupted download goes on from the bytes it has", { tag: NO_GPU }, async ({ page, context }) => {
   // The first file is small. The second is cut off: once 20 MiB have
   // arrived, which is in its third part, the next request finds no connection.
   const interrupted = manifestFile(1);
@@ -191,7 +196,7 @@ test("an interrupted download goes on from the bytes it has", async ({ page, con
   });
 });
 
-test("a file with a wrong hash is removed and downloaded again", async ({ page }) => {
+test("a file with a wrong hash is removed and downloaded again", { tag: NO_GPU }, async ({ page }) => {
   const damaged = manifestFile(0);
   const { api } = await openEditor(page, { corrupt: damaged.path });
   await dropClip(page, referenceClip());
@@ -221,7 +226,7 @@ test("a file with a wrong hash is removed and downloaded again", async ({ page }
   expect(await opfsList(page, MODEL_DIR)).toEqual(modelManifest.files.map((_, index) => manifestFile(index).localName).sort());
 });
 
-test("a second session downloads nothing and shows no panel", async ({ page, context }) => {
+test("a second session downloads nothing and shows no panel", { tag: NO_GPU }, async ({ page, context }) => {
   await ensureModelCached(context);
   const { api, assets } = await openEditor(page);
   await dropClip(page, referenceClip());
@@ -235,7 +240,7 @@ test("a second session downloads nothing and shows no panel", async ({ page, con
   expect(api.eventsOf("model_download")).toEqual([]);
 });
 
-test("a download that keeps failing ends with its message, and what arrived is kept", async ({ page }) => {
+test("a download that keeps failing ends with its message, and what arrived is kept", { tag: NO_GPU }, async ({ page }) => {
   // One part of the second file arrives; every request after it is refused.
   const failing = manifestFile(1);
   const { api, assets } = await openEditor(page, { failAfterBytes: PART_BYTES, status: 503 });
@@ -263,7 +268,7 @@ test("a download that keeps failing ends with its message, and what arrived is k
   expect(await opfsList(page, MODEL_DIR)).toContain(`${failing.localName}.part`);
 });
 
-test("no room for the model: the storage message", async ({ page, context, baseURL }) => {
+test("no room for the model: the storage message", { tag: NO_GPU }, async ({ page, context, baseURL }) => {
   // Room for the clip and for a part of the model, not for the model.
   const quota = statSync(referenceClip()).size + 3 * PART_BYTES;
   expect(quota).toBeLessThan(modelManifest.totalBytes);

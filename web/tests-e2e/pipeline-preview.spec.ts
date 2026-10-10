@@ -20,6 +20,7 @@ import { DB_NAME, STORES } from "../src/persistence/schema";
 import { type FakeApi, installFakeApi } from "./helpers/fake-api";
 import {
   type AssetLog,
+  NO_GPU,
   dropClip,
   ensureModelCached,
   opfsList,
@@ -381,7 +382,7 @@ test.describe("one clip, from the drop to the preview", () => {
   });
 });
 
-test("sample clip: the button fetches the clip from the asset host and imports it", async ({ page }) => {
+test("sample clip: the button fetches the clip from the asset host and imports it", { tag: NO_GPU }, async ({ page }) => {
   const api = await installFakeApi(page);
   const assets = await routeAssets(page);
   await page.goto("/app");
