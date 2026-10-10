@@ -10,7 +10,10 @@ const PREVIEW_URL = "http://localhost:4173";
 // need a build made with the test key (v2implementation D-24), and the model
 // in `fixtures/.cache/`, which `media-setup` puts there.
 const MEDIA_SUITES = ["model-download.spec.ts", "pipeline-preview.spec.ts", "export-creator.spec.ts"];
-const MEDIA_TIMEOUT_MS = 300_000;
+// On a machine without a graphics processor a case may take this many times
+// longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).
+const TIMEOUT_SCALE = Number(process.env.E2E_TIMEOUT_SCALE ?? "1");
+const MEDIA_TIMEOUT_MS = 300_000 * TIMEOUT_SCALE;
 // Arguments Chrome is started with for the media suites and the bench, where a
 // machine needs some to give a page WebGPU: the hosted runner of CI, which has
 // no graphics card (TE-10). Separated by spaces. None on a development machine.

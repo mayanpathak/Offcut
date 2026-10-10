@@ -24,6 +24,7 @@ import {
   ensureModelCached,
   opfsList,
   opfsSize,
+  patient,
   referenceClip,
   routeAssets,
   sampleClipPath,
@@ -186,7 +187,9 @@ test.describe("one clip, from the drop to the preview", () => {
     await dropClip(page, referenceClip());
     processing.from = requests.length;
     processingMs.from = await page.evaluate(() => performance.now());
-    await expect(canvas(page)).toBeVisible({ timeout: 240_000 });
+    // The player, or the page that says the clip could not be processed: that one ends the wait at once.
+    await expect(canvas(page).or(page.getByTestId("clip-failed")).or(page.getByTestId("clip-rejected"))).toBeVisible({ timeout: patient(240_000) });
+    await expect(canvas(page), "the clip was processed").toBeVisible();
     processing = { ...processing, to: requests.length };
     processingMs = { ...processingMs, to: await page.evaluate(() => performance.now()) };
   });

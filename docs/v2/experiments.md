@@ -241,8 +241,11 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 | The job on the runner: did the 30 cases pass | **No.** The app does not start there as Chrome is started now |
 | Chrome's software WebGPU adapter, on D1 (`--enable-unsafe-webgpu --use-webgpu-adapter=swiftshader`), for what a machine without a graphics card can do at best | The model download: not tried. The pipeline: the speech model first failed, for want of 16-bit floats on that adapter, which was a fault of the app and is corrected; then `ready` after 82 s with the model on WASM, and `pipeline-preview.spec.ts` 11 of 11 in 2.8 min. **The export: 17% of 2,242 frames after 180 s, about 2.1 frames a second, so about 18 minutes for one Creator file,** against 35 s with the graphics processor. D1 has 12 threads; a hosted runner has 4 |
 | The job's minutes | The failed run took 2 min 30 s, of which about 2 min 20 s were the tools. A run of the 30 cases: not known yet |
-| WebGPU on the runner, and Chrome's arguments if it needs any | **Not known yet.** The setup test prints it on the next run |
-| The H.264 and the AAC encoder on the runner | **Not known.** A Windows Server image may lack the system encoders Chrome uses |
+| The third run, 2026-10-10 (run 38057474961, commit `84a52ef`) | The setup test failed in 21 s with the runner's own answers, and the 30 cases were not started: 52 s for the step |
+| WebGPU on the runner | **None as Chrome starts:** `UNSUPPORTED_WEBGPU`, no adapter and no fallback adapter. 4 cores, 16 GB |
+| **Chrome's arguments: the arguments of TE-10** | **`--enable-unsafe-webgpu --ignore-gpu-blocklist`:** the adapter is then "microsoft warp", the software renderer of Windows. `--enable-unsafe-webgpu` alone: none. `--use-webgpu-adapter=swiftshader`, in three combinations: none |
+| The H.264 and the AAC encoder on the runner | **Both there.** H.264: the two software entries of the ladder; no hardware entry. AAC: decode and encode |
+| The suites on "microsoft warp" | **Not known yet.** The arguments are in `e2e-media.yml` since 2026-10-10, with every long wait stretched five times. D1 cannot be made to name that adapter, so the next run is the first reading |
 
 **Date.** 2026-10-10 for the allowance. The run: open.
 

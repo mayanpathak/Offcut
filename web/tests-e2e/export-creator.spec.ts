@@ -15,7 +15,7 @@ import { type BrowserContext, type Download, expect, type Page, test } from "@pl
 
 import { messages } from "../src/copy/messages";
 import { type FakeApi, installFakeApi, mintEntitlementToken, seedEntitlement } from "./helpers/fake-api";
-import { dropClip, ensureModelCached, opfsList, referenceClip, routeAssets, sourceDurationMs, verifyMp4 } from "./helpers/fixtures";
+import { dropClip, ensureModelCached, opfsList, patient, referenceClip, routeAssets, sourceDurationMs, verifyMp4 } from "./helpers/fixtures";
 
 declare global {
   interface Window {
@@ -33,7 +33,7 @@ declare global {
 const UUID_MP4 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.mp4$/;
 /** Analytics sends what it has every 10 s; a case waits that long for an event, and a little more. */
 const FLUSH_WAIT_MS = 20_000;
-const EXPORT_TIMEOUT_MS = 240_000;
+const EXPORT_TIMEOUT_MS = patient(240_000);
 /** A seed that is not the test key's: a token signed with it must be refused. */
 const OTHER_SEED = new Uint8Array(32).fill(7);
 
@@ -141,7 +141,9 @@ test.describe("one clip, exported", () => {
     await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
     durationMs = sourceDurationMs(referenceClip());
     await dropClip(page, referenceClip());
-    await expect(canvas(page)).toBeVisible({ timeout: 240_000 });
+    // The player, or the page that says the clip could not be processed: that one ends the wait at once.
+    await expect(canvas(page).or(page.getByTestId("clip-failed")).or(page.getByTestId("clip-rejected"))).toBeVisible({ timeout: patient(240_000) });
+    await expect(canvas(page), "the clip was processed").toBeVisible();
     await expect(exportButton(page)).toBeEnabled();
   });
 
@@ -215,7 +217,7 @@ test.describe("one clip, exported", () => {
     await expect(button(page, messages.editor.startOver)).toBeEnabled();
   });
 
-  test("events: the export is announced, timed in its two stages, and reported done", async () => {
+  test("events: the export is announced, timed in its two stages, and reported done", async ({}, testInfo) => {
     await expect.poll(() => api.eventsOf("export_done").length, { timeout: FLUSH_WAIT_MS }).toBe(1);
     // The refused export was announced too, as a Creator's: the plan is read from the token as it is (D-52).
     expect(api.eventsOf("export_started")).toEqual([
@@ -227,6 +229,10 @@ test.describe("one clip, exported", () => {
       { stage: "render_encode", duration_ms: expect.any(Number) },
       { stage: "mux", duration_ms: expect.any(Number) },
     ]);
+    // How long the machine took is its own to say, and is written down.
+    const timingLine = `the Creator export took: ${stages.map((props) => `${props.stage} ${String(props.duration_ms)} ms`).join(", ")}`;
+    testInfo.annotations.push({ type: "export time", description: timingLine });
+    process.stdout.write(`      ${timingLine}\n`);
     const done = api.eventsOf("export_done")[0] as { props: Record<string, unknown> };
     expect(done.props).toEqual({
       total_ms: expect.any(Number),

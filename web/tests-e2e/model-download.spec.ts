@@ -23,6 +23,7 @@ import {
   modelManifest,
   opfsList,
   opfsSize,
+  patient,
   referenceClip,
   routeAssets,
 } from "./helpers/fixtures";
@@ -113,13 +114,13 @@ test("first run: the panel says what is downloaded, its bar moves, and the feed 
   // The J4 sentence, with the size worked out from the manifest.
   await expect(panel(page)).toBeVisible({ timeout: 30_000 });
   expect(PANEL_TEXT).toContain(`about ${String(SIZE_MB)} MB`);
-  await expect(panel(page)).toBeHidden({ timeout: 180_000 });
+  await expect(panel(page)).toBeHidden({ timeout: patient(180_000) });
   // "Advances at least twice": three different values or more.
   const bar = await page.evaluate(() => window.e2eBar ?? []);
   expect(new Set(bar).size).toBeGreaterThanOrEqual(3);
   expect(bar.at(-1)).toBe("100");
 
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: 180_000 });
+  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
   expect(await modelDownloadEvent(page, api)).toEqual({
     name: "model_download",
     props: { outcome: "ok", resumed: false, duration_ms: expect.any(Number) },
@@ -134,7 +135,7 @@ test("requests: every model request is a GET for one range, with no cookie, no q
   const { assets } = await openEditor(page);
   await dropClip(page, referenceClip());
   await expect(panel(page)).toBeVisible({ timeout: 30_000 });
-  await expect(panel(page)).toBeHidden({ timeout: 180_000 });
+  await expect(panel(page)).toBeHidden({ timeout: patient(180_000) });
 
   const requests = assets.modelRequests();
   // Every file of the manifest was asked for, and nothing else under the model's folder.
@@ -166,7 +167,7 @@ test("an interrupted download goes on from the bytes it has", async ({ page, con
   const interrupted = manifestFile(1);
   const { assets } = await openEditor(page, { failAfterBytes: 20 * MIB });
   await dropClip(page, referenceClip());
-  await expect.poll(() => assets.requests.some((request) => request.answer === "aborted"), { timeout: 120_000 }).toBe(true);
+  await expect.poll(() => assets.requests.some((request) => request.answer === "aborted"), { timeout: patient(120_000) }).toBe(true);
   await page.close();
 
   const second = await context.newPage();
@@ -183,7 +184,7 @@ test("an interrupted download goes on from the bytes it has", async ({ page, con
   const first = resumed.modelRequests()[0];
   expect(first?.path).toBe(interrupted.path);
   expect(rangeStart(first)).toBe(3 * PART_BYTES);
-  await expect(feedLines(second).first()).toHaveText(messages.feed.transcribing, { timeout: 240_000 });
+  await expect(feedLines(second).first()).toHaveText(messages.feed.transcribing, { timeout: patient(240_000) });
   expect(await modelDownloadEvent(second, api)).toEqual({
     name: "model_download",
     props: { outcome: "ok", resumed: true, duration_ms: expect.any(Number) },
@@ -196,7 +197,7 @@ test("a file with a wrong hash is removed and downloaded again", async ({ page }
   await dropClip(page, referenceClip());
 
   const copy = messages.errors.E_MODEL_HASH;
-  await expect(failure(page)).toContainText(copy.title, { timeout: 120_000 });
+  await expect(failure(page)).toContainText(copy.title, { timeout: patient(120_000) });
   await expect(failure(page)).toContainText(copy.body);
   await expect(failure(page)).toContainText(copy.action);
   // Neither the file nor a part of it is kept (INV-20).
@@ -216,7 +217,7 @@ test("a file with a wrong hash is removed and downloaded again", async ({ page }
   const again = assets.modelRequests().find((request) => request.path === damaged.path);
   expect(rangeStart(again)).toBe(0);
   // The model is ready when the recognizer has loaded it.
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: 240_000 });
+  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(240_000) });
   expect(await opfsList(page, MODEL_DIR)).toEqual(modelManifest.files.map((_, index) => manifestFile(index).localName).sort());
 });
 
@@ -225,7 +226,7 @@ test("a second session downloads nothing and shows no panel", async ({ page, con
   const { api, assets } = await openEditor(page);
   await dropClip(page, referenceClip());
 
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: 180_000 });
+  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
   expect(assets.modelRequests()).toEqual([]);
   expect(await page.evaluate(() => window.e2ePanelSeen)).toBe(false);
   // Nothing was downloaded, so nothing is reported.
@@ -240,14 +241,14 @@ test("a download that keeps failing ends with its message, and what arrived is k
   const { api, assets } = await openEditor(page, { failAfterBytes: PART_BYTES, status: 503 });
   await dropClip(page, referenceClip());
   const refused = () => assets.modelRequests().filter((request) => typeof request.answer === "object" && request.answer.status === 503);
-  await expect.poll(() => refused().length, { timeout: 120_000 }).toBeGreaterThan(0);
+  await expect.poll(() => refused().length, { timeout: patient(120_000) }).toBeGreaterThan(0);
 
   // The three waits of 1, 3 and 9 s pass on the page's clock, not on the wall's.
   const copy = messages.errors.E_MODEL_DOWNLOAD;
   await expect(async () => {
     await page.clock.runFor(3_000);
     await expect(failure(page)).toContainText(copy.title, { timeout: 1_000 });
-  }).toPass({ timeout: 120_000 });
+  }).toPass({ timeout: patient(120_000) });
   await expect(failure(page)).toContainText(copy.action);
 
   // One request and its three retries, each for the same bytes.
@@ -272,7 +273,7 @@ test("no room for the model: the storage message", async ({ page, context, baseU
   const { api } = await openEditor(page);
   await dropClip(page, referenceClip());
   const copy = messages.errors.E_MODEL_STORAGE;
-  await expect(failure(page)).toContainText(copy.title, { timeout: 180_000 });
+  await expect(failure(page)).toContainText(copy.title, { timeout: patient(180_000) });
   await expect(failure(page)).toContainText(copy.action);
   expect(await modelDownloadEvent(page, api)).toEqual({
     name: "model_download",
@@ -292,9 +293,9 @@ test("loading and transcribing: nothing leaves the page but analytics", async ({
   await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
 
   await dropClip(page, referenceClip());
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: 180_000 });
+  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
   const transcribingFrom = requests.length;
-  await expect(page.getByTestId("preview-canvas")).toBeVisible({ timeout: 240_000 });
+  await expect(page.getByTestId("preview-canvas")).toBeVisible({ timeout: patient(240_000) });
   const all = requests.filter((request) => /^https?:/.test(request.url));
 
   // The recognizer was loaded from this device and from the app's own origin:

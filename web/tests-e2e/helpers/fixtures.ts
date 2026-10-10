@@ -35,6 +35,20 @@ export async function flushAnalytics(page: Page): Promise<void> {
   await page.clock.runFor(FLUSH_INTERVAL_MS - 1);
 }
 
+/**
+ * How long a wait for the pipeline or for an export may take on this machine.
+ * The suites are written for a machine with a graphics processor. One without,
+ * like the hosted runner of CI, draws with the processor and is several times
+ * slower: there `E2E_TIMEOUT_SCALE` says by how much a long wait is stretched.
+ */
+export function patient(ms: number): number {
+  const scale = Number(process.env.E2E_TIMEOUT_SCALE ?? "1");
+  if (!Number.isFinite(scale) || scale < 1) {
+    throw new Error("E2E_TIMEOUT_SCALE is a number of 1 or more");
+  }
+  return ms * scale;
+}
+
 // --- Where things are ------------------------------------------------------------
 
 const ROOT = path.resolve(import.meta.dirname, "../../..");

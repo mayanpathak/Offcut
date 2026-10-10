@@ -30,11 +30,22 @@ env:
   # its checksum is the one written here.
   FFMPEG_VERSION: 9.0.2
   FFMPEG_SHA256: 60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+  # The arguments of TE-10 (docs/v2/experiments.md). A hosted runner has no
+  # graphics card, and Chrome as it starts gives a page no WebGPU adapter
+  # there; the app then refuses to run. With these two it names the software
+  # adapter of Windows, "microsoft warp" (read on the runner, 2026-10-10).
+  E2E_CHROME_ARGS: "--enable-unsafe-webgpu --ignore-gpu-blocklist"
+  # That adapter draws with the processor, and the runner has 4 cores: a
+  # long wait of the suites may take this many times what it takes on a
+  # machine with a graphics processor.
+  E2E_TIMEOUT_SCALE: "5"
 
 jobs:
   media:
     runs-on: windows-latest
-    timeout-minutes: 45
+    # A first measure, generous on purpose: how long the suites take without
+    # a graphics card is what the next runs have to show (TE-10).
+    timeout-minutes: 120
 
     # The default shell of a Windows runner is PowerShell; every step here is
     # written for bash, as in ci.yml.
@@ -115,12 +126,16 @@ jobs:
           key: e2e-assets-${{ hashFiles('web/src/config/model-manifest.json', 'web/src/net/asset-fetch.ts') }}
 
       # --- 10.4 The suites, against `vite preview` ---------------------------
-      - name: Playwright, the media suites
-        env:
-          # What Chrome needs on this runner to give a page WebGPU, if it
-          # needs anything: the outcome of TE-10 (docs/v2/experiments.md).
-          E2E_CHROME_ARGS: ""
-        run: pnpm e2e:media
+      # In two steps, so that the log says how long each half takes on this
+      # runner and one half's failure does not hide the other's result. No
+      # retry: a case that fails here has a reason, and a second try of a
+      # group is one more clip through the pipeline.
+      - name: Playwright, the model download and the pipeline
+        run: pnpm e2e:media --retries=0 model-download pipeline-preview
+
+      - name: Playwright, the export
+        if: ${{ !cancelled() }}
+        run: pnpm e2e:media --retries=0 export-creator
 
       # --- 10.5 What is kept of a failed run ---------------------------------
       # The report: the names of the cases and what failed. Not

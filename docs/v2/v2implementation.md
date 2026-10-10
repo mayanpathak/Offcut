@@ -1951,6 +1951,7 @@ On `main` only, after step 10 passes:
 - **`e2e-media.yml`** is started by `workflow_call` alone. A manual start has no `web/dist` to take: the fallback of TE-10 will have to give it one. Its tools: Node 24 and pnpm as in `ci.yml`; Chrome through `playwright install chrome`; Python 3.13 through `actions/setup-python` at the commit of v7.0.0; `ffmpeg` 9.0.2, the "essentials" archive of the same builder as on D1, refused unless its SHA-256 is the one in the file. The cache of `fixtures/.cache/` is keyed by the hash of `model-manifest.json` and of `net/asset-fetch.ts`, which names the sample clip. On failure it uploads `web/playwright-report` and nothing else.
 - **The guard** fails the job when a file of `.vercel/output/` holds the key, when the directory holds no file, when the key to search for is empty, and when the search itself fails. Only "no file holds it" lets the deploy run.
 - **Step 13 and step 15** are the two halves of V1's one step: `vercel pull` and `vercel build --prod`, then `vercel deploy --prebuilt --prod`.
+- **Since 2026-10-10, after three runs on the runner** (TE-10): `e2e-media.yml` sets `E2E_CHROME_ARGS` to `--enable-unsafe-webgpu --ignore-gpu-blocklist`, with which Chrome on the runner names the software adapter "microsoft warp"; it sets `E2E_TIMEOUT_SCALE` to 5; it runs the suites in two steps, `model-download` with `pipeline-preview` and then `export-creator`, each with `--retries=0`, the second also when the first failed; and the job may take 120 minutes. These are a first measure, not the job's lasting form: where the media suites run is open (section 27, item 41).
 
 ### 22.6 Hosting
 
@@ -2046,6 +2047,7 @@ export function referenceClip(): string;                                     // 
 - **`referenceClip()`** takes the file's name from `SAMPLE_CLIP_PATH`, which it reads from the source of `net/asset-fetch.ts`: that file cannot be imported in Node, because it reads the build configuration. `assetBaseUrl()` reads `VITE_ASSET_BASE_URL` from the environment or from `web/.env.local`, as `check-hosts.mjs` does.
 - **Also exported:** `modelManifest`, `assetBaseUrl()`, `sampleClipPath()`, and the types `AssetLog`, `AssetRequest`, `AssetOptions`.
 - **`media.setup.ts` asks first whether Chrome can run the app** (since 2026-10-10). Its first test opens `/app`; with the unsupported page there it fails, the projects that depend on it are not started, and its message holds the app's sentence, the `capability_check` event, this Chrome's answer to each question of TS §13.2 taken by itself, and the WebGPU adapter Chrome names under five other sets of arguments. Its second test is `fillAssetCache()`. The project `media-setup` starts Chrome as `media` does.
+- **`patient(ms)`** stretches a long wait by the number in `E2E_TIMEOUT_SCALE`, which is 1 when it is not set; the limit of a case of `media` is stretched the same way in `playwright.config.ts`. Every wait of two minutes or more in the three suites goes through it. A machine without a graphics processor draws with the processor, and its waits are not those of D1.
 
 ### 23.5 `web/tests-e2e/landing.spec.ts`: the two replaced cases (D-56)
 
