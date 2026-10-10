@@ -127,28 +127,40 @@ export function size(path: string): Promise<Bytes | null> {
   });
 }
 
+/**
+ * Changes a file through a writable stream and closes it: the change is in
+ * the file only once the stream has closed. When the change fails, its
+ * failure is the one that is thrown and the file stays as it was. A stream
+ * that failed cannot be closed, and what it says to that names no cause: a
+ * full disk would be reported as any other failure.
+ */
+async function write(
+  handle: FileSystemFileHandle,
+  keepExistingData: boolean,
+  change: (writable: FileSystemWritableFileStream) => Promise<void>,
+): Promise<void> {
+  const writable = await handle.createWritable({ keepExistingData });
+  try {
+    await change(writable);
+  } catch (error) {
+    await writable.abort().catch(() => undefined);
+    throw error;
+  }
+  await writable.close();
+}
+
 /** Writes at an offset and closes the file, so the bytes survive a closed tab (D-36). */
 export function writeAt(path: string, offset: Bytes, data: Uint8Array<ArrayBuffer>): Promise<void> {
   return guarded(async () => {
     const handle = await fileHandle(path, { create: true });
-    const writable = await handle.createWritable({ keepExistingData: true });
-    try {
-      await writable.write({ type: "write", position: offset, data });
-    } finally {
-      await writable.close();
-    }
+    await write(handle, true, (writable) => writable.write({ type: "write", position: offset, data }));
   });
 }
 
 export function truncate(path: string, length: Bytes): Promise<void> {
   return guarded(async () => {
     const handle = await fileHandle(path, { create: true });
-    const writable = await handle.createWritable({ keepExistingData: true });
-    try {
-      await writable.truncate(length);
-    } finally {
-      await writable.close();
-    }
+    await write(handle, true, (writable) => writable.truncate(length));
   });
 }
 
@@ -204,12 +216,7 @@ export function list(dir: string): Promise<readonly string[]> {
 export function writeAudio(id: ClipId, out48: Float32Array<ArrayBuffer>): Promise<void> {
   return guarded(async () => {
     const handle = await fileHandle(paths.clipOut48(id), { create: true });
-    const writable = await handle.createWritable();
-    try {
-      await writable.write(out48);
-    } finally {
-      await writable.close();
-    }
+    await write(handle, false, (writable) => writable.write(out48));
   });
 }
 

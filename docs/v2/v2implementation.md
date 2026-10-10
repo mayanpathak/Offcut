@@ -337,7 +337,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 ├── web/
 │   ├── package.json                    CHANGED  + @huggingface/transformers; dev-dep @types/node (D-63)
 │   ├── vite.config.ts                  CHANGED  ORT copy step (D-37)
-│   ├── playwright.config.ts            CHANGED  + projects "media" and "bench", globalSetup
+│   ├── playwright.config.ts            CHANGED  + projects "media-setup", "media" and "bench"
 │   ├── tsconfig.json                   CHANGED  "include" is src alone (D-63)
 │   ├── eslint.config.js                CHANGED  the edges of D-27 and D-58; overrides of D-59
 │   ├── src/config/env.ts               CHANGED  + entitlementTestPublicKey
@@ -349,7 +349,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 │   ├── src/models/model-manager.ts     NEW F
 │   ├── src/models/download.ts          NEW F
 │   ├── src/models/download.test.ts     NEW F
-│   ├── src/persistence/opfs.ts         NEW P    sweepTemp, removeAll in V7
+│   ├── src/persistence/opfs.ts         NEW P    sweepTemp, removeAll in V7. A write that fails keeps its own error (Prompt 56)
 │   ├── src/persistence/entitlement-repo.ts    NEW P  (D-23) clear() in V6
 │   ├── src/state/model-store.ts        NEW F
 │   ├── src/state/clip-store.ts         NEW P    edit actions in V4
@@ -393,6 +393,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 │   ├── tests-e2e/tsconfig.json         NEW F    Node types for tests, bench and tool configuration only (D-63)
 │   ├── tests-e2e/helpers/fake-api.ts   CHANGED  + mintEntitlementToken, seedEntitlement
 │   ├── tests-e2e/helpers/fixtures.ts   CHANGED  + asset routing, clip drop, model cache
+│   ├── tests-e2e/media.setup.ts        NEW F    fills fixtures/.cache/ for "media" and "bench" (G item 6b)
 │   ├── tests-e2e/landing.spec.ts       CHANGED  two cases replaced (D-56)
 │   ├── tests-e2e/model-download.spec.ts       NEW F
 │   ├── tests-e2e/pipeline-preview.spec.ts     NEW P  remaining cases in V4
@@ -1197,6 +1198,8 @@ The path table is TS §23.1 verbatim. Names are ids and fixed words only; no pat
 
 **Never.** Imports `net`, `ui` or `workers`. Opens a sync access handle. Deletes the model directory except through `remove` called by the model manager.
 
+**As built (Prompt 56).** `writeAt`, `truncate` and `writeAudio` change the file through one helper: the change, then `close()`. When the change fails, the stream is given up with `abort()` and the failure of the change is the one thrown; the file stays as it was. Before that the stream was closed in a `finally`, and a stream that has failed answers a close with a `TypeError`, which took the place of the `QuotaExceededError`: a full disk was tagged `io` and shown as any other failure (section 27, item 36).
+
 ### 15.3 `persistence/entitlement-repo.ts` (D-23)
 
 ```ts
@@ -1884,6 +1887,8 @@ Only what changes.
 
 `fixtures` and `corpus` are added by V3. Also changed: `check` runs a second `tsc --noEmit`, for `web/tests-e2e/tsconfig.json`, and the root package gains the dev-dependency `@playwright/test` at the version `web` pins (D-63).
 
+**As built (Prompt 56).** `e2e:media` is `playwright test --project=media`, which runs the project `media-setup` first; `e2e:device` is `playwright test --project=non-media --project=media --headed`; `bench:device` is `playwright test --project=bench` and finds no test until Prompt 58 writes `bench/device-bench.ts`. The media suites are given a build made with `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`; `model-download.spec.ts` alone passes on a plain build too, because it makes no export.
+
 ### 22.3 Web configuration files
 
 | File | Change |
@@ -1894,6 +1899,8 @@ Only what changes.
 | `web/playwright.config.ts` | Project `media`: `testMatch` of the three media suites, `channel: "chrome"`, `timeout` 300 s, launch arguments for WebGPU as recorded by TE-10. `globalSetup` fills `fixtures/.cache/` (section 23.4). Project `non-media` keeps `landing.spec.ts`. Project `bench`: `testDir` `../bench`, the one file `device-bench.ts`, headed (D-63) |
 | `web/eslint.config.js` | The six edges of D-27 and the two of D-58, none of which V1's matrix has, and the seven cast overrides of D-59. No existing rule is loosened for any other file. The `tests-e2e` block needs no change: its files find the new `tsconfig.json` by themselves |
 | `.gitignore` | `web/public/ort/`, `fixtures/.cache/` |
+
+**`web/playwright.config.ts` as built (Prompt 56; G item 6b).** Four projects and no `globalSetup`. `non-media`: `testMatch` of `landing.spec.ts`, no dependency, so `pnpm e2e` and the Linux job never fetch the model. `media-setup`: the one file `tests-e2e/media.setup.ts`, whose one test calls `fillAssetCache()` with 30 minutes to do it. `media`: the three suites, 300 s for a case, `dependencies: ["media-setup"]`, and one worker with `fullyParallel: false`, because a case loads the speech model and the GPU. `bench`: `testDir: "../bench"`, the file `device-bench.ts`, headed, the same dependency, one worker. The launch arguments for WebGPU on the CI runner are Prompt 58's (TE-10). A temporary `zz-*.spec.ts` is matched by no project since then: a check that needs one brings a configuration of its own and runs with `--config`.
 
 ### 22.4 Scripts
 
@@ -2016,6 +2023,15 @@ export function referenceClip(): string;                                     // 
 
 `routeAssets` answers every asset-host URL from `fixtures/.cache/` (models) and `referenceClip()` (the sample clip, D-39), honouring `Range` with 206 and `Content-Range`, and records method, URL, headers and byte counts. With `E2E_REAL_ASSETS=1` it only records (D-41). `globalSetup` downloads any manifest file missing from `fixtures/.cache/` from the real asset host and checks its SHA-256. When `testclips/` does not hold the reference clip (as on the CI runner), it downloads `SAMPLE_CLIP_PATH` the same way and checks that the file's SHA-256 starts with the hash segment of its name. `mintEntitlementToken` defaults: `plan: "creator"`, `iat = now`, `exp = now + 7 days`, `periodEnd = now + 30 days`. **As built (Prompt 46):** `sub` is one fixed user id and `freeExportsRemaining` defaults to 3, so the claims of a token are known in full; `seedEntitlement` rejects, and makes nothing, on a page where the app has not made its database yet. Every media suite calls `installFakeApi` (V1) so no test reaches a real server.
 
+**As built (Prompt 56).**
+
+- **`fillAssetCache()`** takes the place of `globalSetup` and is called by `media.setup.ts` (G item 6b). A file is kept in `fixtures/.cache/` under its path on the asset host. One that is there is hashed again on every run, and fetched again when its hash is wrong.
+- **`routeAssets(page, o)`** returns `{ requests, modelRequests() }`. A request is `{ method, url, path, headers, hasBody, answer }`: `headers` is the list as the browser sent it, a repeated header twice, so that "one `Range` header" can be counted; `answer` is `{ status, bytes }`, `"aborted"`, or `"network"` for a request that went to the real host. That is every request under `E2E_REAL_ASSETS=1`, and otherwise one for a path that is neither a file of the manifest nor the sample clip, the demo video for one. `corrupt` is a part of a model file's path, and every answer for that file has its first byte changed. `failAfterBytes` is a threshold: once that many bytes of the model were served, the next model request finds the connection broken, or gets `status` when that is given too; `status` alone answers every model request with it. A second call for the same page takes the place of the first.
+- **`ensureModelCached(context)`** does not run a download. It opens an empty page of the app's origin, in which the app does not start, and writes each file of the manifest into `models/<modelId>/` under its plain name, from `fixtures/.cache/`. A finished download leaves the same seven files; the hashes were checked when the cache was filled. It is what known issue 21 of the changelog asked for: nothing comes from the asset host.
+- **`dropClip(page, fixture)`** hands the bytes to the page through one request to `/e2e-fixture/<uuid>` on the app's origin, which the test answers itself. A case that counts requests sees that one before the drop.
+- **`referenceClip()`** takes the file's name from `SAMPLE_CLIP_PATH`, which it reads from the source of `net/asset-fetch.ts`: that file cannot be imported in Node, because it reads the build configuration. `assetBaseUrl()` reads `VITE_ASSET_BASE_URL` from the environment or from `web/.env.local`, as `check-hosts.mjs` does.
+- **Also exported:** `modelManifest`, `assetBaseUrl()`, `sampleClipPath()`, and the types `AssetLog`, `AssetRequest`, `AssetOptions`.
+
 ### 23.5 `web/tests-e2e/landing.spec.ts`: the two replaced cases (D-56)
 
 | Case | Expect |
@@ -2037,6 +2053,18 @@ The other V1 cases are unchanged and still pass. This suite must keep passing on
 | Retries exhausted | Route answering 503: after the three backoffs (page clock advanced) the page shows the `E_MODEL_DOWNLOAD` message; the event carries `outcome: "failed"`; the `.part` file still exists |
 | Quota | With the origin quota overridden through the DevTools protocol to less than the model size: the `E_MODEL_STORAGE` message |
 | Loading | During transcription no request leaves the page except `POST /api/v1/events`; in particular none to any host named in the D-38 list (TE-1) |
+
+**As built (Prompt 56).** Every case has a browser context of its own, so nothing is on the device unless the case puts it there, and starts on `/app`. The page's clock is installed, so that analytics can be flushed and the three waits of the downloader passed without waiting.
+
+| Case | As built |
+|---|---|
+| First run | The bar is read by an observer of the page: at least three different values, the last 100 |
+| Requests | Also: the requests name every file of the manifest and nothing else under `models/`; no request is for more than 8 MiB, and the bytes add up to `totalBytes`; and of all requests the page and its workers make, to any host, the ones that name a model file are exactly those to the asset host |
+| Interrupted download resumes | `failAfterBytes` of 20 MiB is reached inside the third part of the second file. The page is closed when the fourth request has found no connection: the `.part` holds three parts, 25,165,824 bytes, and the new page's first model request starts there |
+| Hash mismatch re-downloads | The damaged file is the first of the manifest, so the download ends at once |
+| Retries exhausted | `failAfterBytes` of 8 MiB with `status: 503`: one part arrives, so a `.part` exists; then four refused requests, each from byte 8,388,608. The clock is moved 3 s at a time until the message shows |
+| Quota | `Storage.overrideQuotaForOrigin` with the clip's size and 24 MiB more. Before the correction of `opfs.ts` this quota gave `E_STORAGE_IO` and the failure stub (section 27, item 36) |
+| Loading | From the page's load to the player no request goes to another origin than the page's. From the first line of the feed to the player, every request is `POST /api/v1/events` or a `GET` for a file of the build under `/assets/` or `/ort/`: the render worker's script and the two WASM bundles are fetched in that time, from the app's own origin (section 27, item 38) |
 
 ### 23.7 `web/tests-e2e/pipeline-preview.spec.ts` (V2 cases; TS §27.1, J6-J7)
 
@@ -2340,5 +2368,8 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 33 | The feed is shown while the clip is processed and not once it is `ready`. The events are detected in the last step before `ready`, so a "Found:" line is on the page for half a second or less: a person can hardly read it, and PS §10 J6 calls the feed what Offcut found (found in Prompt 55) | Section 20.1 vs PS §10 J6 | Open. Built as the table says. A test reads the line with an observer of the page, not by looking at a moment |
 | 34 | No lint rule stops a component from writing a store: `useClipStore.setState(...)` in a component passes ESLint and `tsc`. TS §2 has the rule in words only (found in Prompt 55, the third drill of G 10.2) | TS §2, V1's `eslint.config.js` | Open. Covered by review |
 | 35 | TS §11.3 asks for `assertNever` at the end of every `switch` over a generated union, and no file of the tree holds it. Four files have one of their own: `run-pipeline.ts`, `ProcessingFeed.tsx`, `PreviewPlayer.tsx`, `EditorPage.tsx` (found in Prompts 54 and 55) | TS §11.3, TS §5 | Open: a home for it is a file the tree must gain |
+| 36 | `opfs.ts` closed its writable stream in a `finally`. A write that is refused for lack of room leaves the stream failed, a failed stream answers `close()` with a `TypeError`, and that error took the place of the `QuotaExceededError`: the failure was tagged `io`, so a full disk during the model download was `E_STORAGE_IO` and the failure stub, not `E_MODEL_STORAGE` and its message, and the same for `E_STORAGE_QUOTA` when the clip's audio is written. Which of the two a person got depended on where in a part the room ran out (found in Prompt 56, by the quota case of section 23.6) | Section 15.2 as built in Prompt 37 | Section 15.2 as built in Prompt 56: the stream is given up and the first failure thrown |
+| 37 | When `createWritable({ keepExistingData: true })` itself fails for lack of room, Chrome leaves its copy of the file, `<name>.crswap`, beside the file. It counts against the quota, `opfs.list` names it, and nothing removes it before the directory is removed (found in Prompt 56) | TS §16.3, section 17.2 | Open. The model's directory is removed by `clear()` only. V7's `quota.ts` should know of it |
+| 38 | Section 23.6 says that during transcription no request leaves the page except `POST /api/v1/events`. In that time the page fetches files of its own build from its own origin: the render worker's script and the two WASM bundles (found in Prompt 56) | Section 23.6, TS §25.2 assertion 4 | Section 23.6 as built: those `GET`s are allowed and every other request is refused. Correct the wording of assertion 4 when `privacy-network.spec.ts` is written |
 
 **Decisions to copy back into `technicalspec.md`:** D-25 (§10.8), D-26 (§21.1), D-27 and D-58 (§2, §7), D-28 (§7), D-29 (§19.2), D-30 (§19.2, §20.1), D-34 (§15.1), D-35 (§32), D-37 (§16.4, §24.6), D-42 (§17.1), D-45 (§21.4, INV-11), D-47 (§17.1), D-50 (§16.1), D-53 (§5), D-55 and D-46 (§5), D-59 (§10.1), D-68 (§19.2, §19.4). **Into `buildplan.md`:** the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33. **Into `product.md`:** none.

@@ -77,6 +77,8 @@ The exact display strings come from `format_quantity` (`technicalspec.md` §17.2
 **Clip.** `testclips/speech_scriptA_landscape_720p.mp4`: the founder reading Script A to a webcam, 74,705 ms.
 **Recognized on.** 2026-10-09 (Prompt 43), by the model `asr-en-v1` of `web/src/config/model-manifest.json` (the small-size English model: a 4-bit encoder, and a 4-bit decoder that computes in 16-bit floats), on the WebGPU backend and again on the WASM backend. The two transcripts are equal, word for word and millisecond for millisecond.
 
+**Final for V2** (Prompt 56, 2026-10-10). The build of that day was given the clip once more and its clip store read: 157 words, 17 sentences, each with the word range, the two times and the text of the table below, the six numbers of the second table, and the one event. Nothing in this section was changed by that reading. It changes again only with the model (`web/src/config/model-manifest.json`), with `offcut-text`, or with the detector.
+
 **Expected transcript.** 157 words in 17 sentences. A test compares with this text, not with the script: the recording and the script differ, and so does what the recognizer hears. Words are counted from 0; times are milliseconds from the first video frame.
 
 | # | Words | Starts | Ends | Text |
@@ -121,6 +123,17 @@ The recognizer writes the amount as two words, `$12` and `,000`: it starts a new
 | 1 | NumberReveal | 132-133, `$12 ,000` | value 12,000, unit USD, display `$12k`, no label in V2 |
 
 The five other numbers have no unit, score 0.70 and must not become events (INV-6). That holds for the `8` too, which the recognizer wrote where the script says "ate".
+
+The event's span is 62,660 ms to 63,540 ms, the time its two words are spoken, and its confidence is 1: the recognizer gives no probability for a word (TE-2).
+
+**Expected feed.** What the page shows while it works on the clip, in this order, and nothing else. A test of the feed takes its list of amounts from here.
+
+| # | Line | Amount |
+|---|---|---|
+| 1 | "Transcribing…" | - |
+| 2 | "Found: $12k" | `$12k` |
+
+V2 shows no "Cleaning voice" line: the voice chain arrives in V3.
 
 **Where the transcript differs from Script A.** Which of these the speaker said and which the recognizer misheard has not been judged by ear.
 

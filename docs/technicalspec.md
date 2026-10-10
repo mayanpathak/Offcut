@@ -665,6 +665,7 @@ offcut/
 │       ├── helpers/network-capture.ts
 │       ├── helpers/fake-api.ts
 │       ├── helpers/fixtures.ts
+│       ├── media.setup.ts             fills fixtures/.cache/ for the media suites and the bench (v2buildguide item 6b)
 │       ├── landing.spec.ts
 │       ├── capability.spec.ts
 │       ├── unsupported.spec.ts
