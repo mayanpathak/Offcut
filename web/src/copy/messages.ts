@@ -6,7 +6,7 @@
 // the video is not uploaded. Legal and certification terms are not used.
 
 import type { AnalyticsEvent, Wanted } from "../gen/api";
-import { type ErrorCode, LIMITS, type UnsupportedReason } from "../gen/domain";
+import { type ErrorCode, type EventKind, LIMITS, type UnsupportedReason } from "../gen/domain";
 
 type EventName = AnalyticsEvent["name"];
 type ErrorCopy = { title: string; body: string; action: string };
@@ -56,7 +56,7 @@ export const messages = {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
       `Drop a clip (up to ${String(limits.MAX_CLIP_DURATION / MS_PER_SECOND)} seconds, English).`,
     sampleButton: "Try with a sample clip",
-    notReady: "Offcut cannot process clips yet. Join the waitlist and we will email you when it can.",
+    fetchingSample: "Getting the sample clip…",
   },
 
   modelDownload: {
@@ -64,6 +64,44 @@ export const messages = {
       `One-time setup: downloading the speech model (about ${String(sizeMb)} MB). It stays in your browser, and your video is not uploaded.`,
     progress: (etaSecs: number) => `About ${waitText(etaSecs)} left.`,
     verifying: "Checking the download…",
+  },
+
+  // The processing feed (PS §10 J6). A line is shown for something that
+  // happened, and for nothing else. `display` is the event's own figure.
+  feed: {
+    transcribing: "Transcribing…",
+    cleaningVoice: "Cleaning voice",
+    eventFound: {
+      number_reveal: (display: string) => `Found: ${display}`,
+      list_reveal: (display: string) => `Found: ${display}-item list`,
+      from_to: (display: string) => `Found: ${display}`,
+      keyword_pop: (display: string) => `Found: ${display}`,
+    } satisfies Record<EventKind, (display: string) => string>,
+  },
+
+  preview: {
+    play: "Play",
+    pause: "Pause",
+    replay: "Play again",
+  },
+
+  export: {
+    button: "Export video",
+    unavailable: "Exporting needs an account, and accounts are not open yet.",
+    stage: {
+      rendering: "Rendering",
+      muxing: "Writing the file",
+      saving: "Saving",
+    },
+    elapsed: (seconds: number) => `${String(seconds)} ${seconds === 1 ? "second" : "seconds"} so far.`,
+    renderingLocally: "Everything is rendering on your computer.",
+    done: "Your video is ready. Your browser has downloaded it.",
+  },
+
+  editor: {
+    rejectedStub: "This clip could not be used.",
+    failedStub: "Something went wrong on this device.",
+    startOver: "Start over",
   },
 
   capability: {

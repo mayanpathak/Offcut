@@ -171,18 +171,17 @@ test("waitlist: a slow API shows the waking message, then success", async ({ pag
   expect(api.requests.filter((entry) => entry.path === "/notify-me")).toHaveLength(1);
 });
 
-test("the drop zone is inactive: a dropped file shows the not-ready message and nothing is sent", async ({ page }) => {
+test("a dropped file starts an import and opens /app, or is refused where Offcut cannot run", async ({ page, baseURL }) => {
   const api = await installFakeApi(page);
-  await page.goto("/");
+  const response = await page.goto("/");
   await capabilityChecked(page);
-  await expect(dropZone(page)).toHaveAttribute("aria-disabled", "true");
+  await expect(dropZone(page)).not.toHaveAttribute("aria-disabled");
   // Let the start of the app finish its own requests first: the wake-up
   // call is the last one it always makes.
   await expect.poll(() => api.requests.some((entry) => entry.path === "/healthz")).toBe(true);
-  await page.waitForLoadState("networkidle");
 
-  const urls: string[] = [];
-  page.on("request", (request) => urls.push(request.url()));
+  const requests: { method: string; url: string }[] = [];
+  page.on("request", (request) => requests.push({ method: request.method(), url: request.url() }));
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer();
     data.items.add(new File(["not a real clip"], "private-clip.mp4", { type: "video/mp4" }));
@@ -191,22 +190,55 @@ test("the drop zone is inactive: a dropped file shows the not-ready message and 
   await dropZone(page).dispatchEvent("dragover", { dataTransfer: transfer });
   await dropZone(page).dispatchEvent("drop", { dataTransfer: transfer });
 
-  await expect(page.getByText(messages.dropZone.notReady)).toBeVisible();
-  // The browser did not open the file, and no request followed the drop.
-  await expect(page).toHaveURL(/\/$/);
+  // Two outcomes, and the browser of CI may give either: the clip is taken
+  // and the page moves on with it, or the drop is refused and the page stays.
+  const refused = page.getByText(messages.blockers.B_UNSUPPORTED);
+  await expect(page.getByTestId("editor").or(refused)).toBeVisible({ timeout: 15_000 });
+  if (await refused.isVisible()) {
+    await expect(page).toHaveURL(/\/$/);
+  } else {
+    await expect(page).toHaveURL(/\/app$/);
+    // The file is no clip: the page says so, and offers the way back.
+    await expect(page.getByText(messages.editor.rejectedStub)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: messages.editor.startOver })).toBeVisible();
+  }
+
+  // The browser did not open the file, and the drop sent nothing anywhere:
+  // what followed it are analytics, the wake-up call, and files that are
+  // fetched from the page's own origin or from the asset host.
   await page.waitForTimeout(500);
-  expect(urls).toEqual([]);
+  const origin = new URL(baseURL ?? "").origin;
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  const assetHosts = (csp.match(/https?:\/\/[^\s;]+/g) ?? []).map((host) => new URL(host).origin);
+  const unexpected = requests.filter(({ method, url }) => {
+    const target = new URL(url);
+    if (!/^https?:$/.test(target.protocol)) {
+      return false;
+    }
+    if (target.origin === origin && target.pathname.startsWith("/api/")) {
+      return !(
+        (method === "POST" && target.pathname === "/api/v1/events") ||
+        (method === "GET" && target.pathname === "/api/v1/healthz")
+      );
+    }
+    return method !== "GET" || (target.origin !== origin && !assetHosts.includes(target.origin));
+  });
+  expect(unexpected).toEqual([]);
 });
 
-test("/app shows the not-ready panel or the unsupported page, never a blank screen", async ({ page }) => {
+test("/app shows the drop zone or the unsupported page, never a blank screen", async ({ page }) => {
   await installFakeApi(page);
   await page.goto("/app");
 
-  const notReady = page.getByTestId("not-ready");
   const unsupported = page.getByTestId("unsupported-reason");
-  await expect(notReady.or(unsupported)).toBeVisible({ timeout: 15_000 });
-  // Both ways in, the visitor can leave an email.
-  await expect(submitButton(page)).toBeVisible();
+  await expect(dropZone(page).or(unsupported)).toBeVisible({ timeout: 15_000 });
+  // The page that cannot run Offcut is the one that still takes an email.
+  if (await unsupported.isVisible()) {
+    await expect(submitButton(page)).toBeVisible();
+  } else {
+    await expect(dropZone(page)).toHaveText(messages.dropZone.prompt(LIMITS));
+    await expect(page.getByRole("button", { name: messages.dropZone.sampleButton })).toBeVisible();
+  }
 });
 
 test("every request of a session goes to the page's own origin or to the asset host", async ({ page, baseURL }) => {
@@ -222,7 +254,7 @@ test("every request of a session goes to the page's own origin or to the asset h
   await page.getByRole("link", { name: messages.landing.whatLeavesLink }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await page.goto("/app");
-  await expect(page.getByTestId("not-ready").or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
 
   // The hosts the CSP allows are the hosts the app may contact.
   const csp = response?.headers()["content-security-policy"] ?? "";

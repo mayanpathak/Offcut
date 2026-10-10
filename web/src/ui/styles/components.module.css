@@ -120,6 +120,72 @@
   transition: width 0.3s linear;
 }
 
+/* --- Something that waits: the sample button while the clip is fetched ---- */
+
+.pending {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* --- ProcessingFeed ------------------------------------------------------- */
+
+.feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: var(--space-5);
+}
+
+.feedLine {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+/* --- PreviewPlayer -------------------------------------------------------- */
+
+.player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* The canvas is drawn at its own size and shown at the width there is. */
+.previewCanvas {
+  width: min(100%, 20rem);
+  height: auto;
+  aspect-ratio: 9 / 16;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.playerControls {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* --- ExportButton, ExportProgress ----------------------------------------- */
+
+.exportPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.exportProgress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 /* --- WhatLeavesTable ------------------------------------------------------ */
 
 .tables {

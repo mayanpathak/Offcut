@@ -73,6 +73,27 @@
   gap: var(--space-2);
 }
 
+/* The editor: what one clip shows at each step of its way. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A clip that could not be used, or a failure: what is said, then the way on. */
+.stub {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.problem {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--color-problem);
+}
+
 /* The demo is a vertical short, so its box is portrait too. */
 .video {
   width: min(100%, 20rem);

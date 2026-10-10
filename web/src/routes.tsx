@@ -18,7 +18,7 @@ export const ROUTES = {
 } as const;
 
 export const router = createBrowserRouter([
-  { path: ROUTES.landing, element: <LandingPage settingsPath={ROUTES.settings} /> },
+  { path: ROUTES.landing, element: <LandingPage settingsPath={ROUTES.settings} appPath={ROUTES.app} /> },
   {
     path: ROUTES.app,
     element: (

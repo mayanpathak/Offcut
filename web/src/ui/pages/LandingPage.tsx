@@ -1,12 +1,15 @@
 // J1: the landing page. What it promises, the demo, where it works, that the
-// video is not uploaded, and whether this browser can run it (J3). The drop
-// zone is shown but inactive until V2; the waitlist form is the way in.
+// video is not uploaded, and whether this browser can run it (J3). A clip
+// dropped here is taken, and the page moves on to the editor with it
+// (v2implementation D-48).
 
-import { Link } from "react-router";
+import { useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router";
 
 import { messages } from "../../copy/messages";
 import { assetUrl, DEMO_VIDEO_PATH } from "../../net/asset-fetch";
 import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
+import { useClipStore } from "../../state/clip-store";
 import { DropZone } from "../components/DropZone";
 import { NotifyMeForm } from "../components/NotifyMeForm";
 import styles from "../styles/pages.module.css";
@@ -22,9 +25,23 @@ function capabilityLine(state: CapabilityState): { text: string; supported: bool
   return { text: messages.capability.checking, supported: false };
 }
 
-export function LandingPage({ settingsPath }: { settingsPath: string }) {
+export function LandingPage({ settingsPath, appPath }: { settingsPath: string; appPath: string }) {
   const capability = capabilityLine(useCapabilityStore());
   const copy = messages.landing;
+  const navigate = useNavigate();
+  const clipStatus = useClipStore((state) => state.status);
+  const lastClipStatus = useRef(clipStatus);
+
+  // The move to the editor follows a clip that arrives while this page is
+  // shown. A clip that was there already does not send a visitor away who
+  // came back to this page.
+  useEffect(() => {
+    const arrived = lastClipStatus.current === "idle" && clipStatus !== "idle";
+    lastClipStatus.current = clipStatus;
+    if (arrived) {
+      void navigate(appPath);
+    }
+  }, [clipStatus, appPath, navigate]);
 
   return (
     <main className={styles.page}>

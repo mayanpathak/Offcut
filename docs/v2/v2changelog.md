@@ -68,6 +68,7 @@
 | 35 | **What Prompts 54 to 57 build on** (entry of Prompt 53). `usecases/control-preview.ts`: `attach(canvas, out48)` (the canvas is handed over for good: an element can be attached once), `play()`, `pause()`, `detach()`, `lockForExport()`, `unlockAfterExport()`. `play()` resolves when the preview is playing; it needs a click before it the first time, or the browser keeps the `AudioContext` silent and `play()` does not resolve. All six do nothing when there is nothing to do, and none throws for a failure of the worker: that is stored with `noteFailure` on the clip store. `start-export.ts` calls `lockForExport()` before `exportClip` and `unlockAfterExport()` after it, whatever the outcome. **The worker refuses `exportClip`, `closeSession` and every other call while `previewPlay` runs** (`E_INTERNAL`, `Busy`): pause or lock first. `preview_played` is tracked in `control-preview.ts`, once for each `attach`. On D1 the loop drew 30 frames a second with under 1% late and at most 17 ms from the audio's time. `rpc.ts` has 377 lines and `render.worker.ts` 372 | Prompts 54, 55, 56, 57 |
 | 36 | **`web/src/workers/render/video-source.ts` has 399 lines of the 400** since D-70 was built, and it is now the longest source file. V4 adds `prefetch` and the seek to this file: room must be made first, and the place to take it from is the handling of the colour range, which could move into a file of its own with a line in the tree of TS §5. **An export of a full-range clip is now less contrasty than every export before 2026-10-10:** a check that compares a new file with an old one, or with a number written down before that date, sees the difference. `DemuxerHandle` has five methods; a test double of it needs `video_full_range()` | V4; Prompts 56, 57 |
 | 37 | **What Prompts 55 to 58 build on** (entry of Prompt 54). `importClip(file, source)` resolves when the clip is accepted, rejected or failed, and the pipeline runs on after that: a caller reads the clip store, not the promise. `importSampleClip()` fetches 35 MB before the clip store leaves `idle`, and says nothing meanwhile; a second call joins the first. `dismissClip()` does nothing for a clip that is `idle`, being imported or being processed, and nothing while an export runs; it stops a preview that plays, closes the session, removes the clip's directory and resets an export that is over. `startExport(clipId)` resolves when the export is over, however it ended; with no token it sets `unavailable` and changes nothing else. All of them return without a word when a blocker stands: the component shows the blocker's copy from `forImport()` or `forExport()`. **While the model downloads** the clip is `processing` at `probe_audio` with `waitingModel: true`. **A promise of these calls that rejects is a fault of the code,** never a failure of the device: those are in the stores. **For the suites:** `exports/` holds `<exportId>.mp4` and an empty directory `tmp/`, and does not exist after an export that was refused; `stage_timing` for `asr` is sent for a clip without speech too; `model_download` is sent only when files were downloaded; one `preview_played` for each `attach`. `git grep -n "V3: \|V7: " -- web/src/usecases` prints 5 lines, one of them V1's | Prompts 55, 56, 57, 58 |
+| 38 | **What Prompts 56 to 58 build on** (entry of Prompt 55). **Test ids:** `drop-zone`, `editor`, `feed` (an `<ol>`, one `<li>` for each line), `preview-canvas`, `export-status` (the line under the export button: a blocker's words or the unavailable message), `export-progress`, `export-stage`, `export-done`, `export-failed`, `clip-rejected`, `clip-failed`. The model panel has none: find it by `messages.modelDownload.body(sizeMb)` and its bar by the role `progressbar`. **Buttons by name:** `messages.preview.play`, `.pause`, `.replay` (match exactly: "Play" is also the start of "Play again"), `messages.export.button`, `messages.editor.startOver`, `messages.dropZone.sampleButton`. **The feed is gone once the clip is `ready`,** and "Found: $12k" is on the page for half a second or less: a case must record the list with a `MutationObserver` installed before the page loads, not look for the line. The stage labels of an export need the same; "Saving" lasts a moment. **A drop on `/` moves to `/app`; a drop on `/app` stays there.** The drop zone also holds a hidden `<input type="file">`. **`ready` has no "start over":** a case that needs the drop zone again reloads the page. **To make Chrome unsupported in a test,** define `Navigator.prototype.userAgentData` with `mobile: true` in an init script; Playwright's `isMobile` and `--disable-blink-features=WebGPU` do not do it. The first press of play must be a real click | Prompts 56, 57, 58 |
 
 ---
 
@@ -3124,3 +3125,136 @@ No console line of the kind error or warning and no page error in that run.
 - **The first six Playwright cases of a run are slow on D1 whenever the machine has been busy,** near or over the 30 s a case may take. `ci` runs them with a retry. Prompt 58 changes the Playwright config anyway.
 
 **Open, for the human.** Push `v2-build` and read `ci` (open item 4): Prompt 55 waits for green.
+
+## 2026-10-10 - The fourteenth push: `ci` green on Prompt 54
+
+**Done by the human.** One push of `v2-build`, at `26129c3`, the commit of Prompt 54.
+
+**Read by the agent** (the public API of GitHub).
+
+| Read | Result |
+|---|---|
+| `origin/v2-build` | `26129c3`, equal to the local branch |
+| The check runs on `26129c3` | `ci`: success. `deploy-api` and `deploy-web`: skipped, as on every pull request |
+
+**Closes.** The line "Push `v2-build` and read `ci`" of the entry of Prompt 54. The number of the run and its time were not read.
+
+**Changed.** This file only. The entry was written with the commit of Prompt 55.
+
+## 2026-10-10 - Prompt 55: copy, components, pages, landing navigation
+
+**The one path, on a page.** A clip dropped on `/` takes the visitor to `/app`, where the feed says "Transcribing…" and then "Found: $12k", and the player follows. The preview plays, pauses, goes on and offers "Play again" at its end. With no token the export button answers that exporting needs an account. In a production build made with the test key, with a seeded Creator token, the button ends in a downloaded MP4 of 1080 x 1920 that passes the verifier's six checks.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/src/ui/components/ProcessingFeed.tsx` | One line for each `FeedLine` of the clip store, in order; a `switch` over `kind` and one over `eventKind`, each ending in `assertNever`. 59 lines |
+| `web/src/ui/components/PreviewPlayer.tsx` | The canvas of 540 x 960; `attach` when it appears and `detach` when it goes, one after the other; `pause()` when the tab hides; one button for play, pause and "play again", disabled while `detached`, `seeking` or `locked`; the failure stub when the preview failed. 118 lines |
+| `web/src/ui/components/ExportButton.tsx` | The button; the words of the blocker of `forExport()`; `messages.export.unavailable`. No counter and no upgrade prompt. 52 lines |
+| `web/src/ui/components/ExportProgress.tsx` | The stage, the bar (its width through `style.setProperty`), the elapsed seconds, the "rendering on your computer" line; the words for `done` and `failed`. 93 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/src/copy/messages.ts` | `feed`, `preview`, `export`, `editor`; `dropZone.fetchingSample`; `dropZone.notReady` is gone (D-56). 254 lines |
+| `web/src/ui/components/DropZone.tsx` | A dropped file, the first of several, goes to `importClip(file, "user")`; the button to `importSampleClip()`; a click on the zone opens the file chooser; the words of a blocker; no `aria-disabled`. 120 lines |
+| `web/src/ui/pages/LandingPage.tsx` | The prop `appPath`; `navigate(appPath)` when a clip arrives while the page is shown |
+| `web/src/routes.tsx` | Passes `appPath` to `LandingPage` (G item 6c) |
+| `web/src/ui/pages/EditorPage.tsx` | The body by the clip's status (the table of §20.1); "start over" calls `dismissClip()`. The placeholder and its `NotifyMeForm` are gone. 125 lines |
+| `web/src/ui/styles/components.module.css`, `pages.module.css` | New classes only: `pending`, `feed`, `feedLine`, `player`, `previewCanvas`, `playerControls`, `exportPanel`, `exportProgress`; `editor`, `stub`, `problem`. Every value is a token of `tokens.css` |
+| `web/tests-e2e/landing.spec.ts` | **REOPENED V1 CONTRACT (D-56).** The two cases of §23.5 take the place of "the drop zone is inactive" and "/app shows the not-ready panel". One locator of a third case changed (below) |
+| `docs/v2/v2implementation.md` | §4 lists `routes.tsx` as changed; §20.1, §20.2 and §20.3 say what was built; §27 gains items 32 to 35 |
+| `docs/v2/v2changelog.md` | This entry and the one of the push before it; known issue 38 |
+
+No dependency was added. No use-case, no store, no worker and no Rust file changed.
+
+**The three drills.** Each was undone from a copy, and ESLint is clean after the last.
+
+| Temporary edit | Result |
+|---|---|
+| `<p>Rendering</p>` in `ExportProgress.tsx` | `react/jsx-no-literals`: "Strings not allowed in JSX files: "Rendering"" |
+| `import { pool } from "../../workers/pool";` in `PreviewPlayer.tsx` | `boundaries/dependencies`: "There is no policy allowing dependencies from elements of type "ui" to elements of type "workers"" |
+| `useClipStore.setState({ waitingModel: true });` in `ExportButton.tsx` | **Nothing fires:** ESLint and `tsc` pass. V1 has no rule for it, as the prompt expected; the gap is §27, item 34 |
+
+**Browser check (dev), the rows of G 10.4.** `vite` on port 5173 with the bundles of the last build; Chrome under Playwright, headless, a new profile under `fixtures/.cache/`; a temporary case that drives the page as a person would and prints what it reads; the fake API of the E2E helpers. The feed was read with an observer of the page that keeps every state the list was in.
+
+| Do | Read |
+|---|---|
+| Open `/`, drop the reference clip, no model on the device | The address becomes `/app`. The model panel says "about 210 MB"; its bar took 28 values from 0 to 100; its line went from "About 2 minutes left." to "About 1 second left."; then the panel went and the feed's first line was "Transcribing…". `model_download { outcome: "ok", duration_ms: 61700, resumed: false }` |
+| The same with the model on the device | `/app`; no model panel at any time; the feed was "Transcribing…", then "Transcribing…" and "Found: $12k", and no other state; no "Cleaning voice" line; then the player |
+| The canvas | 540 x 960, shown at 320 x 569 |
+| Play; pause; play | Two pictures of the canvas 1 s apart differ; paused, two pictures 0.5 s apart are equal; playing again, they differ |
+| The tab is hidden (the event sent by the test, known issue 33) | The preview pauses |
+| Let it reach the end | The button says "Play again"; the preview store says `stopped`. One `preview_played` for the three plays |
+| Export, with no token | "Exporting needs an account, and accounts are not open yet."; no download; no `export_started` |
+| A text file named `.mp4`, dropped on `/app` | "This clip could not be used." and "Start over", nothing else: no code. "Start over" brings the drop zone back |
+| The sample button | "Getting the sample clip…" while it is fetched; one request to the asset host, `GET /media/speech_scriptA_landscape_720p.7da948cecc39438a.mp4`; then `/app`, the feed and the player. `clip_accepted` with `source: "sample"` |
+
+No console line of the kind error or warning and no page error in that run, which took 6.5 minutes.
+
+**Browser check (production build with the test key), the rows of G 10.5.** `vite build` with `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` exported in that one terminal, the key worked out from the seed in `fake-api.ts` and printed nowhere; `vite preview` on port 4173, so the CSP of `vercel.json`; a new profile; a Creator token from `mintEntitlementToken()`, seeded with `seedEntitlement`.
+
+| Do | Read |
+|---|---|
+| Drop the clip, wait for the player, play | The player; two pictures 1 s apart differ |
+| Press Export while it plays | The play button and the export button are disabled; the button's line says "An export is running. Wait until it has finished." |
+| The stage labels | "Rendering", "Writing the file", "Saving", in that order and no other |
+| The bar | 101 values, 0 to 100 |
+| "Everything is rendering on your computer." | In every state the progress panel was in |
+| The download | `offcut-20261010-1248.mp4`, 78,965,863 bytes. `python verify/verify_mp4.py <file> --profile creator --expected-duration-ms 74705`: `PASS 1` to `PASS 6`, exit 0 |
+| After it | "Your video is ready. Your browser has downloaded it." Play works: two pictures 1 s apart differ |
+| The events | `export_started { profile: "creator" }`; `stage_timing` for `render_encode` (39,744 ms) and `mux` (22 ms); `export_done` with `total_ms: 39939`, `profile: "creator"`, `events_kept: 1`, `style: "clean"`; no `export_failed`. `asr` took 88,458 ms on WebGPU in that run |
+| The console | No "Refused to" line, no `securitypolicyviolation` event, no line of the kind error or warning |
+
+That closes the first line under "Not checked" of Prompt 54: the click on an anchor with a `blob:` address downloads under the production CSP.
+
+**The landing suite on a browser that cannot run Offcut.** D1's Chrome can, so `pnpm e2e` takes one of the two ways through the two new cases. A temporary copy of the suite, in which the page reports itself as a phone before the app starts (`navigator.userAgentData.mobile`), took the other: the capability line was "Offcut does not work on phones and tablets yet.", the drop was refused with the words of `B_UNSUPPORTED`, the page stayed on `/`, and 12 of 12 cases passed. Two things that do **not** make this Chrome unsupported, tried first: Playwright's `isMobile` (`userAgentData.mobile` stays `false`) and the launch argument `--disable-blink-features=WebGPU`.
+
+**Decided here, where the plan is silent.** Each is in §20 of the plan now.
+
+- **A click on the drop zone opens the browser's file chooser,** and so do Enter and the space bar. The zone has the role of a button and can be reached with the keyboard; without this it would do nothing for a person who cannot drag. The chosen file goes the way of a dropped one, and its name is not read.
+- **The words of a blocker are shown once a clip was offered.** While the browser is still being checked, `forImport()` already answers `B_UNSUPPORTED`; shown at once, the page would say "cannot run Offcut" for the second the check takes.
+- **`LandingPage` moves on when a clip arrives while it is shown,** not whenever the clip is not `idle`. Otherwise a visitor with a clip in work who goes back to `/` would be sent to `/app` again, and could not get back.
+- **The sample button says that it fetches.** The found issue of Prompt 54: 35 MB are fetched before any store changes. The button is marked busy and the zone shows `messages.dropZone.fetchingSample`, a key the table of §20.3 does not have.
+- **One button for play, pause and "play again".** The plan says "play / pause / replay buttons"; at each moment one of the three is the one that can be pressed.
+- **`attach` and `detach` run in turn.** A player that is taken away and put back at once would otherwise start a second attach while the first runs, and the second would find the preview attached already, which the preview machine refuses.
+- **A failure of the preview is shown under the player,** with `messages.editor.failedStub`: `control-preview.ts` stores it on the clip, which stays `ready`, and the table of §20.1 has no place for it.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **A third case of `landing.spec.ts` changed, by one locator.** "every request of a session goes to the page's own origin or to the asset host" waited on `/app` for the test id `not-ready`, which belonged to the placeholder that is gone. It waits for the drop zone or the unsupported page now. D-56 names two cases (§27, item 32).
+- **The first new case asserts more than "navigates to `/app`":** on a supported browser the dropped text is no clip, so the page must show the rejection stub and "start over".
+- **The dev server was `vite` alone,** not `pnpm dev`, as in Prompts 52 to 54.
+- **G 10.5 builds with `pnpm build:wasm` first.** The bundles were built already and no Rust file changed: `vite build` alone.
+
+**Checked.**
+
+- `git grep -n "notReady\|zz-" -- web`: nothing. `git grep -n "never leaves\|GDPR\|DPDP\|CCPA\|SOC 2\|compliant" -- web/src/copy`: nothing. `node scripts/check-copy-codes.mjs`: 9 of 29 errors, 4 of 8 blockers, 38 pending, as before.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build` and `pnpm e2e` green; the frozen-file diff against `322c7d3` is empty; no file of `web/dist` holds the test key. **262 Rust** (2 ignored), **92 Vitest**, **12 Playwright** (23.5 s, 6 workers, 6.4 GB free). `check-file-tree`: 229 files. The app shell is 299.2 kB gzipped, was 286.8: the four use-cases and the new components are reached from the first page now.
+- Both temporary cases, the temporary copy of the landing suite, the two temporary Playwright configurations, the two browser profiles, the screenshots and `web/test-results` are gone. The exported file is kept, outside git, as `testclips/renders/p55-creator-1080x1920.mp4`, for the founder to watch.
+
+**"Done when".**
+
+- [x] `git grep -n "notReady" -- web` is empty; `pnpm e2e` passes 12 cases with the two replaced ones.
+- [ ] Both walk-throughs match every row; the exported file passes checks 1 to 6; G M-10 passes. **Every row an agent can read matches, the file passes, and the command block of G M-10 is green. The box waits for the founder's eyes and ears:** the row "Play" of G 10.4 (a 9:16 centre crop, captions word by word in the lower third, sound in sync, the reveal as the amount is spoken).
+- [x] No banned phrase in the copy: the `git grep` above is empty.
+
+**Not checked.**
+
+- **By eye and by ear** (Human). A picture of the page while it played shows the centre crop and a caption in the lower third with one word in yellow; that the sound is in sync and that the reveal comes as the amount is spoken was not judged.
+- **The first run of the dev walk-through was stopped after 13 minutes.** Its output went through a pipe and was not visible, so where it stood is not known. The second run, the one reported, printed as it went and took 6.5 minutes. Whether the first hung or was slow is open.
+- **A failure of the preview on the page.** The stub under the player was not seen: nothing failed.
+- **The four pending blockers and the three event kinds V2 does not detect** have no words or no line that a run could show.
+- **R1** (D-69). Every time here is D1's.
+
+**Found, and not for this prompt.**
+
+- **A person can hardly read "Found: $12k".** The line appears when the events are detected and goes when the clip is `ready`, a moment later: 545 ms for `detect_scene` in the production run above, 18 ms in Prompt 54's. PS §10 J6 calls the feed what Offcut found. Whether the feed stays under the player is the founder's to decide (§27, item 33); the store keeps the lines.
+- **`ready` has no "start over".** The table of §20.1 gives it to `rejected` and `failed` alone. After an export a visitor reaches the drop zone by a reload or by going back to `/`.
+- **A FromTo's line would say "Found: $20k",** not "Found: $2k to $20k" as PS §10 J6 has it: `run-pipeline.ts` hands over the `to` quantity alone. V2 detects none; V3 must put both figures into `display`.
+- **`assertNever` is in four files now** (§27, item 35).
+- **The page is taller than a small window:** the player, the play button and the export button need about 760 px, and the export's progress is below that.
+
+**Open, for the human.** Watch the preview and `testclips/renders/p55-creator-1080x1920.mp4` once. Push `v2-build` and read `ci` (open item 4).

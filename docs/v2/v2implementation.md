@@ -343,6 +343,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 │   ├── src/config/env.ts               CHANGED  + entitlementTestPublicKey
 │   ├── src/config/model-manifest.json  NEW F    values filled at S5
 │   ├── src/config/entitlement-public-key.ts   NEW F  (D-24)
+│   ├── src/routes.tsx                  CHANGED  passes appPath to LandingPage (D-48)
 │   ├── src/copy/messages.ts            CHANGED  sections of 20.3; dropZone.notReady removed
 │   ├── src/net/asset-fetch.ts          CHANGED  + fetchAsset, SAMPLE_CLIP_PATH
 │   ├── src/models/model-manager.ts     NEW F
@@ -1806,6 +1807,8 @@ export function newExportId(): ExportId;                                  // UUI
 
 "Start over" calls `dismissClip()`: components read stores and never write them (TS §2). The stub shows no code and no file detail.
 
+**As built (Prompt 55).** `LandingPage` moves to `appPath` when a clip arrives while the page is shown, which is the change from `idle` to any other status seen by the mounted page. A visitor who comes back to `/` while a clip is in work is not sent away again; a drop there dismisses the old clip and moves on with the new one. For the three failures of the model download `EditorPage` shows the title, the body and the action of `messages.errors[code]`. The table gives `ready` no "start over": from there a visitor reaches the drop zone by a reload, or by going back to `/`. The feed is on the page while the clip is `importing`, `accepted` or `processing` only, so the line of an event is shown from its detection to `ready`, which is half a second or less on D1 (section 27, item 33).
+
 ### 20.2 Components
 
 | File | Reads | Behaviour | Calls |
@@ -1818,6 +1821,15 @@ export function newExportId(): ExportId;                                  // UUI
 | `ExportProgress.tsx` | export store | While `rendering`, `muxing`, `saving`: the stage name, `done / total` as a bar, elapsed seconds, and `messages.export.renderingLocally`. `done`: `messages.export.done`. `failed`: `messages.editor.failedStub` | none |
 
 No component contains a literal sentence (`react/jsx-no-literals`), a number that belongs to a limit (INV-15) or a call into `workers`, `net`, `persistence`, `wasm`, `models` or `analytics`. No upgrade prompt exists (INV-14).
+
+**As built (Prompt 55).**
+
+- **`DropZone`.** A click on the zone, or Enter or the space bar with the zone in focus, opens the browser's file chooser, and the chosen file goes the way of a dropped one: the zone has the role of a button and would otherwise do nothing for a keyboard. The chooser is a hidden `<input type="file">` whose `accept` names MP4 and MOV as a hint; the name of the file is not read. The words of a blocker are shown once a clip was offered, not before: while the browser is still being checked `forImport()` answers `B_UNSUPPORTED`, and nothing has been refused yet. While the sample clip is fetched the button is marked busy and the zone shows `messages.dropZone.fetchingSample`: no store says that the fetch runs (it is over before the clip leaves `idle`), so the component keeps it.
+- **`PreviewPlayer`.** One button, which says play, pause or "play again" by the state of the preview: `stopped` after a play is the end of the clip. It is disabled while the preview is `detached`, `seeking` or `locked`. The canvas is an element of 540 by 960 that the page shows at the width there is. `attach` and `detach` are run one after the other, never together: a player that goes and comes back at once (back and forward in the browser) would otherwise have two attaches under way, and the second would find the preview attached already. When the clip store holds a failure while the clip is `ready`, which is how `control-preview.ts` reports a failure of the preview, the player shows `messages.editor.failedStub`.
+- **`ExportButton`.** Its line shows the words of the blocker, also `B_EXPORT_IN_PROGRESS` while an export runs, and `messages.export.unavailable` once an export was asked for on a device without a token. The button stays usable after that message.
+- **`ExportProgress`.** The elapsed time is counted from `startedAt` of the export store, once a second.
+- **`ProcessingFeed`, `PreviewPlayer`, `EditorPage`.** Each has an `assertNever` of its own, as `run-pipeline.ts` has: no file of the tree is a home for it (section 27, item 35). `ProcessingFeed` names the type of a feed line through the clip store's state: `ui` may not import `workers/protocol.ts`.
+- **Test ids.** `editor`, `feed`, `preview-canvas`, `export-status`, `export-progress`, `export-stage`, `export-done`, `export-failed`, `clip-rejected`, `clip-failed`; `drop-zone` is V1's.
 
 ### 20.3 `copy/messages.ts` additions
 
@@ -1832,6 +1844,8 @@ No component contains a literal sentence (`react/jsx-no-literals`), a number tha
 | `errors` | `E_MODEL_DOWNLOAD`, `E_MODEL_HASH`, `E_MODEL_STORAGE`, each `{ title, body, action }` | TS §11.2 recovery column |
 
 Removed: `dropZone.notReady` (D-56). Rules that already apply (V1 §11.11): no typed-in digit (sizes and seconds are parameters), none of the phrases "never leaves", "GDPR", "DPDP", "CCPA", "SOC 2", "compliant" (P-12). `export.unavailable` says that exporting needs an account and that accounts are not open yet; it makes no promise about a date.
+
+**As built (Prompt 55).** One key more than the table: `dropZone.fetchingSample`, shown while the sample clip is fetched. The three lines of `feed.eventFound` that V2 never shows are "Found: {display}-item list" for a ListReveal, whose `display` is the count, and "Found: {display}" for a FromTo and a KeywordPop. PS §10 J6 gives "Found: $2k to $20k" for a FromTo, and `run-pipeline.ts` hands over the `to` quantity alone: V3, which detects the first FromTo, has to put both figures into `display` (section 25.2).
 
 ### 20.4 Styles
 
@@ -2322,5 +2336,9 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 29 | `importClip` starts a timer at its step 5 that `runPipeline(clipId)` reads at its steps 3 and 12, and no file and no signature holds it (found in Prompt 54) | Section 19.2 vs section 19.3 | Section 19.2 as built: `run-pipeline.ts` exports `startTimer(clipId)` |
 | 30 | `dismissClip` resets the store and then closes the session. The player is detached by its component only after the reset, and the worker refuses `closeSession` beside a running preview: the clip's file would stay locked and its directory could not be removed (found in Prompt 54) | Section 19.2 vs TS §14.3 | Section 19.2 as built: `previewPause` before `closeSession` |
 | 31 | The guide and Prompt 54 expect 4 lines with `V3: ` or `V7: ` under `web/src/usecases`. V1's `start-app.ts` already holds `// V7: restoreClip()`, so the count is 5 (found in Prompt 54) | G 9.5, Prompt 54 | Read as 5: the four of section 25.3 and V1's marker |
+| 32 | D-56 replaces two cases of `landing.spec.ts` and leaves "every other case untouched". A third case, "every request of a session goes to the page's own origin or to the asset host", waits on `/app` for the test id `not-ready` of the placeholder that D-56 removes (found in Prompt 55) | D-56, section 23.5 | One locator of that case changed: it waits for the drop zone or the unsupported page |
+| 33 | The feed is shown while the clip is processed and not once it is `ready`. The events are detected in the last step before `ready`, so a "Found:" line is on the page for half a second or less: a person can hardly read it, and PS §10 J6 calls the feed what Offcut found (found in Prompt 55) | Section 20.1 vs PS §10 J6 | Open. Built as the table says. A test reads the line with an observer of the page, not by looking at a moment |
+| 34 | No lint rule stops a component from writing a store: `useClipStore.setState(...)` in a component passes ESLint and `tsc`. TS §2 has the rule in words only (found in Prompt 55, the third drill of G 10.2) | TS §2, V1's `eslint.config.js` | Open. Covered by review |
+| 35 | TS §11.3 asks for `assertNever` at the end of every `switch` over a generated union, and no file of the tree holds it. Four files have one of their own: `run-pipeline.ts`, `ProcessingFeed.tsx`, `PreviewPlayer.tsx`, `EditorPage.tsx` (found in Prompts 54 and 55) | TS §11.3, TS §5 | Open: a home for it is a file the tree must gain |
 
 **Decisions to copy back into `technicalspec.md`:** D-25 (§10.8), D-26 (§21.1), D-27 and D-58 (§2, §7), D-28 (§7), D-29 (§19.2), D-30 (§19.2, §20.1), D-34 (§15.1), D-35 (§32), D-37 (§16.4, §24.6), D-42 (§17.1), D-45 (§21.4, INV-11), D-47 (§17.1), D-50 (§16.1), D-53 (§5), D-55 and D-46 (§5), D-59 (§10.1), D-68 (§19.2, §19.4). **Into `buildplan.md`:** the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33. **Into `product.md`:** none.
