@@ -93,7 +93,9 @@ test.describe("one clip, exported", () => {
   let api: FakeApi;
   let downloads: Download[];
   let scratch: string;
-  const durationMs = sourceDurationMs(referenceClip());
+  // Read when the group starts, not when the file is loaded: on a machine
+  // without `testclips/` the clip is there only once the setup project ran.
+  let durationMs: number;
   /** Everything the page and its workers asked for. */
   const requests: Recorded[] = [];
   /** What the Creator export left for the cases that follow it. */
@@ -137,6 +139,7 @@ test.describe("one clip, exported", () => {
     await watchExport(page);
     await page.goto("/app");
     await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+    durationMs = sourceDurationMs(referenceClip());
     await dropClip(page, referenceClip());
     await expect(canvas(page)).toBeVisible({ timeout: 240_000 });
     await expect(exportButton(page)).toBeEnabled();

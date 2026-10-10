@@ -236,8 +236,9 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 |---|---|
 | The allowance | "GitHub Actions usage is free for self-hosted runners and for public repositories that use standard GitHub-hosted runners." The repository is public, and `windows-latest` is a standard hosted runner: the job's minutes count against nothing. The same page says a larger runner is always charged for; none is used |
 | The suites on D1, for scale | 30 cases in 9.7 minutes, headless, one worker, with a GPU (entry of Prompt 57) |
-| The job on the runner: did the 30 cases pass | **Not run yet** |
-| The job's minutes | **Not run yet** |
+| The first run of the job, 2026-10-10 (run 38044970567, commit `45dbea2`) | Every step before the suites passed on `windows-latest`: Node and pnpm; Chrome through Playwright, 66 s; Python and the verifier's requirements, 27 s; `ffmpeg` from its archive, 5 s; the `web-dist` artifact of the job `ci`, 2 s. **The suites then stopped after 4 s, before any test ran:** a fault of `export-creator.spec.ts`, which asked `ffprobe` for the reference clip while the file was being loaded, before the setup project had downloaded it. Corrected the same day (`v2changelog.md`) |
+| The job on the runner: did the 30 cases pass | **Not known yet:** no case has run there |
+| The job's minutes | The failed run took 2 min 30 s, of which about 2 min 20 s were the tools. A run of the 30 cases: not known yet |
 | WebGPU on the runner, and Chrome's arguments if it needs any | **Not known.** The runner has no graphics card |
 | The H.264 and the AAC encoder on the runner | **Not known.** A Windows Server image may lack the system encoders Chrome uses |
 
@@ -252,4 +253,4 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 | It answers `UNSUPPORTED_H264_ENCODE` or `UNSUPPORTED_AAC_ENCODE` | No argument adds an encoder. The fallback of §22.5: the job on `main` and on a manual trigger only, and `pnpm e2e:device` on D1 before every merge. Record the reason |
 | The cases run but a clip takes longer than a case may | The runner transcribes without a GPU. Read how long, and decide between a longer limit for the job and the fallback |
 
-**What this does not show yet.** Anything about the runner. The workflow passes `actionlint` 1.7.12 and was read; it has never been started.
+**What this does not show yet.** Whether a page on the runner gets WebGPU and the two encoders, and how long a clip takes there. The workflow's own steps have run once and work.
