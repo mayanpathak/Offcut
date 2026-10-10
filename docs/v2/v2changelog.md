@@ -29,7 +29,8 @@
 | 13 | **Closed on 2026-10-10.** D-70 is built: the entry of that date has the measurements | - | - |
 | 14 | **Closed on 2026-10-10.** The job `e2e-media` ran four times, and each run said something: a fault of a test file, the app refusing the runner's Chrome, what it lacks (WebGPU alone) and the arguments that give it a software adapter, and that a clip takes more than 20 minutes there. The entries of that date have each | - | - |
 | 15 | **Closed by D-72 on 2026-10-10.** The job runs the 8 cases that need no processed clip; D1 runs all 30 before a merge | - | - |
-| 16 | **Two things D-72 leaves to do.** (a) After the next push: read the job `e2e-media` green and hand over its time, the last reading of TE-10. (b) **Before every merge into `main`, the first being Prompt 59's: `pnpm e2e:media` on D1, on a build made with the test key, 30 of 30.** No machine checks that this was done | Human; (b) the agent can run it when asked | (a) before Prompt 59; (b) before every merge |
+| 16 | **What D-72 leaves to do.** (a) Done on 2026-10-10: the job is green, 4 min 11 s. (b) **Before every merge into `main`, the first being Prompt 59's: `pnpm e2e:media` on D1, on a build made with the test key, 30 of 30.** No machine checks that this was done | Human; the agent can run it when asked | Before every merge |
+| 17 | Mark pull request #2 ready for review: it is still a draft, and Prompt 58 asks for it | Human | Before Prompt 59's merge |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -3588,7 +3589,7 @@ The search of the prompt, `grep -rl "<test public key>" web/dist | wc -l`: 2 on 
 **"Done when".**
 
 - [x] The local chain is green with 30 media cases; no `dev-*.json` is left in `bench/results/`.
-- [ ] The pull request is green including the Windows job, or the fallback is in the workflow and recorded; TE-10 has minutes and a date; G M-11 passes (Human). **Waits for the push.** What is done of it: the minutes of TE-10 are read and dated.
+- [x] The pull request is green including the Windows job, or the fallback is in the workflow and recorded; TE-10 has minutes and a date; G M-11 passes (Human). **Ticked on 2026-10-10, after the twentieth push** (the entry of that name): run 38063880466 is green, `e2e-media` in 4 min 11 s; the job runs the 8 cases of D-72, which is in the workflow and recorded; TE-10 has its minutes and its date. The pull request is still a draft.
 
 **Not checked.** All of it is what only a run on GitHub can show.
 
@@ -3846,3 +3847,35 @@ No file of the app changed.
 - **A software adapter still runs the speech model if it has 16-bit floats.** If that is what made the runner slow, a person on such a machine waits as long. The capability check lets a software adapter in (TS §13.2); whether it should is a question for V3.
 
 **Open, for the human.** Push `v2-build` (one commit), read the job `e2e-media`, and hand over its time: that is the last reading of TE-10 (open item 16). Before the merge of Prompt 59: `pnpm e2e:media` on D1, on a build with the test key.
+
+## 2026-10-10 - The twentieth push: `ci` and `e2e-media` green; TE-10 is read
+
+**Done by the human.** One push of `v2-build`, at `8adfd9b`, the commit of D-72.
+
+**Read by the agent** (the public API of GitHub, run 38063880466).
+
+| Job | Result |
+|---|---|
+| `ci` | Success, 4 min 0 s |
+| `e2e-media / media` | **Success, 4 min 11 s** |
+| `deploy-api`, `deploy-web` | Skipped, as on every pull request |
+
+The steps of `e2e-media`, on `windows-latest`:
+
+| Step | Time |
+|---|---|
+| Checkout, Node, pnpm, the dependencies | 30 s |
+| Install Chrome for Playwright | 48 s |
+| Python and the verifier's requirements | 18 s |
+| `ffmpeg` from its archive | 5 s |
+| The build of the job `ci`; the cache, which had nothing | 1 s |
+| **Playwright, the media cases that need no graphics card** | **2 min 15 s**, the setup's two tests and the 8 cases |
+| Saving the cache of `fixtures/.cache/` | 3 s: the first job that passed, so the first that saved it |
+
+**TE-10 is read.** The job runs on a hosted Windows runner, 8 of the 30 cases as D-72 decided, in a little over four minutes, with the retry of CI and a scale of 3: the "Not checked" of the entry before this one is closed. Its minutes count against nothing, the repository being public. `experiments.md` has the reading; `check-external-facts.mjs` had its date already.
+
+**The second "Done when" box of Prompt 58 is ticked** in that entry: the pull request is green, the Windows job in it; what the job runs, and why, is in the workflow and recorded as D-72; TE-10 has its minutes and its date. Of G M-11, `gh pr checks` is what this entry reads through the API. **Not done, and the founder's:** the pull request, #2, is still a draft; Prompt 58 asks for it to be marked ready.
+
+**Changed.** `docs/v2/experiments.md` and this file: the entry, the box of Prompt 58, open item 16.
+
+**Open, for the human.** Mark pull request #2 ready. Before the merge of Prompt 59: `pnpm e2e:media` on D1, on a build with the test key, 30 of 30 (open item 16). Still open from Prompt 55: the founder's look at the preview and at `testclips/renders/p55-creator-1080x1920.mp4`.
