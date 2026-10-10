@@ -13,7 +13,7 @@
 | TE-3 (frame capture method; render-only speed) | 51 | Run on 2026-10-09 on D1: passed. Method A; 130 frames a second or more render-only; an export with the page hidden passes |
 | TE-4 (encoder ladder entry; AAC priming) | 51 | Run on 2026-10-09 on D1: passed. `avc1.640028` with hardware at both sizes; no priming |
 | E-4 (render and encode time; on D1 since D-69) | 51, 59 | S11: run on 2026-10-09 on D1, median 29,641 ms against 112,000 ms: continue. S15: not run |
-| TE-10 (the Windows media job in CI: does it run, and its minutes) | 58 | Not run |
+| TE-10 (the Windows media job in CI: does it run, and its minutes) | 58 | The minutes: read on 2026-10-10, a public repository pays none. The job: in `ci.yml` since 2026-10-10, **not run yet**; its first run is the push of Prompt 58 |
 | TE-14 (memory on a 90 s 1080p60 clip, ten runs) | 59 | Not run |
 | E-1 (waitlist: visitors and joins) | 60 | Not run |
 | M0 gate decision | 60 | Not taken |
@@ -221,3 +221,35 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 **Decision.** Continue: the reading falls in the first column of §24.3. No fallback is applied. The reading of S15 (`pnpm bench:device`, ten runs, Prompt 59) is still to be taken.
 
 **What this reading does not show.** R1. The line is 3.8 times this reading, and D1 was about twice as fast as the one laptop like R1 at transcribing; nothing says what the factor is for drawing and encoding, which lean on the GPU and its encoder and not on the processor. **The time rose as the session went on,** by a third to a half from the first export to the last, and the Free export's time doubled; the cause was not looked for. Decoding here is of a 720p source, which is cheaper than a 1080 x 1920 phone clip (D-64).
+
+## TE-10: the media suites on a hosted Windows runner
+
+**Question.** Do the three media suites pass headless in Chrome on `windows-latest`, and does a month of runs fit the free minutes of GitHub Actions (§24.1)?
+
+**State on 2026-10-10: half answered.** The minutes are read. The suites have not run on the runner: the job was written in Prompt 58 and its first run is that prompt's push, which is the founder's.
+
+**Method.** `ci.yml` calls `e2e-media.yml` as the job `e2e-media`, after the job `ci` and before any deploy, on every pull request and on `main` (D-44). The job runs on `windows-latest`: Node, pnpm, Chrome through Playwright, Python 3.13 with `verify/requirements.txt`, and `ffmpeg` 9.0.2 from a release archive whose SHA-256 is written in the workflow. It takes the `web/dist` that the job `ci` built with the E2E test key, restores `fixtures/.cache/` from the Actions cache, and runs `pnpm e2e:media`. For the minutes: GitHub's page on the billing of GitHub Actions, read on 2026-10-10.
+
+**Numbers.**
+
+| Read | Value |
+|---|---|
+| The allowance | "GitHub Actions usage is free for self-hosted runners and for public repositories that use standard GitHub-hosted runners." The repository is public, and `windows-latest` is a standard hosted runner: the job's minutes count against nothing. The same page says a larger runner is always charged for; none is used |
+| The suites on D1, for scale | 30 cases in 9.7 minutes, headless, one worker, with a GPU (entry of Prompt 57) |
+| The job on the runner: did the 30 cases pass | **Not run yet** |
+| The job's minutes | **Not run yet** |
+| WebGPU on the runner, and Chrome's arguments if it needs any | **Not known.** The runner has no graphics card |
+| The H.264 and the AAC encoder on the runner | **Not known.** A Windows Server image may lack the system encoders Chrome uses |
+
+**Date.** 2026-10-10 for the allowance. The run: open.
+
+**Decision.** Not taken. Until the first run is read, the job is on pull requests and on `main`, as §22.5 has it. What that run decides, by its outcome (G 11.5):
+
+| Outcome of the first run | Then |
+|---|---|
+| 30 cases pass | The job stays where it is. Write its minutes and the date here and the date into `scripts/check-external-facts.mjs` |
+| The capability check answers `UNSUPPORTED_WEBGPU` | Put the arguments that give Chrome WebGPU on the runner into `E2E_CHROME_ARGS` of `e2e-media.yml`, which the `media` project hands to Chrome; record them here and in `v2changelog.md` as the arguments of TE-10 |
+| It answers `UNSUPPORTED_H264_ENCODE` or `UNSUPPORTED_AAC_ENCODE` | No argument adds an encoder. The fallback of §22.5: the job on `main` and on a manual trigger only, and `pnpm e2e:device` on D1 before every merge. Record the reason |
+| The cases run but a clip takes longer than a case may | The runner transcribes without a GPU. Read how long, and decide between a longer limit for the job and the fallback |
+
+**What this does not show yet.** Anything about the runner. The workflow passes `actionlint` 1.7.12 and was read; it has never been started.

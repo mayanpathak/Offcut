@@ -27,6 +27,7 @@
 | 11 | **Closed by D-70 on 2026-10-10.** A full-range clip is drawn as its file states: the fix on the decode side was chosen. Building it is open item 13 | - | - |
 | 12 | **Measure on a laptop like R1 before the page promises a time** (D-69). Nothing of V2 is measured on a machine with 8 GB and an integrated GPU alone: not E-4, not TE-14's memory, and of E-3 only the founder's one reading. The founder's plan: after the final version is deployed, on testers' devices. Until then every time in `experiments.md` is D1's, and a user's may be about twice it | Human | After the deploy; before the page is announced |
 | 13 | **Closed on 2026-10-10.** D-70 is built: the entry of that date has the measurements | - | - |
+| 14 | **TE-10: the first run of the job `e2e-media`.** After the push of Prompt 58: mark the pull request ready, read the job, and tell the agent what it says. 30 cases green: its minutes and the date go into `experiments.md` and `check-external-facts.mjs`. A failure at the capability check names what the runner lacks: for WebGPU, Chrome's arguments go into `E2E_CHROME_ARGS` of `e2e-media.yml`; for an encoder, the fallback of §22.5 | Human, then the agent | Before Prompt 59 |
 ## Known issues for later prompts
 
 | # | Issue | Affects |
@@ -71,6 +72,7 @@
 | 38 | **What Prompts 56 to 58 build on** (entry of Prompt 55). **Test ids:** `drop-zone`, `editor`, `feed` (an `<ol>`, one `<li>` for each line), `preview-canvas`, `export-status` (the line under the export button: a blocker's words or the unavailable message), `export-progress`, `export-stage`, `export-done`, `export-failed`, `clip-rejected`, `clip-failed`. The model panel has none: find it by `messages.modelDownload.body(sizeMb)` and its bar by the role `progressbar`. **Buttons by name:** `messages.preview.play`, `.pause`, `.replay` (match exactly: "Play" is also the start of "Play again"), `messages.export.button`, `messages.editor.startOver`, `messages.dropZone.sampleButton`. **The feed is gone once the clip is `ready`,** and "Found: $12k" is on the page for half a second or less: a case must record the list with a `MutationObserver` installed before the page loads, not look for the line. The stage labels of an export need the same; "Saving" lasts a moment. **A drop on `/` moves to `/app`; a drop on `/app` stays there.** The drop zone also holds a hidden `<input type="file">`. **`ready` has a "start over" since D-71** (the entry of 2026-10-10), disabled while an export runs. **To make Chrome unsupported in a test,** define `Navigator.prototype.userAgentData` with `mobile: true` in an init script; Playwright's `isMobile` and `--disable-blink-features=WebGPU` do not do it. The first press of play must be a real click | Prompts 56, 57, 58 |
 | 39 | **What Prompts 57 to 59 build on** (entry of Prompt 56). **Helpers** of `web/tests-e2e/helpers/fixtures.ts`: `routeAssets(page, o?)` gives `{ requests, modelRequests() }`, a request being `{ method, url, path, headers, hasBody, answer }` with `headers` a list of `{ name, value }` in lower case; `dropClip(page, referenceClip())`; `await ensureModelCached(context)` before the page opens, which writes the model into OPFS and starts no download (the whole case of the second session takes 11 s with it); `opfsList(page, dir)`, sorted names, `[]` for no directory; `sourceDurationMs(fixture)`, which starts `ffprobe` from PATH; `modelManifest`, `assetBaseUrl()`, `sampleClipPath()`. **A case begins:** `installFakeApi(page)`, `routeAssets(page)`, `page.clock.install()`, `page.goto("/app")`, wait for the test id `drop-zone`. **Analytics:** `await flushAnalytics(page)`, then `expect.poll` on `api.eventsOf(name)`; do not flush twice without waiting for what the first sent. With the clock installed time still runs on by itself. **`pnpm e2e:media`** runs `media-setup` and then `media`, one worker; the suites of Prompt 57 are matched by name already (`pipeline-preview.spec.ts`, `export-creator.spec.ts`). **A temporary `zz-*.spec.ts` matches no project:** bring a temporary `web/zz-pw.config.ts` that spreads the real configuration and sets `projects: [{ name: "zz", testMatch: "zz-*.spec.ts" }]`, and run `playwright test --config zz-pw.config.ts`. **Each test has its own browser context,** so its own OPFS: a case that needs the model calls `ensureModelCached` itself. **`fixtures/.cache/`** holds each file under its path on the asset host. A quota for a case is set with `Storage.overrideQuotaForOrigin` through `context.newCDPSession(page)`. `bench/device-bench.ts` (Prompt 58) is matched by the project `bench` already | Prompts 57, 58, 59 |
 | 40 | **What Prompts 58 and 59 build on** (entry of Prompt 57). `pnpm e2e:media` is 30 cases and takes 9.7 minutes on D1, headless, one worker; the files run in the order of their names: `export-creator`, `model-download`, `pipeline-preview`. **It needs on PATH:** `python` with the verifier's requirements, and `ffprobe` and `ffmpeg`; on D1 the Python of the SAB must come first. **It needs a build with the test key:** on a plain build `export-creator` fails at "Creator export" with `E_ENTITLEMENT_INVALID` and 8 cases do not run; `model-download` and `pipeline-preview` pass on either. **The cases of `pipeline-preview` and of `export-creator` are one group each, in order, in one page:** one that fails stops the rest of its group, and a retry runs the group again from the drop. **An exported file is written under the system's temporary directory** and removed by the suite; nothing is written under `web/test-results` but what Playwright writes itself for a failed case, which can hold text of the page. Helpers added: `verifyMp4(file, profile, expectedDurationMs)` gives `{ status, output }`; `opfsSize(page, file)` gives a number or `null`. For the bench: a page with `installFakeApi`, `routeAssets`, a dropped clip, `seedEntitlement(page, mintEntitlementToken())` and a click on `messages.export.button` ends in a `download` event; the timings are in `api.eventsOf("stage_timing")`, `"pipeline_done"` and `"export_done"`, which arrive within 10 s of the export's end | Prompts 58, 59 |
+| 41 | **What Prompts 59 and 60 build on** (entry of Prompt 58). **The bench:** `BENCH_DEVICE=d1 pnpm bench:device`, in a terminal with the test key exported and after a build made with it; headed; one warm-up and ten runs; 24.5 minutes on D1; writes `bench/results/d1-<yyyy-mm-dd>.json` and prints the total's median and p90. It needs `python` nowhere, and `ffprobe` on PATH. On D1 the check run gave `asr` 83,948 ms, `render_encode` 35,443 ms, total 120,778 ms, peak memory 936 MB. **`ci.yml`:** the jobs are `ci`, `e2e-media`, `deploy-api`, `deploy-web`; the test public key is the one line `E2E_TEST_PUBLIC_KEY` of its `env`; the artifact `web-dist` is the keyed build; a deploy stops at the guard of step 14 when `.vercel/output` holds the key or holds nothing. **Prompt 59's check "no `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` in Vercel" is what makes the guard pass:** `vercel pull` brings the project's variables into the build. **TE-10 is half open** (open item 14): `e2e-media.yml` has never run. **The root `package.json` is `"type": "module"`:** a `.js` file added at the root is an ES module. **`media` and `bench` record no trace;** `E2E_CHROME_ARGS` gives Chrome its arguments for both | Prompts 59, 60 |
 
 ---
 
@@ -3496,3 +3498,108 @@ The Creator export case takes about 45 s with the verifier, the Free one about 3
 - **A report of a failed case can hold text of the page.** Playwright writes a snapshot of the page beside a failure, and a trace holds the page's text and pictures. Prompt 58 must turn traces off for the media project before a report is uploaded (§22.5, step 10.5).
 
 **Open, for the human.** Nothing new. Prompt 58 follows in the same sitting, and its push is the one that counts.
+
+## 2026-10-10 - Prompt 58: bench, media job in CI, test-key guard
+
+**What it adds.** `pnpm bench:device` measures the stages of the reference clip on a machine, ten times. `ci.yml` builds the app the tests run against with the E2E test key, hands that build to a new job that runs the 30 media cases in Chrome on Windows, and refuses to deploy a build that holds the key. **The new job has never run:** its first run is this prompt's push, which is the founder's.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `bench/device-bench.ts` | One warm-up run and ten measured ones; `bench/results/<BENCH_DEVICE>-<yyyy-mm-dd>.json` with the fields of §23.10. 180 lines |
+| `.github/workflows/e2e-media.yml` | Reusable, `windows-latest`, `defaults.run.shell: bash`; steps 10.1 to 10.5 of §22.5. 135 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `.github/workflows/ci.yml` | The test public key, once, in `env`; step 8 builds with it and uploads `web/dist` on every event; the job `e2e-media` (step 10); `deploy-api` waits for it; the Vercel step is three: build, guard, deploy. 448 lines |
+| `web/playwright.config.ts` | The projects `media` and `bench` record no trace, and start Chrome with the arguments of `E2E_CHROME_ARGS` |
+| `package.json` | `"type": "module"` (below) |
+| `scripts/check-external-facts.mjs` | TE-10: the date the minutes were read; `checked` stays `null` until the job has run |
+| `docs/v2/experiments.md` | TE-10: what is read, what is open, and what each outcome of the first run decides |
+| `docs/v2/v2implementation.md` | §4, §22.3, §22.5 and §23.10 say what was built; §27 gains item 39 |
+| `docs/v2/v2changelog.md` | This entry; open item 14; known issue 41 |
+
+**Pinned.** `actions/setup-python` at `5fda3b95a4ea91299a34e894583c3862153e4b97`, the commit of v7.0.0, read from GitHub's API on 2026-10-10. `ffmpeg` 9.0.2, `ffmpeg-9.0.2-essentials_build.zip` of the builder whose full build D1 has, 114,768,076 bytes, SHA-256 `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`: the archive was downloaded and hashed here, and the hash is the one GitHub publishes for it. Python 3.13. The other actions are at the commits `ci.yml` already uses. No dependency of the app or of the tests was added.
+
+**The bench, run once on D1.** `BENCH_DEVICE=dev pnpm bench:device` on a build with the test key, headed, 24.5 minutes. It is a check that the bench works, not a reading: the name is `dev`, and the file was deleted.
+
+| Asked | Result |
+|---|---|
+| The line of G 11.3 | `10 probe_audio,asr,detect_scene,render_encode,mux 10 number` |
+| `grep -c "clip.mp4\|twelve"` in the file | 0 |
+| `device`, `clip`, `clip_duration_ms`, `asr_backend`, `chrome` | `dev`, `speech_scriptA_landscape_720p.mp4`, 74,705, `webgpu`, 155.0.8059.39 |
+| `probe_audio`: median, p90 | 806 ms, 889 ms |
+| `asr` | 83,948 ms, 85,671 ms (83,164 to 87,268) |
+| `detect_scene` | 190 ms, 214 ms |
+| `render_encode` | 35,443 ms, 35,624 ms (34,637 to 35,704) |
+| `mux` | 17 ms, 23 ms |
+| `total` | 120,778 ms, 122,647 ms |
+| `peak_memory_bytes` | 936,182,945 |
+
+The ten runs lie within 5% of each other. `asr` at 84 s is slower than the 60 s of Prompt 54's one import and inside the 62 to 96 s of Prompt 44; this was a headed browser doing eleven clips in a row. Prompt 59 takes the reading that counts, as `d1`.
+
+**The guard, run here with the step's own text.** The shell of the step "Refuse a build that holds the test key" was taken out of `ci.yml` by a script and run with `bash --noprofile --norc -eo pipefail`, as GitHub runs a step, on a directory `.vercel/output` made from a build.
+
+| The directory holds | The step |
+|---|---|
+| A build made with the test key | Fails, exit 1: "The build for production holds the E2E test key", and names the two files, `assets/index-….js` and `assets/render.worker-….js` |
+| A plain build | Passes: "The test key is in none of the 11 files of .vercel/output." |
+| Nothing | Fails: "vercel build wrote no file to .vercel/output, so there is nothing to search." |
+| A plain build, and no key to search for | Fails: "E2E_TEST_PUBLIC_KEY is empty, so there is nothing to search for." |
+
+The search of the prompt, `grep -rl "<test public key>" web/dist | wc -l`: 2 on the keyed build, 0 on the plain one.
+
+**The workflows, read by tools.** Neither tool is installed on D1; each was taken as a release archive, checked against its published SHA-256, and kept outside the repository.
+
+| Tool | Result |
+|---|---|
+| `actionlint` 1.7.12 on `ci.yml`, `e2e-media.yml`, `deploy-api.yml` | No finding |
+| `gitleaks` 8.18.4, the version of CI, `detect --no-git` on a copy of the working tree | "no leaks found" |
+| The same on `ci.yml` with the `gitleaks:allow` comment taken off | "no leaks found" too: the rule does not take this key's text for a secret. The comment stays, as known issue 8 asks: the scan reads the whole history, and a later version of the rule may differ |
+
+**Decided here, where the plan is silent or cannot be built as written.** Each is in §22 and §23 of the plan now.
+
+- **The key is written once, at the top of `ci.yml`, as `E2E_TEST_PUBLIC_KEY`.** The prompt writes it "literally in step 8". Step 14 needs the same text to search for; two copies could drift apart, and one name for both cannot. Under that name Vite does not read it, so the build that is deployed cannot pick it up from the workflow's `env`.
+- **The root `package.json` says `"type": "module"`.** Without it Playwright took `bench/device-bench.ts` for CommonJS and stopped at "Cannot use 'import.meta' outside a module": the file is outside `web/`, as D-63 puts it, and imports helpers that are ES modules (§27, item 39). The root has no `.js` file and its scripts are `.mjs`; `node -e` with `require`, which `ci.yml` uses, works as before.
+- **No trace for the media suites and the bench.** §22.5 forbids uploading a trace with transcript text. A trace of these suites holds the feed and frames of the clip, so none is made; then the report of a failed run can be uploaded.
+- **`E2E_CHROME_ARGS`.** The arguments TE-10 may find necessary for WebGPU on the runner have a place: one line of `e2e-media.yml`. It is empty.
+- **`e2e-media.yml` has no manual trigger.** Started by hand it would have no `web/dist`. If TE-10 ends in its fallback, the workflow gains what a manual run needs then.
+- **The cache of `fixtures/.cache/` is keyed by two files,** the manifest and `net/asset-fetch.ts`, which names the sample clip. A key that is too old costs a download, never a wrong file: the setup test checks every hash.
+- **TE-10's date.** `checked` of `check-external-facts.mjs` is the date an experiment was read. This one is half read: the minutes, on 2026-10-10. That date is in the entry's note, and `checked` stays `null` until the job has run.
+- **The bench uses the browser context of its one test,** with the model put there by `ensureModelCached`, and a new page for each run. §23.10 says a persistent context; the model is on the device either way.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **Step 9 runs the landing suite on the keyed build now,** because step 8 makes only that one. The suite does not look at the key.
+- **`deploy-web` was split in three, not two:** build, guard, deploy. The header check and the smoke case follow as before.
+- **The step numbers in `ci.yml`** follow TS §33: 10 is the media job, 11 the API, 12 to 15 the web app.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json`: clean, the bench in it.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build` and `pnpm e2e` green; the frozen-file diff against `322c7d3` is empty; no file of `web/dist` holds the test key. **262 Rust** (2 ignored), **92 Vitest**, **12 Playwright**, and before it **30 media cases** on the keyed build with the final configuration. `check-file-tree`: 235 files.
+- `bench/results/` holds `.gitkeep` alone. The tools, the copies made for the scans and the guard, and `web/test-results` are gone or outside the repository.
+
+**"Done when".**
+
+- [x] The local chain is green with 30 media cases; no `dev-*.json` is left in `bench/results/`.
+- [ ] The pull request is green including the Windows job, or the fallback is in the workflow and recorded; TE-10 has minutes and a date; G M-11 passes (Human). **Waits for the push.** What is done of it: the minutes of TE-10 are read and dated.
+
+**Not checked.** All of it is what only a run on GitHub can show.
+
+- **`e2e-media.yml` on a runner.** Not one step of it has run: `playwright install chrome` on Windows, the Python action, `unzip` and `cygpath` in the runner's bash, the hand-over of `web-dist` from the job `ci`, the cache.
+- **WebGPU, the H.264 encoder and the AAC encoder on the runner** (TE-10). A runner without a graphics card may give a page no WebGPU; then every case stops at the capability check.
+- **Time on the runner.** A case may take 300 s and the job 45 minutes. Transcription without a GPU took 98 to 123 s on D1 (Prompt 44); a hosted runner has fewer cores.
+- **Steps 13 to 15.** They run on `main` only. That `vercel build` writes to `.vercel/output` in the directory the step runs in is what the guide says and V1's step relied on; the guard fails, and deploys nothing, if it finds no file there.
+- **The secret scan in CI,** which reads the history and not a copy of the tree.
+
+**Found, and not for this prompt.**
+
+- **With a retry, a failed group runs again from the drop:** `retries: 1` in CI is one more pipeline for the suite that failed, four minutes or so on D1.
+- **The report of a failed case can hold text of the page:** Playwright keeps a snapshot of the page beside a failure of a test that uses its own `page`. For the reference clip that text is what `fixtures/speech/README.md` already publishes.
+- **`asr` is 84 s on D1 in the bench,** against the 25 s of E-3's first column and inside D-67's 180 s. Open item 10, the three-minute promise, stands.
+
+**Open, for the human.** Push `v2-build` (three commits: D-71, Prompt 57, Prompt 58). Mark the pull request ready. Read every job, the new `e2e-media` among them, and its minutes (open item 14). Tell the agent what it says: the outcome fills TE-10, and a failure at the capability check names what the runner lacks.

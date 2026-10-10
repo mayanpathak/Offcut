@@ -11,6 +11,13 @@ const PREVIEW_URL = "http://localhost:4173";
 // in `fixtures/.cache/`, which `media-setup` puts there.
 const MEDIA_SUITES = ["model-download.spec.ts", "pipeline-preview.spec.ts", "export-creator.spec.ts"];
 const MEDIA_TIMEOUT_MS = 300_000;
+// Arguments Chrome is started with for the media suites and the bench, where a
+// machine needs some to give a page WebGPU: the hosted runner of CI, which has
+// no graphics card (TE-10). Separated by spaces. None on a development machine.
+const MEDIA_CHROME_ARGS = (process.env.E2E_CHROME_ARGS ?? "").split(" ").filter((argument) => argument !== "");
+// A trace holds what the page showed: the lines of the feed, and frames of the
+// clip with its captions. No report of these suites may carry that (§22.5).
+const MEDIA_USE = { channel: "chrome", trace: "off", launchOptions: { args: MEDIA_CHROME_ARGS } } as const;
 
 export default defineConfig({
   testDir: "tests-e2e",
@@ -37,7 +44,7 @@ export default defineConfig({
       // One clip at a time: a case loads the speech model and the GPU.
       fullyParallel: false,
       workers: 1,
-      use: { channel: "chrome" },
+      use: MEDIA_USE,
     },
     {
       name: "bench",
@@ -46,7 +53,7 @@ export default defineConfig({
       dependencies: ["media-setup"],
       fullyParallel: false,
       workers: 1,
-      use: { channel: "chrome", headless: false },
+      use: { ...MEDIA_USE, headless: false },
     },
   ],
   ...(deployedUrl === undefined && {

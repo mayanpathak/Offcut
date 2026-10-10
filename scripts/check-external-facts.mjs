@@ -47,8 +47,13 @@ const FACTS = [
     id: "TE-10",
     host: "GitHub Actions (free minutes)",
     fact: "The media suites run headless on a hosted Windows runner, within the monthly free minutes.",
+    // Two halves. The minutes were read at GitHub's billing page on 2026-10-10:
+    // a public repository pays none on a standard hosted runner, and
+    // windows-latest is one. The suites on the runner have not run: the job is
+    // in ci.yml since Prompt 58 and its first run is that prompt's push. The
+    // date goes here when that run has been read (docs/v2/experiments.md).
     checked: null,
-    note: "due in V2",
+    note: "minutes read 2026-10-10: free for a public repository; the suites on the runner are not run yet",
   },
   {
     id: "TE-11",

@@ -255,7 +255,7 @@ Marks: **NEW** = created in V2. **F** = final in V2. **P** = partial; section 25
 <repo root>/
 ├── Cargo.toml                          CHANGED  8 members (V1 §15.2) + shared deps of section 3.2
 ├── deny.toml                           CHANGED  license entries; ban wrappers per section 22.1
-├── package.json                        CHANGED  scripts e2e:media, e2e:device, bench:device, verify; dev-dep @playwright/test (D-63)
+├── package.json                        CHANGED  scripts e2e:media, e2e:device, bench:device, verify; dev-dep @playwright/test (D-63); "type": "module" (Prompt 58)
 ├── .gitignore                          CHANGED  + web/public/ort/, fixtures/.cache/
 ├── .github/workflows/
 │   ├── ci.yml                          CHANGED  artifact upload, media job, test-key guard (section 22.5)
@@ -1903,6 +1903,8 @@ Only what changes.
 
 **`web/playwright.config.ts` as built (Prompt 56; G item 6b).** Four projects and no `globalSetup`. `non-media`: `testMatch` of `landing.spec.ts`, no dependency, so `pnpm e2e` and the Linux job never fetch the model. `media-setup`: the one file `tests-e2e/media.setup.ts`, whose one test calls `fillAssetCache()` with 30 minutes to do it. `media`: the three suites, 300 s for a case, `dependencies: ["media-setup"]`, and one worker with `fullyParallel: false`, because a case loads the speech model and the GPU. `bench`: `testDir: "../bench"`, the file `device-bench.ts`, headed, the same dependency, one worker. The launch arguments for WebGPU on the CI runner are Prompt 58's (TE-10). A temporary `zz-*.spec.ts` is matched by no project since then: a check that needs one brings a configuration of its own and runs with `--config`.
 
+**Since Prompt 58.** The projects `media` and `bench` record no trace (`trace: "off"`): a trace holds the lines of the feed and frames of the clip with its captions, and §22.5 lets no report carry that. Both start Chrome with the arguments of the environment variable `E2E_CHROME_ARGS`, separated by spaces, and with none when it is not set: that is where the arguments of TE-10 go, should the runner need any for WebGPU. `non-media` keeps its trace of a failed case, as in V1.
+
 ### 22.4 Scripts
 
 | Script | Contract change |
@@ -1938,6 +1940,15 @@ On `main` only, after step 10 passes:
 15. `vercel deploy --prebuilt --prod`; header check; `@smoke`.
 
 **Ordering rules and why.** The media job runs before any deploy, as TS §33 step 10. The guard sits between build and deploy so a wrong variable can never reach production. Server first, then web (TS §33). If TE-10 shows the Windows minutes do not fit, step 10 runs on `main` and on a manual trigger only, and `pnpm e2e:device` covers pull requests locally (TS §33, BP Appendix D).
+
+**As built (Prompt 58).**
+
+- **One literal, in one place.** The test public key is written once, as `E2E_TEST_PUBLIC_KEY` in the `env` of `ci.yml`, with the `gitleaks:allow` comment on its line. Step 8 hands it to `vite build` as `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`; the guard of step 14 searches for it. Under its own name Vite does not read it, so the build of step 13 cannot take it from there.
+- **The artifact** is `web-dist`, the `web/dist` of step 8, kept for a day and uploaded on every event. Step 9 runs the landing suite on that same keyed build.
+- **The jobs.** `ci` (steps 1 to 9), `e2e-media` (step 10, `needs: ci`, the reusable workflow), `deploy-api` (step 11, `needs: [ci, e2e-media]`, on `main`), `deploy-web` (steps 12 to 15).
+- **`e2e-media.yml`** is started by `workflow_call` alone. A manual start has no `web/dist` to take: the fallback of TE-10 will have to give it one. Its tools: Node 24 and pnpm as in `ci.yml`; Chrome through `playwright install chrome`; Python 3.13 through `actions/setup-python` at the commit of v7.0.0; `ffmpeg` 9.0.2, the "essentials" archive of the same builder as on D1, refused unless its SHA-256 is the one in the file. The cache of `fixtures/.cache/` is keyed by the hash of `model-manifest.json` and of `net/asset-fetch.ts`, which names the sample clip. On failure it uploads `web/playwright-report` and nothing else.
+- **The guard** fails the job when a file of `.vercel/output/` holds the key, when the directory holds no file, when the key to search for is empty, and when the search itself fails. Only "no file holds it" lets the deploy run.
+- **Step 13 and step 15** are the two halves of V1's one step: `vercel pull` and `vercel build --prod`, then `vercel deploy --prebuilt --prod`.
 
 ### 22.6 Hosting
 
@@ -2158,6 +2169,8 @@ Result file `bench/results/<BENCH_DEVICE>-<yyyy-mm-dd>.json`:
 ```
 
 `total` is `pipeline_done.total_ms + export_done.total_ms`. `peak_memory_bytes` is the largest `performance.measureUserAgentSpecificMemory()` reading sampled every 2 s, or `null` when the API is unavailable. The file holds numbers and enums only: no transcript, no file name. `--compare` is V9.
+
+**As built (Prompt 58).** The eleven runs share the browser context of the one test, in which `ensureModelCached` has put the model; each run is a new page of it, closed when its numbers are read. The context is not a persistent one: the model is on its device all the same, and the first run is still kept out of the numbers. A run reads its five stage times, `pipeline_done.total_ms` and `export_done.total_ms` from the events its own fake API received, and waits up to 30 s for the last of them. The downloaded file is deleted as soon as it is whole. `median` is the middle of the sorted times, the mean of the two middle ones for an even count; `p90` is the nearest rank, the ninth of ten. The memory is asked for every 2 s by a script of the page; Chrome answers when it next collects garbage, so a run gives a few readings, and the file holds the largest of all runs. `clip` is the name of the fixture, never of a file a person chose. `BENCH_DEVICE` must be set, in lower-case letters and digits; the test ends by asserting that all ten runs used the same ASR backend. The root `package.json` says `"type": "module"` since this prompt, without which Playwright cannot load a test file outside `web/` (section 27, item 39).
 
 ---
 
@@ -2399,5 +2412,6 @@ Nothing below was resolved by guessing. Items 1-10 are contradictions or gaps in
 | 36 | `opfs.ts` closed its writable stream in a `finally`. A write that is refused for lack of room leaves the stream failed, a failed stream answers `close()` with a `TypeError`, and that error took the place of the `QuotaExceededError`: the failure was tagged `io`, so a full disk during the model download was `E_STORAGE_IO` and the failure stub, not `E_MODEL_STORAGE` and its message, and the same for `E_STORAGE_QUOTA` when the clip's audio is written. Which of the two a person got depended on where in a part the room ran out (found in Prompt 56, by the quota case of section 23.6) | Section 15.2 as built in Prompt 37 | Section 15.2 as built in Prompt 56: the stream is given up and the first failure thrown |
 | 37 | When `createWritable({ keepExistingData: true })` itself fails for lack of room, Chrome leaves its copy of the file, `<name>.crswap`, beside the file. It counts against the quota, `opfs.list` names it, and nothing removes it before the directory is removed (found in Prompt 56) | TS §16.3, section 17.2 | Open. The model's directory is removed by `clear()` only. V7's `quota.ts` should know of it |
 | 38 | Section 23.6 says that during transcription no request leaves the page except `POST /api/v1/events`. In that time the page fetches files of its own build from its own origin: the render worker's script and the two WASM bundles (found in Prompt 56) | Section 23.6, TS §25.2 assertion 4 | Section 23.6 as built: those `GET`s are allowed and every other request is refused. Correct the wording of assertion 4 when `privacy-network.spec.ts` is written |
+| 39 | D-63 puts `bench/device-bench.ts` outside `web/` and runs it as a project of `web/playwright.config.ts`. The file imports the E2E helpers, which are ES modules because `web/package.json` says so; the root `package.json` did not, so Playwright took the bench for CommonJS and could not load it: "Cannot use 'import.meta' outside a module" (found in Prompt 58) | D-63 (b), TS §5 | The root `package.json` says `"type": "module"`. The root holds no `.js` file, and its scripts are `.mjs`: nothing else reads the field |
 
 **Decisions to copy back into `technicalspec.md`:** D-25 (§10.8), D-26 (§21.1), D-27 and D-58 (§2, §7), D-28 (§7), D-29 (§19.2), D-30 (§19.2, §20.1), D-34 (§15.1), D-35 (§32), D-37 (§16.4, §24.6), D-42 (§17.1), D-45 (§21.4, INV-11), D-47 (§17.1), D-50 (§16.1), D-53 (§5), D-55 and D-46 (§5), D-59 (§10.1), D-68 (§19.2, §19.4). **Into `buildplan.md`:** the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33. **Into `product.md`:** none.

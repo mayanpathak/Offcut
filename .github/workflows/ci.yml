@@ -1,10 +1,15 @@
-# The gates of technicalspec.md §33, steps 1 to 9, on every pull request and
-# on main. They are the same commands as `pnpm check`, `pnpm test`,
-# `pnpm build` and `pnpm e2e` locally, in the order of the spec.
+# The gates of technicalspec.md §33, steps 1 to 10, on every pull request and
+# on main. Steps 1 to 9 are the same commands as `pnpm check`, `pnpm test`,
+# `pnpm build` and `pnpm e2e` locally, in the order of the spec. Step 10 is
+# `pnpm e2e:media`, in Chrome on Windows (e2e-media.yml).
 #
-# On main only, after step 9 has passed, steps 10 to 14 deploy: first the API,
-# then the web app, always in that order. The server rejects fields it does
-# not know, so a new client must never reach an old server.
+# On main only, after step 10 has passed, steps 11 to 15 deploy: first the
+# API, then the web app, always in that order. The server rejects fields it
+# does not know, so a new client must never reach an old server.
+#
+# Two builds of the web app are made. Step 8 builds the one the tests run
+# against, with the E2E test key. Step 13 builds the one that is deployed,
+# without it, and step 14 refuses to deploy a build that holds the key.
 #
 # The deploy needs, besides VITE_ASSET_BASE_URL:
 #   variable  APP_ORIGIN              https://<project>.vercel.app, no trailing slash
@@ -44,6 +49,13 @@ env:
   BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
   GITLEAKS_VERSION: 8.18.4
   GITLEAKS_SHA256: ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d
+  # The public half of the E2E test key (v2implementation D-24): the key of
+  # the fixed seed in web/tests-e2e/helpers/fake-api.ts. It is no secret. A
+  # build made with it accepts the entitlement tokens the tests mint, so it
+  # is given to one build only, the one of step 8, under the name Vite
+  # reads. Under this name Vite does not read it, and step 14 searches the
+  # build that is deployed for it.
+  E2E_TEST_PUBLIC_KEY: mCydb6uLK58faqtJ0v3Ol8tnmNboOoH6t/RD6rcXxxM= # gitleaks:allow
 
 jobs:
   ci:
@@ -218,11 +230,24 @@ jobs:
         run: pnpm --filter web exec vitest run
 
       # --- 8. The production build, and the hosts in it ---------------------
+      # Built with the E2E test key, for the suites of steps 9 and 10. This
+      # build is tested and never deployed.
       - name: Build the web app
+        env:
+          VITE_ENTITLEMENT_TEST_PUBLIC_KEY: ${{ env.E2E_TEST_PUBLIC_KEY }}
         run: pnpm build:vite
 
       - name: Hosts in the bundle and in the CSP
         run: node scripts/check-hosts.mjs
+
+      # On every event: the media suites of step 10 run against this build.
+      - name: Hand the build to the media suites
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 1
+          if-no-files-found: error
 
       # --- 9. End-to-end, in Chrome, against the build ----------------------
       - name: Install Chrome for Playwright
@@ -242,9 +267,9 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      # The deploy job builds the web app again, for Vercel. It takes the WASM
-      # bundle from here, so it needs no Rust toolchain.
-      - name: Hand the WASM bundle to the deploy
+      # The deploy job builds the web app again, for Vercel. It takes the two
+      # WASM bundles from here, so it needs no Rust toolchain.
+      - name: Hand the WASM bundles to the deploy
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -253,9 +278,14 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # --- 10. The API: build the image, push it, tell Render -------------------
-  deploy-api:
+  # --- 10. The media suites, in Chrome on Windows, against the build of step 8
+  e2e-media:
     needs: ci
+    uses: ./.github/workflows/e2e-media.yml
+
+  # --- 11. The API: build the image, push it, tell Render -------------------
+  deploy-api:
+    needs: [ci, e2e-media]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -264,7 +294,7 @@ jobs:
     secrets:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
 
-  # --- 11 to 14. The web app, once the API runs this commit -----------------
+  # --- 12 to 15. The web app, once the API runs this commit -----------------
   deploy-web:
     needs: deploy-api
     runs-on: ubuntu-latest
@@ -297,7 +327,7 @@ jobs:
         with:
           node-version: 24
 
-      # --- 11. The API must run this commit before the web app is deployed --
+      # --- 12. The API must run this commit before the web app is deployed --
       - name: Wait until the API runs this commit
         run: |
           # The API host is the one the web app's rewrite points at.
@@ -322,16 +352,18 @@ jobs:
       - name: Install the web dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Take the WASM bundle of the ci job
+      - name: Take the WASM bundles of the ci job
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: wasm-pkg
           path: web/src/wasm/pkg
 
-      # --- 12. Build for Vercel here, deploy the result ---------------------
+      # --- 13. Build for Vercel here, without the test key ------------------
       # Vercel builds nothing: its builders have no Rust toolchain. The project
-      # is not connected to the Git repository.
-      - name: Deploy the web app to Vercel
+      # is not connected to the Git repository. This step is given no
+      # VITE_ENTITLEMENT_TEST_PUBLIC_KEY; `vercel pull` brings the variables
+      # of the Vercel project, which must not have one either.
+      - name: Build the web app for Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -346,16 +378,56 @@ jobs:
           vercel="pnpm dlx vercel@$VERCEL_CLI_VERSION"
           $vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
           $vercel build --prod --token="$VERCEL_TOKEN"
-          $vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      # --- 14. The test-key guard (v2implementation D-24) --------------------
+      # A build that holds the E2E test key accepts tokens anyone can mint.
+      # What `vercel build` wrote is searched for the key, and a build that
+      # holds it is not deployed.
+      - name: Refuse a build that holds the test key
+        run: |
+          set -u
+          if [ -z "$E2E_TEST_PUBLIC_KEY" ]; then
+            echo "::error::E2E_TEST_PUBLIC_KEY is empty, so there is nothing to search for."
+            exit 1
+          fi
+          if [ ! -d .vercel/output ] || [ -z "$(find .vercel/output -type f -print -quit)" ]; then
+            echo "::error::vercel build wrote no file to .vercel/output, so there is nothing to search."
+            exit 1
+          fi
+          # grep: 0 when a file holds the key, 1 when none does, 2 when it could not read.
+          status=0
+          grep --recursive --files-with-matches --fixed-strings -- "$E2E_TEST_PUBLIC_KEY" .vercel/output > "$RUNNER_TEMP/test-key-files.txt" || status=$?
+          case "$status" in
+            1)
+              echo "The test key is in none of the $(find .vercel/output -type f | wc -l) files of .vercel/output."
+              ;;
+            0)
+              echo "::error::The build for production holds the E2E test key. Remove VITE_ENTITLEMENT_TEST_PUBLIC_KEY from the Vercel project and from this job. Nothing was deployed."
+              cat "$RUNNER_TEMP/test-key-files.txt"
+              exit 1
+              ;;
+            *)
+              echo "::error::The search of .vercel/output failed, so nothing is deployed."
+              exit 1
+              ;;
+          esac
+
+      # --- 15. Deploy what was built and searched, then check it ------------
+      - name: Deploy the web app to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: pnpm dlx "vercel@$VERCEL_CLI_VERSION" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
       - name: The API answers through the web app's rewrite
         run: node scripts/wait-for-version.mjs "$APP_ORIGIN" "$GITHUB_SHA" 120
 
-      # --- 13. The headers of the deployment, value for value ---------------
+      # The headers of the deployment, value for value.
       - name: Headers of the deployment
         run: node scripts/check-headers.mjs "$APP_ORIGIN"
 
-      # --- 14. Smoke: isolated, WASM compiles under the CSP, API reachable --
+      # Smoke: isolated, WASM compiles under the CSP, API reachable.
       - name: Install Chrome for Playwright
         run: pnpm --filter web exec playwright install --with-deps chrome
 
