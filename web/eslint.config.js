@@ -36,6 +36,8 @@ const to = (layer, ...files) => ({
   element: files.length > 0 ? { type: layer, fileInternalPath: files } : { type: layer },
 });
 const from = (layer) => ({ element: { type: layer } });
+/** The named files of a layer, as the importing side. */
+const fromFile = (layer, ...files) => ({ element: { type: layer, fileInternalPath: files } });
 
 // What each layer may import, beyond itself. Everything else is refused.
 // Every layer may import `gen`, which holds types and constants only.
@@ -107,6 +109,51 @@ const layerPolicies = [
     from: from("net"),
     allow: { to: to("workers", "protocol.ts"), dependency: { kind: "type" } },
   },
+
+  // The six edges V2 adds (v2implementation D-27, a to f). The flows of the
+  // spec need them and the matrix above did not have them.
+  // (a) The sample clip is fetched through asset-fetch.ts and handed to importClip (TS §15.4).
+  {
+    from: fromFile("usecases", "import-clip.ts"),
+    allow: { to: to("net", "asset-fetch.ts") },
+  },
+  // (b) opfs.ts is the only builder of OPFS paths, and the workers write to those paths (TS §23.1).
+  {
+    from: from("workers"),
+    allow: { to: to("persistence", "opfs.ts") },
+  },
+  // (c) The render worker verifies the entitlement token (TS §21.3).
+  {
+    from: fromFile("workers", "render.worker.ts"),
+    allow: { to: to("config", "entitlement-public-key.ts") },
+  },
+  // (d) The model manager writes the model store and reads the bundled manifest (TS §12.1).
+  {
+    from: from("models"),
+    allow: [{ to: to("state", "model-store.ts") }, { to: to("config", "model-manifest.json") }],
+  },
+  // (e) ensureReady records in `meta` that it asked for persistent storage.
+  {
+    from: fromFile("models", "model-manager.ts"),
+    allow: { to: to("persistence", "db.ts") },
+  },
+  // (f) The stores, the model manager and the use-cases hold and pass on a
+  // FeedLine or an AppFailure: the types of the worker protocol, never its code.
+  {
+    from: { element: { types: { anyOf: ["state", "models", "usecases"] } } },
+    allow: { to: to("workers", "protocol.ts"), dependency: { kind: "type" } },
+  },
+
+  // The two use-case pairs V2 adds (D-58): importClip starts the pipeline
+  // (TS C-2), and startExport pauses and locks the preview (TS C-9).
+  {
+    from: fromFile("usecases", "import-clip.ts"),
+    allow: { to: to("usecases", "run-pipeline.ts") },
+  },
+  {
+    from: fromFile("usecases", "start-export.ts"),
+    allow: { to: to("usecases", "control-preview.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------
@@ -133,6 +180,18 @@ const restrictedProperties = (names) => [
 ];
 
 const NETWORK_GLOBALS_BUT_FETCH = NETWORK_GLOBALS.filter((name) => name !== "fetch");
+
+// --- The speech runtime (TDR-3) ------------------------------------------------
+
+// One file knows which runtime recognizes speech, so that the runtime can be
+// replaced by changing that file alone.
+const ASR_RUNTIME_FILE = "src/workers/asr/whisper-runtime.ts";
+const ASR_RUNTIME_PACKAGES = ["@huggingface/transformers", "onnxruntime-web"];
+const asrRuntimeMessage = "The speech runtime is imported by workers/asr/whisper-runtime.ts only (TDR-3).";
+const NO_ASR_RUNTIME = {
+  paths: ASR_RUNTIME_PACKAGES.map((name) => ({ name, message: asrRuntimeMessage })),
+  patterns: [{ group: ASR_RUNTIME_PACKAGES.map((name) => `${name}/*`), message: asrRuntimeMessage }],
+};
 
 // --- Restricted syntax (TS §7, §11.3) ----------------------------------------
 
@@ -168,6 +227,40 @@ const NO_SWALLOWED_ERROR = [
 
 const restrictedSyntax = (...groups) => ["error", ...groups.flat()];
 
+// Seven files of the main thread turn a raw browser value into a unit or an
+// id (v2implementation D-59). Each may hold one cast, to one type, in one
+// named place: the last `return` of its minting helper or, in model-store.ts,
+// the constant that is the zero of the initial state. Every other cast in
+// the file is refused as before.
+const MINTING = [
+  { file: "src/persistence/opfs.ts", brand: "Bytes", helper: "toBytes" },
+  { file: "src/models/download.ts", brand: "Bytes", helper: "toBytes" },
+  { file: "src/models/model-manager.ts", brand: "Bytes", helper: "toBytes" },
+  { file: "src/state/model-store.ts", brand: "Bytes", constant: "ZERO_BYTES" },
+  { file: "src/usecases/import-clip.ts", brand: "ClipId", helper: "newClipId" },
+  { file: "src/usecases/start-export.ts", brand: "ExportId", helper: "newExportId" },
+  { file: "src/usecases/control-preview.ts", brand: "TimeMs", helper: "toTimeMs" },
+];
+
+/** The brand-cast rule for a minting file: NO_BRAND_CAST, less its one named cast. */
+const noBrandCastExcept = ({ file, brand: minted, helper, constant }) => {
+  if (!BRANDS.includes(minted)) {
+    throw new Error(`eslint.config.js: ${minted} (${file}) is not a branded type of src/gen/domain.ts`);
+  }
+  const others = BRANDS.filter((name) => name !== minted);
+  const place =
+    helper === undefined
+      ? `Program > VariableDeclaration[kind='const'] > VariableDeclarator[id.name='${constant}'] > TSAsExpression[expression.value=0]`
+      : `FunctionDeclaration[id.name='${helper}'] > BlockStatement > ReturnStatement:last-child > TSAsExpression`;
+  const where = helper === undefined ? `\`const ${constant} = 0 as ${minted}\`` : `the last return of ${helper}()`;
+  const message = `In this file one cast is allowed: to ${minted}, in ${where} (D-59). Every other value must arrive already typed.`;
+  return [
+    `TSAsExpression > TSTypeReference[typeName.name=/^(${others.join("|")})$/]`,
+    `TSAsExpression:not(${place}) > TSTypeReference[typeName.name='${minted}']`,
+    `TSTypeAssertion > ${brand}`,
+  ].map((selector) => ({ selector, message }));
+};
+
 // --- The configuration -------------------------------------------------------
 
 export default defineConfig(
@@ -195,6 +288,7 @@ export default defineConfig(
 
       "no-restricted-globals": ["error", ...restrictedGlobals(NETWORK_GLOBALS)],
       "no-restricted-properties": ["error", ...restrictedProperties(NETWORK_GLOBALS)],
+      "no-restricted-imports": ["error", NO_ASR_RUNTIME],
       "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST, NO_SWALLOWED_ERROR),
 
       "@typescript-eslint/no-explicit-any": "error",
@@ -236,6 +330,12 @@ export default defineConfig(
     },
   },
 
+  // The one file that may import the speech runtime.
+  {
+    files: [ASR_RUNTIME_FILE],
+    rules: { "no-restricted-imports": "off" },
+  },
+
   // The one exception to each restricted-syntax rule.
   {
     files: ["src/config/env.ts"],
@@ -249,6 +349,13 @@ export default defineConfig(
     files: ["src/analytics/client.ts"],
     rules: { "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST) },
   },
+  // The seven minting files: one named cast each (D-59).
+  ...MINTING.map((entry) => ({
+    files: [entry.file],
+    rules: {
+      "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, noBrandCastExcept(entry), NO_SWALLOWED_ERROR),
+    },
+  })),
 
   // User-facing text lives in copy/messages.ts, never in a component.
   {

@@ -407,7 +407,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | **J1** Land | Hero: "Turn what you say into a finished short." Before/after demo on a real technical clip. Below: "Your video stays on your computer." and a link to "What leaves your device." | Supported-browser line: "Works in Chrome or Edge on Windows and Mac." Shown before any upload |
 | **J2** Drop a clip | Large drop zone: "Drop a clip (up to 90 seconds, English)." Optional "Try with a sample clip" | No account needed to try |
 | **J3** Capability check | 1-3 second check, green tick or a clear unsupported page (§9.3) | Tone: plain, specific. "Your browser can do this." |
-| **J4** First-run model download | "One-time setup: downloading the speech model (about 150 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
+| **J4** First-run model download | "One-time setup: downloading the speech model (about 250 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
 | **J5** Validate | Probe the file; reject with specific guidance if constraints fail (§9.4) | Counted as `reject_reason` only |
 | **J6** Processing | Live "what we found" feed: "Transcribing…", "Found: 3-item list", "Found: $2k to $20k", "Cleaning voice" | Shows real detections only; no fake steps |
 | **J7** Preview (AHA) | Preview plays with animated captions and visual events; two buttons: "Looks good → Export" and "Fix something" | If no events were confident enough: "No numbers or lists found in this clip. Captions and cleanup applied." (honest, no padding) |
@@ -778,7 +778,9 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | Mux + finalize | 2 s |
 | **Median total** | **121 s** (3 + 20 + 2 + 4 + 90 + 2) |
 | **p90 budget (promise: under 3 minutes)** | **180 s** (about 49% headroom over the median) |
-| First run, model download | ≤ 90 s: a 150 MB model at 25 Mbps (A-8) takes 150 × 8 ÷ 25 = 48 s, plus about 5 s initialization = 53 s, leaving margin |
+| First run, model download | ≤ 90 s: a 260 MB model at 25 Mbps (A-8) takes 260 × 8 ÷ 25 = 83 s, plus about 5 s initialization = 88 s, leaving a margin of 2 s |
+
+**Status on 2026-10-09 (D-67 of `docs/v2/v2implementation.md`).** The transcription budget is not met by the speech model V2 uses, the small-size one: about 150 s on an R1-class laptop for the 74.7 s reference clip, which is about 120 s for 60 s. The founder accepts that for the quality of the transcript, up to 145 s for 60 s. The budgets above stay the targets. On these numbers the median total is 3 + 120 + 2 + 4 + 90 + 2 = 221 s, so the three-minute promise does not hold until the model or the promise changes.
 
 ### 20.3 Critical-path arithmetic for the end-to-end promise
 
@@ -790,7 +792,7 @@ These budgets and the three-minute promise are for the 60-second reference clip.
 
 | If this misses | Fallback | Decision time |
 |---|---|---|
-| ASR median > 40 s on R1 | Ship the smaller model with stronger caption edit UX; keep cloud fallback as P1 trigger | M0 (end of week 3) and re-check at M2 |
+| ASR median > 145 s on R1 for a 60 s clip (the founder's decision of 2026-10-09, D-67 of `docs/v2/v2implementation.md`; the line was 40 s) | Ship the smaller model with stronger caption edit UX; keep cloud fallback as P1 trigger | M0 (end of week 3) and re-check at M2 |
 | Render + encode > 150 s on R1 | Canvas2D overlay path instead of Vello readback; cap input at 60 s and 30 fps | M0 and M1 |
 | Denoise exceeds the CPU budget | Loudness normalization + high-pass only | M1 |
 | Corpus pass rate < 90% at week 8 | Cut the least-valuable P0 inputs from the supported list (e.g. 60 fps input) rather than slipping launch | Week 8 |

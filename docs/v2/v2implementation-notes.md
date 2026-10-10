@@ -108,7 +108,7 @@ V1 §15.3 items 1-9 are preconditions 1-9 of section 1A, in the same order.
 
 ## Revision of 2026-10-08: checked against V1 as built
 
-The two parts above were written from the specs and `v1implementation.md`. On 2026-10-08 the document was read against the V1 repository itself (`web/eslint.config.js`, `workers/protocol.ts`, `deny.toml`, the `scripts/`, `ci.yml`) and `docs/v1/v1changelog.md`. What the frozen contracts say held; what V1 did beyond its own plan did not always. The document now has 46 decisions, D-18 to D-63.
+The two parts above were written from the specs and `v1implementation.md`. On 2026-10-08 the document was read against the V1 repository itself (`web/eslint.config.js`, `workers/protocol.ts`, `deny.toml`, the `scripts/`, `ci.yml`) and `docs/v1/v1changelog.md`. What the frozen contracts say held; what V1 did beyond its own plan did not always. The document now has 47 decisions, D-18 to D-64 (D-64 is the reference clip, part 5 below).
 
 ### 1. Corrections where the plan did not match V1 as built
 
@@ -145,3 +145,16 @@ Precondition 10 no longer asks for the `v1` tag or `docs/v1/experiments.md`. The
 | §16.1 | D-62: hashed asset names, plain names in OPFS |
 | §17.2 | D-42, only if the conditional form is added |
 | §7 (crate graph) | Nothing: D-61 keeps the graph as drawn |
+
+### 5. The reference clip (founder's decision, 2026-10-08)
+
+The V2 reference clip is the founder's webcam recording of Script A, not the 60-second 1080x1920 portrait clip of TS §26: `testclips/speech_scriptA_landscape_720p.mp4`, 1280x720, 74.7 s, variable frame rate, 35.2 MB. The reason given: it is what a user really drops in. The clip passes the 11 rules of TS §15.2 unchanged.
+
+| Follows from it | Changed |
+|---|---|
+| The clip is longer than 60 s | D-64: every PS §20.2 budget and the E-3 and E-4 thresholds are multiplied by 1.245 (transcription 25 s, render and encode 112 s). Readings are recorded as measured and normalised to 60 s. Sections 6.8, 7, 11.8, 16.5, 16.8, 24.1, 24.3 |
+| The clip is landscape | The E2E case expects `orientation: "landscape"` and `duration_bucket: "lte90"` (section 23.7). The output is a centre strip 405 pixels wide, enlarged |
+| The clip is kept out of git | D-39: it stays in `testclips/`; CI gets it from the asset host, where it is the sample clip (sections 4, 23.4) |
+| A portrait clip is still wanted | It is recorded in V3 with the other fixtures, and E-3 and E-4 are read again on it (section 25.2) |
+
+To copy back: TS §26 gains a row for this clip; PS §20.2 is unchanged, since its budgets stay defined for 60 s.

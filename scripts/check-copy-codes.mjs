@@ -15,7 +15,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DOMAIN = resolve(ROOT, "web/src/gen/domain.ts");
+const DOMAIN = "web/src/gen/domain.ts";
+// The blocker codes are in no generated list: this file is their source (v2implementation D-20).
+const BLOCKERS = "web/src/state/blockers.ts";
 const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
 
 /**
@@ -38,10 +40,8 @@ const COPY_PENDING = [
   "REJECT_FRAME_RATE",
   "REJECT_DECODE_UNSUPPORTED",
   "REJECT_NO_SPEECH",
-  // Every error but the six a person can meet in V1: due by V7.
-  "E_MODEL_DOWNLOAD",
-  "E_MODEL_HASH",
-  "E_MODEL_STORAGE",
+  // Every error but the six a person can meet in V1 and the three of the
+  // model download, written in V2: due by V7.
   "E_STORAGE_QUOTA",
   "E_STORAGE_IO",
   "E_DECODE_AUDIO",
@@ -62,41 +62,51 @@ const COPY_PENDING = [
   "E_BILLING_PENDING",
   "E_ENTITLEMENT_INVALID",
   "E_ENTITLEMENT_EXPIRED",
+  // The four blockers no person can meet yet: the room on the device is
+  // due in V5, the account and the plan in V6.
+  "B_STORAGE_LOW",
+  "B_NOT_SIGNED_IN",
+  "B_ENTITLEMENT_EXPIRED",
+  "B_NO_FREE_EXPORTS",
 ];
 
-/** The three code lists of gen/domain.ts. Each is written one code per line. */
-const LISTS = ["ERROR_CODES", "REJECT_REASONS", "UNSUPPORTED_REASONS"];
+/** The code lists, and the file each is in. Each is written one code per line. */
+const LISTS = [
+  { name: "ERROR_CODES", file: DOMAIN },
+  { name: "REJECT_REASONS", file: DOMAIN },
+  { name: "UNSUPPORTED_REASONS", file: DOMAIN },
+  { name: "BLOCKER_CODES", file: BLOCKERS },
+];
 /** A list none of whose codes may be pending: its copy is needed now. */
 const NEVER_PENDING = ["UNSUPPORTED_REASONS"];
 
-function readCodes(source, list) {
-  const lines = source.split(/\r?\n/);
+function readCodes(file, list) {
+  const lines = readFileSync(resolve(ROOT, file), "utf8").split(/\r?\n/);
   const start = lines.indexOf(`export const ${list} = [`);
   const end = lines.indexOf("] as const;", start);
   if (start < 0 || end < 0) {
-    throw new Error(`gen/domain.ts: cannot find the list ${list}`);
+    throw new Error(`${file}: cannot find the list ${list}`);
   }
   return lines.slice(start + 1, end).map((line) => {
     const code = /^\s*"([A-Z0-9_]+)",$/.exec(line)?.[1];
     if (code === undefined) {
-      throw new Error(`gen/domain.ts: cannot read this line of ${list}: ${line}`);
+      throw new Error(`${file}: cannot read this line of ${list}: ${line}`);
     }
     return code;
   });
 }
 
-const domain = readFileSync(DOMAIN, "utf8");
 const messages = readFileSync(MESSAGES, "utf8");
 
 /** The codes that appear in messages.ts as the key of an entry. */
-const withCopy = new Set([...messages.matchAll(/^\s*((?:E|REJECT|UNSUPPORTED)_[A-Z0-9_]+):/gm)].map((match) => match[1]));
+const withCopy = new Set([...messages.matchAll(/^\s*((?:E|REJECT|UNSUPPORTED|B)_[A-Z0-9_]+):/gm)].map((match) => match[1]));
 const pending = new Set(COPY_PENDING);
 const problems = [];
 const known = new Set();
 const counts = [];
 
-for (const list of LISTS) {
-  const codes = readCodes(domain, list);
+for (const { name: list, file } of LISTS) {
+  const codes = readCodes(file, list);
   let written = 0;
   for (const code of codes) {
     known.add(code);
@@ -115,10 +125,10 @@ for (const list of LISTS) {
 }
 
 for (const code of COPY_PENDING.filter((code) => !known.has(code))) {
-  problems.push(`${code}: is in COPY_PENDING, but gen/domain.ts has no such code.`);
+  problems.push(`${code}: is in COPY_PENDING, but no list of codes has it.`);
 }
 for (const code of [...withCopy].filter((code) => !known.has(code))) {
-  problems.push(`${code}: has copy in messages.ts, but gen/domain.ts has no such code.`);
+  problems.push(`${code}: has copy in messages.ts, but no list of codes has it.`);
 }
 if (pending.size !== COPY_PENDING.length) {
   problems.push("COPY_PENDING names a code twice.");

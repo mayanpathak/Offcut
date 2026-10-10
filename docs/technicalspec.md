@@ -291,8 +291,10 @@ offcut/
 │   │   │   ├── sample_table.rs        stts/ctts/stsc/stsz/stco/co64/stss/elst resolution
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
+│   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
 │   │   │   ├── validate.rs            [ONLY] validate_probe(): PS §9.4 limits -> RejectReason
-│   │   │   └── mux.rs                 Mp4Muxer (faststart)
+│   │   │   ├── mux.rs                 Mp4Muxer (faststart)
+│   │   │   └── mux_boxes.rs           box writers for the muxer (v2implementation D-55)
 │   │   └── tests/
 │   │       ├── demux_fixtures.rs
 │   │       ├── probe_rejections.rs
@@ -659,9 +661,11 @@ offcut/
 │   │           ├── pages.module.css
 │   │           └── components.module.css
 │   └── tests-e2e/
+│       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
 │       ├── helpers/fake-api.ts
 │       ├── helpers/fixtures.ts
+│       ├── media.setup.ts             fills fixtures/.cache/ for the media suites and the bench (v2buildguide item 6b)
 │       ├── landing.spec.ts
 │       ├── capability.spec.ts
 │       ├── unsupported.spec.ts
@@ -726,6 +730,12 @@ offcut/
     ├── v1/v1buildguide.md             step-by-step build order for V1, with a milestone per phase
     ├── v1/coding-prompts.md           the 30 V1 coding prompts, run in order
     ├── v1/v1changelog.md              record of every change made while building V1
+    ├── v2/v2implementation.md         file-by-file implementation plan for V2 (M0.2 to M0.4)
+    ├── v2/v2implementation-notes.md   analysis and consistency check written around the V2 plan
+    ├── v2/v2buildguide.md             step-by-step build order for V2, with a milestone per phase
+    ├── v2/coding-promptsv2.md         the 30 V2 coding prompts (31 to 60), run in order
+    ├── v2/experiments.md              outcome of every experiment V2 runs (TE-n, E-n) and the M0 gate decision
+    ├── v2/v2changelog.md              record of every change made while building V2
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
@@ -1853,7 +1863,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
   "totalBytes": 0 }
 ```
 
-Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): base-size English model (default candidate), small-size English model (if E-10 WER exceeds 12%), tiny-size English model (PS §20.4 fallback). Constraint: `totalBytes` at most 150 MB (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
+Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
 
 ### 16.2 Interfaces
 
@@ -1923,9 +1933,9 @@ transcribe(pcm16):
 - WebGPU backend produces NaN logits on a driver: detected as empty output with non-silent audio (RMS above -50 dBFS) → automatic retry on `wasm`, backend reported in `stage_timing.asr_backend`.
 - Hallucinated text over silence at clip end: not removed automatically at MVP; the user hides such words in the caption editor. E-10 counts occurrences and decides whether a filter is needed (§39).
 
-**Acceptance.** Median transcription at most 20 s for the reference clip on R1 (PS §20.2, E-3). WER at most 12% and median caption edits at most 8 per 60 s on the 20-clip set (E-10). First-run download plus initialization at most 90 s at 25 Mbps (PS §20.2). Second session skips the download (PS §20.1); `model-download.spec.ts`. No request to a host outside §24.1; `privacy-network.spec.ts`.
+**Acceptance.** Median transcription at most 20 s for the reference clip on R1 (PS §20.2, E-3; a target that the small-size model of V2 does not meet, accepted up to 145 s for 60 s by D-67 of `docs/v2/v2implementation.md`). WER at most 12% and median caption edits at most 8 per 60 s on the 20-clip set (E-10). First-run download plus initialization at most 90 s at 25 Mbps (PS §20.2). Second session skips the download (PS §20.1); `model-download.spec.ts`. No request to a host outside §24.1; `privacy-network.spec.ts`.
 
-**Contingency (PS §20.4).** ASR median above 40 s on R1 → ship the tiny-size model and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
+**Contingency (PS §20.4).** ASR median above 145 s for a 60 s clip on R1 (D-67; the line was 40 s) → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
 **Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker.
 
@@ -2197,7 +2207,7 @@ KeywordPop word: scale 1.0 → 1.25 → 1.10 over 180 ms from its start, style.p
 | Bold | Inter 900 | 84 | Upper | 12 chars x 2 lines, 3 words | White fill, 10 lp stroke, active word accent, word-by-word pop | Back-out, 140 ms |
 | Tech | JetBrains Mono 700 | 56 | As spoken | 22 chars x 2 lines, 5 words | Rounded dark panel at 85% opacity, green active word, block cursor | Linear, 80 ms |
 
-Same layout rules for all three (PS §12.2). Fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them; `cargo deny` plus a CI grep assert no other font files exist.
+Same layout rules for all three (PS §12.2). A glyph run is stroked first and filled over the stroke, so the outline that shows is the outer half of the stroke width (v2implementation D-68). Fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them; `cargo deny` plus a CI grep assert no other font files exist.
 
 ### 19.5 Event visuals (PS §12.2)
 
@@ -2390,7 +2400,7 @@ AAC priming: the first audio chunk's timestamp/duration and the encoder's report
 - **Frame accounting.** Every output frame `0..N` is rendered and encoded exactly once; the loop never drops or duplicates an output frame, and it runs from the first instant of the recording to the last. Source frames may repeat (VFR, source below 30 fps) or be skipped (source above 30 fps) only because of the frame-rate conversion to 30 fps; none is skipped or repeated because of what the audio contains.
 - **Duration.** Output duration equals source duration to within one video frame, for any amount of silence in the clip. `timeline-preserved.spec.ts` and verifier checks 5 and 8.
 - **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end (dev builds).
-- **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`.
+- **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`. TE-3 picked method A on 2026-10-09: a readback was 2.8 times slower, and a frame made from a buffer of RGBA bytes is encoded with full-range brightness that the stream does not declare (`docs/v2/experiments.md`; read on the development machine, v2implementation D-69).
 - **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted.
 - **GPU device lost.** `E_GPU_LOST`; the user retries; no partial resume.
 - **Encoder emits reordered frames.** The muxer writes composition offsets (`ctts`) when chunk timestamps are not monotonic.
@@ -3002,7 +3012,7 @@ The PS totals assume sequential stages; ASR and the voice chain run in parallel 
 
 | Miss | Action | Decided at |
 |---|---|---|
-| ASR median above 40 s on R1 | Smaller model; stronger caption editing; cloud fallback remains a P1 trigger | M0, re-checked at M2 |
+| ASR median above 145 s for a 60 s clip on R1 (D-67; was 40 s) | Smaller model; stronger caption editing; cloud fallback remains a P1 trigger | M0, re-checked at M2 |
 | Render + encode above 150 s on R1 | Canvas2D overlay path; cap input at 60 s and 30 fps | M0 and M1 |
 | Denoise exceeds the audio budget | High-pass + loudness only | M1 |
 | Corpus pass rate under 90% at week 8 | Remove the least valuable accepted input rather than slip launch | Week 8 |
@@ -3034,10 +3044,10 @@ Memory and GPU objects are the scarce resources: the minimum supported device re
 
 | Phase | Component | Estimate |
 |---|---|---|
-| ASR | Model session and runtime | 700 MB |
+| ASR | Model session and runtime (small-size model; the 700 MB estimated for the base-size files, scaled by file size) | 1,200 MB |
 | ASR | `pcm16` + `pcm48` + chain working copies (5.8 + 17.3 + 34.6 MB, derived) | 58 MB |
 | ASR | App shell, `offcut_core.wasm` heaps in three workers | 200 MB |
-| ASR | **Phase total** | **about 0.96 GB** |
+| ASR | **Phase total** | **about 1.46 GB** |
 | Render | `offcut_render.wasm` heap, fonts, scene | 150 MB |
 | Render | Decoded frame queue: 8 x 1920 x 1080 x 4 B (derived) | 66 MB |
 | Render | Overlay + target textures at 1080x1920 (2 x 8.3 MB, derived) and Vello atlases | 80 MB |
@@ -3046,7 +3056,7 @@ Memory and GPU objects are the scarce resources: the minimum supported device re
 | Render | **Phase total** | **about 0.56 GB** |
 | Any | **Peak (phases do not overlap, §12.4)** | **under 1.5 GB budget** |
 
-Disk: source up to 500 MB (PS §9.4), model up to 150 MB (PS §10 J4), audio 17.3 MB, export up to 91.8 MB (§21.2) per clip; `quota.ts` enforces eviction (§23.3).
+Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.3 MB, export up to 91.8 MB (§21.2) per clip; `quota.ts` enforces eviction (§23.3).
 
 ---
 
@@ -3500,7 +3510,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 4. Mobile detection via `navigator.userAgentData.mobile` (§3) — E-8 data at M2.2.
 5. `MAX_FILE_SIZE` read as 500,000,000 bytes; `INPUT_FPS_TOLERANCE`; `MIN_WORDS`; `MAX_RECENT_CLIPS` (§10.2) — M1.1, E-2, M2.1.
 6. First video track used when several exist; fragmented MP4 rejected (§15.4) — TE-12.
-7. Per-word ASR confidence (§16.4) — TE-2. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
+7. Per-word ASR confidence (§16.4) — TE-2. Run on 2026-10-09 (`docs/v2/experiments.md`): the runtime of V2 returns no probability, so every word has `Confidence(1.0)` and detector scores do not use ASR confidence. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
 8. Non-English speech and multiple speakers are not detected at import; these two PS §9.4 constraints have copy but no rejection test (§15.4) — E-2, E-10.
 9. Sentence segmentation constants (§17.2) — E-10.
 10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7.

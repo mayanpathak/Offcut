@@ -1,6 +1,7 @@
 {
   "name": "offcut",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@10.15.0",
   "engines": { "node": ">=24" },
   "scripts": {
@@ -9,8 +10,21 @@
     "build:wasm": "sh scripts/build-wasm.sh",
     "build:vite": "pnpm --filter web run build:vite",
     "build": "pnpm gen:types && pnpm build:wasm && pnpm build:vite && node scripts/check-hosts.mjs",
-    "check": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo deny check && pnpm --filter web exec eslint . && pnpm --filter web exec tsc --noEmit && node scripts/check-file-tree.mjs && sh scripts/check-gen-clean.sh && node scripts/check-copy-codes.mjs",
+    "check": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo deny check && pnpm --filter web exec eslint . && pnpm --filter web exec tsc --noEmit && pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json && node scripts/check-file-tree.mjs && sh scripts/check-gen-clean.sh && node scripts/check-copy-codes.mjs",
     "test": "cargo test --workspace && pnpm --filter web exec vitest run",
-    "e2e": "pnpm --filter web exec playwright test --project=non-media"
+    "e2e": "pnpm --filter web exec playwright test --project=non-media",
+    "e2e:media": "pnpm --filter web exec playwright test --project=media",
+    "e2e:device": "pnpm --filter web exec playwright test --project=non-media --project=media --headed",
+    "bench:device": "pnpm --filter web exec playwright test --project=bench",
+    "verify": "python verify/verify_mp4.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@huggingface/transformers>onnxruntime-node": "-",
+      "@huggingface/transformers>sharp": "-"
+    }
   }
 }

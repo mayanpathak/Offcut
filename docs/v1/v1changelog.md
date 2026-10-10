@@ -1948,4 +1948,82 @@ The production database: Postgres 18.6, the nine tables of `0001_init.sql`, migr
 
 **`.env` repaired a third time.** The human had put the Render key at the end of `.env`, on a line with no name. The agent checked, printing no value, that the public key above is the public half of that line, then moved the line to `.env.deploy` as `PROD_ENTITLEMENT_SIGNING_KEY`. `.env` holds its 15 variables again and loads in `sh`. **That line was also selected in the editor, which shared the private key with the agent's chat**: see the reply of that date for the recommendation to replace the key in Render while nothing has been signed with it.
 
-**Checked.** Every replacement in `v2implementation.md` was applied exactly once (96 of 96). A search of the file finds no remaining reference to the old step numbers of the spike or to the removed statements. Nothing was built or run: only documents changed.
+**The reference clip for V2 (decided by the human).** The founder's webcam recording of Script A is the V2 reference clip, in place of a 60-second 1080x1920 portrait clip: it is what a user really drops in. It is kept in `testclips/`, which git ignores, not in `fixtures/`.
+
+- The recording, `testclips/WIN_20261008_16_05_38_Pro.mp4`: 1280x720, 74.7 s, H.264 Main and AAC, a variable frame rate of about 30 fps, 76 MB. It passes the 11 rules of TS §15.2 as it is.
+- Prepared by the agent with ffmpeg 9.0.2: `testclips/speech_scriptA_landscape_720p.mp4`, 35.2 MB. Video at 3.6 Mbit/s; audio copied; metadata removed; frames 150 and 1950 made fully white.
+- Checked on that file: 2,246 frames with the same frame gaps as the recording; the audio stream is byte for byte the same; exactly two white frames; it decodes with no warning. A first attempt had rounded the timestamps to a 1/30 s grid and produced 79 frames with a repeated timestamp; it was replaced.
+- In the V2 document: D-39 (not committed; CI takes it from the asset host), new D-64 (the clip, and every 60-second budget multiplied by 1.245: transcription 25 s, render and encode 112 s), the E2E case expects `landscape`. `fixtures/speech/README.md` lists the clip. A portrait recording moves to V3.
+- Also on the machine: ffmpeg 9.0.2 installed with winget; NumPy 2.5.3 on Python 3.13 (`py`). The `python` of Git Bash is an old MSYS2 Python 3.9 without pip: use `py -3` for the verifier.
+
+**Checked.** Every replacement in `v2implementation.md` was applied exactly once (96 of 96, then 28 of 28 for the reference clip). A search of the file finds no remaining reference to the old step numbers of the spike or to the removed statements. Nothing was built or run: only documents changed.
+
+## 2026-10-08 - The V2 build guide: checked against the repository and corrected; R2 dropped
+
+**Decided (by the human).** R2, the Apple M1, is not used in V2: no Mac is available. R1 is the only reference machine. TE-3, TE-4, E-3 and E-4 are read on R1 alone.
+
+**Added.** `docs/v2/v2buildguide.md`, the step-by-step guide to `v2implementation.md`. It was written on this date outside the agent's session and is listed here for the first time. It is not committed yet.
+
+**Checked before the corrections (by the agent).**
+
+- **The V1 baseline, on `322c7d3`:** `pnpm check`, `pnpm test` (170 Rust tests, 76 web tests), `pnpm build` and `pnpm e2e` (12 cases) pass in one run. `ci` is green on that commit; Render and Vercel both report it on `/api/v1/healthz`; `check-headers.mjs` passes against production.
+- **The asset host:** a ranged request answers 206, and CORS answers for the app origin and for `http://localhost:5173`. It does not answer for `http://localhost:4173` yet (D-41 of the V2 plan).
+- **The public key in precondition 12 of the V2 plan** is the public half of `PROD_ENTITLEMENT_SIGNING_KEY` in `.env.deploy`; compared without printing either. Whether the key in Render was replaced since is not known.
+- **The guide against the plan:** every decision D-18 to D-64 has a step; every count of the guide (test cases per phase, machine pairs, 30 E2E cases, 26 and 13 exit boxes) and every threshold (25 and 50 s, 112 and 187 s, 2.5 s, 224 s) equals the plan's. The 145 files of the plan's tree are in the tree of TS §5, except the three the plan names.
+- **The reference clip,** with `ffprobe`: 1280x720, H.264 Main, 74,705 ms, 2,246 frames, `moov` before `mdat`. Its audio track is 74.518 s, 187 ms shorter than the video track.
+
+**Found on the machine.**
+
+- Plain `python` (and `python3`) is the MSYS2 Python 3.9 in Git Bash and in PowerShell: `C:\msys64\mingw64\bin` is ahead in PATH. With the folder of Python 3.13 put first in PATH, `python` is 3.13.5 with NumPy 2.5.3 and pip.
+- `gh` and gitleaks are not installed.
+- The development machine (Acer Aspire A715-76G: i5-12450H, 16 GB, GTX 1650) is not R1.
+- `Cargo.lock` holds `web-sys` 0.3.106, in which the types `VideoFrame`, `OffscreenCanvas` and `FileSystemSyncAccessHandle` are not behind `web_sys_unstable_apis`. `scripts/build-wasm.sh` sets `RUSTFLAGS` on its `cargo build` line, which replaces `build.rustflags` of a `.cargo/config.toml`.
+
+**Changed in `docs/v2/v2buildguide.md` (by the agent).** The guide lists every change itself: "Read this first", items 9 to 12, and rows 19 to 32 of its table of contradictions. In short:
+
+- **R2 removed** from Steps 0.6, 8.4, 8.5 and 12.4 and from Milestone 12. Step 1.1 now tells the builder to record the decision in the plan as D-65 and to reword the plan's lines that name R2.
+- **Python:** every terminal puts the Python 3.13 folder first in PATH; the commands still say `python`, as §22.2 of the plan and CI do.
+- **The production database** is read through `PROD_DATABASE_URL` of `.env.deploy` in Steps 12.3 and 12.7, with the real column names. The first draft used `$DATABASE_URL`, which the loaded `.env` points at the local database: the E-1 counts of the M0 gate would have come from local test rows.
+- **CI from the first day:** a draft pull request at Milestone 1, because `ci.yml` runs on pull requests and on `main` only. A note on a possible gitleaks finding on the public key literals; this was not tested.
+- **The unstable-API flag** (item 4 and Step 7.1): rewritten from what the lock file holds. A flag, if `wgpu` needs one, goes on the `RUSTFLAGS` line of `build-wasm.sh`.
+- **The download of the test assets** is a Playwright setup project with one new file, `web/tests-e2e/media.setup.ts`, in place of `globalSetup`, which would also have run for `non-media`.
+- **Checks that could not fire as written:** the typed-in-digit rule (no V1 tool has it), `cargo deny check` after the first `proptest` dependency, the `.name` search, the expected verifier output on the source clip, the pair check of `wasm-bindgen` (the workspace pins it exactly), the count of unticked boxes before the tag.
+- **Gaps in the plan that the guide now names:** a file shorter than one box header is `NotIsoBmff`; the one visible event needs a word confidence of 0.80; `exportClip` restores the preview only when one was attached; the CI runner may lack an AAC or H.264 encoder, and `ffmpeg`.
+- The repository path, the tool states and the table of assumptions now give what was found.
+
+**How it was applied.** 112 replacements in three passes, each refused unless its old text occurred exactly as often as expected; all 112 applied. The file keeps its CRLF line endings. A search finds no remaining instruction that uses R2, `globalSetup` or `$DATABASE_URL` for production.
+
+**Not done.**
+
+- `docs/v2/v2implementation.md` still names R2, in §1A, §5, §23.1, §24.1, §25.3 and §26. Step 1.1 of the guide rewrites those lines; until then the two documents differ there.
+- `buildplan.md` (§1.5, §4.4, §12.1), `technicalspec.md` (§28, §30, §37) and `product.md` (A-7, §20.1) still name R2. PS §9.3 lists macOS as supported: with this decision nothing in V2 shows that the pipeline runs on a Mac.
+- Nothing was built or run for V2: only documents changed.
+
+## 2026-10-08 - The V2 coding prompts: rewritten as Prompts 31 to 60
+
+**Added.** `docs/v2/coding-promptsv2.md`: the agent prompts for V2, in the form of `docs/v1/coding-prompts.md`. A first draft (27 prompts, 31 to 57) was written on this date outside the agent's session; the agent read it against `v2implementation.md`, `v2buildguide.md`, the three specs, `v1implementation.md` and the repository, and rewrote it. Not committed yet.
+
+**What the rewrite changed.** The file lists all 18 changes itself, under "Revision notes". In short:
+
+- **30 prompts, 31 to 60,** as V1 had 30; V3 starts at 61. Four heavy prompts of the draft were split (model, export, use-cases, E2E), and the preflight and the plan's step S4 each became one prompt.
+- **A Standard Agent Block** replaces the draft's preamble: the terminal block (environment, the Python 3.13 folder first in PATH, the baseline), the precedence of the documents, the frozen V1 files, the exact list of V2 test files, and one gate that ends every prompt.
+- **The gate:** no temporary file, no test key in the environment, `pnpm check && pnpm test && pnpm build && pnpm e2e`, an empty frozen-file diff against the baseline, and test counts that may not fall (baseline 170 Rust, 76 web, 12 Playwright).
+- **"Done when" boxes** with the command or the number that proves each, in place of "Accept" bullets.
+- **Browser checks by the agent,** through a temporary Playwright spec, where the draft had marked whole prompts as the human's. What stays with the human: R1, dashboards, credentials, a push, a merge, a tag, the production database, and judgements by eye or ear.
+- **A preflight in Prompt 31:** the branch, the pending documents committed, the baseline recorded.
+
+**Differs from the guide, on purpose.** Each is listed in the file under "Issues in the source documents".
+
+- The chunk-scoped entries of `check-hosts.mjs` (D-38) are written in Prompt 43, with the runtime, not in the TE-1 step. The guide lets `pnpm build` fail between its Steps 5.2 and 5.5; with the prompts every commit passes the gate, and TE-1 confirms the entries in Prompt 44.
+- The test key pair is generated in Prompt 46, where it is first written down, not in Step 0.5.
+- Prompt 50 makes a first export on the development machine, so that the export loop is not committed unexecuted. Verifier check 5 may fail there until Prompt 51 sets the priming.
+- Prompt 32 says how the seven cast overrides of D-59 are built: each exempts one named helper, so a second cast in the file still fails.
+- Prompt 43 adds the lint rule for TDR-3 (only `whisper-runtime.ts` may import the runtime), which V1's ESLint configuration does not have.
+
+**Changed.** `docs/v2/v2buildguide.md`: item 6a and the table of Step 1.1 also name `docs/v2/coding-promptsv2.md` for the TS §5 tree.
+
+**Checked.** By script: 30 prompt headings, 31 to 60 without a gap; 30 rows in the dependency table; every prompt has "Done when" boxes; every file of the tree in §4 of the plan is named in a prompt; every decision D-18 to D-65 is mentioned; every guide step a prompt cites exists. The counts in the prompts (rows of inline tests, machine pairs, E2E cases, exit boxes) were compared with the plan. `check-file-tree.mjs` passes; `docs/` is not among its checked roots.
+
+**Not checked.** No prompt has been run. Whether Chrome under Playwright on this machine gives a worker WebGPU and the encoders is what Prompt 33 finds out; the Standard Agent Block says what to do if it does not.
+
+**Recorded deviation.** TS §34.1 and `buildplan.md` §1.3 ask for one specification per file. `docs/v1/coding-prompts.md` accepted prompts that cover several files for V1 only. The new file extends that to V2 and says so in its header; it is the human's choice to make.

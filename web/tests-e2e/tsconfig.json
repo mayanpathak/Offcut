@@ -1,0 +1,7 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "@types/dom-webcodecs", "node"]
+  },
+  "include": [".", "../playwright.config.ts", "../vite.config.ts", "../vitest.config.ts", "../../bench"]
+}

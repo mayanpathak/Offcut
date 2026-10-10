@@ -1,0 +1,149 @@
+# The media suites of technicalspec.md §33, step 10, as far as a hosted
+# runner can run them: the cases tagged @no-gpu, which are the download of
+# the speech model and the import of the sample clip, in Chrome on Windows.
+#
+# A hosted runner has no graphics card. Its Chrome can be given a software
+# adapter, and the app then runs; but a clip took more than 20 minutes to
+# process there, twice, against a minute and a half on a machine with a
+# graphics processor (TE-10, docs/v2/experiments.md). So the cases that need
+# a processed clip, the pipeline with its preview and the export with the
+# verifier, are not run here: `pnpm e2e:media` on the development machine,
+# all 30 cases, is the gate for them before every merge (v2implementation
+# D-72).
+#
+# ci.yml calls this once its own steps have passed, and before any deploy. It
+# builds nothing: it takes the web/dist that ci.yml built with the E2E test
+# key (D-44).
+#
+# It uploads one thing, and only when a case failed: the Playwright report.
+# Never an exported file, and never a trace (the media project records none).
+
+name: e2e-media
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # The asset host, as in ci.yml: the suites answer its addresses from
+  # fixtures/.cache, and fill that directory from it once.
+  VITE_ASSET_BASE_URL: ${{ vars.VITE_ASSET_BASE_URL }}
+  # The Python of verify/README.md.
+  PYTHON_VERSION: "3.13"
+  # ffmpeg and ffprobe, which the verifier and the suites start. The same
+  # version as on the development machine: a release archive, refused unless
+  # its checksum is the one written here.
+  FFMPEG_VERSION: 9.0.2
+  FFMPEG_SHA256: 60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+  # The arguments of TE-10 (docs/v2/experiments.md). A hosted runner has no
+  # graphics card, and Chrome as it starts gives a page no WebGPU adapter
+  # there; the app then refuses to run. With these two it names the software
+  # adapter of Windows, "microsoft warp" (read on the runner, 2026-10-10).
+  E2E_CHROME_ARGS: "--enable-unsafe-webgpu --ignore-gpu-blocklist"
+  # The runner has 4 cores and no graphics processor: a long wait of a
+  # case may take this many times what it takes on the development machine.
+  E2E_TIMEOUT_SCALE: "3"
+
+jobs:
+  media:
+    runs-on: windows-latest
+    # The eight cases took about five minutes on the runner, and its tools three.
+    timeout-minutes: 30
+
+    # The default shell of a Windows runner is PowerShell; every step here is
+    # written for bash, as in ci.yml.
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # --- 10.1 Checkout and tools ------------------------------------------
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Set up pnpm, the version of package.json
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          corepack enable
+          pnpm --version
+          echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore the pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ env.PNPM_STORE }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install the web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chrome for Playwright
+        run: pnpm --filter web exec playwright install chrome
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install what the verifier needs
+        run: |
+          python --version
+          python -m pip install -r verify/requirements.txt
+
+      - name: Install ffmpeg
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP"
+          archive="ffmpeg-$FFMPEG_VERSION-essentials_build"
+          curl --fail --silent --show-error --location --retry 3 --output ffmpeg.zip "https://github.com/GyanD/codexffmpeg/releases/download/$FFMPEG_VERSION/$archive.zip"
+          echo "$FFMPEG_SHA256  ffmpeg.zip" | sha256sum --check --quiet -
+          unzip -q ffmpeg.zip
+          # The path as Windows writes it: later steps read it from there.
+          cygpath -w "$PWD/$archive/bin" >> "$GITHUB_PATH"
+          "$archive/bin/ffmpeg" -version > ffmpeg-version.txt
+          "$archive/bin/ffprobe" -version > ffprobe-version.txt
+          head -n 1 ffmpeg-version.txt
+          head -n 1 ffprobe-version.txt
+
+      # --- 10.2 The build of the ci job --------------------------------------
+      - name: Take the build of the ci job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: web-dist
+          path: web/dist
+
+      # --- 10.3 The model files and the reference clip -----------------------
+      # The setup project of the suites downloads what is missing and checks
+      # every file's hash, so a cache that is old or empty costs time only.
+      - name: Restore the model files and the reference clip
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fixtures/.cache
+          key: e2e-assets-${{ hashFiles('web/src/config/model-manifest.json', 'web/src/net/asset-fetch.ts') }}
+
+      # --- 10.4 The cases a runner can run, against `vite preview` ------------
+      # The setup project runs first, whatever is selected: it stops the step
+      # at once, with the reason, if Chrome here cannot run the app.
+      - name: Playwright, the media cases that need no graphics card
+        run: pnpm e2e:media --grep @no-gpu
+
+      # --- 10.5 What is kept of a failed run ---------------------------------
+      # The report: the names of the cases and what failed. Not
+      # web/test-results, and not a file a case exported.
+      - name: Keep the Playwright report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report-media
+          path: web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore

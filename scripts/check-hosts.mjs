@@ -22,10 +22,24 @@ const DIST = resolve(ROOT, "web/dist");
 const VERCEL = resolve(ROOT, "web/vercel.json");
 const ENV_LOCAL = resolve(ROOT, "web/.env.local");
 
+// The two places a literal of the speech runtime may be in: the chunk of the
+// ASR worker, and the module of ONNX Runtime that vite.config.ts copies.
+const ASR_CHUNK = /^assets\/asr\.worker-[\w-]+\.js$/;
+const ORT_MODULE = /^ort\/[^/]+\/ort-wasm-simd-threaded\.asyncify\.wasm$/;
+const ORT_OPERATOR_TEXT = "text of an operator's description compiled into ONNX Runtime; the module makes no request";
+// The render bundle. It holds the sources of Vello's shaders as text, which it
+// hands to the GPU's shader compiler; an address in one of them is in a comment.
+const RENDER_MODULE = /^assets\/offcut_render_bg-[\w-]+\.wasm$/;
+const VELLO_SHADER_COMMENT = "an address in a comment of one of Vello's shader sources, which the module holds as text; the module makes no request";
+
 /**
  * URL literals in the bundle that are never requested. Each entry is the
  * start of the literal and the reason it is harmless. Keep this list short:
  * a new entry needs the same proof, that nothing fetches it.
+ *
+ * An entry with `chunk` holds only in the output files whose path, relative
+ * to web/dist, matches it (v2implementation D-38). The same literal anywhere
+ * else is a problem, as if the entry were not there.
  */
 const NON_NETWORK_LITERALS = [
   { prefix: "http://www.w3.org/", reason: "XML namespace names (SVG, MathML, XLink, XML) that React passes to createElementNS; a name, not an address" },
@@ -33,6 +47,33 @@ const NON_NETWORK_LITERALS = [
   { prefix: "https://reactrouter.com/", reason: "a documentation address in the text of a React Router error" },
   // Exactly this and nothing after it: a port or a path would be a real address.
   { prefix: "http://localhost", exact: true, reason: "the placeholder base React Router gives to `new URL()` to parse a relative path; never requested" },
+
+  // The speech runtime (@huggingface/transformers with onnxruntime-web). Its
+  // two default hosts are in its code as strings. workers/asr/whisper-runtime.ts
+  // turns remote loading off, refuses every request the runtime would make,
+  // and points it at /ort/<version>/ on the app's own origin; the CSP names
+  // neither host. Prompt 44 (TE-1) proves that no request is made.
+  { prefix: "https://huggingface.co/", exact: true, chunk: ASR_CHUNK, reason: "the runtime's default model host (`env.remoteHost`); remote loading is off (`env.allowRemoteModels = false`) and `env.fetch` refuses, see TE-1" },
+  { prefix: "https://cdn.jsdelivr.net/npm/onnxruntime-web@$", exact: true, chunk: ASR_CHUNK, reason: "the runtime's default place for ONNX Runtime's files, set on import and replaced by /ort/<version>/ before the first session is made; see TE-1" },
+  { prefix: "https://huggingface.co/docs/", chunk: ASR_CHUNK, reason: "documentation addresses in the text of two of the runtime's errors" },
+  { prefix: "https://github.com/huggingface/transformers.js/issues/", chunk: ASR_CHUNK, reason: "where to report a fault, in the text of a warning of the runtime" },
+  { prefix: "https://gist.github.com/hollance/", chunk: ASR_CHUNK, reason: "an address in the text of the error for a model without alignment heads" },
+  { prefix: "https://developer.mozilla.org/en-US/docs/Web/API/Cache", exact: true, chunk: ASR_CHUNK, reason: "an address in the text of the error for a model cache without `match` and `put`" },
+  { prefix: "https://web.dev/cross-origin-isolation-guide/", exact: true, chunk: ASR_CHUNK, reason: "an address in the text of ONNX Runtime's warning for a page that is not cross-origin isolated" },
+  { prefix: "https://rolldown.rs/in-depth/bundling-cjs", chunk: ASR_CHUNK, reason: "an address in the text of the bundler's error for a `require` call it cannot serve" },
+  { prefix: "https://tinyurl.com/sudb9s96", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+  { prefix: "https://docs.nvidia.com/cuda/cublas/", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+  { prefix: "https://github.com/google/re2/wiki/Syntax", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+  { prefix: "https://ieeexplore.ieee.org/document/1163711", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+  { prefix: "https://arxiv.org/abs/1502.03167", chunk: ORT_MODULE, reason: ORT_OPERATOR_TEXT },
+
+  // offcut_render.wasm (v2implementation D-38). Each is the whole literal.
+  { prefix: "https://skia.org/docs/dev/design/conical/", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://raphlinus.github.io/graphics/2020/04/21/blurred-rounded-rects.html", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/gfx-rs/naga/issues/1930", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/linebender/vello/issues/1061", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://github.com/google/skia/blob/30bba741989865c157c7a997a0caebe94921276b/src/opts/SkRasterPipeline_opts.h#L5859", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+  { prefix: "https://en.wikipedia.org/wiki/Carry-less_product", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
 ];
 
 const URL_LITERAL = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/g;
@@ -77,12 +118,15 @@ const files = filesUnder(DIST);
 for (const file of files) {
   // latin1 maps every byte to one character, so a binary file can be searched too.
   const text = readFileSync(file, "latin1");
+  const where = relative(DIST, file).replaceAll("\\", "/");
   for (const [literal] of text.matchAll(URL_LITERAL)) {
     if (literal === assetOrigin || literal.startsWith(`${assetOrigin}/`)) {
       continue;
     }
-    const known = NON_NETWORK_LITERALS.find((entry) =>
-      entry.exact === true ? literal === entry.prefix : literal.startsWith(entry.prefix),
+    const known = NON_NETWORK_LITERALS.find(
+      (entry) =>
+        (entry.chunk === undefined || entry.chunk.test(where)) &&
+        (entry.exact === true ? literal === entry.prefix : literal.startsWith(entry.prefix)),
     );
     if (known !== undefined) {
       tolerated.set(known.prefix, (tolerated.get(known.prefix) ?? 0) + 1);

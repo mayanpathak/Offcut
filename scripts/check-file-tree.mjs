@@ -51,7 +51,8 @@ const ALLOWED_CRATE_DEPS = {
   "offcut-mp4": ["offcut-types"],
   "offcut-text": ["offcut-types"],
   "offcut-dsp": ["offcut-types"],
-  "offcut-scene": ["offcut-types"],
+  // offcut-text for format_quantity only (v2implementation D-28).
+  "offcut-scene": ["offcut-text", "offcut-types"],
   "offcut-entitlement": ["offcut-types"],
   "offcut-detect": ["offcut-text", "offcut-types"],
   "offcut-render": ["offcut-scene", "offcut-types"],
@@ -65,7 +66,16 @@ const ALLOWED_CRATE_DEPS = {
  * the crates that would let them. `cargo deny` cannot see this for `uuid`,
  * which the server uses with its random features and these crates without.
  */
-const PURE_CRATES = ["offcut-types", "offcut-api-types"];
+const PURE_CRATES = [
+  "offcut-types",
+  "offcut-api-types",
+  "offcut-mp4",
+  "offcut-dsp",
+  "offcut-text",
+  "offcut-detect",
+  "offcut-scene",
+  "offcut-entitlement",
+];
 const NOT_IN_PURE_CRATES = ["rand", "getrandom", "wasm-bindgen", "js-sys", "web-sys", "wgpu"];
 
 const problems = [];

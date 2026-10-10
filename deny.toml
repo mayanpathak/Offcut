@@ -55,20 +55,27 @@ deny = [
   # themselves; cargo-deny checks every direct parent, not only ours.
   # - `reqwest` (a dev-dependency of the server), `wasm-bindgen-futures`,
   #   `web-sys` and `js-sys` use the browser crates when built for wasm.
-  # - `uuid`, `rand` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # - `serde-wasm-bindgen`, which the binding crates convert values with,
+  #   uses `js-sys` and `wasm-bindgen`.
+  # - `uuid`, `rand`, `rand_core` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # - `proptest`, a dev-dependency of the media crates, uses `rand`. A test may
+  #   draw random cases; the `cargo tree` check keeps `rand` out of the crates.
+  # - `vello`, which the renderer draws the overlay with, uses `wgpu`; `wgpu`
+  #   and `wgpu-types` use the browser crates when built for wasm. Only
+  #   `offcut-render` depends on any of the three.
   # `uuid` is also a dependency of the pure crates, which take it without its
   # random features; that is checked with `cargo tree`, not here.
-  { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest"] },
-  { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys"] },
-  { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys"] },
-  { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render"] },
-  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres"] },
-  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "ring"] },
+  { crate = "web-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wgpu", "wgpu-types"] },
+  { crate = "js-sys", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "serde-wasm-bindgen", "wgpu", "wgpu-types"] },
+  { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys", "serde-wasm-bindgen", "wgpu"] },
+  { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "vello"] },
+  { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres", "proptest"] },
+  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring"] },
 
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.
   { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
-  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect"] },
+  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene"] },
   { crate = "offcut-detect", wrappers = ["offcut-wasm-render"] },
   { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
   { crate = "offcut-scene", wrappers = ["offcut-render"] },

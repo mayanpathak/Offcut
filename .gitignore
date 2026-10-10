@@ -21,3 +21,9 @@ fixtures/bad_*
 
 # Videos to try the app with. Never committed.
 testclips/
+
+# Copied from the ONNX Runtime package at build start (v2implementation D-37).
+web/public/ort/
+
+# Model files and the reference clip, downloaded for the media tests (D-39, D-41).
+fixtures/.cache/

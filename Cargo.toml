@@ -1,17 +1,47 @@
 [workspace]
 resolver = "2"
-members = ["crates/offcut-types", "crates/offcut-api-types", "crates/offcut-wasm-core", "server"]
+members = [
+    "crates/offcut-types",
+    "crates/offcut-api-types",
+    "crates/offcut-mp4",
+    "crates/offcut-dsp",
+    "crates/offcut-text",
+    "crates/offcut-detect",
+    "crates/offcut-scene",
+    "crates/offcut-render",
+    "crates/offcut-entitlement",
+    "crates/offcut-wasm-core",
+    "crates/offcut-wasm-render",
+    "server",
+]
 
 # Every shared dependency is versioned here, once. Features are set by the crate that uses it.
 [workspace.dependencies]
 offcut-types = { path = "crates/offcut-types" }
 offcut-api-types = { path = "crates/offcut-api-types" }
+offcut-mp4 = { path = "crates/offcut-mp4" }
+offcut-dsp = { path = "crates/offcut-dsp" }
+offcut-text = { path = "crates/offcut-text" }
+offcut-detect = { path = "crates/offcut-detect" }
+offcut-scene = { path = "crates/offcut-scene" }
+offcut-render = { path = "crates/offcut-render" }
+offcut-entitlement = { path = "crates/offcut-entitlement" }
 serde = "1.0.229"
 serde_json = "1.0.151"
 ts-rs = "12.0.1"
 uuid = "1.27.0"
 trybuild = "1.0.121"
 thiserror = "2.0.21"
+# Tests only. Without its default features: no fork, no timeout, no temporary files.
+proptest = { version = "1.11.0", default-features = false }
+rubato = { version = "5.0.1", default-features = false }
+# Without `system`: no font of the machine is ever read; a scene uses the three it embeds.
+parley = { version = "0.11.1", default-features = false }
+# The renderer's pair: `wgpu` is the release `vello` 0.11 is built on. Without
+# default features, so that no native graphics backend is built: the browser's
+# WebGPU is the only one, and `offcut-render` turns it on.
+vello = { version = "0.11.0", default-features = false }
+wgpu = { version = "30.0.1", default-features = false }
 axum = "0.8.9"
 tokio = "1.53.2"
 tower = "0.5.3"
@@ -27,6 +57,12 @@ ed25519-dalek = "3.0.0"
 reqwest = { version = "0.13.5", default-features = false }
 # Exact: must equal the installed wasm-bindgen CLI (scripts/build-wasm.sh checks it).
 wasm-bindgen = "=0.2.129"
+# The releases that go with that wasm-bindgen. For the binding crates only.
+js-sys = "0.3.106"
+web-sys = "0.3.106"
+serde-wasm-bindgen = "0.6.5"
+# The release that goes with that wasm-bindgen: an `async fn` export needs it.
+wasm-bindgen-futures = "0.4.79"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

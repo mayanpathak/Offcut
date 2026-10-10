@@ -47,8 +47,15 @@ const FACTS = [
     id: "TE-10",
     host: "GitHub Actions (free minutes)",
     fact: "The media suites run headless on a hosted Windows runner, within the monthly free minutes.",
-    checked: null,
-    note: "due in V2",
+    // Read on 2026-10-10, in four runs of the job (docs/v2/experiments.md).
+    // The minutes: a public repository pays none on a standard hosted runner,
+    // and windows-latest is one. The suites: the runner has no graphics card;
+    // with two arguments Chrome runs the app there, and a clip then takes
+    // more than 20 minutes. So 8 of the 30 cases run there, the ones that
+    // need no processed clip, and all 30 on the development machine before a
+    // merge (v2implementation D-72).
+    checked: "2026-10-10",
+    note: "true for 8 of the 30 cases; the others need a graphics processor (D-72)",
   },
   {
     id: "TE-11",

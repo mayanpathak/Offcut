@@ -1,0 +1,2 @@
+# For checks 7 to 9 (V5). The version is exact: a check of numbers must not change with a library.
+numpy==2.5.3

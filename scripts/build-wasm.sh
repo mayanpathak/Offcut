@@ -10,8 +10,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# One entry per bundle, "<crate>:<name>". V2 adds offcut-wasm-render:render.
-BUNDLES="offcut-wasm-core:core"
+# One entry per bundle, "<crate>:<name>".
+BUNDLES="offcut-wasm-core:core offcut-wasm-render:render"
 
 TARGET=wasm32-unknown-unknown
 # The features wasm-opt must accept. The first is what RUSTFLAGS turns on
