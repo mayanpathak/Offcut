@@ -70,6 +70,7 @@
 | 37 | **What Prompts 55 to 58 build on** (entry of Prompt 54). `importClip(file, source)` resolves when the clip is accepted, rejected or failed, and the pipeline runs on after that: a caller reads the clip store, not the promise. `importSampleClip()` fetches 35 MB before the clip store leaves `idle`, and says nothing meanwhile; a second call joins the first. `dismissClip()` does nothing for a clip that is `idle`, being imported or being processed, and nothing while an export runs; it stops a preview that plays, closes the session, removes the clip's directory and resets an export that is over. `startExport(clipId)` resolves when the export is over, however it ended; with no token it sets `unavailable` and changes nothing else. All of them return without a word when a blocker stands: the component shows the blocker's copy from `forImport()` or `forExport()`. **While the model downloads** the clip is `processing` at `probe_audio` with `waitingModel: true`. **A promise of these calls that rejects is a fault of the code,** never a failure of the device: those are in the stores. **For the suites:** `exports/` holds `<exportId>.mp4` and an empty directory `tmp/`, and does not exist after an export that was refused; `stage_timing` for `asr` is sent for a clip without speech too; `model_download` is sent only when files were downloaded; one `preview_played` for each `attach`. `git grep -n "V3: \|V7: " -- web/src/usecases` prints 5 lines, one of them V1's | Prompts 55, 56, 57, 58 |
 | 38 | **What Prompts 56 to 58 build on** (entry of Prompt 55). **Test ids:** `drop-zone`, `editor`, `feed` (an `<ol>`, one `<li>` for each line), `preview-canvas`, `export-status` (the line under the export button: a blocker's words or the unavailable message), `export-progress`, `export-stage`, `export-done`, `export-failed`, `clip-rejected`, `clip-failed`. The model panel has none: find it by `messages.modelDownload.body(sizeMb)` and its bar by the role `progressbar`. **Buttons by name:** `messages.preview.play`, `.pause`, `.replay` (match exactly: "Play" is also the start of "Play again"), `messages.export.button`, `messages.editor.startOver`, `messages.dropZone.sampleButton`. **The feed is gone once the clip is `ready`,** and "Found: $12k" is on the page for half a second or less: a case must record the list with a `MutationObserver` installed before the page loads, not look for the line. The stage labels of an export need the same; "Saving" lasts a moment. **A drop on `/` moves to `/app`; a drop on `/app` stays there.** The drop zone also holds a hidden `<input type="file">`. **`ready` has a "start over" since D-71** (the entry of 2026-10-10), disabled while an export runs. **To make Chrome unsupported in a test,** define `Navigator.prototype.userAgentData` with `mobile: true` in an init script; Playwright's `isMobile` and `--disable-blink-features=WebGPU` do not do it. The first press of play must be a real click | Prompts 56, 57, 58 |
 | 39 | **What Prompts 57 to 59 build on** (entry of Prompt 56). **Helpers** of `web/tests-e2e/helpers/fixtures.ts`: `routeAssets(page, o?)` gives `{ requests, modelRequests() }`, a request being `{ method, url, path, headers, hasBody, answer }` with `headers` a list of `{ name, value }` in lower case; `dropClip(page, referenceClip())`; `await ensureModelCached(context)` before the page opens, which writes the model into OPFS and starts no download (the whole case of the second session takes 11 s with it); `opfsList(page, dir)`, sorted names, `[]` for no directory; `sourceDurationMs(fixture)`, which starts `ffprobe` from PATH; `modelManifest`, `assetBaseUrl()`, `sampleClipPath()`. **A case begins:** `installFakeApi(page)`, `routeAssets(page)`, `page.clock.install()`, `page.goto("/app")`, wait for the test id `drop-zone`. **Analytics:** `await flushAnalytics(page)`, then `expect.poll` on `api.eventsOf(name)`; do not flush twice without waiting for what the first sent. With the clock installed time still runs on by itself. **`pnpm e2e:media`** runs `media-setup` and then `media`, one worker; the suites of Prompt 57 are matched by name already (`pipeline-preview.spec.ts`, `export-creator.spec.ts`). **A temporary `zz-*.spec.ts` matches no project:** bring a temporary `web/zz-pw.config.ts` that spreads the real configuration and sets `projects: [{ name: "zz", testMatch: "zz-*.spec.ts" }]`, and run `playwright test --config zz-pw.config.ts`. **Each test has its own browser context,** so its own OPFS: a case that needs the model calls `ensureModelCached` itself. **`fixtures/.cache/`** holds each file under its path on the asset host. A quota for a case is set with `Storage.overrideQuotaForOrigin` through `context.newCDPSession(page)`. `bench/device-bench.ts` (Prompt 58) is matched by the project `bench` already | Prompts 57, 58, 59 |
+| 40 | **What Prompts 58 and 59 build on** (entry of Prompt 57). `pnpm e2e:media` is 30 cases and takes 9.7 minutes on D1, headless, one worker; the files run in the order of their names: `export-creator`, `model-download`, `pipeline-preview`. **It needs on PATH:** `python` with the verifier's requirements, and `ffprobe` and `ffmpeg`; on D1 the Python of the SAB must come first. **It needs a build with the test key:** on a plain build `export-creator` fails at "Creator export" with `E_ENTITLEMENT_INVALID` and 8 cases do not run; `model-download` and `pipeline-preview` pass on either. **The cases of `pipeline-preview` and of `export-creator` are one group each, in order, in one page:** one that fails stops the rest of its group, and a retry runs the group again from the drop. **An exported file is written under the system's temporary directory** and removed by the suite; nothing is written under `web/test-results` but what Playwright writes itself for a failed case, which can hold text of the page. Helpers added: `verifyMp4(file, profile, expectedDurationMs)` gives `{ status, output }`; `opfsSize(page, file)` gives a number or `null`. For the bench: a page with `installFakeApi`, `routeAssets`, a dropped clip, `seedEntitlement(page, mintEntitlementToken())` and a click on `messages.export.button` ends in a `download` event; the timings are in `api.eventsOf("stage_timing")`, `"pipeline_done"` and `"export_done"`, which arrive within 10 s of the export's end | Prompts 58, 59 |
 
 ---
 
@@ -3402,3 +3403,96 @@ No copy was added: the button says `messages.editor.startOver`, as on the stub. 
 **Checked.** `tsc` and ESLint are clean. The button was first pressed by a test: the "Start over" case of `pipeline-preview.spec.ts` (Prompt 57) presses it on a `ready` clip, after a preview that was played and paused, and reads the drop zone and an empty `clips/`; the "Progress" case of `export-creator.spec.ts` reads it disabled while an export runs and enabled after. The gate was run once, on the tree with Prompt 57 in it, and is in that entry: this commit, without the two suites, was not gated by itself.
 
 **Not checked.** By eye: where the button stands under the export's progress on a small window (the page was already taller than 760 px, entry of Prompt 55).
+
+## 2026-10-10 - Prompt 57: `pipeline-preview.spec.ts`, `export-creator.spec.ts`
+
+**The one path, asserted.** `pnpm e2e:media` runs 30 cases: the 8 of the model download, 11 that take the reference clip from a drop to a preview that plays, and 11 that export it, with the verifier started from inside the suite on both files it downloads.
+
+**Added.**
+
+| File | Content |
+|---|---|
+| `web/tests-e2e/pipeline-preview.spec.ts` | The 11 cases of §23.7. 389 lines |
+| `web/tests-e2e/export-creator.spec.ts` | The 11 cases of §23.8. 293 lines |
+
+**Changed.**
+
+| File | Change |
+|---|---|
+| `web/tests-e2e/helpers/fixtures.ts` | `verifyMp4(file, profile, expectedDurationMs)`, which starts `python verify/verify_mp4.py`, and `opfsSize(page, file)`. 470 lines |
+| `web/tests-e2e/model-download.spec.ts` | Reads the size of the `.part` with `opfsSize`; nothing else |
+| `docs/v2/v2implementation.md` | §23.7 and §23.8 say what was built |
+| `docs/v2/v2changelog.md` | This entry; known issue 40 |
+
+No file of the app changed in this prompt. No dependency was added.
+
+**How the suites are built.** Each of the two processes the clip once. Its cases are one group that runs in order in one page, with the model put on the device by `ensureModelCached` before the page opens; a case that fails stops the ones after it. A case of its own for each row would take the clip through the pipeline 22 times, a minute and more each. "Sample clip" alone has a page of its own, and ends when `clip_accepted` has arrived. Neither suite installs the page's clock: the preview keeps time with the render worker by the page's own clock, and a moved clock would put them apart. An event is waited for until analytics sends it, at most 10 s.
+
+| Suite | Order of its cases |
+|---|---|
+| `pipeline-preview` | Feed; real detections only; quiet processing; OPFS; long tasks; preview before sign-in; pause and resume; events; event shape; start over. Then, in a page of its own: sample clip |
+| `export-creator` | No token; a token signed with another key; Creator export; progress; events; download name; storage; quiet export; preview after export; Free-plan token; second export |
+
+**The runs.** Headless Chrome on D1, one worker.
+
+| Run | Result |
+|---|---|
+| The two new suites, on a build with the test key, as first written | 22 of 22 in 5.0 min |
+| All three, after a change to the export helper (below) | 22 passed, 1 failed, 8 did not run: "Creator export". A fault of the helper, not of the app |
+| `export-creator` alone, the helper corrected | 11 of 11 in 3.8 min |
+| **`pnpm e2e:media`, final, on a build with the test key** | **30 of 30 in 9.7 min** (31 with the setup test) |
+
+The Creator export case takes about 45 s with the verifier, the Free one about 35 s. The longest task of the main thread while the clip was processed, written by the "long tasks" case and not asserted: 241, 250 and 226 ms in three runs, each time the one task of 50 ms or more.
+
+**The fault in the helper, and what it showed.** To make a failed export say why, `exportAndSave` was changed to stop waiting for the download when the failure stub is on the page. But the stub of the export before, the one with the wrong key, stays on the page until the next export has read its token and begun: the helper saw that stub at once and reported a failure that had not happened. It now counts, with an observer of the page, how often a failure *comes* onto the page, and waits for one more. Worth knowing for V4: between the click on Export and the start of the new export the page still shows the last export's failure.
+
+**The two checks of the prompt.**
+
+| Check | Result |
+|---|---|
+| A build without the test key, then `export-creator.spec.ts` | "No token" and "a token signed with another key" pass; "Creator export" fails with `Error: the export failed: {"name":"export_failed","props":{"error_code":"E_ENTITLEMENT_INVALID","stage":"render_encode"}}`; the 8 cases after it do not run. Run twice, the second time with the corrected helper, on the plain build of the gate |
+| `answered(await pool.asr.unload(), run.stage);` commented out in `run-pipeline.ts`, a build with the test key, then `pipeline-preview.spec.ts` | 11 of 11 pass. **Nothing in V2 asserts INV-12:** that the speech model's memory is given back before the render session opens is covered by review until V4's `run-pipeline.test.ts`. The line was restored from a copy; `git diff` of the file is empty |
+
+**Decided here, where the plan is silent or cannot be built as written.** Each is in §23.7 and §23.8 of the plan now.
+
+- **"Quiet processing" allows the page its own files,** as "Loading" of Prompt 56 does: from the drop to the player it fetches its workers, the two WASM bundles and the recognizer's runtime from its own origin (§27, item 38). **"Quiet export" allows nothing but `POST /api/v1/events`,** and holds: no file is fetched while an export runs.
+- **"No property is a free string" is a table.** Each event the session may send is listed with what each property may be: a whole number, a boolean, or a member of a fixed list of words. An event or a property that is not in the table fails the case.
+- **"No feed text in any request"** looks for "Transcribing…", "Found:" and the amounts of the README's expected feed in the address and the body of every request the page and its workers made.
+- **"Neither is a single flat color"** is read from the picture's bytes without a library: a flat picture holds a handful of different byte values.
+- **An exported file is saved outside `test-results`,** in a directory under the system's temporary one that is removed when the suite ends, so that no report can pick it up (§22.5).
+- **"No token" waits 11 s** before it reads that no `export_started` came: longer than analytics takes to send.
+- **"Second export" is the Free export.** It is the second export that succeeds, and its file's name is compared with the Creator export's.
+- **The start-over case uses the button of D-71,** on the `ready` clip, after the preview was played and paused.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The cases of a suite are not independent tests.** §23.7 and §23.8 list rows; they do not say each has a clip of its own. On a retry in CI the whole group runs again.
+- **Three `export_started` events, not one per successful export:** the refused export is announced as a Creator's, because `planOf` reads the plan from the token as it is (D-52). The "Events" case asserts the two that have been sent by then.
+- **`verifyMp4` and `opfsSize` are in the helpers,** beside the functions §23.4 lists.
+
+**Checked.**
+
+- `pnpm --filter web exec tsc --noEmit -p tests-e2e/tsconfig.json` and ESLint on `tests-e2e`: clean.
+- The gate: no `zz-` file; no test key in the environment; `pnpm check`, `pnpm test`, `pnpm build` and `pnpm e2e` green; the frozen-file diff against `322c7d3` is empty. **262 Rust** (2 ignored), **92 Vitest**, **12 Playwright**, and **30 media cases** on the keyed build before it. `check-file-tree`: 233 files. The app shell is 299.3 kB gzipped, was 299.2: the button of D-71.
+- After the plain build, the search for the test public key in `web/dist` finds 0 files.
+- `web/test-results` is gone; the directory of exported files under the system's temporary one is removed by the suite itself.
+
+**"Done when".**
+
+- [x] `pnpm e2e:media` passes 30 cases (8, 11, 11); no feed text appears in any request (the "event shape" case).
+- [x] After the plain build, `grep -rl "<test public key>" web/dist | wc -l` is 0.
+
+**Not checked.**
+
+- **CI.** The media suites have run on D1 only. The Windows job is Prompt 58's.
+- **The suites with `E2E_REAL_ASSETS=1`,** and headed (`pnpm e2e:device`).
+- **A retry of a group.** No case failed in a way that made Playwright run a group again.
+- **By eye and by ear.** The verifier and the pictures say the export is well formed and the preview moves; that the sound is in sync is still the founder's to judge (Prompt 55).
+- **R1** (D-69).
+
+**Found, and not for this prompt.**
+
+- **The page shows the last export's failure until the next export begins** (above).
+- **A report of a failed case can hold text of the page.** Playwright writes a snapshot of the page beside a failure, and a trace holds the page's text and pictures. Prompt 58 must turn traces off for the media project before a report is uploaded (§22.5, step 10.5).
+
+**Open, for the human.** Nothing new. Prompt 58 follows in the same sitting, and its push is the one that counts.

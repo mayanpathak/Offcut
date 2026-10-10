@@ -22,6 +22,7 @@ import {
   flushAnalytics,
   modelManifest,
   opfsList,
+  opfsSize,
   referenceClip,
   routeAssets,
 } from "./helpers/fixtures";
@@ -173,16 +174,7 @@ test("an interrupted download goes on from the bytes it has", async ({ page, con
   const names = await opfsList(second, MODEL_DIR);
   expect(names).toContain(`${interrupted.localName}.part`);
   expect(names).not.toContain(interrupted.localName);
-  const partBytes = await second.evaluate(
-    async ({ dir, name }) => {
-      let handle = await navigator.storage.getDirectory();
-      for (const segment of dir.split("/")) {
-        handle = await handle.getDirectoryHandle(segment);
-      }
-      return (await (await handle.getFileHandle(name)).getFile()).size;
-    },
-    { dir: MODEL_DIR, name: `${interrupted.localName}.part` },
-  );
+  const partBytes = await opfsSize(second, `${MODEL_DIR}/${interrupted.localName}.part`);
   // Three parts arrived before the connection broke, and all were kept.
   expect(partBytes).toBe(3 * PART_BYTES);
 
@@ -190,7 +182,7 @@ test("an interrupted download goes on from the bytes it has", async ({ page, con
   await expect.poll(() => resumed.modelRequests().length, { timeout: 60_000 }).toBeGreaterThan(0);
   const first = resumed.modelRequests()[0];
   expect(first?.path).toBe(interrupted.path);
-  expect(rangeStart(first)).toBe(partBytes);
+  expect(rangeStart(first)).toBe(3 * PART_BYTES);
   await expect(feedLines(second).first()).toHaveText(messages.feed.transcribing, { timeout: 240_000 });
   expect(await modelDownloadEvent(second, api)).toEqual({
     name: "model_download",

@@ -2085,6 +2085,20 @@ Model pre-cached with `ensureModelCached`. Fixture: the reference clip, through 
 | Start over | "Start over" returns to the drop zone and `clips/` is empty |
 | Long tasks | The longest main-thread task while processing is written to the test output. It is not asserted in V2 (TS §13.5: assumption, M2.4) |
 
+**As built (Prompt 57).** The clip is processed once for ten of the eleven cases: they are one group that runs in order in one page, the model put on the device with `ensureModelCached` before it opens, and a case that fails stops the ones after it. Taking each case through the pipeline by itself would cost a minute and more a case. "Sample clip" has a page of its own. The page's clock is not installed here: the preview keeps time with the render worker by the page's own clock, and a moved clock would put the two apart. An event is waited for until analytics sends it by itself, at most 10 s.
+
+| Case | As built |
+|---|---|
+| Feed, Real detections only | The list is read by an observer of the page, which keeps every state it was in: the line of an event is on the page for a moment (section 27, item 33). Each state begins with the one before it. The amounts a "Found:" line may name are read from the table "Expected feed" of `fixtures/speech/README.md` |
+| Preview before sign-in | "No session" is the `entitlement` store read through IndexedDB: no record `current`. "Not a single flat color" is read from the picture's own bytes: a flat picture holds a handful of different byte values, a frame of video hundreds |
+| Events | The three `stage_timing` events are exactly `probe_audio`, `asr` and `detect_scene`, in that order, and `asr_backend` is on `asr` alone. Also: no `model_download` and no `client_error` |
+| Event shape | Every event of the session is checked against a table of what it may carry: each property is a whole number, a boolean, or a member of a fixed list of words. "No feed text in any request" is read from every request of the page and its workers, address and body: "Transcribing…", "Found:" and the amounts |
+| Quiet processing | From the drop to the player: nothing to another origin than the page's; besides `POST /api/v1/events`, `GET`s for files of the build under `/assets/` and `/ort/` (section 27, item 38) |
+| OPFS | Also: `clips/` holds exactly one directory, named by a UUID, with exactly `source` and `out48.f32` |
+| Start over | From the `ready` clip, with the button of D-71: the drop zone is back and `clips/` is empty |
+| Long tasks | The longest task of the main thread between the drop and the player, from a `PerformanceObserver` for `longtask`, is written to the test's output and to its annotations |
+| Sample clip | One `GET` for `SAMPLE_CLIP_PATH`, with no `Range` and no cookie. The case ends when `clip_accepted` has arrived; it does not wait for the pipeline |
+
 ### 23.8 `web/tests-e2e/export-creator.spec.ts` (V2 cases; TS §27.1)
 
 | Case | Expect |
@@ -2100,6 +2114,19 @@ Model pre-cached with `ensureModelCached`. Fixture: the reference clip, through 
 | Preview after export | Play works again and the canvas changes (the preview canvas and profile were restored) |
 | Second export | `exports/` again holds exactly one file, named after a new `ExportId`; the first export's file is gone (D-40) |
 | Quiet export | Between `export_started` and `export_done` the only requests are `POST /api/v1/events` |
+
+**As built (Prompt 57).** One clip, processed once, and the eleven cases export it in this order in one page: no token, a token signed with another key, a Creator token, a Free token. The cases "Progress", "Events", "Download name", "Storage" and "Quiet export" read what the Creator export left; "Second export" reads what the Free export left. A case that fails stops the ones after it. The suite needs a build made with the test key: on a plain build the Creator export fails with `E_ENTITLEMENT_INVALID`, and the case says so.
+
+| Case | As built |
+|---|---|
+| Creator export passes the verifier | The file is saved to a directory under the system's temporary one, never under `test-results`, and removed when the suite ends: an exported file is in no report (section 22.5). `verifyMp4` of the helpers starts `python verify/verify_mp4.py` |
+| Progress | The stage labels are read by an observer of the page: "Rendering", "Writing the file", and "Saving" when it was on the page long enough to be seen. Also: the bar ends at 100 and never goes back; while the export runs the play button and "start over" are disabled (D-71) |
+| Events | Two `export_started` have been sent by then, both `creator`: the refused export is announced too, with the plan its token names (D-52) |
+| Free-plan token | Also: the same file fails the verifier's check 2 as `creator`, so the size is what the token said |
+| No token | The case waits 11 s, longer than analytics takes to send, before it reads that no `export_started` came |
+| Token signed with another seed | Also: no download, and the play button and the export button can be used again |
+| Second export | The Free export is the second: `exports/` holds one file whose name is another id than the Creator export's, and two files were downloaded in all |
+| Quiet export | From the click on Export to the download: every request is `POST /api/v1/events`. No file of the build is fetched in that time |
 
 ### 23.9 `verify/verify_mp4.py` (checks 1-6)
 

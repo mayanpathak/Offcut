@@ -2,7 +2,7 @@
 // host served from this machine, the reference clip, and the speech model put
 // on the browser's device without a download.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
@@ -113,6 +113,23 @@ export function sourceDurationMs(fixture: string): number {
     throw new Error(`ffprobe gave no duration for ${fixture}`);
   }
   return Math.round(seconds * 1000);
+}
+
+/**
+ * Runs the independent verifier on an exported file (TS §27.2) and gives its
+ * exit status and what it printed: 0 only when every check it makes passes.
+ * `python` is the one on PATH, which must be the Python of `verify/README.md`.
+ */
+export function verifyMp4(file: string, profile: "free" | "creator", expectedDurationMs: number): { status: number | null; output: string } {
+  const run = spawnSync(
+    "python",
+    [path.join(ROOT, "verify/verify_mp4.py"), file, "--profile", profile, "--expected-duration-ms", String(expectedDurationMs)],
+    { encoding: "utf8" },
+  );
+  if (run.error !== undefined) {
+    throw run.error;
+  }
+  return { status: run.status, output: `${run.stdout}${run.stderr}` };
 }
 
 // --- The cache of the asset host's files -----------------------------------------
@@ -368,6 +385,24 @@ export function opfsList(page: Page, dir: string): Promise<string[]> {
       return names.sort();
     },
     dir.split("/").filter((segment) => segment !== ""),
+  );
+}
+
+/** The size in bytes of a file of the page's origin private file system, or `null` when it is not there. */
+export function opfsSize(page: Page, file: string): Promise<number | null> {
+  return page.evaluate(
+    async (segments) => {
+      let handle = await navigator.storage.getDirectory();
+      try {
+        for (const segment of segments.slice(0, -1)) {
+          handle = await handle.getDirectoryHandle(segment);
+        }
+        return (await (await handle.getFileHandle(segments.at(-1) ?? "")).getFile()).size;
+      } catch {
+        return null;
+      }
+    },
+    file.split("/").filter((segment) => segment !== ""),
   );
 }
 
