@@ -94,6 +94,12 @@
   color: var(--color-problem);
 }
 
+/* Under the preview and the export: the way back to the drop zone. */
+.startOver {
+  display: flex;
+  justify-content: center;
+}
+
 /* The demo is a vertical short, so its box is portrait too. */
 .video {
   width: min(100%, 20rem);

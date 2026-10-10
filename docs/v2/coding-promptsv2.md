@@ -25,7 +25,7 @@ BASE=$(git merge-base main HEAD)                                             # t
 1. Read the plan sections and guide steps this prompt cites, and the files it touches.
 2. Search for existing types, helpers and constants before creating any. Reuse them.
 3. Verify that the previous prompts' outputs exist and behave as this prompt assumes. If not: decide whether it is a bug or an intended boundary, make the smallest compatible fix, and report it.
-4. Precedence: a decision D-18 to D-70 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
+4. Precedence: a decision D-18 to D-71 of §2 is binding, also where it corrects a TS section (it says which). Otherwise TS wins over the plan, and PS over both. The guide gives the order of work, and its "Read this first" items 1 to 12 and its table (b) correct the plan where they say so. If two sources disagree in a way none of these settles, or a signature is missing, stop and list it. Do not guess (TS §34.1).
 
 **During implementation**
 

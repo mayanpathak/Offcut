@@ -1,12 +1,15 @@
 // `/app`: the editor. One clip at a time, and what the page shows is where
 // that clip is on its way: the drop zone, the processing feed, the preview
-// with the export, or what went wrong and the way to start over (J2 to J10).
+// with the export, or what went wrong. From the preview and from a clip that
+// ended badly there is a way to start over (J2 to J10).
 
 import type { ReactNode } from "react";
 
 import { messages } from "../../copy/messages";
 import type { ErrorCode } from "../../gen/domain";
+import { forImport } from "../../state/blockers";
 import { type ClipState, useClipStore } from "../../state/clip-store";
+import { useExportStore } from "../../state/export-store";
 import { useModelStore } from "../../state/model-store";
 import { dismissClip } from "../../usecases/import-clip";
 import { DropZone } from "../components/DropZone";
@@ -31,20 +34,34 @@ function failureCopy(code: ErrorCode | undefined) {
   return undefined;
 }
 
+/**
+ * "Start over": lets go of the clip and brings the drop zone back. While an
+ * export runs the clip cannot be let go, and the button waits with it.
+ */
+function StartOver() {
+  // Read so that the button is drawn again when an export starts and when it ends.
+  useExportStore((state) => state.status);
+  const waiting = forImport() !== null;
+  return (
+    <button
+      className={[components.secondaryButton, waiting ? components.pending : undefined].filter(Boolean).join(" ")}
+      type="button"
+      disabled={waiting}
+      onClick={() => {
+        void dismissClip();
+      }}
+    >
+      {messages.editor.startOver}
+    </button>
+  );
+}
+
 /** What is said of a clip that ended badly, and the way on. No code and nothing of the file is shown. */
 function Stub({ children, testId }: { children: ReactNode; testId: string }) {
   return (
     <section className={styles.stub} data-testid={testId}>
       {children}
-      <button
-        className={components.secondaryButton}
-        type="button"
-        onClick={() => {
-          void dismissClip();
-        }}
-      >
-        {messages.editor.startOver}
-      </button>
+      <StartOver />
     </section>
   );
 }
@@ -95,6 +112,9 @@ function body(clip: Pick<ClipState, "status" | "waitingModel"> & { code: ErrorCo
           <PreviewPlayer />
           <ExportButton />
           <ExportProgress />
+          <div className={styles.startOver}>
+            <StartOver />
+          </div>
         </section>
       );
     case "rejected":
