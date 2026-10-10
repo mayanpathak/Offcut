@@ -35,7 +35,8 @@ export default defineConfig({
   projects: [
     // `pnpm e2e`, and the Linux job of CI. No dependency: it never fetches the model.
     { name: "non-media", testMatch: "landing.spec.ts" },
-    { name: "media-setup", testMatch: "media.setup.ts" },
+    // With the arguments of the suites it stands for: it asks whether their Chrome can run the app.
+    { name: "media-setup", testMatch: "media.setup.ts", fullyParallel: false, workers: 1, use: MEDIA_USE },
     {
       name: "media",
       testMatch: MEDIA_SUITES,

@@ -237,14 +237,16 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 | The allowance | "GitHub Actions usage is free for self-hosted runners and for public repositories that use standard GitHub-hosted runners." The repository is public, and `windows-latest` is a standard hosted runner: the job's minutes count against nothing. The same page says a larger runner is always charged for; none is used |
 | The suites on D1, for scale | 30 cases in 9.7 minutes, headless, one worker, with a GPU (entry of Prompt 57) |
 | The first run of the job, 2026-10-10 (run 38044970567, commit `45dbea2`) | Every step before the suites passed on `windows-latest`: Node and pnpm; Chrome through Playwright, 66 s; Python and the verifier's requirements, 27 s; `ffmpeg` from its archive, 5 s; the `web-dist` artifact of the job `ci`, 2 s. **The suites then stopped after 4 s, before any test ran:** a fault of `export-creator.spec.ts`, which asked `ffprobe` for the reference clip while the file was being loaded, before the setup project had downloaded it. Corrected the same day (`v2changelog.md`) |
-| The job on the runner: did the 30 cases pass | **Not known yet:** no case has run there |
+| The second run, 2026-10-10 (run 38053613126, commit `72878ba`) | The setup test passed: the model and the reference clip were downloaded on the runner and their hashes hold, 15 s. **Then every case failed at the same place, 11 failed and 19 did not run, 12.6 min:** no drop zone on `/app` within 30 s, which is what the page shows when the app's capability check refuses the browser. The log does not say which capability. Since that day the setup asks first and says it |
+| The job on the runner: did the 30 cases pass | **No.** The app does not start there as Chrome is started now |
+| Chrome's software WebGPU adapter, on D1 (`--enable-unsafe-webgpu --use-webgpu-adapter=swiftshader`), for what a machine without a graphics card can do at best | The model download: not tried. The pipeline: the speech model first failed, for want of 16-bit floats on that adapter, which was a fault of the app and is corrected; then `ready` after 82 s with the model on WASM, and `pipeline-preview.spec.ts` 11 of 11 in 2.8 min. **The export: 17% of 2,242 frames after 180 s, about 2.1 frames a second, so about 18 minutes for one Creator file,** against 35 s with the graphics processor. D1 has 12 threads; a hosted runner has 4 |
 | The job's minutes | The failed run took 2 min 30 s, of which about 2 min 20 s were the tools. A run of the 30 cases: not known yet |
-| WebGPU on the runner, and Chrome's arguments if it needs any | **Not known.** The runner has no graphics card |
+| WebGPU on the runner, and Chrome's arguments if it needs any | **Not known yet.** The setup test prints it on the next run |
 | The H.264 and the AAC encoder on the runner | **Not known.** A Windows Server image may lack the system encoders Chrome uses |
 
 **Date.** 2026-10-10 for the allowance. The run: open.
 
-**Decision.** Not taken. Until the first run is read, the job is on pull requests and on `main`, as §22.5 has it. What that run decides, by its outcome (G 11.5):
+**Decision.** Not taken, and since 2026-10-10 it is plain that it is not the choice G 11.5 lays out. Whatever the runner lacks, two exports of the reference clip cannot be drawn without a graphics card in a time a pull request waits for, and the fallback of §22.5, the job "on `main`", would put that wait, or that failure, before every deploy. The choices are in open item 15 of `v2changelog.md`; the founder takes one. The table below is what G 11.5 says, kept for the record:
 
 | Outcome of the first run | Then |
 |---|---|

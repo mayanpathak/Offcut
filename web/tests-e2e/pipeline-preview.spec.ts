@@ -314,7 +314,7 @@ test.describe("one clip, from the drop to the preview", () => {
     await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
   });
 
-  test("events: the clip, its three stages, the result, and one preview for two plays", async () => {
+  test("events: the clip, its three stages, the result, and one preview for two plays", async ({}, testInfo) => {
     await expect.poll(() => api.eventsOf("preview_played").length, { timeout: FLUSH_WAIT_MS }).toBe(1);
     expect(api.eventsOf("clip_accepted")).toEqual([
       { name: "clip_accepted", props: { source: "user", orientation: "landscape", duration_bucket: "lte90" } },
@@ -326,6 +326,12 @@ test.describe("one clip, from the drop to the preview", () => {
       expect(event.props.asr_backend === undefined || event.props.asr_backend === null).toBe(event.props.stage !== "asr");
     }
     expect(["webgpu", "wasm"]).toContain(timings[1]?.props.asr_backend);
+    // Which of the two it was is the machine's to say, and is written down: a
+    // graphics processor that cannot run the model leaves it to the processor.
+    const backendLine = `the speech model ran on: ${String(timings[1]?.props.asr_backend)}, ${String(timings[1]?.props.duration_ms)} ms`;
+    testInfo.annotations.push({ type: "asr backend", description: backendLine });
+    process.stdout.write(`      ${backendLine}
+`);
     expect(api.eventsOf("pipeline_done")).toEqual([
       { name: "pipeline_done", props: { total_ms: expect.any(Number), n_number: expect.any(Number), n_list: 0, n_from_to: 0, n_keyword: 0 } },
     ]);

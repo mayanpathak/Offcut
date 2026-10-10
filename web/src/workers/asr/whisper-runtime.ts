@@ -72,9 +72,23 @@ function configure(modelId: string): void {
 }
 
 /**
+ * Whether the graphics processor can run this model. Its decoder computes in
+ * 16-bit floats (`q4f16`), which a graphics processor offers as the feature
+ * `shader-f16` or not at all. One without it still makes a session, and then
+ * fails in the middle of the first clip: so it is asked before, not after.
+ */
+async function gpuRunsModel(): Promise<boolean> {
+  if (!("gpu" in navigator)) {
+    return false;
+  }
+  const adapter = await navigator.gpu.requestAdapter();
+  return adapter !== null && adapter.features.has("shader-f16");
+}
+
+/**
  * Loads the model of `modelId` from OPFS. `webgpu` falls back to `wasm` when
- * a session cannot be made on the graphics processor. Returns the backend
- * in use.
+ * the graphics processor cannot run the model, or when a session cannot be
+ * made on it. Returns the backend in use.
  */
 export async function loadModel(modelId: string, backend: "webgpu" | "wasm"): Promise<"webgpu" | "wasm"> {
   await unloadModel();
@@ -82,7 +96,7 @@ export async function loadModel(modelId: string, backend: "webgpu" | "wasm"): Pr
   const create = (device: "webgpu" | "wasm"): Promise<AutomaticSpeechRecognitionPipeline> =>
     pipeline("automatic-speech-recognition", modelId, { device, dtype: MODEL_DTYPE });
 
-  if (backend === "webgpu") {
+  if (backend === "webgpu" && (await gpuRunsModel())) {
     try {
       session = await create("webgpu");
       return "webgpu";
