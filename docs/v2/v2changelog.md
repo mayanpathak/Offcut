@@ -3879,3 +3879,13 @@ The steps of `e2e-media`, on `windows-latest`:
 **Changed.** `docs/v2/experiments.md` and this file: the entry, the box of Prompt 58, open item 16.
 
 **Open, for the human.** Mark pull request #2 ready. Before the merge of Prompt 59: `pnpm e2e:media` on D1, on a build with the test key, 30 of 30 (open item 16). Still open from Prompt 55: the founder's look at the preview and at `testclips/renders/p55-creator-1080x1920.mp4`.
+
+## 2026-10-10 - Outside a prompt: `introvideoscript.md` is ignored
+
+**Asked by the founder.** A script to record as the introduction video, the one that is to take the place of the placeholder demo of the landing page (open item 6). It is a working note of the founder's, in the repository's root, and is not committed.
+
+**Changed.** `.gitignore`: one line, `introvideoscript.md`, with its comment. This file: this entry. Nothing else.
+
+**Checked.** `git check-ignore introvideoscript.md` names the file; `git status` does not show it; `node scripts/check-file-tree.mjs` is green, 235 files.
+
+**What the script commits the app to, when the video is made.** Its first line, "I did not edit this video", is true only of a file that is the app's own export of the recording. And the caption under the demo, `messages.landing.demoCaption`, says the demo was "made by hand": it has to change in the commit that puts the new video on the page, with `DEMO_VIDEO_PATH`.
