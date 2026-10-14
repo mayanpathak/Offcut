@@ -27,3 +27,6 @@ web/public/ort/
 
 # Model files and the reference clip, downloaded for the media tests (D-39, D-41).
 fixtures/.cache/
+
+# The founder's script for the introduction video: a working note, never committed.
+introvideoscript.md
