@@ -67,16 +67,21 @@ export const messages = {
   },
 
   // The processing feed (PS §10 J6). A line is shown for something that
-  // happened, and for nothing else. `display` is the event's own figure.
+  // happened, and for nothing else. `display` is the event's own figure; a
+  // FromTo has two, its start and its end (v3implementation D-83).
   feed: {
     transcribing: "Transcribing…",
     cleaningVoice: "Cleaning voice",
     eventFound: {
       number_reveal: (display: string) => `Found: ${display}`,
       list_reveal: (display: string) => `Found: ${display}-item list`,
-      from_to: (display: string) => `Found: ${display}`,
+      // An empty `displayTo` is for type completeness only: no line is made without one.
+      from_to: (display: string, displayTo: string) =>
+        displayTo === "" ? `Found: ${display}` : `Found: ${display} to ${displayTo}`,
       keyword_pop: (display: string) => `Found: ${display}`,
-    } satisfies Record<EventKind, (display: string) => string>,
+    } satisfies Record<Exclude<EventKind, "from_to">, (display: string) => string> & {
+      from_to: (display: string, displayTo: string) => string;
+    },
   },
 
   preview: {

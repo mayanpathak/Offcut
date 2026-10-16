@@ -13,10 +13,8 @@
 ## Open items
 | # | Item | Owner | Version |
 |---|---|---|---|
-| 1 | **Decide §23 item 27**: a written emphasis scores exactly 0.80, the KeywordPop threshold. Either written emphasis gets `pitch_z = 2.0` (score 0.90), or `lib.rs` compares scores with the threshold after rounding to 2 decimals | Human | Before Prompt 64 |
 | 2 | **Write down the words spoken in `testclips/v3testclip.mp4`**, sentence by sentence, into `~/v3testclip-words.txt` (outside the repository, D-99) | Human | Before Prompt 65 |
 | 3 | **Decide §23 item 26**: after "start over", the clip's transcript stays in IndexedDB until V7. Accept that, or add a `clear()` to each of the three repos, called at import step 4 | Human | Before Prompt 80 |
-| 4 | Push the tag `v2` (`git push origin v2`). It exists locally on `8a271a9` since Prompt 61 | Human | Any time |
 | 5 | **`main`, and so the deployed API, still locks `rustls` 0.23.45**, which RUSTSEC-2026-0346 to 0349 name (Entry 1). `v3-build` locks 0.23.46 from Prompt 61 on; `main` gets it with V3's merge (Prompt 90). A fix sooner is a one-line `cargo update -p rustls` on a branch of `main` and a pull request; the founder decides. Until then any push to `main` fails `cargo deny check` in `ci` | Human | Before any push to `main` |
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. Prompt 87 writes it into `ci.yml`: check it then, and choose there between a newer build of the same day and a copy kept on the asset host | Agent | Prompt 87 |
@@ -34,7 +32,7 @@
 | Item | Value |
 |---|---|
 | Baseline commit | 8a271a9967ab1e80826feec1107b307da45b80b5 |
-| `v2` tag | absent at the start; created on 2026-10-16 as an annotated tag on `8a271a9` at the founder's request, not pushed (open item 4) |
+| `v2` tag | absent at the start; created on 2026-10-16 as an annotated tag on `8a271a9` at the founder's request, pushed in Prompt 62 |
 | Rust tests at baseline | 262 passed, 0 failed, 2 ignored: the 262 does not count the two ignored tests |
 | Vitest at baseline | 92 |
 | `pnpm e2e` at baseline | 12 |
@@ -46,7 +44,7 @@
 | Linux ffmpeg archive | `https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz`, SHA-256 `1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29457` (equal to the digest GitHub lists for the asset), binaries in `ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0/bin/` |
 | `offcut_core_bg`, `offcut_render_bg` size at baseline | 459,281 bytes, 6,033,574 bytes |
 | Docs review before S1 | 2026-10-15: `v3implementation.md` and this guide made consistent with each other and with the V2 changelog (six fixture-reading tests, `@no-gpu` count 15, `a01`/`a02` handling, sorted lexicons, `limit` count, §8.7 and §19.11 expectations, metadata checks, §23 items 25-28) |
-| Founder's decisions on §23 items 26 and 27 | pending (open items 1 and 3) |
+| Founder's decisions on §23 items 26 and 27 | item 27, 2026-10-16: written emphasis gets `pitch_z = 2.0` (score 0.90); no rounding before the threshold (Prompt 62). Item 26: pending (open item 3) |
 
 ### Prompt 61 (V3 01/30): preflight, V3 documents, spec tree, ignore rules
 
@@ -86,3 +84,32 @@
 **Done.** At the founder's request, each of the 30 prompts gained one line under its heading, `**Effort: High.**` or `**Effort: Medium.**` with its reason (Prompt 61: `Done`). A paragraph after "Three readings are gates" explains the key: 20 High (63–73, 75–79, 81, 84, 85, 89), 9 Medium (62, 74, 80, 82, 83, 86, 87, 88, 90). Prompts 74 and 88 also say when to switch to High. The ratings are for the human choosing the agent's reasoning effort. No instruction, requirement, file list or acceptance criterion of any prompt changed.
 
 **Checked.** `grep -c '^\*\*Effort: High'` gives 20 and `Medium` gives 9 (plus 61's `Done`). Docs only: no code, test or count changed.
+
+---
+
+## 2026-10-16 - Prompt 62 (V3 02/30): crates, reopened contracts D-83 and D-103, corpus manifest
+
+**Done.**
+
+- **G 1.5, crates.** `grep -rn "unused_crate_dependencies" Cargo.toml crates/*/src/lib.rs clippy.toml` prints nothing, so both crates are added now, not in Prompts 66 and 67. `Cargo.toml` `[workspace.dependencies]`: `nnnoiseless = { version = "0.5.2", default-features = false }`, `ebur128 = { version = "0.1.10", default-features = false }` (the versions of Entry 1). `crates/offcut-dsp/Cargo.toml`: both `{ workspace = true }`, dev `sha2`. `crates/offcut-mp4/Cargo.toml`: dev `sha2`. `crates/offcut-text/Cargo.toml`: dev `proptest` (`std`). `crates/offcut-detect/Cargo.toml`: dev `serde` (`derive`), `serde_json`, `proptest` (`std`). All through the workspace. `Cargo.lock` gains the two crates' trees (Entry 1's G 0.7 list) and changes no version already locked; its 13 removed lines are `"bitflags"` references that now read `"bitflags 2.x"`, because `ebur128` brings `bitflags` 1.3.2 beside it.
+- **`deny.toml`: unchanged.** `cargo deny check` gives `advisories ok, bans ok, licenses ok, sources ok` with the two trees: every licence in them is already on the allowlist (§18.1 expected BSD-3-Clause to need adding; it was there since V1).
+- **D-83, REOPENED V1 CONTRACT (`web/src/workers/protocol.ts`).** The `event_found` arm of `FeedLine` gains `displayTo?: string`; no other line changes.
+- **`web/src/copy/messages.ts`.** `feed.eventFound.from_to` is `(display: string, displayTo: string) => string`: "Found: {display} to {displayTo}", or "Found: {display}" when `displayTo` is empty (type completeness only). Its `satisfies` clause had to change with it: `Record<EventKind, (display: string) => string>` cannot hold a two-argument function, so it is now `Record<Exclude<EventKind, "from_to">, (display: string) => string> & { from_to: (display: string, displayTo: string) => string }`. The three other functions are unchanged.
+- **`web/src/ui/components/ProcessingFeed.tsx`** (moved here from S9, G item 4). `eventText` takes a third argument, and the `event_found` line passes `line.displayTo ?? ""`; the `from_to` case calls `found.from_to(display, displayTo)`. The `assertNever` defaults stay. `git grep "eventFound\|from_to("` finds no other caller: `pipeline-preview.spec.ts` uses `number_reveal("")` only.
+- **D-103, REOPENED V2 CONTRACT (`web/eslint.config.js`).** One `MINTING` entry, `{ file: "src/persistence/clips-repo.ts", brand: "Bytes", helper: "toBytes" }`, in the form of V2's entries (the cast must be the last `return` of a function declaration `toBytes`). No rule changed. The file it names arrives in Prompt 80.
+- **G 1.8.** `corpus/manifest.json`: `founder-01` and `founder-02` with the SHA-256 values of Entry 1 and the tags of §17.6, `expect: "accept"`, `owner: "founder"`. No path, no file name, no person's name. Listed in TS §5 since V1.
+- **G 1.9, the three drills.** (1) `crates/offcut-dsp/src/stray.rs` → `check-file-tree: 1 problem ... stray.rs: not in the file tree of TS §5`; (2) `found.from_to(display)` → `tsc`: `ProcessingFeed.tsx(25,20): error TS2554: Expected 2 arguments, but got 1.`; (3) `fixtures/.gen/x.mp4` → `git status --short` shows nothing for it. All three undone.
+- **The founder's decision on §23 item 27 (2026-10-16): written emphasis gets `pitch_z = 2.0`.** The founder's words: "a missed animation is fine but a wrong animation makes the edit bad". Of the two options, `pitch_z = 2.0` changes only how a test turns a written `*word*` into prosody (score 0.90, clear of the 0.80 threshold); rounding scores before the threshold would have changed the detector itself and let borderline real candidates (0.795 and up) through, the wrong-event direction. The detector keeps `score >= threshold`. Applied in `docs/v3/v3implementation.md`: D-87, the `sentences` row of §17.5, the "*Workflow* matters." row of §19.11 (now 0.90, from 0.80), and §23 item 27 (now "Decided"). Open item 1 closed; Entry 1's decisions row updated.
+- **The `v2` tag was pushed** (`git push origin v2`, at the founder's request; tag object `4b7e7dd`). A tag push runs no workflow: `ci.yml` runs on pull requests and pushes to `main` only. Open item 4 closed.
+
+**Differs from the prompt, the guide or the plan.**
+
+- `deny.toml` is not changed (no licence was missing).
+- The `satisfies` type of `messages.feed.eventFound` changes (above); the prompt names only the signature.
+- `docs/v3/v3implementation.md` changes (item 27), though not in the prompt's file list: the founder's decision is due before Prompt 64 and Prompts 64, 77 and 79 read the plan.
+
+**Checked.** Validation commands: `cargo build --workspace` finished; `cargo deny check` all four ok; the purity grep is empty; `cargo build -p offcut-dsp --target wasm32-unknown-unknown --release` finished; the manifest prints `1 founder-01,founder-02`; `pnpm check` exit 0. SAB gate: no `zz` file, no test key, `pnpm check` exit 0, `cargo test --workspace` 262 passed, 0 failed, 2 ignored, Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 459,281 bytes, `offcut_render_bg` 6,033,574: unchanged, since no code uses the new crates yet), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing. Counts equal the baseline.
+
+**Pinned versions.** `nnnoiseless` 0.5.2, `ebur128` 0.1.10 (workspace, `default-features = false`).
+
+**Found, not fixed.** None.
