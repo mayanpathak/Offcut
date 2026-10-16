@@ -745,6 +745,9 @@ offcut/
     ├── v3/coding-promptsv3.md         the 30 V3 coding prompts (61 to 90), run in order
     ├── v3/v3changelog.md              record of every change made while building V3
     ├── v3/experiments.md              outcome of every experiment V3 runs (TE-n, E-n) and the precision gate
+    ├── v3/testvideo_scripts/script1.md   founder's recording script: phone, portrait, all four event kinds
+    ├── v3/testvideo_scripts/script2.md   founder's recording script: laptop webcam, the exclusion traps
+    ├── v3/testvideo_scripts/script3.md   founder's recording script: noisy room and a long pause (voice chain)
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
