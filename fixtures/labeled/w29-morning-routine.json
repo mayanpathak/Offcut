@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w29-morning-routine",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My morning routine is short, and I keep it the same every day.",
+    "First, I drink a glass of water before anything else.",
+    "Second, I walk outside without my phone.",
+    "Third, I write down the one task that matters today.",
+    "That last step is *everything*.",
+    "Mornings set the tone for the rest of the day."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "list_reveal", "say": "First, I drink a glass of water before anything else. Second, I walk outside without my phone. Third, I write down the one task that matters today.", "occurrence": 1,
+      "count": 3 },
+    { "kind": "keyword_pop", "say": "everything", "occurrence": 1 }
+  ],
+  "tags": ["marker_only"],
+  "notes": "a list of three ordinal markers with no announcer; one emphasized word"
+}

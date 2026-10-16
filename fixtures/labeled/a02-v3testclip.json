@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "a02-v3testclip",
+  "source": "asr",
+  "author": "founder",
+  "frozen": "2026-10-17",
+  "sentences": null,
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "500 paying users", "occurrence": 1, "value": 500, "unit": "count:users" },
+    { "kind": "number_reveal", "say": "500 paying customers", "occurrence": 1, "value": 500, "unit": "count:customers" },
+    { "kind": "number_reveal", "say": "$2,000", "occurrence": 1, "value": 2000, "unit": "usd", "label": "in revenue" }
+  ],
+  "tags": ["no_change_pair"],
+  "notes": "data filled at S12 (Prompt 88) by CORPUS_MODE=transcripts; labels frozen here. Written from the founder's words for testclips/v3testclip.mp4 (fixtures/speech/README.md, The V3 test clip as recognized). The two goals and the revenue target are what a person would animate. three months, and three to four months (a range, not a change from one to the other), are no events; the first plan is not a list. The say values are matched against the recognized words when the data is filled; if the recognizer writes an amount differently, that is a change of say recorded in the changelog, not of the label"
+}

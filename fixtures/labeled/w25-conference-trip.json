@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w25-conference-trip",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I gave my first conference talk in 2026, and I was terrified.",
+    "My slot was at 9 am, right after the opening keynote.",
+    "I have attended that conference every year from 2019 to 2025, but never on stage.",
+    "The talk went fine, and people asked good questions.",
+    "If you are nervous, practise the first minute until it is boring."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["X1", "X3", "years_from_to"],
+  "notes": "in 2026 is a year; at 9 am is a clock time; from 2019 to 2025 is a span of years, not a change a person would animate (TS 17.6). The from-to of years is added to this row because the set must cover it (17.5 coverage, edge cases) and no row of the file plan names it"
+}

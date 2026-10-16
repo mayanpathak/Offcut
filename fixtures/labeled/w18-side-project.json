@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w18-side-project",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My side project is a tool that turns screenshots into tidy tables.",
+    "For a year it made almost nothing, and I nearly shut it down.",
+    "Then a single integration changed everything.",
+    "Revenue went from $300 a month to $4,500 a month in one summer.",
+    "Honestly, that felt *unreal*.",
+    "The lesson is to talk to the people who already pay you."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "from $300 a month to $4,500 a month", "occurrence": 1,
+      "from": { "value": 300, "unit": "usd" }, "to": { "value": 4500, "unit": "usd" } },
+    { "kind": "keyword_pop", "say": "unreal", "occurrence": 1 }
+  ],
+  "tags": ["from_frame"],
+  "notes": "FromTo with a from-frame between monthly revenues; one emphasized word"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w24-version-upgrades",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "This month I upgraded almost everything I use for work.",
+    "My test phone is now an iPhone 15 Pro, which I bought used.",
+    "On the backend I moved from an old interpreter to Python 3.12.",
+    "Nothing broke, which never happens.",
+    "Upgrade one thing at a time and keep notes."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["X2", "X2"],
+  "notes": "iPhone 15 Pro and Python 3.12 are product and version numbers and no event. moved from an old interpreter to Python 3.12 has one quantity only, no from-to"
+}

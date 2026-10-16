@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w19-editing-workflow",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "People ask how I edit so quickly, so here is the honest answer.",
+    "I keep every project in the same folder layout.",
+    "Each week I spend about 20 minutes on captions and $15 a month on music.",
+    "Everything else is templates I made once and reuse.",
+    "The real speed comes from deciding before I open the editor."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["no_change_pair"],
+  "notes": "20 minutes and $15 a month are two quantities of unrelated units in one sentence: no change from one to the other, and neither is a figure a person would animate in this aside. The plan's example was $5,000 on gear and 20 hours of setup; a person would expect $5,000 to be animated, which the row's no-event rule forbids, so smaller everyday amounts are used"
+}

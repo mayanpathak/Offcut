@@ -13,7 +13,6 @@
 ## Open items
 | # | Item | Owner | Version |
 |---|---|---|---|
-| 2 | **Write down the words spoken in `testclips/v3testclip.mp4`**, sentence by sentence, into `~/v3testclip-words.txt` (outside the repository, D-99) | Human | Before Prompt 65 |
 | 3 | **Decide §23 item 26**: after "start over", the clip's transcript stays in IndexedDB until V7. Accept that, or add a `clear()` to each of the three repos, called at import step 4 | Human | Before Prompt 80 |
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. Prompt 87 writes it into `ci.yml`: check it then, and choose there between a newer build of the same day and a copy kept on the asset host | Agent | Prompt 87 |
@@ -185,5 +184,31 @@ At the founder's request: `docs/v3/testvideo_scripts/script1.md` (phone, portrai
 **Checked.** Every file parses; the G 2.6 checker prints `15 files, 2 without events, 0 problems`; a misspelled `say` ("painfull" in `w09`) gave `say not found: painfull` and was undone; `git ls-files crates/offcut-detect/src` lists `config.rs event_id.rs lib.rs number.rs` only; `check-file-tree.mjs` passes. SAB gate: no `zz` file, no test key, `pnpm fixtures` "fixtures are up to date", `pnpm check` exit 0, `cargo test --workspace` 262 passed, 0 failed, 2 ignored, Vitest 92, `pnpm build` exit 0 (WASM sizes unchanged); the frozen check and the tracked-private check print nothing. **`pnpm e2e` failed twice and then passed 12 of 12** with no change between the runs: in the two failed runs six cases of `landing.spec.ts` timed out at 30 s with the page fully drawn (`page.goto` waits for the page's `load`, which follows the asset host). The asset host answered in about 1 s when measured afterwards, and the third run passed in 33.9 s. Read as a slow network on D1 at that moment, not a fault: this prompt changes nothing under `web/`. Counts equal the baseline.
 
 **Frozen.** From this commit on, a change to a label of these files needs a line here naming the file, the label and the reason; "the detector disagrees" is not a reason (D-87).
+
+**Found, not fixed.** None.
+
+---
+
+## 2026-10-17 - Prompt 65 (V3 05/30): labeled set part 2, a01, a02, README; labels frozen
+
+**Done.**
+
+- **The founder's words for `v3testclip.mp4`** were given in the prompt's message on 2026-10-17, as a transcript with timestamps. Written, without the timestamps, sentence by sentence into `~/v3testclip-words.txt` (outside the repository, 12 sentences) and into the README (below). Open item 2 is closed.
+- **`w16-open-source` to `w29-morning-routine`**, the rows `w16`-`w29` of §17.5's file plan, as in Prompt 64: sentences first, then the labels by what a person would expect. `w23` hides word 28 ("thick", inside the second list item: `{ "28": "" }`) and also announces four fixes with three markers, so it is the set's partial list and its hidden word; it expects nothing. `w26`'s two phone-like runs are made up (`5550147`, `5550193`).
+- **`a01-scriptA.json`**: the 17 sentences of "The V2 reference clip as recognized", word for word: 157 words, `3000` at word 23, `$12` and `,000` at words 132-133, no `*` marks. Expected: NumberReveal `3000 hours` (3,000 hours, label "editing by hand"), FromTo `from 90 minutes to 10 minutes`, ListReveal `three reasons …` (count 3, "3 REASONS"), NumberReveal `$12 ,000` (12,000 USD, label "in sales"); no KeywordPop. Tags `from_frame`, `announcer`, `X5` (the misheard `8`).
+- **`a02-v3testclip.json`**: `source: "asr"`, `author: "founder"`, `sentences`, `words`, `prosody` null. Expected from the founder's words: NumberReveal "500 paying users" (500, `count:users`), NumberReveal "500 paying customers" (500, `count:customers`), NumberReveal "$2,000" (2,000 USD, label "in revenue"). "three months" and the range "three to four months" are no events (tag `no_change_pair` for the range); "The first plan" is not a list. `notes` as the prompt words them, and that a `say` the recognizer writes differently is a change of `say`, not of the label.
+- **`fixtures/speech/README.md`** (§17.7), additive: the five TS clips marked "derived in V3 from the reference clip (D-76)" with each one's cut, and that they hold the reference clip's words, not Scripts B, C and D; a row for `testclips/v3testclip.mp4` (D-99, D-100); after V2's expected feed, "Expected events of V3" (the five events, with word ranges, the KeywordPop conditional on measured prosody) and "Expected feed of V3"; two new sections, "The derived clips as recognized" (filled at S8, Prompt 82) and "The V3 test clip as recognized" (the founder's twelve sentences now, the three expected events, the recognized transcript at S8). Every V2 line is kept; the five table rows gain text in their last cell.
+- **Coverage, by the G 2.6 checker.** `w01`-`w29`: `29 files, 8 without events, 0 problems`; kinds NumberReveal 10, ListReveal 7, FromTo 11, KeywordPop 9; tags `X1` 2, `X2` 6, `X3` 2, `X4` 2, `X5` 5, `announcer` 4, `marker_only` 3, `from_frame` 5, `change_verb` 6, `no_change_pair` 2, `edit_number` 1, `hidden_word` 1, `partial_list` 1, `years_from_to` 1. All 31: `31 files, 8 without events, 0 problems`; NumberReveal 15, ListReveal 8, FromTo 12, KeywordPop 9, `announcer` 5, `from_frame` 6. Every minimum of §17.5's coverage table is met; Requirement 2 of the prompt holds exactly.
+
+**Differs from the prompt or the plan.**
+
+- **`w25` also holds "from 2019 to 2025"** (tag `years_from_to`). §17.5's coverage table requires "years in a from-to" as an edge case, and no row of the file plan names it; the conference-trip row is about dates and allows it (the prompt's error handling: add a missing case to the file whose row allows it). It changes no kind total.
+- **`w19`'s two quantities are "about 20 minutes on captions and $15 a month on music"**, not the plan's example "$5,000 on gear and 20 hours of setup": the row expects no event, and a person would expect $5,000 to be animated. `notes` says so.
+- `a01`'s `author` is `"founder"`: the words are the founder's recording; the labels follow the README's expected events.
+- The founder's words hold the founder's name. They are committed as the founder's own words (D-112, confirmed at Prompt 90).
+
+**Checked.** Every file parses; the checker's totals above; `a01` has 157 words with words 132-133 `$12` `,000`; the README's word ranges were computed from `a01` (`3000 hours` 23-24, `brutal` 31, the FromTo 54-59, the list 75-94). `rm -rf fixtures/.gen && pnpm fixtures && pnpm fixtures`: "generated 25 fixtures", then "fixtures are up to date". `git ls-files crates/offcut-detect/src` holds none of `from_to list keyword exclusions resolve`; no private path in `git status`. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` 262 passed, 0 failed, 2 ignored, Vitest 92, `pnpm build` exit 0 (WASM sizes unchanged), `pnpm e2e` 12 passed (1.5 min); the frozen check and the tracked-private check print nothing. Counts equal the baseline.
+
+**Frozen.** All 31 labeled files are frozen from this commit on (D-87): a label changes only with a line here naming the file, the label and the reason, and "the detector disagrees" is not a reason. `a02`'s `sentences`, `words` and `prosody` are filled at S12 (Prompt 88) as data. The commit's SHA is recorded in Prompt 66's entry as "labels frozen at <SHA> on 2026-10-17" (G 2.8).
 
 **Found, not fixed.** None.
