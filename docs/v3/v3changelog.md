@@ -80,3 +80,9 @@
 **Pinned versions.** No new dependency is committed. `rustls` 0.23.46 in `Cargo.lock` (a patch update of a locked transitive crate).
 
 **Found, not fixed.** None besides the open items and known issues above.
+
+### Outside a prompt (2026-10-16): effort ratings in `coding-promptsv3.md`
+
+**Done.** At the founder's request, each of the 30 prompts gained one line under its heading, `**Effort: High.**` or `**Effort: Medium.**` with its reason (Prompt 61: `Done`). A paragraph after "Three readings are gates" explains the key: 20 High (63–73, 75–79, 81, 84, 85, 89), 9 Medium (62, 74, 80, 82, 83, 86, 87, 88, 90). Prompts 74 and 88 also say when to switch to High. The ratings are for the human choosing the agent's reasoning effort. No instruction, requirement, file list or acceptance criterion of any prompt changed.
+
+**Checked.** `grep -c '^\*\*Effort: High'` gives 20 and `Medium` gives 9 (plus 61's `Done`). Docs only: no code, test or count changed.

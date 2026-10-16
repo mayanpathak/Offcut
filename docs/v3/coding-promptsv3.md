@@ -10,6 +10,8 @@ Source documents: `docs/v3/v3implementation.md` (written **§n**; its decisions 
 
 **Three readings are gates.** Prompt 68 (native TE-13 under 2 s per 60 s), Prompt 69 (browser TE-13 at most 4 s per 60 s) and Prompt 79 (precision at least 0.90 over at least 30 labeled files). Each has a pre-agreed action (§20.2, §20.3) and none is a reason to change a label or a test. **D1 is the reference machine (D-69, D-74):** every reading is taken on D1 by the agent and recorded under the label `d1`.
 
+**Effort (for the human, added 2026-10-16).** Each prompt has an **Effort** line under its heading: the reasoning effort to set on the coding agent before pasting it. **High** (20 prompts: 63–73, 75–79, 81, 84, 85, 89) is for numerical, parser, grammar or concurrency code, the labeled ground truth, the three gates, suites likely to expose app bugs, and the spec copy-back. **Medium** (9 prompts: 62, 74, 80, 82, 83, 86, 87, 88, 90) is for exactly specified glue, copy, tooling, CI and runs of measurements. When in doubt the rating is High. Two Medium prompts say when to switch to High partway (74, 88). The line is a note for you; it changes no instruction to the agent.
+
 ---
 
 # Standard Agent Block (SAB) — prepend to every prompt
@@ -223,6 +225,8 @@ Every prompt ends with the SAB gate. The "Acceptance Criteria" are what is speci
 
 ## Prompt 61 (V3 01/30) — Preflight, V2 baseline, branch, V3 documents, spec tree, ignore rules
 
+**Effort: Done.** Committed as `fa67ab4`; nothing to run.
+
 ### Objective
 
 Prove D1 has every tool V3 needs, record the V2 baseline counts, cut `v3-build` from `8a271a9`, and commit the V3 documents with the TS §5 tree, the ignore rules and the closing V2 M0 record, so that every later file has a place in the tree and every later prompt has a changelog to write to.
@@ -364,6 +368,8 @@ Before: read §1A, §2 D-73/D-75/D-98, §3, G Phase 0 and Steps 1.1–1.4. Confi
 
 ## Prompt 62 (V3 02/30) — New crates, the reopened contracts D-83 and D-103, the FromTo feed line, the corpus manifest
 
+**Effort: Medium.** Config and one-line contract edits, all specified exactly; the checks (cargo deny, tsc, the three drills) are mechanical.
+
 ### Objective
 
 Add the two third-party crates and the dev-dependencies V3 tests need, reopen the two contracts S1 owns (D-83: `FeedLine.displayTo` and the two-argument FromTo copy; D-103: one `MINTING` entry), make `ProcessingFeed.tsx` compile against the new copy signature, write `corpus/manifest.json`, and prove the guards — with every V2 count unchanged (G 1.5–1.9, M-1).
@@ -504,6 +510,8 @@ The workspace compiles with `nnnoiseless` and `ebur128` available to `offcut-dsp
 
 ## Prompt 63 (V3 03/30) — The fixture generator: manifest, `gen_fixtures.sh`, `pnpm fixtures`, observations
 
+**Effort: High.** 25 ffmpeg recipes in POSIX sh that must be byte-identical across runs, an exit-code contract, hash checks, and two on-device observations that can replace fixtures (D-78, D-111). Every later fixture test reads its output.
+
 ### Objective
 
 `pnpm fixtures` builds the 25 fixtures of §17.2 (20 synthetic) and §17.3 (5 derived) plus 5 PCM files and a `STAMP` into `fixtures/.gen/`, byte-identically on two runs on D1, with no founder metadata, and records every machine-dependent fact (G 2.1–2.4; D-76, D-77, D-100, D-111).
@@ -638,6 +646,8 @@ Any machine with ffmpeg 9.0.x and the reference clip can run `pnpm fixtures` and
 
 ## Prompt 64 (V3 04/30) — The labeled set, part 1: `SCHEMA.md` and the written files `w01`–`w15`
 
+**Effort: High.** Ground truth for the precision gate: natural sentences, traps and exact `say` matches. A sloppy label makes the 0.90 gate meaningless, and labels freeze at P65 (D-87).
+
 ### Objective
 
 Write the labeled-file schema and the first fifteen written transcripts of the §17.5 file plan, each with the events **a person** would expect, before any detector rule exists (D-87).
@@ -765,6 +775,8 @@ Half of the independent ground truth exists in the repository, dated and committ
 
 ## Prompt 65 (V3 05/30) — The labeled set, part 2: `w16`–`w29`, `a01`, `a02`, the README, the freeze
 
+**Effort: High.** Must hit the exact coverage totals over 31 files, copy `a01` word for word (the `$12` `,000` split) and freeze the set. Mistakes here are permanent.
+
 ### Objective
 
 Complete the labeled set (31 files: 29 written, `a01` written-form from Script A as recognized, `a02` labels-only for the second recording), update `fixtures/speech/README.md` for V3, and freeze the labels (G 2.6–2.8, M-2; D-87, D-99).
@@ -882,6 +894,8 @@ The ground truth of the precision gate is complete and frozen; the README states
 ---
 
 ## Prompt 66 (V3 06/30) — `offcut-dsp` building blocks: constants, high-pass, compressor, loudness, limiter
+
+**Effort: High.** Numerical DSP with tight tolerances (±0.05 dB, ±0.1 LU): RBJ biquad, log-domain soft-knee compressor, BS.1770 loudness, and a delay-free look-ahead limiter that must clamp zero samples.
 
 ### Objective
 
@@ -1019,6 +1033,8 @@ Before: read §7.1–§7.3, §7.5–§7.7, TS §18, §34.3, Appendix D. During: 
 
 ## Prompt 67 (V3 07/30) — Denoise, `run_chain`, and the length, loudness and click tests; measure the denoiser's delay
 
+**Effort: High.** The riskiest DSP prompt: sample-exact denoiser delay compensation, length preservation proven by proptest (INV-10), click tests at 59 block boundaries, and a measured constant.
+
 ### Objective
 
 Compose the full voice chain (`run_chain`, TS §34.3) with an RNNoise denoiser whose delay is compensated to the sample, and prove P1–P8 with the three integration test files that read the speech PCM fixtures; measure `DENOISE_DELAY_SAMPLES` (G 3.4–3.6; §7.4, §7.8, §19.4–§19.6).
@@ -1148,6 +1164,8 @@ A length-preserving, delay-compensated chain hitting -14 LUFS ±0.5 (±1 for the
 
 ## Prompt 68 (V3 08/30) — Prosody, `tests/prosody.rs`, native TE-13 **[gate]**
 
+**Effort: High.** An autocorrelation pitch tracker (decimation, parabolic refinement, per-sentence z-scores) plus the native TE-13 gate, whose result can change the design.
+
 ### Objective
 
 Implement `measure_prosody` (per-word energy and pitch z-scores within each sentence, D-96, D-108) with its tests, read the native TE-13 time, and close Milestone 3 (G 3.7–3.9, M-3).
@@ -1270,6 +1288,8 @@ Before: read §7.9, §7.10, §19.7, D-96, D-108, §20.1–§20.2, G 3.7–3.9. D
 ---
 
 ## Prompt 69 (V3 09/30) — The chain in the browser: `audio_api.rs`, `CoreApi`, `audio.worker.ts`, the pool row, browser TE-13 **[gate]**
+
+**Effort: High.** Rust-to-WASM binding, a new worker with transfer and cancellation, a pool change, browser timing in dev and in the production build (COOP/COEP), bundle size, and the browser TE-13 gate.
 
 ### Objective
 
@@ -1400,6 +1420,8 @@ Before: read §10.1, §13.1–§13.4, §14.1, Appendix C (audio.worker), D-31, D
 
 ## Prompt 70 (V3 10/30) — `offcut-mp4`: edit lists E0–E4 and probe hardening H1–H8
 
+**Effort: High.** A refactor inside the parser of untrusted MP4 input: move code without changing E0-E2 behaviour, add E3/E4 with checked arithmetic, harden the probe, stay under 400 lines.
+
 ### Objective
 
 Move edit-list resolution into `edit_list.rs` with two new shapes (E3 contiguous media edits, E4 a trailing empty edit), keep `sample_table.rs` under 400 lines, and harden `probe.rs` per H1–H8 — with no public signature change and `validate.rs` untouched (G 5.1, 5.2; §6.1–§6.3; D-92).
@@ -1519,6 +1541,8 @@ The demuxer accepts joined and screen-recorder edit lists and reads webcam timin
 
 ## Prompt 71 (V3 11/30) — `demux_fixtures.rs`, `probe_rejections.rs`, the observed manifest values
 
+**Effort: High.** The first time H2 and H5-H8 meet real ffmpeg output. A mismatch is a parser bug to fix in `probe.rs`/`edit_list.rs`, never a test to loosen. Includes the D-100 privacy metadata walk.
+
 ### Objective
 
 Prove natively that every `ok_*` fixture and every derived speech clip opens and validates with its expected properties, and that every `rej_*` fixture except `rej_silent.mp4` gives its manifest code; fill the two observed manifest values (G 5.3–5.5, M-5; §19.2, §19.3).
@@ -1632,6 +1656,8 @@ Native proof that the demuxer meets the PS §9.4 rejection table and the accept 
 ---
 
 ## Prompt 72 (V3 12/30) — `offcut-text`: word lists, the wider `Digits`, spelled cardinals
+
+**Effort: High.** The spelled-cardinal grammar (descending magnitudes, the "and" rule, teen-hundred, "a hundred", the 24-token cap) is where off-by-one bugs hide, and P74's property test will hammer it up to 999,999,999.
 
 ### Objective
 
@@ -1755,6 +1781,8 @@ The text crate can recognise every token form and spelled number the V3 grammar 
 
 ## Prompt 73 (V3 13/30) — `offcut-text`: the full `parse_quantity`, `format_quantity`, the 40-word split, per-sentence numbers
 
+**Effort: High.** The four-stage `parse_quantity`, the display table, the recursive 40-word split and per-sentence normalisation, with `numbers.rs` under 400 lines. Every event's value comes from here.
+
 ### Objective
 
 Complete the number grammar and display rules of TS §17.2 in `numbers.rs`, split sentences over 40 words, and normalise numbers per sentence so no quantity crosses a sentence (G 6.4, 6.5; §8.3, §8.5, §8.6; D-104).
@@ -1868,6 +1896,8 @@ Any recognised number form becomes one correctly displayed quantity inside its s
 
 ## Prompt 74 (V3 14/30) — `numbers_table.rs`, `numbers_prop.rs`, `tests/sentences.rs`
 
+**Effort: Medium.** Mostly transcribing 72 rows and 5 properties onto a grammar already built at high effort. Switch to High if more than a couple of rows fail, since the fixes go into the grammar.
+
 ### Objective
 
 Make the grammar's authority executable: 62 parse rows and 10 display rows, 5 properties, 8 sentence cases; close Milestone 6 (G 6.6, 6.7, M-6; §19.8–§19.10).
@@ -1978,6 +2008,8 @@ Before: read §19.8–§19.10, G 6.6–6.7. During: copy rows exactly. After: SA
 ---
 
 ## Prompt 75 (V3 15/30) — `offcut-detect`: configuration, lexicons, and NumberReveal V3
+
+**Effort: High.** 29 new config fields and 11 lexicons, and NumberReveal rewritten: effective tokens with edits, `parts`, scoring, label derivation (D-107). P76-P79 build on it.
 
 ### Objective
 
@@ -2104,6 +2136,8 @@ The detector's single home of numbers and words exists, and NumberReveal is V3's
 
 ## Prompt 76 (V3 16/30) — `offcut-detect`: ListReveal, FromTo, KeywordPop finders
 
+**Effort: High.** Three finders with exact scoring formulas, list windows, unit-inheritance compatibility and marker rules; scores must match the plan's tables to the hundredth.
+
 ### Objective
 
 Write the three new finders exactly as §9.4–§9.6 define them, each with inline tests from its table (G 7.3 rows 2–4; D-85, D-105, D-106, D-107).
@@ -2220,6 +2254,8 @@ All four kinds produce scored candidates; nothing is excluded or resolved yet.
 ---
 
 ## Prompt 77 (V3 17/30) — Exclusions, resolution, the full `detect`, `rules_table.rs`
+
+**Effort: High.** Exclusions X1-X7, total-order resolution with display windows and caps, the full `detect` and 34 rule rows under INV-6/INV-7. The detector's correctness lives here.
 
 ### Objective
 
@@ -2341,6 +2377,8 @@ Before: read §9.2, §9.7, §9.8, §9.9, §19.11, Appendix C (`resolve.rs`), TS 
 
 ## Prompt 78 (V3 18/30) — `redetect_sentence`, `redetect.rs`, `determinism.rs`
 
+**Effort: High.** Re-detection scoped by time that keeps unchanged ids, plus a proptest determinism harness over random transcripts.
+
 ### Objective
 
 Re-detect one sentence's scope after an edit while keeping every unchanged event's id, and prove detection deterministic over the labeled set and random transcripts (G 8.1, 8.2; §9.2, D-86; §19.13, §19.14).
@@ -2452,6 +2490,8 @@ The detector is complete in Rust, including re-detection for V4.
 ---
 
 ## Prompt 79 (V3 19/30) — The precision gate **[gate]**, the `redetect_sentence` binding, `RenderApi`
+
+**Effort: High.** The precision gate: IoU and unit matching, the coverage check, the threshold sweep, and the pre-agreed actions if precision is under 0.90. Also the render binding.
 
 ### Objective
 
@@ -2574,6 +2614,8 @@ V3's detector ships with measured precision, recorded thresholds, and a binding 
 ---
 
 ## Prompt 80 (V3 20/30) — The three IndexedDB repos and `import-clip.ts` (C-2)
+
+**Effort: Medium.** Three small IndexedDB repos and ordered edits to `import-clip.ts`; signatures and the hash's byte layout are given exactly. The browser check is straightforward.
 
 ### Objective
 
@@ -2705,6 +2747,8 @@ Every accepted clip has a durable record; every import-time refusal is counted b
 
 ## Prompt 81 (V3 21/30) — `run-pipeline.ts`: the voice chain beside ASR, prosody, all four kinds, step F records (C-4, D-90)
 
+**Effort: High.** Concurrency: the chain runs beside the model wait and ASR, with joins on every failure path, earliest-failure ordering, transfer ownership and INV-12. A listed high-risk area.
+
 ### Objective
 
 Replace V2's two stand-ins: the chain runs in `audio.worker` from right after audio extraction, in parallel with the model wait and ASR; prosody is measured on the cleaned audio; detection gets real prosody and yields all four kinds; step F writes OPFS and the two repos; `REJECT_NO_SPEECH` sends `clip_rejected`; FromTo feed lines carry `displayTo` (G 9.4, 9.5; §15.2; D-83, D-90, D-97).
@@ -2832,6 +2876,8 @@ The app processes a clip end to end with V3's chain, prosody, detector and recor
 
 ## Prompt 82 (V3 22/30) — The README's "as recognized" sections; the derived clips' events; Milestone 9
 
+**Effort: Medium.** Operational: run six clips through the pipeline, read their transcripts from IndexedDB, write the README. Little new code, and the rule is "record, never change the detector".
+
 ### Objective
 
 Run each derived speech clip and the second recording through the V3 pipeline on D1, write their recognized transcripts, numbers and events into `fixtures/speech/README.md`, and confirm the derived clips give the events of §17.3 (G 9.6, M-9; D-99; §17.7, §20.1).
@@ -2944,6 +2990,8 @@ Every speech clip V3 tests against has a written, recognized expectation.
 ---
 
 ## Prompt 83 (V3 23/30) — The 14 rejection messages, `RejectionPanel`, the copy check (S9)
+
+**Effort: Medium.** A copy table copied verbatim, one small component, CSS, a check-script edit and three drills. Well bounded.
 
 ### Objective
 
@@ -3064,6 +3112,8 @@ Every refusal tells the person what the limit is and what to do, in the product'
 
 ## Prompt 84 (V3 24/30) — E2E helpers and `rejections.spec.ts` (16 cases, 15 `@no-gpu`)
 
+**Effort: High.** 16 E2E cases that must pass on the Windows CI runner without a GPU: the 525 MB in-page `File`, a hash recomputed in Node, IndexedDB reads. V2 had flakiness here (V2 CL items 38-41).
+
 ### Objective
 
 Make every refusal and the accept path testable in the browser: helpers for generated fixtures, in-page oversize files, IndexedDB reads and the second recording; the rejection suite of §19.16 joined to `MEDIA_SUITES` (G 11.1, 11.2; D-78, D-79, D-93).
@@ -3183,6 +3233,8 @@ Every one of the 14 codes is proven end to end in Chrome; 15 of the cases can ru
 
 ## Prompt 85 (V3 25/30) — `pipeline-preview` D-91 rewrites, the second-recording cases, the full media run (48+ on D1)
 
+**Effort: High.** Rewrites a reopened V2 contract, adds two D1-only privacy cases (ffprobe metadata) and must pass the full 48+ media run, where any other failure is an app regression to root-cause.
+
 ### Objective
 
 Rewrite the three V2 cases that asserted the V2 stand-ins, extend the OPFS case with the three records, add the D1-only case of the second recording to `pipeline-preview.spec.ts` and the D1-only metadata case to `export-creator.spec.ts`, and pass the whole media suite on D1 on a keyed build (G 11.3, 11.6; D-91, D-99, D-100; §19.17, §19.18).
@@ -3293,6 +3345,8 @@ The media suite describes V3, and passes in full on D1.
 ---
 
 ## Prompt 86 (V3 26/30) — Bench stage and file name; corpus fetcher, runner and project
+
+**Effort: Medium.** Tooling: the bench stage list and file name, a copy-and-hash shell script, a Playwright runner with four modes. Fully specified, and mistakes surface in P88. Keep D-112 in view.
 
 ### Objective
 
@@ -3413,6 +3467,8 @@ V3 can measure itself on D1 and on lent clips without any lent words leaving the
 
 ## Prompt 87 (V3 27/30) — CI: pinned Linux ffmpeg, fixtures before `cargo test`, the rejection cases on Windows
 
+**Effort: Medium.** A few named workflow steps and one facts line; most of the time is waiting on CI and on your pushes.
+
 ### Objective
 
 Make both CI jobs generate the fixtures and run every fixture-reading Rust test and the 15 `@no-gpu` rejection cases, with a checksum-pinned Linux ffmpeg, and get the pull request green (G 11.7–11.10, M-11; D-93, D-94; §18.4–§18.6).
@@ -3528,6 +3584,8 @@ CI proves on every pull request that fixtures generate and that the demuxer, DSP
 ---
 
 ## Prompt 88 (V3 28/30) — Measure: bench, TE-12, E-3/E-4 re-reads, `a02` data, E-10 smoke, the founder's reading (S12)
+
+**Effort: Medium.** Running the measurements and recording them; the decisions are pre-agreed (§20). Switch to High if the precision re-run on 31 files falls under 0.90.
 
 ### Objective
 
@@ -3647,6 +3705,8 @@ V3's numbers exist, labelled, dated and committed; V4 has a baseline to compare 
 
 ## Prompt 89 (V3 29/30) — Spec copy-back and the final local gate (S13)
 
+**Effort: High.** Faithful copy-back of about 40 decisions into the right TS/BP/PS sections without paraphrase drift, plus the full final gate and four audits. Errors here mislead V4-V10.
+
 ### Objective
 
 Make the specifications say what V3 built (every decision of §23.2 copied into TS, BP, PS; §23 items 1–14 corrected; thresholds in use in TS §17.4), confirm every value that must be real, and pass the complete local gate including the full media suite before the merge (G 13.1–13.3; §23, §22 "Code and checks").
@@ -3764,6 +3824,8 @@ A merge-ready branch whose specs, records and tests all agree.
 ---
 
 ## Prompt 90 (V3 30/30) — Merge, deploy, verify the deployed system, exit checklist, tag `v3` (S14, S15)
+
+**Effort: Medium.** Mostly your steps (merge, SQL, tag) and verification commands against production; the rollback rule is already written.
 
 ### Objective
 
