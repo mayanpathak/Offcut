@@ -15,7 +15,6 @@
 |---|---|---|---|
 | 2 | **Write down the words spoken in `testclips/v3testclip.mp4`**, sentence by sentence, into `~/v3testclip-words.txt` (outside the repository, D-99) | Human | Before Prompt 65 |
 | 3 | **Decide §23 item 26**: after "start over", the clip's transcript stays in IndexedDB until V7. Accept that, or add a `clear()` to each of the three repos, called at import step 4 | Human | Before Prompt 80 |
-| 5 | **`main`, and so the deployed API, still locks `rustls` 0.23.45**, which RUSTSEC-2026-0346 to 0349 name (Entry 1). `v3-build` locks 0.23.46 from Prompt 61 on. **The fix for `main` is pushed as branch `hotfix/rustls-0.23.46`** (commit `69ce295`, `Cargo.lock` only, cut from `8a271a9`; 2026-10-17, at the founder's request). Open the pull request at `https://github.com/mayanpathak/Offcut/compare/main...hotfix/rustls-0.23.46`, let `ci` run, merge: the merge deploys (`ci.yml`). V3's merge then carries the same line and does not conflict. Until then any push to `main` fails `cargo deny check` in `ci` | Human | Before any push to `main` |
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. Prompt 87 writes it into `ci.yml`: check it then, and choose there between a newer build of the same day and a copy kept on the asset host | Agent | Prompt 87 |
 | 9 | **`fixtures/gen_fixtures.sh` may be checked out with CRLF on the Windows runner.** The repository has no `.gitattributes`; GitHub's Windows images set `core.autocrlf=true`, and `sh` cannot run a script with CRLF line endings. D1 (`core.autocrlf=input`) and Linux check it out LF. Today no Windows job runs a `.sh` file; Prompt 87 makes `e2e-media.yml` run `pnpm fixtures`. Then either a `git config --global core.autocrlf false` step before the checkout, or a root `.gitattributes` with `*.sh text eol=lf` (a new file: TS §5 entry in the same change) | Agent | Prompt 87 |
@@ -158,3 +157,33 @@ At the founder's request: `docs/v3/testvideo_scripts/script1.md` (phone, portrai
 **Pinned versions.** No dependency added. ffmpeg 9.0.2 (full build on D1).
 
 **Found, not fixed.** None besides open items 9 and 10.
+
+---
+
+## 2026-10-17 - Outside a prompt: the `rustls` fix is on `main`; `v3-build` has a draft pull request
+
+- The founder opened and merged pull request #4 (`hotfix/rustls-0.23.46`) on 2026-10-16 at 20:52 UTC: `main` is at `02c1578`, and its run passed `ci`, `e2e-media`, `deploy-api` and `deploy-web`. The deployed API runs `rustls` 0.23.46. Open item 5 is closed.
+- At the founder's request `v3-build` was pushed (`git push -u origin v3-build`; before it, a scan of the branch found no secret beyond the public test values already on `main`), and the founder opened **draft pull request #5** ("V3 build") into `main`. Its first run, on `f80901f`: `ci` success (8 min 11 s), `e2e-media / media` success, the two deploy jobs skipped; GitHub reports the branch mergeable with no conflict. From now on the agent pushes `v3-build` after each prompt's commit (the founder: CI on every commit) and reads the run before the next prompt. The pull request stays a draft until Prompt 90; merging it deploys.
+- **To keep CI green from Prompt 67 on:** the ffmpeg install and `pnpm fixtures` steps of Prompt 87 (D-94) move forward into the first prompt that adds a test reading `fixtures/.gen/` (Prompt 67), with open items 9 and 10.
+
+## 2026-10-17 - Prompt 64 (V3 04/30): labeled set part 1 (schema, w01-w15)
+
+**Done.**
+
+- **The founder's decision on §23 item 27 as applied** (Prompt 62): a written emphasis gets `energy_z = 2.0`, `pitch_z = 2.0`; no rounding in `lib.rs`. `SCHEMA.md` states it in the `sentences` row.
+- **`fixtures/labeled/SCHEMA.md`**: the format of §17.5 and every row of its field table (`sentences`, word timings, `words`, `prosody`, `expected`, `kind`, `say`, values, `tags`, `edits`, `notes`), the matching rules (normalisation, true positive), the null-data rule, the unit vocabulary of the prompt (`count:<noun>` with the noun as spoken) and the tags vocabulary with a one-line meaning each. Two conventions the plan leaves open are fixed there: **which words a `say` covers** per kind (NumberReveal the quantity with its unit words; FromTo from "from", or from the first quantity, to the end of the second; ListReveal from the announcer's count word, or the first marker, to the end of the last item; KeywordPop the one word), so that every label puts its anchors the same way; and **edits**: word indices count the words of all sentences together from 0, `say` names the words as written, and the expected values are those of the edited text (D-109).
+- **`w01-saas-pricing` to `w15-podcast`**, the rows `w01`-`w15` of §17.5's file plan, 5 to 8 sentences each, `frozen` 2026-10-17, `words` and `prosody` null, `edits` only in `w11` (`{ "21": "$4,200" }`: `$3,200` corrected to `$4,200`; the expected NumberReveal is 4,200 on that word). The sentences were written first, then the labels, by what a person would expect; no detector file was opened.
+- What the half covers, by the G 2.6 checker: 15 files, 2 without events (`w12`, `w14`), 0 problems. Kinds: NumberReveal 8, FromTo 7, KeywordPop 5, ListReveal 4. Tags: `from_frame` 3, `change_verb` 4, `announcer` 2, `marker_only` 2, `X2` 3, `X5` 2, `X3` 1, `edit_number` 1. Each row's events, traps and edits are as the plan states.
+
+**Differs from the prompt or the plan.**
+
+- **Change-verb FromTos** are written as two quantities on both sides of a verb with "to" ("was 26 percent, and then it went up to 52 percent", "$3,000 a month, and we cut it to $1,100", "$60 an hour, then I raised it to $95", "9 hours, and the rewrite brought it down to 2 hours"), the natural spoken form of TS §17.4's "went … to" frame without "from".
+- `w07`'s "4K camera" carries no tag: the tag vocabulary has none for it. `notes` says why it is no event.
+- Numbers that are neither a planned event nor a planned trap were kept out of the sentences ("for years" rather than "for three years"), so that each file holds exactly what its row says.
+- A file holds its `edits` after `prosody` and before `expected`; §17.5's example has no `edits`.
+
+**Checked.** Every file parses; the G 2.6 checker prints `15 files, 2 without events, 0 problems`; a misspelled `say` ("painfull" in `w09`) gave `say not found: painfull` and was undone; `git ls-files crates/offcut-detect/src` lists `config.rs event_id.rs lib.rs number.rs` only; `check-file-tree.mjs` passes. SAB gate: no `zz` file, no test key, `pnpm fixtures` "fixtures are up to date", `pnpm check` exit 0, `cargo test --workspace` 262 passed, 0 failed, 2 ignored, Vitest 92, `pnpm build` exit 0 (WASM sizes unchanged); the frozen check and the tracked-private check print nothing. **`pnpm e2e` failed twice and then passed 12 of 12** with no change between the runs: in the two failed runs six cases of `landing.spec.ts` timed out at 30 s with the page fully drawn (`page.goto` waits for the page's `load`, which follows the asset host). The asset host answered in about 1 s when measured afterwards, and the third run passed in 33.9 s. Read as a slow network on D1 at that moment, not a fault: this prompt changes nothing under `web/`. Counts equal the baseline.
+
+**Frozen.** From this commit on, a change to a label of these files needs a line here naming the file, the label and the reason; "the detector disagrees" is not a reason (D-87).
+
+**Found, not fixed.** None.

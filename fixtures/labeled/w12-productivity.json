@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w12-productivity",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My productivity system fits on a single index card.",
+    "Every evening I write down what matters most for tomorrow.",
+    "In the morning I start with that, before email or messages.",
+    "Anything that is not on the card can wait until the afternoon.",
+    "It sounds too simple, but it has kept me calm through busy weeks."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": [],
+  "notes": "no number and no emphasis: no event"
+}

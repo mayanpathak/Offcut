@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "w13-data-migration",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "We moved our nightly data pipeline to a new scheduler last quarter.",
+    "The import used to take 9 hours, and the rewrite brought it down to 2 hours.",
+    "The trick was loading only the rows that changed.",
+    "Reports are ready before anyone starts work, which is *wonderful*.",
+    "Measure the slow step before you rewrite anything."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "9 hours, and the rewrite brought it down to 2 hours", "occurrence": 1,
+      "from": { "value": 9, "unit": "hours" }, "to": { "value": 2, "unit": "hours" } },
+    { "kind": "keyword_pop", "say": "wonderful", "occurrence": 1 }
+  ],
+  "tags": ["change_verb"],
+  "notes": "FromTo with a change verb (brought it down to), hours to hours; one emphasized word"
+}

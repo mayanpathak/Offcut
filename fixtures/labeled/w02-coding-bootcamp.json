@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w02-coding-bootcamp",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I finished a coding bootcamp this summer, and it took 16 weeks of full days.",
+    "I learned three lessons that I wish someone had told me.",
+    "First, build small projects every single day.",
+    "Second, read other people's code before writing your own.",
+    "Third, ask for help early instead of staying stuck.",
+    "Those habits mattered more than any single course."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "16 weeks", "occurrence": 1, "value": 16, "unit": "weeks" },
+    { "kind": "list_reveal", "say": "three lessons that I wish someone had told me. First, build small projects every single day. Second, read other people's code before writing your own. Third, ask for help early instead of staying stuck.", "occurrence": 1,
+      "count": 3, "header": "3 LESSONS" }
+  ],
+  "tags": ["announcer"],
+  "notes": "a list announced as three lessons, with ordinal markers; a time span in weeks over 10"
+}

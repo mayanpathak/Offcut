@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w14-sleep-focus",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "For a while I paid attention to how sleep changes my focus.",
+    "I go to bed at 10 pm now, even on weekends.",
+    "My phone stays in the kitchen overnight.",
+    "Deep work is easier in the morning, and I make fewer mistakes.",
+    "Nothing about this is new, but it works for me."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["X3"],
+  "notes": "at 10 pm is a clock time and no event; no other number"
+}
