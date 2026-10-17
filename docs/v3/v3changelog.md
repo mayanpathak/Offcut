@@ -321,3 +321,27 @@ At the founder's request: `docs/v3/testvideo_scripts/script1.md` (phone, portrai
 **Checked.** `pnpm build:wasm`; `cargo clippy -p offcut-wasm-core --target wasm32-unknown-unknown -- -D warnings` clean; `pnpm check` exit 0; `pnpm build` exit 0 with `check-hosts` ok. `pnpm e2e:media --grep @no-gpu` on an unkeyed build: "10 passed" (V2's 8 cases and the 2 of `media-setup`), the pool holding its fourth worker. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` 328 passed, 0 failed, 3 ignored (no Rust test is added: TS §5 has no test file for the binding), Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 698,122 bytes), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing.
 
 **Found, not fixed.** None.
+
+---
+
+## 2026-10-17 - Prompt 70 (V3 10/30): edit-list shapes E0-E4 and probe hardening H1-H8
+
+CI on Prompt 69's `5577dad`: `ci` and `e2e-media` success. Port 5173 on D1 (Prompt 69) was another project's front end, the founder confirmed.
+
+**Done.**
+
+- **State verified before starting**: clean tree on `v3-build` at `5577dad`; `sample_table.rs` 387 lines above its tests (V2 CL known issue 10, as the prompt says); `validate.rs` and `media_api.rs` unchanged since `8a271a9`; fixtures up to date.
+- **`crates/offcut-mp4/src/edit_list.rs`** (crate-private, §6.1, D-92), 143 lines above its tests: `EditPlan { edit_offset, presented }` and `resolve_edits(edits, media_timescale, movie_timescale, media_duration)`. E0 (no edits) returns at once, before any timescale check, as V2 did; then at most `MAX_EDITS = 16` entries; one trailing empty edit is set aside (E4); one leading empty edit gives the lead (E2, E3); what remains must be one or more media edits with `media_time >= 0`, else `Unsupported("elst")`. One media edit: `edit_offset = media_time - lead` (saturating, as V2) and `presented = shown(edit)`, V2's E1 and E2 exactly. Two or more (E3): each must start within `CONTIGUITY_TICKS = 1` media tick of where the previous one ended (`abs_diff`, which cannot overflow), the last may run to the end of the media (`segment_duration` 0), and the lengths are summed with `checked_add` (`Malformed("elst")`). `to_media` (`Malformed("mvhd")` for a movie timescale of 0) and `shown` moved here unchanged as methods of a small private `Ticks`. The 12 inline cases of §6.1.
+- **`sample_table.rs`**: `edits()` keeps its signature: V2's overflow-checked sum of the `stts` runs, `resolve_edits`, `(plan.edit_offset, plan.presented)`. `Edit` stays with its two fields. 362 lines above its tests (from 387). V2's two edit-list tests pass unchanged; "two media edits are unsupported" stays true because its edits (`media_time` 0 for 1,500 media ticks, then `media_time` 2,000) leave a gap of 500 ticks.
+- **`lib.rs`**: `mod edit_list;` (private).
+- **`probe.rs`** (§6.3), 210 lines above its tests: **H1** each of the matrix's `a b c d` is taken to the nearest of -1, 0, 1 (16.16) when within 1/256 (256 units) of it; an entry farther from all three gives `R0`. **H3** `max_fps` comes from a private `max_fps(stts, timescale)` that leaves out the last sample's duration when it is a run of its own after other runs (inside a longer run it equals its neighbours, so nothing else changes); `is_vfr`'s spread is unchanged. **H4** was already V2's behaviour (frequency index 15 reads the 24-bit rate from the `AudioSpecificConfig`); it now has its test. H2 and H5-H8: no change, covered by Prompt 71's fixture tests.
+
+**Differs from the prompt or the plan.**
+
+- **H3 is tested through the helper, not through a file.** V2's test MP4 builder (`demux::fixture`, in the frozen `demux.rs`) writes one `stts` run per track, so it cannot make a file whose last sample has a run of its own; `max_fps` was taken out of `video_info` into a private function and tested with the runs directly (89 frames then 1 tick: 30,000; a short frame first: 60,000; one sample: 60,000), plus one case through a file.
+- §6.3 says V2 read an explicit rate "from the sample entry"; V2's `audio_specific_config` already read the 24-bit rate. No code change for H4.
+- §6.2 describes V2's second edit-list test as two edits at `media_time` 0 and 0; they are at 0 and 2,000. The conclusion (not contiguous, `Unsupported`) is the same.
+
+**Checked.** `cargo test -p offcut-mp4`: lib 39 passed (V2's 24, 12 `edit_list`, 3 `probe`), `mux_roundtrip` 12 passed unchanged. Drill (G 5.5 row 2): `MAX_EDITS = 2` made `e3_three_contiguous_media_edits` and `e3_one_tick_of_mismatch_is_accepted` fail; undone. `cargo clippy -p offcut-mp4 --all-targets -- -D warnings` clean; `pnpm build:wasm`: core 699,226 bytes, render 6,034,084 (both link `offcut-mp4`; about 1 kB each); `git diff --name-only 8a271a9 -- validate.rs demux.rs boxes.rs media_api.rs` empty; `check-file-tree.mjs` ok (TS §5 has listed `edit_list.rs` since Prompt 61). SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **343 passed** (328 + 15), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 699,226, `offcut_render_bg` 6,034,084 bytes), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing.
+
+**Found, not fixed.** None.
