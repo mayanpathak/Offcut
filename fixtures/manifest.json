@@ -6,7 +6,7 @@
       "probe": { "video_codec": "h264", "width": 1280, "height": 720, "frames": 225 },
       "tests": ["demux_fixtures.rs", "rejections.spec.ts"] },
     { "name": "ok_rotated_90.mov", "kind": "synthetic",
-      "expect": { "accept": { "rotation": null, "display_width": 720, "display_height": 1280, "orientation": "portrait" } },
+      "expect": { "accept": { "rotation": "r270", "display_width": 720, "display_height": 1280, "orientation": "portrait" } },
       "probe": { "video_codec": "h264", "width": 1280, "height": 720, "frames": 90 },
       "tests": ["demux_fixtures.rs"] },
     { "name": "ok_60fps.mp4", "kind": "synthetic",
