@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "w03-home-office",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "This year I finally rebuilt my home office from scratch.",
+    "The standing desk alone cost $1,450, and it was worth every cent.",
+    "I share the room with 2 cats, so every cable now sits in a tray under the desk.",
+    "The biggest change was the chair, though.",
+    "My back pain is *gone*, and I can work a full day again.",
+    "Buy the chair first, then the desk."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "$1,450", "occurrence": 1, "value": 1450, "unit": "usd" },
+    { "kind": "keyword_pop", "say": "gone", "occurrence": 1 }
+  ],
+  "tags": ["X5"],
+  "notes": "a price over $1,000; one emphasized word; 2 cats is a bare small number and no event"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w27-recipe",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "Here is the breakfast I make on busy recording days.",
+    "Whisk 2 eggs with a pinch of salt.",
+    "Add 3 spoons of yogurt and some chopped herbs.",
+    "Cook it slowly in a little butter, and stir the whole time.",
+    "It takes almost no thought, which is the point."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["X5", "X5"],
+  "notes": "2 eggs and 3 spoons are bare small numbers and no event"
+}

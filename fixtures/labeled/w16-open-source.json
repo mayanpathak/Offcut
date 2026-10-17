@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "w16-open-source",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I have maintained a small open source library since 2019.",
+    "It is a date parser that nobody notices until it breaks.",
+    "Last week the project passed 12,000 stars, which still surprises me.",
+    "Most of the stars came from one blog post I never expected to spread.",
+    "If you maintain something, write down how you make decisions."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "12,000 stars", "occurrence": 1, "value": 12000, "unit": "count:stars" }
+  ],
+  "tags": ["X1"],
+  "notes": "stars over 1,000; since 2019 is a year and no event"
+}

@@ -72,8 +72,7 @@ fn video_info(track: &Track, duration_ms: u32) -> VideoTrackInfo {
             .map(|&(_, delta)| delta)
     };
     let timescale = u64::from(track.table.timescale);
-    let shortest = deltas().filter(|&delta| delta > 0).min();
-    let max_fps = shortest.map_or(0, |delta| timescale * 1_000 / u64::from(delta));
+    let max_fps = max_fps(&track.stts, timescale);
     let spread = u64::from(deltas().max().unwrap_or(0)) - u64::from(deltas().min().unwrap_or(0));
 
     VideoTrackInfo {
@@ -90,12 +89,43 @@ fn video_info(track: &Track, duration_ms: u32) -> VideoTrackInfo {
     }
 }
 
+/// Frames per second x 1,000 at the shortest sample duration. H3: the last
+/// sample of a webcam recording often lasts 1 tick, which would give a
+/// `max_fps` in the thousands; with more than one sample its duration is left
+/// out. It differs from the others only when it is a run of its own, the last.
+/// `max_fps` is reported, not validated (rule 10 reads `avg_fps`).
+fn max_fps(stts: &[(u32, u32)], timescale: u64) -> u64 {
+    let runs: Vec<(u32, u32)> = stts.iter().copied().filter(|&(run, _)| run > 0).collect();
+    let paced = match runs.as_slice() {
+        [rest @ .., (1, _)] if !rest.is_empty() => rest,
+        all => all,
+    };
+    let shortest = paced
+        .iter()
+        .map(|&(_, delta)| delta)
+        .filter(|&delta| delta > 0)
+        .min();
+    shortest.map_or(0, |delta| timescale * 1_000 / u64::from(delta))
+}
+
 /// From the 2x2 part of the track matrix, whose 1.0 is 65,536. Anything
-/// that is not a quarter turn is read as no rotation.
+/// that is not a quarter turn is read as no rotation. H1: each entry is first
+/// taken to the nearest of -1, 0 and 1 when it is within 1/256 of it, since
+/// muxers write those values a unit off in the last place.
 fn rotation(matrix: &[i32; 9]) -> Rotation {
     const ONE: i32 = 0x0001_0000;
     const NEG: i32 = -ONE;
+    /// 1/256 in 16.16 fixed point.
+    const NEAR: i64 = 256;
+    let snap = |v: i32| -> Option<i32> {
+        [NEG, 0, ONE]
+            .into_iter()
+            .find(|&target| (i64::from(v) - i64::from(target)).abs() <= NEAR)
+    };
     let [a, b, _, c, d, ..] = *matrix;
+    let (Some(a), Some(b), Some(c), Some(d)) = (snap(a), snap(b), snap(c), snap(d)) else {
+        return Rotation::R0;
+    };
     match (a, b, c, d) {
         (0, ONE, NEG, 0) => Rotation::R90,
         (NEG, 0, 0, NEG) => Rotation::R180,
@@ -206,6 +236,54 @@ mod tests {
             track.matrix = [a, b, 0, c, d, 0, 0, 0, 0x4000_0000];
             assert_eq!(probe_file(file(&[track])).video.unwrap().rotation, expected);
         }
+    }
+
+    #[test]
+    fn h1_a_matrix_a_unit_off_is_still_a_quarter_turn() {
+        const ONE: i32 = 0x1_0000;
+        let cases = [
+            ([0, ONE + 1, -ONE + 1, 0], Rotation::R90),
+            ([1, -ONE - 1, ONE - 1, -1], Rotation::R270),
+            ([-ONE + 256, 0, 0, -ONE - 256], Rotation::R180),
+            // More than 1/256 away from -1, 0 or 1: no rotation.
+            ([0, ONE + 257, -ONE, 0], Rotation::R0),
+            ([300, ONE, -ONE, 0], Rotation::R0),
+        ];
+        for ([a, b, c, d], expected) in cases {
+            let mut track = video(3);
+            track.matrix = [a, b, 0, c, d, 0, 0, 0, 0x4000_0000];
+            assert_eq!(
+                probe_file(file(&[track])).video.unwrap().rotation,
+                expected,
+                "{a} {b} {c} {d}"
+            );
+        }
+    }
+
+    #[test]
+    fn h3_the_last_sample_of_one_tick_does_not_set_max_fps() {
+        // 89 frames at 30 fps, then a last sample of 1 tick: still 30 fps.
+        assert_eq!(max_fps(&[(89, 1_000), (1, 1)], 30_000), 30_000);
+        // A short frame anywhere else still counts.
+        assert_eq!(max_fps(&[(1, 500), (89, 1_000)], 30_000), 60_000);
+        // A track of one sample keeps its own duration.
+        assert_eq!(max_fps(&[(1, 500)], 30_000), 60_000);
+        // As read from a file: V2's builder writes one run.
+        assert_eq!(
+            probe_file(file(&[video(90)])).video.unwrap().max_fps.get(),
+            30_000
+        );
+    }
+
+    #[test]
+    fn h4_an_explicit_24_bit_rate_is_read_from_the_asc() {
+        // AAC-LC (2), frequency index 15, the 24-bit rate 44,100, two channels:
+        // 00010 1111 000000001010110001000100 0010 then padding.
+        let asc = audio_specific_config(&[0x17, 0x80, 0x56, 0x22, 0x10]).unwrap();
+        assert_eq!(
+            (asc.object_type, asc.sample_rate, asc.channels),
+            (2, Some(44_100), Some(2))
+        );
     }
 
     #[test]

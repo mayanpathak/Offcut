@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "id": "a01-scriptA",
+  "source": "written",
+  "author": "founder",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "Last year, I almost quit making videos, editing 8 every evening at almost nobody watched.",
+    "So I added it up.",
+    "I had spent 3000 hours editing by hand.",
+    "This is literally brutal way to make anything.",
+    "The slow part was always a rough cut.",
+    "Then I checked my workflow and the rough cut went from 90 minutes to 10 minutes.",
+    "That change gave me my evenings back and honestly it was not luck.",
+    "There are three reasons it worked.",
+    "First the captions write themselves.",
+    "Second the numbers animate automatically.",
+    "Third everything runs on my laptop.",
+    "I record a clip, drop it in and read the result.",
+    "If a caption is wrong, I fix the word and move on.",
+    "Now I publish every week instead of every month.",
+    "Last month those clips earned $12 ,000 in sales.",
+    "So I keep talking to my camera and let the software handle the rest.",
+    "Your ideas matter more than your timeline."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "3000 hours", "occurrence": 1, "value": 3000, "unit": "hours", "label": "editing by hand" },
+    { "kind": "from_to", "say": "from 90 minutes to 10 minutes", "occurrence": 1,
+      "from": { "value": 90, "unit": "minutes" }, "to": { "value": 10, "unit": "minutes" } },
+    { "kind": "list_reveal", "say": "three reasons it worked. First the captions write themselves. Second the numbers animate automatically. Third everything runs on my laptop.", "occurrence": 1,
+      "count": 3, "header": "3 REASONS" },
+    { "kind": "number_reveal", "say": "$12 ,000", "occurrence": 1, "value": 12000, "unit": "usd", "label": "in sales" }
+  ],
+  "tags": ["from_frame", "announcer", "X5"],
+  "notes": "the V2 reference clip as the recognizer wrote it (fixtures/speech/README.md, The V2 reference clip as recognized), written out word for word with its 157 words, including 3000 and the amount as the two words $12 and ,000 (words 132-133, D-42). No emphasis marks and no KeywordPop: the written form carries no prosody, so literally brutal is not expected. The 8 of editing 8 is a misheard word and a bare small number (X5); 90, 10 and three are parts of the FromTo and the list, not events of their own"
+}

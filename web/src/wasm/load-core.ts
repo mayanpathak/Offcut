@@ -8,19 +8,26 @@
 import {
   type Bytes,
   type ClipInfo,
+  type Dbfs,
   type Hz,
+  type Lufs,
   type ProbeInfo,
+  type Prosody,
   REJECT_REASONS,
   type RejectReason,
+  type Sentence,
   type Transcript,
+  type Word,
 } from "../gen/domain";
 import initCore, {
   core_version,
   type DemuxerHandle,
+  measure_prosody,
   normalize_transcript,
   open_demuxer,
   probe_and_validate,
   resample,
+  run_chain,
   Sha256Stream,
 } from "./pkg/core/offcut_core";
 import coreWasmUrl from "./pkg/core/offcut_core_bg.wasm?url";
@@ -30,6 +37,9 @@ export type AudioSample = { data: Uint8Array; ptsUs: number; durationUs: number 
 
 /** One word as the recognizer returned it (TS §16.2). The times are whole milliseconds. */
 export type RawWord = { text: string; startMs: number; endMs: number; confidence: number };
+
+/** What the voice chain returns (TS §18): the cleaned voice in its own buffer, or that it was cancelled. */
+export type ChainResult = { out48: Float32Array<ArrayBuffer>; loudness: Lufs; peak: Dbfs } | { cancelled: true };
 
 /** A file the demuxer has opened. `free()` gives its memory in the module back. */
 export type CoreDemuxer = {
@@ -59,6 +69,10 @@ export type CoreApi = {
   /** The transcript of these words: their sentences, and the numbers that were spoken. */
   normalizeTranscript(raw: readonly RawWord[], modelVersion: string): Transcript;
   newSha256(): { update(chunk: Uint8Array): void; finalizeHex(): string };
+  /** The voice chain (TS §18). `onBlock` gets the samples done so far once per second of audio; `true` cancels. */
+  runChain(pcm48: Float32Array, onBlock: (done: number) => boolean): ChainResult;
+  /** Per-word prosody of the cleaned audio. Reads only. */
+  measureProsody(out48: Float32Array, words: readonly Word[], sentences: readonly Sentence[]): Prosody;
 };
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -142,6 +156,8 @@ const api: CoreApi = {
       finalizeHex: () => stream.finalize_hex(),
     };
   },
+  runChain: (pcm48, onBlock) => run_chain(pcm48, onBlock) as ChainResult,
+  measureProsody: (out48, words, sentences) => measure_prosody(out48, words, sentences) as Prosody,
 };
 
 /**

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "w22-ai-tool-review",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "This week I tried an AI writing assistant for my scripts.",
+    "It runs on GPT 4 under the hood, and you can tell.",
+    "The first drafts were generic, but the outlines were *excellent*.",
+    "I now use it to plan, and I still write every line myself.",
+    "Try it for structure, not for your voice."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "keyword_pop", "say": "excellent", "occurrence": 1 }
+  ],
+  "tags": ["X2"],
+  "notes": "one emphasized word; GPT 4 is a model version and no event"
+}

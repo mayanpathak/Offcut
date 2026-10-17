@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "w07-camera",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I upgraded my camera after years of filming on my phone.",
+    "The new body cost $2,400, and the lens was extra.",
+    "It is a 4K camera, but I still export most videos at a lower resolution.",
+    "The autofocus is *incredible* in low light.",
+    "If you film indoors, spend on lights before you spend on a camera."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "$2,400", "occurrence": 1, "value": 2400, "unit": "usd" },
+    { "kind": "keyword_pop", "say": "incredible", "occurrence": 1 }
+  ],
+  "tags": [],
+  "notes": "a dollar price; one emphasized word; a 4K camera names a resolution, not an amount, and is no event"
+}

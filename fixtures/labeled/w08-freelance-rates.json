@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "w08-freelance-rates",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "After a long time freelancing, I finally raised my rates.",
+    "I charged $60 an hour, then I raised it to $95.",
+    "I lost a client, and the rest stayed.",
+    "This year I will earn about $110,000, working fewer hours than before.",
+    "Your rate tells clients how seriously to take you."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "$60 an hour, then I raised it to $95", "occurrence": 1,
+      "from": { "value": 60, "unit": "usd" }, "to": { "value": 95, "unit": "usd" } },
+    { "kind": "number_reveal", "say": "$110,000", "occurrence": 1, "value": 110000, "unit": "usd" }
+  ],
+  "tags": ["change_verb"],
+  "notes": "FromTo with a change verb (raised it to) between two hourly rates; a yearly dollar amount"
+}

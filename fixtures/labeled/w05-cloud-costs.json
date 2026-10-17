@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w05-cloud-costs",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "We spent a weekend cutting our cloud bill, and it worked.",
+    "Storage went from $2,800 a month to $900 a month once old backups were deleted.",
+    "The database was $3,000 a month, and we cut it to $1,100 with a smaller instance.",
+    "We also moved to version 2 of our deploy tool, which made the change painless.",
+    "Check your bill every month, not once a year."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "from $2,800 a month to $900 a month", "occurrence": 1,
+      "from": { "value": 2800, "unit": "usd" }, "to": { "value": 900, "unit": "usd" } },
+    { "kind": "from_to", "say": "$3,000 a month, and we cut it to $1,100", "occurrence": 1,
+      "from": { "value": 3000, "unit": "usd" }, "to": { "value": 1100, "unit": "usd" } }
+  ],
+  "tags": ["from_frame", "change_verb", "X2"],
+  "notes": "two FromTos in two sentences, one with a from-frame and one with a change verb (cut it to); version 2 of a tool is no event"
+}

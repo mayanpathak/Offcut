@@ -4,6 +4,7 @@
 
 pub mod boxes;
 pub mod demux;
+mod edit_list;
 pub mod mux;
 mod mux_boxes;
 pub mod probe;

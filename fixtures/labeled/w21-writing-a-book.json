@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "w21-writing-a-book",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I finally finished writing my first technical book.",
+    "The draft came to 62,000 words and took 9 months of early mornings.",
+    "Editing was harder than writing, by a long way.",
+    "My editor cut whole chapters, and the book is *better* for it.",
+    "If you want to write one, start with a single chapter you can share."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "62,000 words", "occurrence": 1, "value": 62000, "unit": "count:words" },
+    { "kind": "keyword_pop", "say": "better", "occurrence": 1 }
+  ],
+  "tags": ["no_change_pair"],
+  "notes": "a word count over 1,000; 62,000 words and 9 months are two quantities of unrelated units in one sentence, no change from one to the other; one emphasized word"
+}

@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "clips": [
+    { "id": "founder-01", "sha256": "7da948cecc39438a1b7a9591c84dc1ff938fdcfd4dad8218b43926b13240c124", "tags": ["webcam", "vfr", "landscape"], "expect": "accept", "owner": "founder" },
+    { "id": "founder-02", "sha256": "e600b6bf2048130aa6ac8468be98496c5ebeede00d819f3b56206b4fc00610bc", "tags": ["webcam", "vfr", "low-fps", "landscape", "location-tag"], "expect": "accept", "owner": "founder" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "w28-mistakes",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "When I started my channel, I made five mistakes I still think about.",
+    "First, I bought gear before I had a single script.",
+    "Second, I posted whenever I felt like it.",
+    "Third, I ignored the comments.",
+    "Fourth, I copied formats that did not suit me.",
+    "Fifth, I never looked at what people actually watched.",
+    "My watch time per video was 40 seconds, and fixing those pushed it up to 3 minutes."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "list_reveal", "say": "five mistakes I still think about. First, I bought gear before I had a single script. Second, I posted whenever I felt like it. Third, I ignored the comments. Fourth, I copied formats that did not suit me. Fifth, I never looked at what people actually watched.", "occurrence": 1,
+      "count": 5, "header": "5 MISTAKES" },
+    { "kind": "from_to", "say": "40 seconds, and fixing those pushed it up to 3 minutes", "occurrence": 1,
+      "from": { "value": 40, "unit": "seconds" }, "to": { "value": 3, "unit": "minutes" } }
+  ],
+  "tags": ["announcer", "change_verb"],
+  "notes": "a list announced as five mistakes, with ordinal markers; FromTo with a change verb (pushed it up to), seconds to minutes"
+}

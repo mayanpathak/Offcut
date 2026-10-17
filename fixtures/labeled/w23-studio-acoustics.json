@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "w23-studio-acoustics",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My spare room used to sound like a bathroom.",
+    "I made four fixes over a weekend.",
+    "First, I hung heavy curtains over the window.",
+    "Second, I put a thick rug on the bare floor.",
+    "Third, I filled the bookshelf behind the camera.",
+    "I also moved the desk 2 steps away from the wall.",
+    "Now my voice sounds close and warm."
+  ],
+  "words": null,
+  "prosody": null,
+  "edits": { "28": "" },
+  "expected": [],
+  "tags": ["partial_list", "hidden_word", "X5"],
+  "notes": "four fixes are announced and only three markers follow, a partial list a person would not want animated (TS 17.6); word 28, thick, inside the second item, is hidden by an edit, which also removes a list (TS 17.6). 2 steps is a bare small number and no event"
+}

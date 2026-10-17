@@ -7,11 +7,12 @@ The scripts are written against the detector rules of `technicalspec.md` §17.2-
 | Clip | Script | Recorded for |
 |---|---|---|
 | `testclips/speech_scriptA_landscape_720p.mp4` (not in git) | Script A | V2: the reference clip. A webcam recording, 1280x720, 74.7 s (`docs/v2/v2implementation.md`, D-39 and D-64). Video-stream duration: **74,705 ms** (`ffprobe`, 74.705033 s, read on 2026-10-08). H.264 and AAC at 48 kHz stereo, 35,201,023 bytes. White-flash frames: 150 and 1950 |
-| `speech_60s_portrait.mp4` | Script A | V3 |
-| `speech_60s_landscape.mp4` | Script A | V3 |
-| `speech_20s_noevents.mp4` | Script B | V3 |
-| `speech_20s_long_pause.mp4` | Script C | V3 |
-| `speech_30s_sparse.mp4` | Script D | V3 |
+| `speech_60s_portrait.mp4` | Script A | V3: derived in V3 from the reference clip (D-76): its 0.960-60.960 s, cropped to 9:16 and scaled to 1080x1920, 30 fps, white frames 150 and 1650. Generated into `fixtures/.gen/speech/` by `pnpm fixtures`, not in git |
+| `speech_60s_landscape.mp4` | Script A | V3: derived in V3 from the reference clip (D-76): its 0.960-60.960 s scaled to 1920x1080, 30 fps, white frames 150 and 1650. Not in git |
+| `speech_20s_noevents.mp4` | Script B | V3: derived in V3 from the reference clip (D-76): its 46.600-61.000 s (sentences 12-14), 14.4 s, 1280x720, 30 fps. It holds the reference clip's words, not Script B's. Not in git |
+| `speech_20s_long_pause.mp4` | Script C | V3: derived in V3 from the reference clip (D-76): its 9.160-14.160 s, 5 s of generated room tone over the video of 14.160-19.160 s, then 18.100-28.100 s; 20 s, white frames 60 and 450. The reference clip's words, not Script C's; the silence is generated, not a recorded room. Not in git |
+| `speech_30s_sparse.mp4` | Script D | V3: derived in V3 from the reference clip (D-76): five 1.1 s pieces of it (from 9.160, 29.040, 46.840, 55.420, 69.120 s) placed at 0.5, 7.0, 13.5, 19.5 and 26.0 s, generated room tone between them; 30 s, white frames 15 and 885. The reference clip's words, not Script D's. Not in git |
+| `testclips/v3testclip.mp4` (not in git) | - | V3 test clip, founder's recording of 2026-10-13, not in git (D-99). A webcam recording, 1280x720, 78.918 s, about 16.8 fps on average (variable), H.264 and AAC at 48 kHz stereo, 46,360,015 bytes. It carries a location tag in its metadata and never leaves the development machine (D-100). Its words: "The V3 test clip as recognized" below |
 
 ## Recording rules for every clip
 
@@ -135,6 +136,29 @@ The event's span is 62,660 ms to 63,540 ms, the time its two words are spoken, a
 
 V2 shows no "Cleaning voice" line: the voice chain arrives in V3.
 
+**Expected events of V3** (`docs/v3/v3implementation.md` §17.7). All five events of Script A, on the same recognized transcript, in time order:
+
+| # | Kind | Words | Expected content |
+|---|---|---|---|
+| 1 | NumberReveal | 23-24, `3000 hours` | value 3,000, unit hours, display `3,000 hours`, label "editing by hand" |
+| 2 | KeywordPop | 31, `brutal` | the word "brutal", **if the measured prosody carries it**: the recognized text is "literally brutal", and the word passes only with its loudness and pitch (`docs/v3/v3implementation.md` §9.6) |
+| 3 | FromTo | 54-59, `from 90 minutes to 10 minutes` | 90 minutes to 10 minutes |
+| 4 | ListReveal | 75-94, `three reasons … First … Second … Third …` | header "3 REASONS"; items "the captions write themselves", "the numbers animate automatically", "everything runs on my laptop" |
+| 5 | NumberReveal | 132-133, `$12 ,000` | value 12,000, unit USD, display `$12k`, label "in sales" |
+
+The labeled file `fixtures/labeled/a01-scriptA.json` holds this transcript in written form with events 1, 3, 4 and 5: a written transcript carries no prosody, so the KeywordPop is not expected there.
+
+**Expected feed of V3.** "Transcribing…" and "Cleaning voice" first, in either order (the voice chain starts before the recognizer, D-90), then one line per event in time order:
+
+| # | Line |
+|---|---|
+| 1, 2 | "Transcribing…", "Cleaning voice" |
+| 3 | "Found: 3,000 hours" |
+| 4 | "Found: brutal" (only if event 2 is detected) |
+| 5 | "Found: 90 minutes to 10 minutes" |
+| 6 | "Found: 3-item list" |
+| 7 | "Found: $12k" |
+
 **Where the transcript differs from Script A.** Which of these the speaker said and which the recognizer misheard has not been judged by ear.
 
 | Script A | Recognized |
@@ -209,3 +233,46 @@ V2 shows no "Cleaning voice" line: the voice chain arrives in V3.
 **Expected result.** The export is 30 seconds long and every pause keeps its length.
 
 **Expected events.** The fixture matrix names none for this clip, and the script is written to produce none.
+
+## The derived clips as recognized
+
+The five clips of the table above are derived in V3 from the reference clip by `fixtures/gen_fixtures.sh` (`docs/v3/v3implementation.md` §17.3, D-76): same speaker, same room, same words as the reference clip, cut and scaled. Their recognized transcripts, their numbers and the events V3 detects in them are filled at S8 (Prompt 82) from one run of each clip on the development machine. V2 can show neither a transcript nor three of the four event kinds, so nothing is written here before then.
+
+| Clip | Recognized transcript, numbers, events |
+|---|---|
+| `speech_60s_portrait.mp4` | filled at S8 (Prompt 82) |
+| `speech_60s_landscape.mp4` | filled at S8 (Prompt 82) |
+| `speech_20s_noevents.mp4` | filled at S8 (Prompt 82) |
+| `speech_20s_long_pause.mp4` | filled at S8 (Prompt 82) |
+| `speech_30s_sparse.mp4` | filled at S8 (Prompt 82) |
+
+## The V3 test clip as recognized
+
+**Clip.** `testclips/v3testclip.mp4`, the founder's recording of 2026-10-13 (D-99): not in git, never uploaded, and never an input of `gen_fixtures.sh`.
+
+**The founder's words** (given on 2026-10-17, sentence by sentence, as the founder wrote them down):
+
+1. Hello everyone, this is Mayan Pathak, the site.
+2. This is just a recording, sample recording for everything that I'm going to do with my new build that I've built, which is offcut, right.
+3. So here's a little bit about myself.
+4. My name is Mayan, I'm an aspiring computer science engineer and a SaaS developer.
+5. My major goal is to develop one of my SaaS that I launch it, get 500 paying users by the end of three months, right.
+6. And the target is to have about 500 paying customers and $2,000 in revenue in three to four months of launch.
+7. I'll see what I can do.
+8. The first plan is to generate content, right.
+9. A lot of content, talking head videos, and then eventually reaching out to creators to try my new product.
+10. And then from that feedback, after I will take that feedback, I will also, you know, improve the product further.
+11. Yes, so that's a plan.
+12. Let's see what happens.
+
+**Expected events** (what a person expects from these words; `fixtures/labeled/a02-v3testclip.json`, frozen 2026-10-17):
+
+| # | Kind | Words | Expected content |
+|---|---|---|---|
+| 1 | NumberReveal | "500 paying users" | value 500, users |
+| 2 | NumberReveal | "500 paying customers" | value 500, customers |
+| 3 | NumberReveal | "$2,000" | value 2,000, USD, label "in revenue" |
+
+No event for "three months", for "three to four months" (a range, not a change from one value to another), or for "The first plan" (not a list).
+
+**Recognized transcript:** filled at S8 (Prompt 82): the recognized sentences with their times, the numbers, the events V3 detects, and where the transcript differs from the words above.

@@ -240,6 +240,7 @@ const MINTING = [
   { file: "src/usecases/import-clip.ts", brand: "ClipId", helper: "newClipId" },
   { file: "src/usecases/start-export.ts", brand: "ExportId", helper: "newExportId" },
   { file: "src/usecases/control-preview.ts", brand: "TimeMs", helper: "toTimeMs" },
+  { file: "src/persistence/clips-repo.ts", brand: "Bytes", helper: "toBytes" },
 ];
 
 /** The brand-cast rule for a minting file: NO_BRAND_CAST, less its one named cast. */

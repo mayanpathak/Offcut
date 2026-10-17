@@ -134,6 +134,8 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 
 Enforcement of every row: §7.
 
+**Edges added in V2** (v2implementation D-27, D-58), each a named entry in `web/eslint.config.js`: `usecases/import-clip.ts` may import `net/asset-fetch` (the sample clip); `workers/**` may import `persistence/opfs` (the path builder); `workers/render.worker.ts` may import `config/entitlement-public-key`; `models/**` may import `state/model-store` and `config/model-manifest.json`; `models/model-manager.ts` may import `persistence/db` (`metaGet`, `metaSet`); `state/**`, `models/**` and `usecases/**` may import types only from `workers/protocol.ts` (`FeedLine`, `AppFailure`). Two use-case pairs may import each other: `import-clip.ts` to `run-pipeline.ts`, and `start-export.ts` to `control-preview.ts` (which also exports `detach()`, `lockForExport()` and `unlockAfterExport()`; `import-clip.ts` also exports `dismissClip()`).
+
 ---
 
 ## 3. Technology Stack
@@ -289,6 +291,7 @@ offcut/
 │   │   │   ├── reader.rs              RandomAccess trait (read_at)
 │   │   │   ├── boxes.rs               box header parsing and typed boxes
 │   │   │   ├── sample_table.rs        stts/ctts/stsc/stsz/stco/co64/stss/elst resolution
+│   │   │   ├── edit_list.rs           edit-list shapes E0-E4 (v3implementation D-92)
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
 │   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
@@ -304,6 +307,7 @@ offcut/
 │   │   ├── src/
 │   │   │   ├── lib.rs
 │   │   │   ├── tokenize.rs
+│   │   │   ├── cardinals.rs           spelled cardinals and "point" decimals (v3implementation D-92)
 │   │   │   ├── sentences.rs           segment_sentences()
 │   │   │   ├── numbers.rs             [ONLY] spoken/written number parsing and display formatting
 │   │   │   ├── units_lex.rs           unit and currency lexicon
@@ -415,7 +419,7 @@ offcut/
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs                 panic hook, init
-│   │       ├── media_api.rs           open_demuxer, probe_and_validate, resample
+│   │       ├── media_api.rs           open_demuxer, probe_and_validate, resample; the DemuxerHandle probe and audio-sample methods, validate (v2implementation D-53)
 │   │       ├── text_api.rs            normalize_transcript
 │   │       ├── audio_api.rs           run_chain, measure_prosody
 │   │       └── hash_api.rs            Sha256Stream
@@ -425,7 +429,7 @@ offcut/
 │           ├── lib.rs                 panic hook, init
 │           ├── session.rs             RenderSession (owns Renderer, Scene, Demuxer)
 │           ├── detect_api.rs          detect, redetect_sentence
-│           ├── profile_api.rs         export_profile_from_token
+│           ├── profile_api.rs         export_profile_from_token, preview_profile (v2implementation D-53)
 │           └── mux_api.rs             Mp4MuxerHandle
 ├── server/
 │   ├── Cargo.toml
@@ -736,6 +740,14 @@ offcut/
     ├── v2/coding-promptsv2.md         the 30 V2 coding prompts (31 to 60), run in order
     ├── v2/experiments.md              outcome of every experiment V2 runs (TE-n, E-n) and the M0 gate decision
     ├── v2/v2changelog.md              record of every change made while building V2
+    ├── v3/v3implementation.md         file-by-file implementation plan for V3 (M1.1 to M1.3)
+    ├── v3/v3buildguide.md             step-by-step build order for V3, with a milestone per phase
+    ├── v3/coding-promptsv3.md         the 30 V3 coding prompts (61 to 90), run in order
+    ├── v3/v3changelog.md              record of every change made while building V3
+    ├── v3/experiments.md              outcome of every experiment V3 runs (TE-n, E-n) and the precision gate
+    ├── v3/testvideo_scripts/script1.md   founder's recording script: phone, portrait, all four event kinds
+    ├── v3/testvideo_scripts/script2.md   founder's recording script: laptop webcam, the exclusion traps
+    ├── v3/testvideo_scripts/script3.md   founder's recording script: noisy room and a long pause (voice chain)
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
@@ -785,6 +797,8 @@ offcut-wasm-render ─► offcut-render ─► offcut-scene ─┐              
 offcut-api (server) ─► offcut-api-types, offcut-entitlement[sign] ─────┘
 ```
 
+`offcut-scene` also depends on `offcut-text`, for `format_quantity` only (count-up values, §19.5). `check-file-tree.mjs` allows that pair, and the `offcut-text` ban in `deny.toml` lists `offcut-scene` as a wrapper (v2implementation D-28). It creates no cycle.
+
 **Web (arrows point to what may be imported)**
 
 ```text
@@ -818,7 +832,7 @@ everything ─► gen (types only)
 **Circularity guards**
 - `offcut-types` imports no `offcut-*` crate. New shared types go there, never into a sibling.
 - `workers/protocol.ts` imports only `gen`; workers and `pool.ts` both import it, never each other.
-- `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call; checked by a `boundaries` rule.
+- `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call, and the two pairs of §2 "Edges added in V2" (`import-clip.ts` to `run-pipeline.ts`, `start-export.ts` to `control-preview.ts`); checked by a `boundaries` rule.
 - Stores never import use-cases; use-cases write stores through exported action functions only.
 
 ---
@@ -1171,7 +1185,7 @@ pub struct WordRange { pub start: WordIdx, pub end: WordIdx }   // half-open
 pub struct JobId(u32);
 ```
 
-TypeScript mirrors these as branded types generated into `web/src/gen/domain.ts` (`type TimeMs = number & { readonly __unit: "TimeMs" }`). `as TimeMs` casts are allowed only in `gen/` and `workers/`; ESLint `no-restricted-syntax` rejects them elsewhere.
+TypeScript mirrors these as branded types generated into `web/src/gen/domain.ts` (`type TimeMs = number & { readonly __unit: "TimeMs" }`). `as TimeMs` casts are allowed only in `gen/` and `workers/`, and in one minting line per file listed in the `MINTING` table of `web/eslint.config.js`: `persistence/opfs.ts`, `models/download.ts`, `models/model-manager.ts` and `state/model-store.ts` (`Bytes`), `usecases/import-clip.ts` (`ClipId`), `usecases/start-export.ts` (`ExportId`), `usecases/control-preview.ts` (`TimeMs`) (v2implementation D-59); ESLint `no-restricted-syntax` rejects them elsewhere.
 
 ### 10.2 Limits (copied from the product spec)
 
@@ -1363,7 +1377,7 @@ All request structs use `#[serde(deny_unknown_fields)]`.
 ### 10.8 Notes
 
 - **Why these representations.** One timeline type, `TimeMs`, because source time and output time are the same instant for the whole recording (INV-5); a second type would encode a distinction that does not exist. `DurMs` stays separate so a length is never passed where a position is expected. Integer milliseconds match the PS data model (PS §12.5) and are exact at 30 fps to within 1 ms; frame timestamps are derived from `FrameIdx`, never accumulated. `Sentence.words` is a range because sentences never overlap.
-- **Serialization.** Rust ↔ worker JS: `serde-wasm-bindgen` for structs; PCM as `Float32Array`; frames as `web_sys::VideoFrame` handles; file access through the `RandomAccess` callback. Worker ↔ main: structured clone of generated types; PCM buffers are transferred, never copied. Client ↔ server: JSON of `offcut-api-types`. Storage: IndexedDB structured clone of generated types wrapped in `{ schemaVersion, value }` (§23.2). Entitlement token: `base64url(JSON claims) "." base64url(Ed25519 signature)`.
+- **Serialization.** Rust ↔ worker JS: `serde-wasm-bindgen` for structs; PCM as `Float32Array`; frames as `web_sys::VideoFrame` handles; file access through the `RandomAccess` callback. Worker ↔ main: structured clone of generated types; PCM buffers are transferred, never copied. Client ↔ server: JSON of `offcut-api-types`. Storage: IndexedDB structured clone of generated types wrapped in `{ schemaVersion, value }` (§23.2). Entitlement token: `base64url(JSON claims) "." base64url(Ed25519 signature)`, both without padding; the signature covers the ASCII bytes of the first segment, so no JSON canonicalization is needed. The claims JSON uses the Rust field names of §10.6, `plan` is `"free"` or `"creator"` and `sub` is a UUID string (v2implementation D-25).
 - **Ownership (who may write).** `ClipInfo`: `validate_probe` only. `Transcript`: `normalize_transcript` only; user edits never mutate it (they live in `EditState`). `DetectedEvent`: `offcut-detect` only; `enabled` is overlaid from `EditState.event_overrides` in `build_scene`. `EditState`: use-cases through `edits-repo.ts`. `EntitlementClaims`: `server/src/entitlement/issue.rs` only. `ExportProfile`: `offcut-entitlement/src/profile.rs::export_profile` only.
 
 ---
@@ -1782,7 +1796,7 @@ export function importToOpfs(clipId: ClipId, file: File, isCancelled: () => bool
 export function decodeAudio(handle: FileSystemSyncAccessHandle, info: ClipInfo, isCancelled: () => boolean): Promise<Float32Array>; // mono, source rate
 ```
 
-Timestamps returned by the demuxer are presentation times with edit lists applied and the first presented video frame at 0. Audio is shifted by the same offset; `decodeAudio` pads leading silence or trims so that audio sample 0 is video time 0, and pads or trims the tail to the video duration. This is container-level track alignment (the two tracks rarely start and end on the same instant); it never looks at the audio content and removes nothing from inside the recording. After it, `pcm48.len() == round(ClipInfo.duration x 48)` and that length is carried unchanged to `out48` (INV-10).
+Timestamps returned by the demuxer are presentation times with edit lists applied and the first presented video frame at 0. Audio is shifted by the same offset; `decodeAudio` pads leading silence or trims so that audio sample 0 is video time 0, and pads or trims the tail to the video duration. This is container-level track alignment (the two tracks rarely start and end on the same instant); it never looks at the audio content and removes nothing from inside the recording. After it, `pcm48.len() == round(ClipInfo.duration x 48)` and that length is carried unchanged to `out48` (INV-10). "The video duration" is `ProbeInfo.duration`: the presented duration of the video track with edit lists applied, rounded to the nearest millisecond; the media worker pads or truncates each resampler output by at most one sample to hold the equality exactly (v2implementation D-34).
 
 ### 15.2 Pipeline
 
@@ -1863,7 +1877,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
   "totalBytes": 0 }
 ```
 
-Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
+Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB. `Transcript.model_version` is the manifest's `modelId`: `AsrWorkerApi.load` carries `modelId` and no version, and workers do not import the manifest (v2implementation D-50).
 
 ### 16.2 Interfaces
 
@@ -1908,7 +1922,7 @@ ensureReady:
 loadModel: configure the runtime so that                  // exact option names confirmed in TE-1
    - remote model loading is disabled
    - the model cache is asr/model-cache-adapter.ts (reads OPFS final files only; a miss throws, never fetches)
-   - runtime .wasm files load from "/ort/" on the app origin
+   - runtime .wasm files load from "/ort/<runtime version>/" on the app origin (versioned: vercel.json marks /ort/* immutable; v2implementation D-37)
    - backend = "webgpu"; on failure → "wasm" with threads = clamp(hardwareConcurrency - 2, 1, 4)
 transcribe(pcm16):
    windows of ASR_WINDOW = 30 s with ASR_OVERLAP = 5 s; word-level timestamps requested
@@ -1959,6 +1973,8 @@ pub fn redetect_sentence(t: &Transcript, p: &Prosody, edits: &BTreeMap<WordIdx, 
                          prev: &[DetectedEvent], cfg: &DetectorConfig) -> Vec<DetectedEvent>;
 pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;           // FNV-1a 64 over (kind, start, end)
 ```
+
+The event-id hash input is 9 bytes: the kind as `u8` (NumberReveal 0, ListReveal 1, FromTo 2, KeywordPop 3), then `anchors.start` and `anchors.end` as little-endian `u32` (v2implementation D-47). Ids are stored from V3 on, so this layout is fixed. `Token` and `TokenKind` are defined in `offcut-text/src/tokenize.rs` (v2implementation §8.2, D-42); the recognizer writes an amount such as "$12,000" as two words, `$12` and `,000`, and `parse_quantity` reads that split form as one quantity (v2implementation §8.4).
 
 ### 17.2 Normalization
 
@@ -2168,6 +2184,8 @@ impl RenderSession {
 }
 ```
 
+`offcut-scene/src/display_list.rs` defines `Rect`, `Rgba`, `PathEl`, `PositionedGlyph`, `Stroke`, `Affine` and a closed `FontId` enum with four members, one per font instance, because `GlyphRun` has no weight field (v2implementation D-29, §11.4). `JsRandomAccess` is private to each binding crate and wraps a `FileSystemSyncAccessHandle`; there is no shared binding crate (v2implementation D-30).
+
 ### 19.3 Build and frame evaluation
 
 ```text
@@ -2269,6 +2287,8 @@ export function runPreview(session: RenderSession, source: VideoSource,
 export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs };
 ```
 
+`DemuxerHandle` is a TypeScript interface declared in `video-source.ts`; `RenderSession` satisfies it through four extra exported methods, so the render worker reads samples through the session that owns the demuxer and loads only `offcut_render.wasm` (v2implementation D-30, §13.5).
+
 ### 20.2 Algorithm
 
 ```text
@@ -2327,7 +2347,7 @@ export function runExport(a: { session: RenderSession; source: VideoSource; prof
 // workers/render/encoders.ts  [ONLY]
 export const VIDEO_ENCODE_LADDER: readonly VideoLadderEntry[];
 export const AAC_ENCODE_CONFIG: AudioEncoderConfig;
-export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // first supported entry, else E_ENCODE_VIDEO
+export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // first supported entry, else E_ENCODE_VIDEO; bitrate from profile.video_bitrate (v2implementation D-26)
 // workers/render/opfs-sink.ts
 export class OpfsSink { static open(path: string): Promise<OpfsSink>; writeAt(offset: Bytes, data: Uint8Array): void;
                         close(): Promise<void>; abort(): Promise<void>; }
@@ -2358,7 +2378,7 @@ pub fn export_profile(claims: Option<&EntitlementClaims>, now: UnixSecs) -> Expo
 | Level check | 1080x1920 = 68 x 120 = 8,160 macroblocks ≤ 8,192 (level 4.0 frame limit); 8,160 x 30 = 244,800 MB/s ≤ 245,760 | derived |
 | Common video settings | `framerate: 30`, `bitrateMode: "variable"`, `latencyMode: "quality"`, `avc: {format: "avc"}` | |
 | Keyframe interval | 60 frames (2 s) | (assumption, TE-4) |
-| Video bitrate | Creator 8,000,000 b/s; Free 4,000,000 b/s; Preview not encoded | (assumption, TE-4) |
+| Video bitrate | Creator 8,000,000 b/s; Free 4,000,000 b/s; Preview not encoded. The values live in `offcut-entitlement/src/profile.rs`, the only builder of an `ExportProfile`; the Preview profile is 540x960, `watermark: false`, both bitrates 0. `CREATOR_VIDEO_BITRATE` in `encoders.ts` is the capability probe's bitrate only and must equal the `profile.rs` constant; TE-4 changes both or neither (v2implementation D-26) | (assumption, TE-4) |
 | Audio | `mp4a.40.2`, 48,000 Hz, 2 channels (mono duplicated), 160,000 b/s | (assumption, TE-4) |
 | Largest output | 90 s x (8,000,000 + 160,000) / 8 = 91.8 MB | derived |
 | MP4 | brands `isom`/`mp42`; video timescale 30,000 with sample delta 1,000 (exact 30 fps CFR); audio timescale 48,000; chunks of 0.5 s; `moov` before `mdat` | |
@@ -2399,7 +2419,7 @@ AAC priming: the first audio chunk's timestamp/duration and the encoder's report
 
 - **Frame accounting.** Every output frame `0..N` is rendered and encoded exactly once; the loop never drops or duplicates an output frame, and it runs from the first instant of the recording to the last. Source frames may repeat (VFR, source below 30 fps) or be skipped (source above 30 fps) only because of the frame-rate conversion to 30 fps; none is skipped or repeated because of what the audio contains.
 - **Duration.** Output duration equals source duration to within one video frame, for any amount of silence in the clip. `timeline-preserved.spec.ts` and verifier checks 5 and 8.
-- **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end (dev builds).
+- **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end. The counter runs in every build, since E2E runs production builds: a non-zero count at the end of an export or after a preview stop fails that call with `E_INTERNAL` (v2implementation D-45).
 - **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`. TE-3 picked method A on 2026-10-09: a readback was 2.8 times slower, and a frame made from a buffer of RGBA bytes is encoded with full-range brightness that the stream does not declare (`docs/v2/experiments.md`; read on the development machine, v2implementation D-69).
 - **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted.
 - **GPU device lost.** `E_GPU_LOST`; the user retries; no partial resume.
@@ -2761,7 +2781,7 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 
 - Model files are SHA-256-verified against the bundled manifest before first use (PS §17).
 - `cargo deny check` (licenses, advisories, bans) and `pnpm audit --prod --audit-level high` run in CI.
-- The ONNX Runtime `.wasm` files are copied from the pinned npm package at build time and served from the app origin.
+- The ONNX Runtime `.wasm` files are copied from the pinned npm package at build time to `web/public/ort/<runtime version>/` and served from the app origin; the version in the path keeps the year-long immutable cache of `/ort/*` from serving a stale runtime after an upgrade (v2implementation D-37).
 
 ### 24.7 Edge cases
 
@@ -3062,7 +3082,7 @@ Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.
 
 ## 32. Observability and Diagnostics
 
-- **Client, production.** The only telemetry is the allowlisted events of §22.6, batched by `analytics/client.ts` (flush every 10 s, on `visibilitychange`, and at 20 queued events; failures dropped silently). Stage timings come from `performance.now()` deltas in workers. No console output in production builds (`no-console` lint; dev logging is behind `import.meta.env.DEV` in `config/env.ts`). No third-party error tracker.
+- **Client, production.** The only telemetry is the allowlisted events of §22.6, batched by `analytics/client.ts` (flush every 10 s, on `visibilitychange`, and at 20 queued events; failures dropped silently). Pipeline stage timings are `performance.now()` deltas measured on the main thread around each worker call: `probe_audio` = `importAndProbe` + `extractAudio`, `asr` = `load` + `transcribe`; export timings come from the worker's `stageTimings` (v2implementation D-35). No console output in production builds (`no-console` lint; dev logging is behind `import.meta.env.DEV` in `config/env.ts`). No third-party error tracker.
 - **Client, "Report this" button (PS §14).** Sends one `client_error {error_code, stage}` event. Nothing else.
 - **Client, local diagnostics.** `AppFailure.detail` and a ring buffer of the last 200 state transitions are kept in memory, shown on `/settings` in dev builds only, and never sent.
 - **Server.** Structured JSON logs to stdout (§24.4), retained by Render per its free-tier policy (external; TE-11). Uptime: the free monitor on `/api/v1/healthz` (PS §20.1) with email alerts.
@@ -3240,7 +3260,7 @@ Definition of done: the three test files pass; clippy clean; file under 400 line
 | INV-8 | Every export has exactly `frame_count` frames at exactly 30 fps and passes the independent verifier | `verify_mp4.py` (3) in both export suites and the corpus run |
 | INV-9 | Output size and watermark are functions of the verified entitlement token only, computed in `export_profile` | `offcut-entitlement/tests/profile.rs`; `export-free.spec.ts`; `export-creator.spec.ts` |
 | INV-10 | `AUDIO_DURATION_PRESERVATION`. The audio enhancement pipeline does not change the duration of the recording: `out48.len() == pcm48.len()`, aligned within `ALIGN_TOLERANCE`; no sample is deleted or shifted because it is quiet | `duration_preserved.rs`; `timeline-preserved.spec.ts`; `verify_mp4.py` (5, 8) |
-| INV-11 | Every obtained `VideoFrame` is closed; the live-frame counter is 0 after preview stop and after export | Dev-build counter asserted in `pipeline-preview.spec.ts` and `export-creator.spec.ts` |
+| INV-11 | Every obtained `VideoFrame` is closed; the live-frame counter is 0 after preview stop and after export | Counter in every build; a non-zero count fails the call with `E_INTERNAL` (v2implementation D-45), exercised by `pipeline-preview.spec.ts` and `export-creator.spec.ts` |
 | INV-12 | The ASR session and the render session never coexist | `run-pipeline.test.ts` (ordering of `unload` and `openSession`) |
 | INV-13 | A usage receipt is stored at most once per `export_id`; a webhook is applied at most once per `provider_event_id` | `usage_receipts.rs`; `webhook_idempotency.rs` |
 | INV-14 | Limits are visible before the action they gate; no upgrade prompt renders during processing, editing or rendering | `export-free.spec.ts` |

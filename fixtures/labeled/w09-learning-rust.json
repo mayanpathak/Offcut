@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "w09-learning-rust",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I spent the last month learning Rust, coming from years of Python.",
+    "I started on Rust 1.80, and the compiler messages were the best teacher I have had.",
+    "The borrow checker felt *painful* at first.",
+    "Then it clicked, and I rewrote a small command line tool in a weekend.",
+    "Version 2 of that tool is twice as fast and uses less memory.",
+    "If you are curious, start with a tiny project, not a big one."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "keyword_pop", "say": "painful", "occurrence": 1 }
+  ],
+  "tags": ["X2", "X2"],
+  "notes": "one emphasized word; Rust 1.80 and Version 2 are version numbers and no event"
+}
