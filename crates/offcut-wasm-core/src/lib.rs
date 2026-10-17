@@ -4,6 +4,7 @@
 //! and does not branch on a domain value beyond decoding an argument and
 //! mapping an error to a code (TS §2).
 
+mod audio_api;
 mod hash_api;
 mod media_api;
 mod text_api;

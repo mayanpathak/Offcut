@@ -295,3 +295,29 @@ At the founder's request: `docs/v3/testvideo_scripts/script1.md` (phone, portrai
 **Checked.** `cargo test -p offcut-dsp --test prosody -- --nocapture`: 10 passed, the reading printed. `cargo test -p offcut-dsp --lib`: 36 passed. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **328 passed** (313 + 15), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (WASM sizes as Prompt 67), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing.
 
 **Found, not fixed.** None besides open item 12.
+
+---
+
+## 2026-10-17 - Prompt 69 (V3 09/30): audio worker and the voice chain in the browser (TE-13)
+
+**The gate did not apply the fallback: TE-13 in the browser, median 733 ms per 60 s in dev and 828 ms in the production build (`d1`), against at most 4,000 ms.** Denoise stays on. CI on Prompt 68's `bbedf47`: `ci` and `e2e-media` success.
+
+**Done.**
+
+- **`crates/offcut-wasm-core/src/audio_api.rs`** (§10.1): `run_chain(pcm48: &[f32], on_block: &Function)` calls `offcut_dsp::run_chain` with `ChainConfig::default()` (D-110). The closure calls `on_block(done)`; a truthy answer is `Flow::Cancel`; a throw sets a flag and cancels, and the call then fails `{ code: "E_INTERNAL", detail: "Callback" }`. `Ok(Some(out))` is the plain object `{ out48, loudness, peak }` with `out48` a new `Float32Array` copied from the samples (its own buffer, so the worker can transfer it), built with `Reflect::set`; `Ok(None)` is `{ cancelled: true }`; `DspError::Empty` / `NonFinite` are `{ code: "E_DSP", detail: "Empty" | "NonFinite" }`. `measure_prosody(out48, words, sentences)` decodes `Word[]` and `Sentence[]` (`E_INTERNAL` `Words` / `Sentences` on failure) and returns the `Prosody` through the crate's `to_js` (`json_compatible`, D-31). No branch on a domain value.
+- **`lib.rs`**: `mod audio_api;` only.
+- **`web/src/wasm/load-core.ts`** (§13.2): `ChainResult` exported; `CoreApi` gains `runChain(pcm48, onBlock)` and `measureProsody(out48, words, sentences)`, thin wrappers that type the module's object once (`as ChainResult`, `as Prosody`), as V2's wrappers do; no `as <Brand>` of a primitive, so no `MINTING` entry.
+- **`web/src/workers/audio.worker.ts`** (§14.1, Appendix C), 49 lines: `kept`; `runChain` sets `kept = null` first (D-90), loads the core, runs the chain with `ctx.progress({ stage: "audio_chain", done, total })` and `ctx.isCancelled()` once per block (a closure, V2 CL item 13), returns `CANCELLED` on a cancel, keeps `out48` and returns `{ loudness }`; `measureProsody` throws `WorkerFailure("E_INTERNAL", "NoAudio")` with nothing kept, measures, clears `kept`, and returns `{ out48, prosody }`, which `serveWorker` transfers. `serveWorker(handlers, { stage: "audio_chain", oneWay: [], duringPreview: [] })`. Imports: `gen/domain` (types), `wasm/load-core`, `workers/protocol` (types), `workers/rpc`.
+- **`web/src/workers/pool.ts`** (§13.4): `import audioWorkerUrl from "./audio.worker.ts?worker&url"`, the `WORKERS` row `audio` (stage `audio_chain`), `audio: lazyClient<AudioWorkerApi>(WORKERS.audio)` and its type; `preload()` adds a `modulepreload` link per row, four now. The header comment says four workers.
+- **Browser checks** (G 4.3, 4.5), with a temporary `web/tests-e2e/zz-te13.spec.ts`, `web/zz-pw.config.ts` and `web/src/zz-spike.ts` (imported from `main.tsx` for the production build), all deleted afterwards; `main.tsx` was restored from its copy and shows no diff. Readings in `docs/v3/experiments.md` ("TE-13 browser"): first `measureProsody` `E_INTERNAL/NoAudio`; dev 866, 705, 733 ms; production 855, 738, 828 ms with `crossOriginIsolated` true; every run `same: true`, `detached: true`, loudness -14.30 LUFS.
+- **G 4.4, bundle size** (`experiments.md`, "Bundle size"): `offcut_core_bg` 459,281 → 698,122 bytes (+238,841); `offcut_render_bg` unchanged; `audio.worker` 15,146 bytes. `check-hosts.mjs`: ok, no new literal, so no `NON_NETWORK_LITERALS` entry and no change to the script.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`n` is 2,879,992, not 2,880,000.** The portrait PCM is what ffmpeg's AAC decoder gives for the 60 s clip, 8 samples short of 60 s. The check that matters, `out48.length === pcm48.length`, holds.
+- **The dev server ran on port 5174.** Port 5173 was held by another process on D1 (PID 43428, which answers every path with an HTML page: not this app's Vite). It was left running. The temporary dev server on 5174 was stopped after the check.
+- The page reaches the pool in dev with a dynamic `import("/src/workers/pool.ts")` and in the production build through the spike; a `new Function` would have been refused by the production CSP.
+
+**Checked.** `pnpm build:wasm`; `cargo clippy -p offcut-wasm-core --target wasm32-unknown-unknown -- -D warnings` clean; `pnpm check` exit 0; `pnpm build` exit 0 with `check-hosts` ok. `pnpm e2e:media --grep @no-gpu` on an unkeyed build: "10 passed" (V2's 8 cases and the 2 of `media-setup`), the pool holding its fourth worker. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` 328 passed, 0 failed, 3 ignored (no Rust test is added: TS §5 has no test file for the binding), Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 698,122 bytes), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing.
+
+**Found, not fixed.** None.

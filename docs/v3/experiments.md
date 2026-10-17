@@ -10,11 +10,11 @@ Date: 2026-10-17, D1 (`d1`).
 Decision: continue. Under 2 s by a factor of 2.8; denoise stays on (`ChainConfig::default()` keeps `denoise: true`). The browser reading (TE-13 browser, at most 4 s per 60 s) is Prompt 69's. A pass on D1 does not show a pass on an R1-class laptop (D-74).
 
 ## TE-13 browser
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: does the voice chain run in the browser, in the audio worker, in at most 4 s per 60 s of audio on D1, with `out48` exactly as long as the input and on target (PS §20.2, §20.2 of the plan, G Phase 4)?
+Method: a temporary Playwright check (Chrome stable, D1): the page fetches `speech_60s_portrait.mp4.pcm48.f32` (2,879,992 samples, 60.0 s), calls `pool.audio.measureProsody` once with nothing kept, then three times `pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] })` timed with `performance.now()` from the call to its answer, each followed by `measureProsody({ words: [], sentences: [] })` to take `out48` back. In dev (the Vite dev server, cross-origin isolated by its headers, `/src/workers/pool.ts` imported in the page) and in the production build (`vite preview` with the headers of `vercel.json`, the pool reached through a temporary module imported from `main.tsx`, removed after).
+Numbers: dev 866, 705, 733 ms, **median 733 ms per 60 s**; production build 855, 738, 828 ms, median 828 ms (13% over dev; `crossOriginIsolated` true). Every run: `out48.length === pcm48.length` (2,879,992), the input buffer detached by the transfer, loudness -14.30 LUFS. The first `measureProsody` failed with `E_INTERNAL` / `NoAudio`. The worker and its module were started by that first, failing call, so no timed run includes compiling the module; each includes the copy into and out of WASM memory (D-110) and the transfer.
+Date: 2026-10-17, D1 (`d1`).
+Decision: continue. At most 4,000 ms; the browser is about 1.1 times the native 0.707 s (TE-13 native), not the 1.5-2.5 the plan assumed. Denoise stays on. A pass on D1 does not show a pass on an R1-class laptop (D-74).
 
 ## DENOISE_DELAY_SAMPLES
 Question: by how many samples does RNNoise (`nnnoiseless` 0.5.2) delay its output, so that `denoise.rs` can align the wet and dry paths and drop exactly that many samples (P2, INV-10)?
@@ -94,8 +94,8 @@ Date:
 Decision:
 
 ## Bundle size
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: how much does the voice chain (`nnnoiseless`, `ebur128` and `offcut-dsp`'s chain) add to `offcut_core_bg-*.wasm` (G 4.4; growth over 2 MB is the signal to find the crate)?
+Method: `pnpm build`, the size of `web/dist/assets/offcut_core_bg-*.wasm`, against Entry 1's baseline.
+Numbers: 459,281 bytes at the baseline (V2); 698,122 bytes with `audio_api.rs` exporting `run_chain` and `measure_prosody` (+238,841 bytes, +52%). `offcut_render_bg` unchanged at 6,033,574. The new `audio.worker` chunk: 15,146 bytes. `check-hosts.mjs` finds no new URL literal (the bundle's only host is still the asset host).
+Date: 2026-10-17, D1.
+Decision: accepted; no crate to look into (well under 2 MB of growth). No entry in `NON_NETWORK_LITERALS`.
