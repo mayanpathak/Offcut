@@ -122,7 +122,8 @@ mod tests {
             EventParams::NumberReveal { value, label } => {
                 assert_eq!(value.display, "$10k");
                 assert_eq!((value.value, &value.unit), (10_000.0, &Unit::Usd));
-                assert_eq!(*label, None);
+                // V3: the words after the number, up to the full stop (D-107).
+                assert_eq!(label.as_deref(), Some("there"));
             }
             EventParams::ListReveal { .. }
             | EventParams::FromTo { .. }
@@ -146,14 +147,28 @@ mod tests {
             (1, 3)
         );
 
-        // A number whose word was edited or hidden is not shown; an edit
-        // somewhere else changes nothing.
+        // V3: a number whose word was edited is read again from the new text
+        // (D-109); a hidden one is not shown; an edit somewhere else changes nothing.
         let t = transcript(&spoken);
         let with = |word: u32, text: &str| {
             let edits = BTreeMap::from([(WordIdx::new(word), text.to_owned())]);
             detect(&t, &flat(&t), &edits, &DetectorConfig::default())
         };
-        assert_eq!(with(2, "$20,000"), []);
+        let edited = with(2, "$20,000");
+        assert_eq!(edited.len(), 1);
+        match &edited[0].params {
+            EventParams::NumberReveal { value, .. } => {
+                assert_eq!((value.value, value.display.as_str()), (20_000.0, "$20k"));
+            }
+            EventParams::ListReveal { .. }
+            | EventParams::FromTo { .. }
+            | EventParams::KeywordPop { .. } => panic!("{:?}", edited[0].params),
+        }
+        // The id is a hash of the kind and the anchors only (D-47), and an edit of
+        // one word keeps the anchors: the id is the one the old event had. Not the
+        // "new id" of v3implementation §9.9 (V3 changelog, open item 14).
+        assert_eq!(edited[0].anchors, event.anchors);
+        assert_eq!(edited[0].id, event.id);
         assert_eq!(with(2, ""), []);
         assert_eq!(with(1, "earned"), found);
     }
