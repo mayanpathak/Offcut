@@ -3,11 +3,11 @@
 Every reading is taken on D1 and recorded under the label `d1` (D-74). One section per row of §20.1, filled when the experiment is run.
 
 ## TE-13 native
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: does the voice chain (`run_chain`, denoise on) run natively in under 2 s per 60 s of audio, the early warning before the browser reading of Prompt 69 (§20.1, G 3.8)?
+Method: `chain_timing` of `crates/offcut-dsp/tests/chain_no_clicks.rs`, release build, five runs, on `speech_60s_portrait.mp4.pcm48.f32` (60.0 s, 2,879,992 samples).
+Numbers: 0.643, 0.655, 0.707, 0.722, 0.775 s; **median 0.707 s per 60 s** (`d1`). Also read: `measure_prosody` on 60 s with 150 words, 0.148 s in release (budget 2 s, TS §8's 1 s for the reference clip).
+Date: 2026-10-17, D1 (`d1`).
+Decision: continue. Under 2 s by a factor of 2.8; denoise stays on (`ChainConfig::default()` keeps `denoise: true`). The browser reading (TE-13 browser, at most 4 s per 60 s) is Prompt 69's. A pass on D1 does not show a pass on an R1-class laptop (D-74).
 
 ## TE-13 browser
 Question:
@@ -80,11 +80,11 @@ Date: 2026-10-17, D1.
 Decision: the fixture stays at 5 s.
 
 ## Derived clips' events
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: (first reading, Prompt 68) does the measured prosody of "brutal" in the reference speech carry the KeywordPop of Script A, which V3's expected events give as conditional ("if the measured prosody carries it", `fixtures/speech/README.md`, §17.7)?
+Method: `the_brutal_reading_of_the_portrait_speech` of `crates/offcut-dsp/tests/prosody.rs`: `measure_prosody` on `speech_60s_portrait.mp4.pcm48.f32` (the uncleaned derived PCM) with sentences 3 and 4 of "The V2 reference clip as recognized", moved 960 ms earlier for the portrait cut. The README gives sentence times only, so the words share their sentence's time by their letters: an approximation, printed and not asserted. The reading with the recognizer's word times on the cleaned voice comes at S8 (Prompt 82).
+Numbers: sentence 4 ("This is literally brutal way to make anything."): "literally" energy_z +0.45, pitch_z +1.79; **"brutal" energy_z +0.91, pitch_z +1.26**; the others between -2.12 and +0.91 in energy and -0.95 and +0.50 in pitch. Sentence 3: "3000" energy_z +1.24, pitch_z +0.83.
+Date: 2026-10-17, D1.
+Decision: none yet. The pitch rise on "literally brutal" is measurable; whether "brutal" passes KeywordPop is read at S8 with real word times and the detector of Prompt 77.
 
 ## Second recording
 Question:

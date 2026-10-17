@@ -47,6 +47,13 @@ pub const PROSODY_MIN_WORDS: usize = 3; // TS §18.2
 /// (v3implementation §7.6). Not one of the 32 tuning constants: a reporting value.
 pub(crate) const NO_PEAK_DBFS: f32 = -200.0;
 
+/// Pitch: among the autocorrelation's peaks, the first (shortest lag) that comes
+/// within this share of the best one is the period. A periodic voice correlates
+/// almost as well at two and three periods, and the plain maximum would halve the
+/// pitch at random (v3changelog, Prompt 68). A refinement of §7.9, not a tuning
+/// constant of TS §18.3.
+pub(crate) const FIRST_PEAK_SHARE: f64 = 0.9;
+
 /// The settings of one run of the chain (TS §34.3). The binding takes none:
 /// it runs `ChainConfig::default()`, and this is the one place where TE-13's
 /// fallback, `denoise: false`, would be written (v3implementation D-110).

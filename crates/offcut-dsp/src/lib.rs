@@ -9,10 +9,12 @@ pub mod denoise;
 pub mod highpass;
 pub mod limiter;
 pub mod loudness;
+pub mod prosody;
 pub mod resample;
 
 pub use chain::{ChainOutput, Flow, run_chain};
 pub use config::ChainConfig;
+pub use prosody::measure_prosody;
 
 use thiserror::Error;
 
