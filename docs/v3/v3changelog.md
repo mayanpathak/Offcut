@@ -368,3 +368,29 @@ Prompts 70 and 71 were run together at the founder's request, each with its own 
 **Checked.** `cargo test -p offcut-mp4 --test demux_fixtures`: 12 passed; `--test probe_rejections`: 15 passed; `cargo test -p offcut-mp4`: 78 passed, 0 failed. Drills (G 5.5): the `rej_mp3_audio.mp4` row removed from `CASES` made the coverage case fail with "rej_mp3_audio.mp4 has no case in probe_rejections.rs"; `fixtures/.gen` moved aside made all 12 `demux_fixtures` cases panic "the generated fixtures are stale or missing: run `pnpm fixtures`" (the folder was moved into the scratchpad and back, never anywhere public); both undone, `pnpm fixtures` up to date. The third row of G 5.5 (`MAX_EDITS`) was Prompt 70's. **Milestone 5**: fixtures up to date; `offcut-mp4` 0 failed; clippy clean; `edit_list.rs` 143, `sample_table.rs` 362, `probe.rs` 210 lines above their tests; no `proptest-regressions` file. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **370 passed** (343 + 27), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (WASM sizes as Prompt 70), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing; `git diff 8a271a9 -- validate.rs media_api.rs` is empty.
 
 **Found, not fixed.** None.
+
+---
+
+## 2026-10-18 - Prompt 72 (V3 12/30): word lists, wider Digits, spelled cardinals
+
+Prompts 72 and 73 were run together at the founder's request, each with its own commit and push. CI on Prompt 71's `4b01080`: `ci` and `e2e-media` success (the Linux runner's fixtures, from its own ffmpeg build, give the same rotation, track and metadata results).
+
+**Done.**
+
+- **State verified**: clean tree at `4b01080`; the five public functions of `offcut-text` as the prompt lists. `numbers.rs` has **297** lines above its tests, not the 262 the prompt states (it matters for Prompt 73's 400-line limit).
+- **`crates/offcut-text/src/units_lex.rs`** (§8.4; D-84, D-101, D-102): the eight lists verbatim (`CURRENCY_SYMBOLS` sorted by code point `$ £ € ₹`, `CURRENCY_WORDS`, `PERCENT_WORDS`, `MAGNITUDE_WORDS`, `TIME_WORDS`, `DATA_WORDS`, `COUNT_NOUNS`, `COMPARATIVES`) and `COUNT_UNIT_MIN = 100.0`: 9 `pub const`. `CurrencyUnit`, `TimeUnit`, `DataUnit` with `From` into `offcut_types::Unit`. Three crate-private lookups by `binary_search`: `lookup` (a `(word, value)` list), `contains` (a word list), `currency_symbol`. "pound", "pounds", "tb", "terabytes" absent, each asserted. One test per list: strictly ascending (sorted, no duplicate) and lower-case.
+- **`tokenize.rs`** (§8.1): a word is `Digits` when, after at most one leading currency symbol (the last character of its leading punctuation, if `$ € £ ₹`), at most one trailing sign or suffix (`k m b x` at the end of the word, or `%` after it, not both), the rest parses with V2's `parse_decimal`; the token's text keeps what was written, lower-cased. `Token` and `TokenKind` unchanged (the doc comment of `Digits` names the new signs). §8.1's ten rows as one inline case, plus "`10k%`: the `%` is punctuation".
+- **`cardinals.rs`** (crate-private, §8.2; D-92): `MAX_CARDINAL_TOKENS = 24`, `cardinal`, `point_fraction`. Groups of 0-99 and of hundreds (with an optional "and" before 1-99); magnitudes strictly descending, each at most once; "and" only before 1-99; a teen hundred takes no magnitude; "a" only before "hundred" or a magnitude, and only first; a group after a magnitude is taken only when what follows it is a smaller magnitude or none ("one million two million" is 1,000,000 and 2 tokens); checked `u64` arithmetic. `point_fraction` parses "0.<digits>" from the digit words, so "point zero five" is the `f64` nearest 0.05.
+- **`lib.rs`**: `mod cardinals;` and `pub mod units_lex;`.
+
+**Differs from the prompt or the plan.**
+
+- **`#[cfg_attr(not(test), expect(dead_code, reason = …))]`** on `mod cardinals;` and on `units_lex::{lookup, contains}`: nothing outside the tests calls them until `parse_quantity` does in Prompt 73, and an unused private item fails `clippy -D warnings`. `expect` (not `allow`) fails the build once the items are used, so Prompt 73 must remove it, and does.
+- **The three unit enums are `pub`, not private** (§8.4 says "private enums of this file"): the `pub const` lists hold their values, and a private type in a public constant is the `private_interfaces` warning. They are not re-exported from `lib.rs`.
+- **§8.2's row "nine hundred ninety nine trillion" counts 6 tokens; the words are 5.** Both forms are asserted: without "and" (5, 999 x 10^12), with "and" (6, 999 x 10^12).
+- **The 24-token cap fits the largest cardinal without "and"** (exactly 24 words, 999,999,999,999,999); with every "and" it is 29 words, and the cap ends it after the thousands (999,999,999,999,000). Both asserted.
+- §8.1's row for `₹2,00,000` prints one `Word`; the tokens are V2's `Punct("₹")` and `Word("2,00,000")` (the symbol is not a letter). What the row means, no `Digits`, holds and is asserted.
+
+**Checked.** `grep -cE '^pub const [A-Z_]+' units_lex.rs`: 9. `cargo test -p offcut-text --lib`: 24 passed (V2's 12 unchanged, 8 list tests, the §8.1 table, 3 cardinal tests holding §8.2's 13 rows and more). `cargo clippy -p offcut-text --all-targets -- -D warnings` clean. Drill (G 6.7 row 1): `"calls"` before `"apps"` in `COUNT_NOUNS` made `count_nouns_are_ordered` fail ("not sorted or duplicated"); undone. `check-file-tree.mjs` ok; `pnpm build:wasm` ok. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **382 passed** (370 + 12), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 699,976, `offcut_render_bg` 6,034,829 bytes), `pnpm e2e` 12 passed; the frozen check and the tracked-private check print nothing.
+
+**Found, not fixed.** The contradiction Prompt 73 meets: see its entry.

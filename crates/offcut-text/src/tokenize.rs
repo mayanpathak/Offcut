@@ -7,11 +7,16 @@ use std::collections::BTreeMap;
 use offcut_types::{Word, WordIdx};
 
 use crate::numbers::parse_decimal;
+use crate::units_lex::currency_symbol;
+
+/// The suffixes a number in digits may carry: thousand, million, billion, times.
+const SUFFIXES: &[char] = &['k', 'm', 'b', 'x'];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TokenKind {
     Word,
-    /// A number in digits. It keeps a leading `$` and a trailing `%`.
+    /// A number in digits. It keeps a leading currency symbol (`$ € £ ₹`) and
+    /// one trailing sign or suffix (`% k m b x`), as written.
     Digits,
     /// One punctuation character.
     Punct,
@@ -57,13 +62,26 @@ fn push_part(part: &str, word: WordIdx, tokens: &mut Vec<Token>) {
     let mut trail = part.get(end..).unwrap_or("");
 
     let mut text = core.to_owned();
-    let kind = if parse_decimal(core).is_some() {
-        // The sign of money and the sign of a share belong to the number.
-        if let Some(before) = lead.strip_suffix('$') {
-            lead = before;
-            text.insert(0, '$');
+    // A number may carry one suffix of its own: `10k`, `$1.5m`, `3x` (v3implementation §8.1).
+    let suffixed = core
+        .strip_suffix(SUFFIXES)
+        .filter(|number| parse_decimal(number).is_some());
+    let kind = if parse_decimal(core).is_some() || suffixed.is_some() {
+        // The sign of money and the sign of a share belong to the number;
+        // a number has at most one sign or suffix after it.
+        if let Some(symbol) = lead
+            .chars()
+            .last()
+            .filter(|c| currency_symbol(*c).is_some())
+        {
+            lead = lead
+                .get(..lead.len().saturating_sub(symbol.len_utf8()))
+                .unwrap_or("");
+            text.insert(0, symbol);
         }
-        if let Some(after) = trail.strip_prefix('%') {
+        if suffixed.is_none()
+            && let Some(after) = trail.strip_prefix('%')
+        {
             trail = after;
             text.push('%');
         }
@@ -153,6 +171,44 @@ pub(crate) mod tests {
                 (TokenKind::Punct, ".", 1),
             ]
         );
+    }
+
+    /// The table of v3implementation §8.1, one row per case.
+    #[test]
+    fn digits_carry_one_currency_symbol_and_one_sign_or_suffix() {
+        let rows: [(&str, &[(TokenKind, &str)]); 10] = [
+            (
+                "$10,000.",
+                &[(TokenKind::Digits, "$10,000"), (TokenKind::Punct, ".")],
+            ),
+            ("10K", &[(TokenKind::Digits, "10k")]),
+            ("$1.5M", &[(TokenKind::Digits, "$1.5m")]),
+            ("3x", &[(TokenKind::Digits, "3x")]),
+            ("€500", &[(TokenKind::Digits, "€500")]),
+            // Indian grouping is not read: the number is not shown rather than misread.
+            (
+                "₹2,00,000",
+                &[(TokenKind::Punct, "₹"), (TokenKind::Word, "2,00,000")],
+            ),
+            // A clock time, a range, a spelled number: never a number in digits.
+            ("10:30", &[(TokenKind::Word, "10:30")]),
+            ("5-10", &[(TokenKind::Word, "5-10")]),
+            ("forty-two", &[(TokenKind::Word, "forty-two")]),
+            ("2024", &[(TokenKind::Digits, "2024")]),
+        ];
+        for (word, expected) in rows {
+            let tokens = tokens_of(&[word]);
+            let found: Vec<(TokenKind, &str)> =
+                tokens.iter().map(|t| (t.kind, t.text.as_str())).collect();
+            assert_eq!(found, expected, "{word}");
+        }
+        // At most one sign or suffix after the number: the `%` of `10k%` is punctuation.
+        let tokens = tokens_of(&["10k%"]);
+        assert_eq!(
+            (tokens[0].kind, tokens[0].text.as_str()),
+            (TokenKind::Digits, "10k")
+        );
+        assert_eq!(tokens[1].kind, TokenKind::Punct);
     }
 
     #[test]
