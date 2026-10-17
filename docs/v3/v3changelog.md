@@ -434,3 +434,25 @@ CI on Prompt 72's `c69ba3b`: `ci` and `e2e-media` success.
 **Checked.** `cargo test -p offcut-text --lib`: 28 passed. `cargo test --workspace`: 386 passed, 0 failed, 3 ignored. Drill (G 6.7 row 3): `normalize_transcript` scanning the whole transcript made `a_number_never_crosses_a_sentence` fail with `[(2, 4, "$12k")]`; undone. `numbers.rs` 385 lines above its tests (it reached 419 on the way: the formatter's currency branch was folded into the main match and the `Digits` core into `Core`, no rule moved out). `cargo clippy -p offcut-text --all-targets -- -D warnings` clean; `pnpm build:wasm`: core 713,091 bytes, render 6,039,008. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **386 passed** (382 + 4), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 713,091, `offcut_render_bg` 6,039,008 bytes); the frozen check and the tracked-private check print nothing. `pnpm e2e` failed once in the gate with the asset host slow from D1 (the demo video took 23 s; known issue 3) and passed 12 of 12 on the next run, nothing changed between.
 
 **Found, not fixed.** None besides the plan's miscount, which is for Prompt 89's copy-back (open item 13).
+
+---
+
+## 2026-10-18 - Prompt 74 (V3 14/30): number table, properties and sentence tests
+
+CI on Prompt 73's `a84c00d`: `ci` and `e2e-media` success.
+
+**Done.**
+
+- **`crates/offcut-text/tests/numbers_table.rs`** (§19.8): the 62 parse rows and the 10 display rows of §19.8, copied exactly, one tuple per line (`grep -cE '^\s*\("'` gives 72), in two tables, one test each; a failure lists every failing row with what was found and what the table says. Words are split on whitespace, made into `Word`s and tokenized by `tokenize`; the unit is named in the row (`none`, `usd`, …, `count <noun>`). **All 72 rows passed on the first run: no grammar fix was needed.** The two tables carry `#[rustfmt::skip]`, because `rustfmt` wraps the six longest rows onto several lines and G 6.6 counts one row per line.
+- **`tests/numbers_prop.rs`** (§19.9), five properties, 256 cases each: digits with separators from 0 to 10^12 read back to the same value, no unit; `format_quantity(n, Usd)` for 1 to 10^9 reads back exactly when the display is exact (under 1,000, whole thousands to 999,000, whole millions) and within 0.5% otherwise; 0 to 999,999,999 spelled by a test-only speller (without "and", so even 999,999,999 is 14 words) is read whole by `parse_quantity`, every word consumed (the public surface: `cardinal` is private); no panic on any sequence of up to 30 words drawn from 40 number words, digits, symbols and fillers, with `1 <= n <= len` and a finite value at every start position; every `Some` displays exactly as `format_quantity` of its value and unit. A sixth test checks the speller.
+- **`tests/sentences.rs`** (§19.10): the 8 cases.
+- **Milestone 6**: `offcut-text` 44 passed (28 unit, 2 table, 6 property, 8 sentence), 0 failed; clippy clean; no `proptest-regressions` file.
+
+**Differs from the prompt or the plan.**
+
+- The display rows are written unit first (`("usd", 1_000_000.0, "$1m")`), so that they too begin with `("` and the prompt's count of 72 holds.
+- §19.9 lists "no panic" and "display is the formatter's" as two properties; they are two `proptest` tests drawing from the same 40-word vocabulary.
+
+**Checked.** `grep -cE '^\s*\("' numbers_table.rs`: 72. `cargo test -p offcut-text`: 44 passed, 0 failed. Drill (G 6.7 row 2): `("pounds", CurrencyUnit::Gbp)` added to `CURRENCY_WORDS` in sorted place made the table fail on one row, `"ten pounds": found Some((2, 10.0, Gbp, "£10")), the table says Some((1, 10.0, None, "10"))`; undone from a copy. Clippy found hand-written `%` multiple checks in three lines of the property test (`is_multiple_of` instead); fixed. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `cargo test --workspace` **402 passed** (386 + 16), 0 failed, 3 ignored, Vitest 92, `pnpm build` exit 0 (`offcut_core_bg` 713,091, `offcut_render_bg` 6,039,008 bytes, unchanged: tests only), `pnpm e2e` 12 of 12; the frozen check and the tracked-private check print nothing. A first gate run, started before the clippy fix, stopped at `pnpm check` (exit 101) and was run again whole.
+
+**Found, not fixed.** None. `offcut-text` is complete for V3 (§21.2).
