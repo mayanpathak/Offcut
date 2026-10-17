@@ -198,10 +198,6 @@ impl From<DataUnit> for Unit {
 }
 
 /// The value of `word` in a list of `(word, value)` sorted by word.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "parse_quantity reads the lists from V3 P73")
-)]
 pub(crate) fn lookup<T: Copy>(list: &[(&str, T)], word: &str) -> Option<T> {
     list.binary_search_by(|(key, _)| (*key).cmp(word))
         .ok()
@@ -210,10 +206,6 @@ pub(crate) fn lookup<T: Copy>(list: &[(&str, T)], word: &str) -> Option<T> {
 }
 
 /// Whether `word` is in a sorted list of words.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "parse_quantity reads the lists from V3 P73")
-)]
 pub(crate) fn contains(list: &[&str], word: &str) -> bool {
     list.binary_search(&word).is_ok()
 }

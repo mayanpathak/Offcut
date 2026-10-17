@@ -164,7 +164,10 @@ mod tests {
             ("about", 1_000, 1_300, 1.0),
             ("ten", 1_400, 1_600, 1.0),
             ("thousand", 1_650, 2_100, 1.0),
-            ("people", 2_200, 2_600, 1.0),
+            // V3: "people" is a count noun, a unit (v3implementation D-101), so the
+            // number is followed by words that are none.
+            ("of", 2_200, 2_400, 1.0),
+            ("them", 2_450, 2_700, 1.0),
         ]);
         assert_eq!(found, []);
         // A bare number in digits scores the same 0.70, and a small one 0.50.

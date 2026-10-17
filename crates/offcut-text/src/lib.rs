@@ -2,11 +2,6 @@
 //! spoken, read and written. Nothing here decides what becomes a visual
 //! event, and a `Transcript` is never changed once it is built.
 
-// Read by `numbers.rs` from Prompt 73 on (V3 P73), which then removes this `expect`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "parse_quantity reads the cardinals from V3 P73")
-)]
 mod cardinals;
 pub mod normalize;
 pub mod numbers;
