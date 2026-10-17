@@ -1,7 +1,15 @@
-//! Audio signal processing. V2 holds the resampler only; V3 adds the voice
-//! chain and the prosody measure.
+//! Audio signal processing: the resampler of V2, and the voice chain and the
+//! prosody measure of V3. Nothing here detects silence, classifies a pause,
+//! cuts, crossfades or changes a length (TS §36, INV-5, INV-10).
 
+pub mod compressor;
+pub mod config;
+pub mod highpass;
+pub mod limiter;
+pub mod loudness;
 pub mod resample;
+
+pub use config::ChainConfig;
 
 use thiserror::Error;
 
