@@ -801,3 +801,57 @@ CI on `ab48dba` (the split decimal point): `ci` and `e2e-media` success.
 
 **Found, not fixed.** None.
 
+---
+
+## 2026-10-19 - Prompt 84 (V3 24/30): rejection suite and E2E helpers
+
+CI on Prompt 83's `f70f38c`: `ci` and `e2e-media` success.
+
+**Done.**
+
+- **`web/tests-e2e/helpers/fixtures.ts`** (§19.15), 604 lines:
+  - `fixturesDir()`: `OFFCUT_FIXTURES_DIR`, else `fixtures/.gen` from the helper's own path.
+  - `genFixture(name)`: the path, or an error ending "run pnpm fixtures" when the file or `STAMP` is absent, or when `STAMP.manifest_sha256` is not the SHA-256 of today's `fixtures/manifest.json` (hashed as the raw bytes, as `gen_fixtures.sh` does; they agree on D1).
+  - `dropFile(page, file, name = "clip.mp4")`: V2's `dropClip` with a chosen name; `dropClip` now calls it.
+  - `dropOversize(page)`, with `OVERSIZE_BYTES` (D-79): in the page, 501 references to one 1 MiB `Blob` in a `File` named `clip.mp4` (525,336,576 bytes), dropped in a `DataTransfer`.
+  - `v3TestClip()`: `testclips/v3testclip.mp4` or `null`.
+  - `readIndexedDb(page, store, key)`: the stored `Versioned` value; it never creates the database.
+  - `rejectCodeOf(page)`: the panel's `data-reject`, or `null`.
+  - Nothing reads a fixture while a file loads (V2 CL item 40).
+- **`web/tests-e2e/rejections.spec.ts`** (§19.16, D-78, D-79, D-93), 208 lines, **16 cases, 15 `@no-gpu`**:
+  - **Import-time refusals:** 12 come from one loop over the manifest's `rej_*` entries except `rej_silent.mp4` (read at load: the manifest is committed; the fixtures are read in the cases), plus the oversize case.
+  - **Also:** `REJECT_NO_SPEECH` (untagged), "start over" and the `ok_vfr.mp4` accept case.
+  - **Every case begins** as V2's do: `installFakeApi`, `routeAssets`, `page.clock.install()`, `/app`, the drop zone.
+  - **Every refusal asserts:**
+    - the code in `data-reject`;
+    - the panel's heading, body and action from `messages.rejections`, with "500", "90", "1920" and "60" worked out from `LIMITS`;
+    - neither the dropped name nor the code in the page's text;
+    - after `flushAnalytics`, exactly one `clip_rejected` equal to `{ reject_reason: <code> }` and no `client_error`;
+    - neither the dropped name nor the file's size in any event body;
+    - `clips/` empty in OPFS.
+  - `rej_vp9.webm` is dropped as `clip.webm`.
+  - **The oversize case** also asserts that no request of the context carried a body of 64 KiB or more.
+  - **The accept case:**
+    - `clip_accepted` is `{ duration_bucket: "lt30", orientation: "landscape", source: "user" }`, with no `clip_rejected`;
+    - `clips[<id>]` in IndexedDB has `schemaVersion` 1, its `clipId`, `sourceBytes` equal to the file's size, and `sourceHashPrefix` equal to the D-81 hash computed in Node;
+    - no `clip.mp4` appears in the record.
+  - **"Start over"** goes from a refusal (`rej_4k.mp4`) to the drop zone with `clips/` empty, and then takes `ok_vfr.mp4`.
+- **`web/playwright.config.ts`**: `MEDIA_SUITES` gains `rejections.spec.ts`.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`REJECT_DECODE_UNSUPPORTED` asks Chrome before it runs.** S2 found Chrome on D1 decodes `avc1.f4001f` (entry of Prompt 63, `experiments.md`), so D-78's last branch applies. Rather than mark the case `test.fixme` for every machine, it calls `VideoDecoder.isConfigSupported` for that codec in the case's page and is `test.fixme` (with D-78's reason) only where the answer is `true`. On D1 it is skipped as fixme; a Chrome that refuses the file (the Windows runner, if so) runs the full assertions. Prompt 87 reads which on the runner.
+- **`REJECT_NO_SPEECH` asserts one `clip_accepted`.** §19.16's "every rejection above: no `clip_accepted`" cannot hold for it: that clip is accepted at import and refused after the recognizer heard it (Prompt 81's step 9; Prompt 82 read `clip_accepted` then `clip_rejected`). The case asserts the truth, with a comment; the twelve loop cases and the oversize case assert no `clip_accepted`. "After Transcribing…" is read from a `MutationObserver` installed before load (V2 CL item 38).
+- **The accept and "start over" cases wait for "Cleaning voice", not for the feed.** The feed shows from the import on, before `clip_accepted` is queued, so the first version flushed analytics too early and both cases failed ("received length 0"; only `landing_view` and `capability_check` were sent). "Cleaning voice" is pushed by the pipeline after `importClip` marks the clip accepted and queues the event, and needs no graphics processor (the media worker's audio and the chain in WASM).
+- The prompt's `pnpm e2e:media --grep @no-gpu` "23 passed" reads **24 passed and 1 skipped** on D1 (the 2 of `media-setup`, V2's 8, these 15 less the fixme).
+
+**Checked.**
+
+- **The prompt's commands:** `pnpm e2e:media --list | grep -c rejections.spec.ts` 16; `--grep @no-gpu --list` "Total: 25 tests in 4 files" (23 and the 2 of `media-setup`).
+- **The suite on D1:** the 12 loop cases 0.76 to 0.93 s each, the oversize case 0.73 s, "start over" 1.4 s, the accept case 1.2 s, `REJECT_NO_SPEECH` 14.3 s (`ensureModelCached` and one pass of the recognizer).
+- **Drill:** with `rej_4k.mp4` moved out of `fixtures/.gen/`, its case failed "rej_4k.mp4 is not in …\fixtures\.gen: run pnpm fixtures"; moved back, `pnpm fixtures` says up to date.
+- **`pnpm e2e:media --grep @no-gpu`:** 24 passed, 1 skipped (1.9 min). **`--grep NO_SPEECH`:** 3 passed (the case and the 2 of `media-setup`).
+- **SAB gate:** no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `pnpm test`: Rust **461 passed**, 3 ignored, Vitest 92; `pnpm build` exit 0 (bundles unchanged: only tests changed); `pnpm e2e` 12 of 12; the frozen check and the tracked-private check print nothing.
+
+**Found, not fixed.** None.
+
