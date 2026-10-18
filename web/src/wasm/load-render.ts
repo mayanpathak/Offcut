@@ -16,6 +16,7 @@ import type {
   ExportProfile,
   Prosody,
   Px,
+  SentenceIdx,
   Transcript,
   UnixSecs,
 } from "../gen/domain";
@@ -25,6 +26,7 @@ import initRender, {
   Mp4MuxerHandle,
   open_session,
   preview_profile,
+  redetect_sentence,
   type RenderSession as ModuleSession,
 } from "./pkg/render/offcut_render";
 import renderWasmUrl from "./pkg/render/offcut_render_bg.wasm?url";
@@ -65,6 +67,18 @@ export type { Mp4MuxerHandle };
 export type RenderApi = {
   /** The visual events of a transcript. `edits` is the user's word edits, by word number. */
   detect(transcript: Transcript, prosody: Prosody, edits: Record<number, string>): DetectedEvent[];
+  /**
+   * The events after an edit in sentence `sentence`: those of `prev` outside
+   * its scope are kept, the scope is detected again. A sentence past the last
+   * returns `prev`. Nothing calls it in V3 (V4's review flow).
+   */
+  redetectSentence(
+    transcript: Transcript,
+    prosody: Prosody,
+    edits: Record<number, string>,
+    sentence: SentenceIdx,
+    prev: readonly DetectedEvent[],
+  ): DetectedEvent[];
   /** The profile of a token that one of `keys` verifies, at the time `now`. Throws `E_ENTITLEMENT_INVALID` for any other token. */
   exportProfileFromToken(token: string, keys: readonly Uint8Array[], now: UnixSecs): ExportProfile;
   previewProfile(): ExportProfile;
@@ -99,6 +113,8 @@ export async function preloadRender(): Promise<void> {
 
 const api: RenderApi = {
   detect: (transcript, prosody, edits) => detect(transcript, prosody, edits) as DetectedEvent[],
+  redetectSentence: (transcript, prosody, edits, sentence, prev) =>
+    redetect_sentence(transcript, prosody, edits, sentence, [...prev]) as DetectedEvent[],
   exportProfileFromToken: (token, keys, now) => export_profile_from_token(token, [...keys], now) as ExportProfile,
   previewProfile: () => preview_profile() as ExportProfile,
   openSession: (clip, source) => open_session(clip, source),

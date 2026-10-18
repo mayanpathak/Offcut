@@ -24,11 +24,50 @@ Date: 2026-10-17, D1 (native, debug build).
 Decision: `DENOISE_DELAY_SAMPLES = 480`, the measured value; denoise stays on (`ChainConfig::default()` keeps `denoise: true`). Native timing on the way: `run_chain` on the 60 s portrait speech PCM took 0.607-0.617 s in a release build (three runs, `chain_timing`); TE-13 is read in Prompt 68.
 
 ## Precision gate
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: is the detector's overall precision at least 0.90 (`DETECTOR_PRECISION_TARGET`, PS §20.1) over at least 30 labeled transcripts written before its rules (D-87), at the default thresholds (§20.3, G 8.3)?
+Method: `cargo test -p offcut-detect --test precision_recall -- --nocapture` (`crates/offcut-detect/tests/precision_recall.rs`, §19.12): every file of `fixtures/labeled/`; written files timed by §17.5's synthesis, `edits` applied; `detect` with `DetectorConfig::default()`; greedy matching per file and kind (IoU of the anchors at least 0.5, equal values and units). The sweep moves one kind's threshold at a time, the others at their defaults, and runs `detect` again at each step, so `resolve` sees what that threshold lets through. Default thresholds: NumberReveal 0.80, ListReveal 0.85, FromTo 0.85, KeywordPop 0.80.
+Numbers (`d1`, default thresholds, printed as run):
+
+```
+precision_recall: 30 files read, 1 skipped
+a02-v3testclip: skipped (no data yet)
+
+kind            TP  FP  FN  precision  recall
+number_reveal   12   3   0       0.80    1.00
+list_reveal      8   0   0       1.00    1.00
+from_to         11   0   1       1.00    0.92
+keyword_pop      9   0   0       1.00    1.00
+overall         40   3   1       0.93    0.98
+
+sweep (precision/recall of the kind; its threshold alone moved, defaults 0.80 0.85 0.85 0.80)
+threshold  number_reveal  list_reveal  from_to    keyword_pop
+0.50       0.75/1.00    1.00/1.00    1.00/1.00    0.06/1.00
+0.55       0.75/1.00    1.00/1.00    1.00/1.00    0.75/1.00
+0.60       0.75/1.00    1.00/1.00    1.00/1.00    0.75/1.00
+0.65       0.75/1.00    1.00/1.00    1.00/1.00    0.75/1.00
+0.70       0.75/1.00    1.00/1.00    1.00/1.00    0.75/1.00
+0.75       0.80/1.00    1.00/1.00    1.00/0.92    1.00/1.00
+0.80       0.80/1.00    1.00/1.00    1.00/0.92    1.00/1.00
+0.85       1.00/0.92    1.00/1.00    1.00/0.92    1.00/1.00
+0.90       1.00/0.92    1.00/0.62    1.00/0.58    1.00/1.00
+0.95       1.00/0.92    1.00/0.50    1.00/0.50    1.00/0.11
+1.00       1.00/0.92    1.00/0.50    1.00/0.50    1.00/0.11
+
+false positives (file: kind words (confidence))
+w19-editing-workflow: number_reveal "20 minutes" (0.80)
+w28-mistakes: number_reveal "40 seconds," (0.80)
+w28-mistakes: number_reveal "3 minutes." (0.80)
+
+missed (file: kind "say")
+w28-mistakes: from_to "40 seconds, and fixing those pushed it up to 3 minutes"
+
+labels and headers that differ (reported, not matched)
+none
+```
+
+The false positives by file. `w19`: "about 20 minutes" in a sentence the file labels as no event (a `no_change_pair` trap); a time span of 10 or more scores 0.80, exactly the NumberReveal threshold. `w28`: "pushed it up to" is a change the labels expect as one FromTo; "pushed" is not in `CHANGE_VERBS`, so the pair stays under 0.85 and its two ends are shown as two NumberReveals instead, one miss and two false positives from one sentence. All three sit at 0.80, on the threshold.
+Date: 2026-10-18, D1 (`d1`), debug build, 0.86 s for the whole test with its sweep.
+Decision: **continue with the default thresholds** (§20.3: overall 0.93 at or above 0.90). No threshold changes; `config.rs` is unchanged. Margin for V4: NumberReveal alone is at 0.80 precision. At 0.85 the sweep gives it 1.00 precision and 0.92 recall (w28's two ends gone, one true NumberReveal lost), so that is the first move if a later reading falls under 0.90. Every kind's recall is at least 0.92. `a02` joins at Prompt 88 and makes 31 files. The gate is read on D1, which has no bearing on R1 (the detector is deterministic and timing-free; D-74 concerns speed only).
 
 ## TE-12
 Question:
