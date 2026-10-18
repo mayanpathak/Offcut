@@ -78,7 +78,7 @@ fn core(tokens: &[Token]) -> Option<Core> {
     match first.kind {
         TokenKind::Digits => {
             let mut d = digits(&first.text)?;
-            // V2's split groups (D-42) follow a plain core only: `$12` `,000`.
+            // V2's split groups (D-42) follow a plain core only: `$12` `,000`; so does a split point.
             if d.plain {
                 (d.used, d.value) = with_split_groups(tokens, first, d.value);
             }
@@ -234,18 +234,25 @@ pub(crate) fn parse_decimal(text: &str) -> Option<f64> {
 /// A recognizer may write `$12,000` as two words, `$12` and `,000`: it starts
 /// a new word at the separator. A word that begins with a comma and exactly
 /// three digits, straight after a whole number, is the next group of that
-/// number (D-42). Nothing else that is written begins a word that way.
+/// number (D-42). Nothing else that is written begins a word that way. The
+/// decimal point is split the same way (`4` `.7`): a word of a point and
+/// digits only ends the number with its fraction (V3 changelog, open item
+/// 19); a point that ends a word ("3." then "5") stays a full stop.
 /// Returns the tokens used and the value.
 fn with_split_groups(tokens: &[Token], first: &Token, value: f64) -> (usize, f64) {
     let (mut used, mut value, mut word) = (1usize, value, first.word);
     while let (Some(comma), Some(group)) = (tokens.get(used), tokens.get(used.saturating_add(1))) {
-        let starts_next_word =
-            comma.word == group.word && comma.word.get() == word.get().saturating_add(1);
-        let is_group = comma.kind == TokenKind::Punct
-            && comma.text == ","
+        let starts_next_word = comma.kind == TokenKind::Punct
+            && comma.word == group.word
+            && comma.word.get() == word.get().saturating_add(1)
             && group.kind == TokenKind::Digits
-            && group.text.len() == 3
             && group.text.bytes().all(|b| b.is_ascii_digit());
+        // The value is whole until here, so it prints without a point.
+        if starts_next_word && comma.text == "." {
+            let joined = format!("{value}.{}", group.text).parse().ok();
+            return joined.map_or((used, value), |v| (used.saturating_add(2), v));
+        }
+        let is_group = comma.text == "," && group.text.len() == 3;
         let Some(digits) = group
             .text
             .parse::<f64>()
@@ -542,6 +549,47 @@ mod tests {
         assert_eq!(
             read(&["$12", "and", ",000"]),
             some(1, 12.0, Unit::Usd, "$12")
+        );
+    }
+
+    #[test]
+    fn a_number_the_recognizer_split_at_its_decimal_point_is_one_number() {
+        // The founder's recordings of 2026-10-18, as the recognizer wrote them.
+        assert_eq!(
+            read(&["4", ".7", "minutes"]),
+            some(4, 4.7, Unit::Minutes, "4.7 minutes")
+        );
+        assert_eq!(
+            read(&["1", ".5", "million", "views"]),
+            some(
+                5,
+                1_500_000.0,
+                Unit::Count {
+                    noun: "views".to_owned()
+                },
+                "1.5 million views"
+            )
+        );
+        assert_eq!(read(&["$4", ".99"]), some(3, 4.99, Unit::Usd, "$4.99"));
+        assert_eq!(
+            read(&["$1", ",250", ".5"]),
+            some(5, 1_250.5, Unit::Usd, "$1,250.5")
+        );
+        // A version stays a number of its own: one point is read, not two.
+        assert_eq!(read(&["5", ".5", ".5"]), some(3, 5.5, Unit::None, "5.5"));
+
+        // A point that ends a word is a full stop: the number after it is another number.
+        assert_eq!(read(&["3.", "5"]), some(1, 3.0, Unit::None, "3"));
+        // Not digits only, a number that had ended, a fraction in a later word,
+        // a core that is not plain.
+        assert_eq!(read(&["4", ".7%"]), some(1, 4.0, Unit::None, "4"));
+        assert_eq!(read(&["4", ".then"]), some(1, 4.0, Unit::None, "4"));
+        assert_eq!(read(&["4", "and", ".7"]), some(1, 4.0, Unit::None, "4"));
+        assert_eq!(read(&["4.5", ".7"]), some(1, 4.5, Unit::None, "4.5"));
+        assert_eq!(read(&["40%", ".5"]), some(1, 40.0, Unit::Percent, "40%"));
+        assert_eq!(
+            read(&["10k", ".5"]),
+            some(1, 10_000.0, Unit::None, "10,000")
         );
     }
 
