@@ -758,3 +758,46 @@ CI on Prompt 81's `4259c42`: `ci` and `e2e-media` success.
 - Known issue 4, the preview attaching while an export locks it (above), seen while making the renders.
 - Open item 20: the copy-back of the split point into the plan and TS.
 
+---
+
+## 2026-10-19 - Prompt 83 (V3 23/30): rejection panel and the 14 rejection messages
+
+CI on `ab48dba` (the split decimal point): `ci` and `e2e-media` success.
+
+**Done.**
+
+- **`web/src/copy/messages.ts`** (§16.3, D-80), 338 lines. `rejections`: the 14 entries of §16.3's table word for word, each `{ title, body, action }`, `satisfies Record<RejectReason, ErrorCopy>`.
+  - Every limit is computed from `LIMITS`, none typed into a sentence (INV-15): `MAX_FILE_SIZE / BYTES_PER_MB` (500 MB), `MAX_CLIP_DURATION / MS_PER_SECOND` (90 seconds), `MAX_LONG_SIDE` (1920 pixels), and `MAX_INPUT_FPS / FPS_MILLI_PER_FPS` (60 frames per second, in both the body and the action of `REJECT_FRAME_RATE`, through one `MAX_FPS`).
+  - `BYTES_PER_MB = 1_000_000` and `FPS_MILLI_PER_FPS = 1000` sit beside V2's `MS_PER_SECOND`.
+  - `editor.rejectedStub` is removed; `failedStub` and `startOver` stay.
+  - None of the six P-12 phrases occur.
+- **`web/src/ui/components/RejectionPanel.tsx`** (new, §16.2), 34 lines: `<section role="alert" data-testid="clip-rejected" data-reject={code}>`, an `h2` with the title, two paragraphs (body, action), and a "start over" button calling `dismissClip()`. The copy is read by key from the store's `reject`, with no `switch`. No retry, no code, size or file name shown. With no `reject` in the store (a state the store never makes), only the button shows.
+- **`web/src/ui/pages/EditorPage.tsx`**: the `rejected` arm of `body()` is `<RejectionPanel />`. V2's `Stub` still serves `failed`.
+- **`web/src/ui/styles/components.module.css`**: `.rejection` composes V2's `.stub` from `pages.module.css` (the first `composes:` of the repository; the built panel carries both classes, a flex column with a 16 px gap). `.rejectionTitle` has `.problem`'s size and colour, `.rejectionBody`, and `.rejectionAction` in the muted colour. No V2 class changed; no `style` attribute.
+- **`scripts/check-copy-codes.mjs`**: the 14 `REJECT_*` entries and their comment are removed from `COPY_PENDING`. The check prints `REJECT_REASONS 14 of 14`; pending falls from 38 to 24 (V2's `E_*` codes including `E_DSP`, and the four blockers).
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`web/tests-e2e/landing.spec.ts` changed: its one reader of `rejectedStub`.** §16.1 removes the key "with its last reader", and the prompt lists no test file, but V2's case "a dropped file starts an import and opens /app, or is refused where Offcut cannot run" read `messages.editor.rejectedStub`, so `tsc -p tests-e2e` would fail. Its assertion "the page says so, and offers the way back" now reads the panel: visible, a `data-reject` code that has copy, its heading equal to that code's title, and the "start over" button. Which code the case's 15 bytes of text get (`REJECT_CONTAINER` or `REJECT_CORRUPT`) is the reader's, so the case does not pin one. Nothing else in the case changed; it passes in `pnpm e2e`.
+- **`grep -c "REJECT_" scripts/check-copy-codes.mjs` prints 1, not 0**: the one line is `{ name: "REJECT_REASONS", file: DOMAIN }` in `LISTS`, which tells the script where the codes are. No `REJECT_*` code is pending, which is what the check means.
+
+**Checked.**
+
+- **The prompt's commands:** `grep -oE '\bREJECT_[A-Z_]+:' web/src/copy/messages.ts | sort -u | wc -l` 14; the forbidden-phrase grep prints nothing; `git grep -n "rejectedStub" -- web` prints nothing; `node scripts/check-copy-codes.mjs` ok.
+- **Drills (G 10.4)**, each from a copy and restored (`cmp` equal):
+  - `REJECT_AUDIO_CODEC` deleted: `tsc` fails (TS1360, the `satisfies` of `rejections`, and TS2551 in `RejectionPanel.tsx`), and `check-copy-codes` fails with "REJECT_AUDIO_CODEC: has no copy in messages.ts and is not in COPY_PENDING".
+  - "90 seconds" typed into `REJECT_DURATION`'s body: `grep -n "90 seconds"` finds line 314.
+  - A sentence in `RejectionPanel.tsx`'s JSX: ESLint fails, `react/jsx-no-literals`.
+- **Browser check (G 10.3)**, `pnpm dev` in Chrome on D1, a temporary `web/zz-pw.config.ts` and `web/tests-e2e/zz-rejections.spec.ts`, deleted:
+  - `rej_4k.mp4`: "This video is larger than Offcut handles", with 1920.
+  - `rej_hevc.mov`: "This video uses HEVC", with "Most Compatible".
+  - `rej_too_long_91s.mp4`: "This clip is too long", with 90 seconds.
+  - `rej_120fps.mp4`: "This video has too many frames per second", with 60.
+  - Each panel had `role="alert"`, its `data-reject` code, and its heading, body and action. The page text held neither "clip.mp4" (the name `dropClip` gives every file), nor the fixture's name, nor the code.
+  - "Start over" brought the drop zone back each time; `ok_vfr.mp4` after them was accepted (the feed showed).
+  - A screenshot of the HEVC panel showed the title in the problem colour, the two paragraphs and the button.
+- **Milestone 10:** `pnpm check` exit 0, the copy check, `pnpm build`, `pnpm e2e` 12 passed, `pnpm e2e:media --grep @no-gpu` 10 passed (V2's 8 and the 2 of `media-setup`), the frozen check empty.
+- **SAB gate:** no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm test`: Rust **461 passed**, 3 ignored, Vitest 92; `pnpm build` exit 0 (`offcut_core_bg` 713,306, `offcut_render_bg` 6,113,666 bytes, unchanged); the tracked-private check prints nothing.
+
+**Found, not fixed.** None.
+

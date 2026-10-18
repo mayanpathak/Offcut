@@ -198,8 +198,15 @@ test("a dropped file starts an import and opens /app, or is refused where Offcut
     await expect(page).toHaveURL(/\/$/);
   } else {
     await expect(page).toHaveURL(/\/app$/);
-    // The file is no clip: the page says so, and offers the way back.
-    await expect(page.getByText(messages.editor.rejectedStub)).toBeVisible({ timeout: 15_000 });
+    // The file is no clip: the page says so in the words of its code, and
+    // offers the way back. V3 (Prompt 83): the rejection panel in place of
+    // V2's one-line stub; which code 15 bytes of text get is the reader's.
+    const panel = page.getByTestId("clip-rejected");
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    const code = (await panel.getAttribute("data-reject")) ?? "";
+    const copy = Object.entries(messages.rejections).find(([reason]) => reason === code)?.[1];
+    expect(copy, `data-reject="${code}" has copy`).toBeDefined();
+    await expect(panel.getByRole("heading")).toHaveText(copy?.title ?? "");
     await expect(page.getByRole("button", { name: messages.editor.startOver })).toBeVisible();
   }
 

@@ -18,6 +18,7 @@ import { ExportProgress } from "../components/ExportProgress";
 import { ModelDownloadPanel } from "../components/ModelDownloadPanel";
 import { PreviewPlayer } from "../components/PreviewPlayer";
 import { ProcessingFeed } from "../components/ProcessingFeed";
+import { RejectionPanel } from "../components/RejectionPanel";
 import components from "../styles/components.module.css";
 import styles from "../styles/pages.module.css";
 
@@ -118,13 +119,7 @@ function body(clip: Pick<ClipState, "status" | "waitingModel"> & { code: ErrorCo
         </section>
       );
     case "rejected":
-      return (
-        <Stub testId="clip-rejected">
-          <p className={styles.problem} role="alert">
-            {messages.editor.rejectedStub}
-          </p>
-        </Stub>
-      );
+      return <RejectionPanel />;
     case "failed":
       return <Failed code={clip.code} />;
     default:

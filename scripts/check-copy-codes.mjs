@@ -25,21 +25,6 @@ const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
  * removed in the change that writes its copy.
  */
 const COPY_PENDING = [
-  // The 14 rejections: due in V3, with real ingest.
-  "REJECT_CONTAINER",
-  "REJECT_CORRUPT",
-  "REJECT_NO_VIDEO",
-  "REJECT_NO_AUDIO",
-  "REJECT_MULTI_AUDIO_TRACK",
-  "REJECT_VIDEO_CODEC",
-  "REJECT_HEVC",
-  "REJECT_AUDIO_CODEC",
-  "REJECT_DURATION",
-  "REJECT_FILE_SIZE",
-  "REJECT_RESOLUTION",
-  "REJECT_FRAME_RATE",
-  "REJECT_DECODE_UNSUPPORTED",
-  "REJECT_NO_SPEECH",
   // Every error but the six a person can meet in V1 and the three of the
   // model download, written in V2: due by V7.
   "E_STORAGE_QUOTA",
