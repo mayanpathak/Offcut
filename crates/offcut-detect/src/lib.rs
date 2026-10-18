@@ -1,67 +1,55 @@
-//! Which moments of a transcript become visual events. V2 finds NumberReveal
-//! only. An event below its kind's threshold is never made (INV-6), and
-//! nothing here lays out or draws.
+//! Which moments of a transcript become visual events: NumberReveal,
+//! ListReveal, FromTo and KeywordPop (TS §17). An event below its kind's
+//! threshold is never made (INV-6), the same inputs give the same events
+//! (INV-7), and nothing here lays out or draws.
 
 pub mod config;
 pub mod event_id;
-// V3: the three finders of section 9.4-9.6. `detect` calls them from Prompt 77
-// on (section 9.2); until then only their tests do, and `expect` fails the
-// build once they are used, so that Prompt 77 removes it.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "detect calls it from Prompt 77")
-)]
+mod exclusions;
 mod from_to;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "detect calls it from Prompt 77")
-)]
 mod keyword;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "detect calls it from Prompt 77")
-)]
 mod list;
 pub mod number;
+mod resolve;
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use offcut_text::tokenize;
-use offcut_types::{Confidence, DetectedEvent, Prosody, Transcript, WordIdx};
+use offcut_types::{Confidence, DetectedEvent, EventKind, Prosody, Transcript, WordIdx};
 
 pub use crate::config::DetectorConfig;
+use crate::config::SCORE_NOISE;
 pub use crate::event_id::event_id;
-use crate::number::Candidate;
 
 /// The events of a transcript, in the order they are spoken. `edits` are the
 /// user's word edits: detection reads the text as edited (TS §17.2). The
-/// same inputs give the same events, with the same ids.
+/// same inputs give the same events, with the same ids. An empty transcript
+/// gives none; nothing here fails.
 pub fn detect(
     t: &Transcript,
     p: &Prosody,
     edits: &BTreeMap<WordIdx, String>,
     cfg: &DetectorConfig,
 ) -> Vec<DetectedEvent> {
+    // 1-3: the text as edited, and the candidates of the four finders, each
+    // reading the quantities of each sentence again (D-104, D-109).
     let toks = tokenize(&t.words, edits);
-    let mut cands = number::find(&toks, t, p, cfg);
-    cands.retain(|c| c.score >= cfg.threshold_number);
-    cands.sort_by_key(|c| c.span.start);
-
-    // V3: `exclusions::apply`, the filter by kind and `resolve::resolve`
-    // take the place of the threshold above and of this rule (D-49): two
-    // overlays are never on the screen at once, and the earlier one stays.
-    let mut kept: Vec<Candidate> = Vec::new();
-    for cand in cands {
-        let shown_from = cand.span.start.get().saturating_sub(cfg.overlay_lead_ms);
-        let free = kept.last().is_none_or(|before| {
-            shown_from > before.span.end.get().saturating_add(cfg.number_hold_ms)
-        });
-        if free {
-            kept.push(cand);
-        }
+    let mut cands = from_to::find(&toks, t, p, cfg);
+    cands.extend(list::find(&toks, t, p, cfg));
+    cands.extend(number::find(&toks, t, p, cfg));
+    cands.extend(keyword::find(&toks, t, p, cfg));
+    // 4: years, versions, clock times, phone-like runs, bare small numbers,
+    // markers, hidden words.
+    exclusions::apply(&mut cands, &toks, t, edits);
+    // 5: the threshold of each kind, on the score without f32 noise.
+    for cand in &mut cands {
+        cand.score = settled(cand.score);
     }
-
-    kept.into_iter()
+    cands.retain(|c| c.score >= cfg.threshold(c.kind));
+    // 6-7: what competes is resolved, and each kept candidate is an event.
+    let mut events: Vec<DetectedEvent> = resolve::resolve(cands, &[], cfg)
+        .into_iter()
         .filter_map(|c| {
             Some(DetectedEvent {
                 id: event_id(c.kind, c.anchors),
@@ -74,7 +62,35 @@ pub fn detect(
                 enabled: true,
             })
         })
-        .collect()
+        .collect();
+    events.sort_by(spoken_order);
+    events
+}
+
+/// A score within `SCORE_NOISE` of a whole hundredth, as that hundredth: the
+/// sums of `config.rs`'s two-decimal values, free of `f32` rounding.
+fn settled(score: f32) -> f32 {
+    let hundredths = (score * 100.0).round();
+    if (score * 100.0 - hundredths).abs() < SCORE_NOISE * 100.0 {
+        hundredths / 100.0
+    } else {
+        score
+    }
+}
+
+/// By start, then the kind order of D-47, then the first word.
+fn spoken_order(a: &DetectedEvent, b: &DetectedEvent) -> Ordering {
+    let rank = |kind: EventKind| match kind {
+        EventKind::NumberReveal => 0u8,
+        EventKind::ListReveal => 1,
+        EventKind::FromTo => 2,
+        EventKind::KeywordPop => 3,
+    };
+    a.span
+        .start
+        .cmp(&b.span.start)
+        .then(rank(a.kind).cmp(&rank(b.kind)))
+        .then(a.anchors.start.cmp(&b.anchors.start))
 }
 
 #[cfg(test)]

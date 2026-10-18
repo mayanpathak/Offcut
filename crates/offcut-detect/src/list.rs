@@ -193,7 +193,7 @@ pub fn find(toks: &[Token], t: &Transcript, _p: &Prosody, cfg: &DetectorConfig) 
             toks,
             t,
             cfg,
-            Some(found.words),
+            Some(&found),
             markers,
             score,
             header,
@@ -286,7 +286,7 @@ fn candidate(
     toks: &[Token],
     t: &Transcript,
     cfg: &DetectorConfig,
-    announcer: Option<WordRange>,
+    announcer: Option<&Found>,
     markers: &[Placed],
     score: f32,
     header: String,
@@ -305,15 +305,16 @@ fn candidate(
             at: p.marker.at,
         });
     }
-    let start = announcer.map_or(first.marker.words.start, |words| words.start);
+    let start = announcer.map_or(first.marker.words.start, |found| found.words.start);
     let words = t.words.get(start.get() as usize..end.get() as usize)?;
     // A list is never more certain than the least certain of its words (TS §17.4).
     let heard = words
         .iter()
         .map(|word| word.confidence.get())
         .fold(1.0f32, f32::min);
-    let mut parts: Vec<WordRange> = announcer.into_iter().collect();
+    let mut parts: Vec<WordRange> = announcer.iter().map(|found| found.words).collect();
     parts.extend(markers.iter().map(|p| p.marker.words));
+    let sentence = announcer.map_or(first.marker.sentence, |found| found.sentence);
     Some(Candidate {
         kind: EventKind::ListReveal,
         anchors: WordRange { start, end },
@@ -325,6 +326,7 @@ fn candidate(
             items,
         },
         parts,
+        sentence,
     })
 }
 

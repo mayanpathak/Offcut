@@ -161,6 +161,22 @@ pub const FROM_TO_VERB_REACH: usize = 3;
 pub const LIST_MARKER_ONLY_MIN: usize = 3;
 /// A list item ends at a comma once it holds this many words (D-107).
 pub const LIST_ITEM_COMMA_WORDS: usize = 2;
+/// X1: a bare whole number in this range, in plain digits, is a year.
+pub const YEAR_FIRST: f64 = 1_900.0;
+pub const YEAR_LAST: f64 = 2_099.0;
+/// X2: a number written with this many decimal points is a version: "3.12.1".
+pub const VERSION_DOTS: usize = 2;
+/// X4: a bare run of at least this many digits is phone-like.
+pub const PHONE_DIGITS_MIN: usize = 7;
+/// X5: a bare number under this, in absolute value, is too small to show.
+pub const BARE_NUMBER_MIN: f64 = 10.0;
+/// Scores are sums of the two-decimal values above, and an `f32` sum can land
+/// a few units in the last place under the value it stands for: 0.65 + 0.20 is
+/// 0.84999996, under a threshold of 0.85 (V2 CL known issue 22). Before the
+/// threshold, a score this close to a whole hundredth is taken as that
+/// hundredth (`lib.rs` step 5, the one place). A score that is really between
+/// two hundredths, such as 0.795, is not moved (section 23, item 27).
+pub const SCORE_NOISE: f32 = 1e-6;
 
 // The grammar words the finders look for. They say what a frame is; they are
 // not tuned.
@@ -245,8 +261,9 @@ pub const VERSION_CONTEXT: &[&str] = &[
 ];
 /// And right before one of these (X2): "iPhone 15 Pro".
 pub const VERSION_AFTER: &[&str] = &["max", "mini", "plus", "pro", "ultra"];
-/// A number right before one of these is a time of day (X3).
-pub const CLOCK_WORDS: &[&str] = &["a.m.", "am", "o'clock", "p.m.", "pm"];
+/// A number right before one of these is a time of day (X3). "a.m." is
+/// tokenized as the word `a.m` and a full stop, so the list holds `a.m`.
+pub const CLOCK_WORDS: &[&str] = &["a.m", "am", "o'clock", "p.m", "pm"];
 
 #[cfg(test)]
 mod tests {

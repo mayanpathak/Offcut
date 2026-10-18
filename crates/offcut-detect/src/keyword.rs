@@ -2,7 +2,9 @@
 //! or by the words around it (TS §17.4, section 9.6).
 
 use offcut_text::{Token, TokenKind};
-use offcut_types::{EventKind, EventParams, Prosody, Span, Transcript, WordIdx, WordRange};
+use offcut_types::{
+    EventKind, EventParams, Prosody, SentenceIdx, Span, Transcript, WordIdx, WordRange,
+};
 
 use crate::config::{DetectorConfig, EMPHASIS_WORDS, INTENSIFIERS, STOP_WORDS};
 use crate::list::{markers, sentence_tokens};
@@ -17,13 +19,14 @@ pub fn find(toks: &[Token], t: &Transcript, p: &Prosody, cfg: &DetectorConfig) -
         .chain(markers(toks, t).iter().map(|marker| marker.words))
         .collect();
     let mut out = Vec::new();
-    for range in sentence_tokens(toks, t) {
+    for (index, range) in (0u32..).zip(sentence_tokens(toks, t)) {
+        let sentence = SentenceIdx::new(index);
         let mut previous: Option<&Token> = None;
         for token in toks.get(range).unwrap_or(&[]) {
             let free = !taken
                 .iter()
                 .any(|words| words.start <= token.word && token.word < words.end);
-            if free && let Some(c) = candidate(t, p, cfg, token, previous) {
+            if free && let Some(c) = candidate(t, p, cfg, token, previous, sentence) {
                 out.push(c);
             }
             previous = Some(token);
@@ -34,13 +37,14 @@ pub fn find(toks: &[Token], t: &Transcript, p: &Prosody, cfg: &DetectorConfig) -
 
 /// `token` as a keyword, when it is a word of at least `keyword_min_letters`
 /// letters and no stop word. `previous` is the token before it in its
-/// sentence.
+/// sentence, `sentence`.
 fn candidate(
     t: &Transcript,
     p: &Prosody,
     cfg: &DetectorConfig,
     token: &Token,
     previous: Option<&Token>,
+    sentence: SentenceIdx,
 ) -> Option<Candidate> {
     let text = token.text.as_str();
     let letters = text.chars().filter(|c| c.is_alphabetic()).count();
@@ -77,6 +81,7 @@ fn candidate(
         score: score.min(1.0) * word.confidence.get(),
         params: EventParams::KeywordPop { word: token.word },
         parts: Vec::new(),
+        sentence,
     })
 }
 

@@ -30,6 +30,9 @@ pub struct Candidate {
     /// The words of each quantity or marker it is built from: what the
     /// exclusions inspect (D-106).
     pub parts: Vec<WordRange>,
+    /// The sentence of its first word: `resolve` keeps one KeywordPop per
+    /// sentence (section 9.8 step 4).
+    pub sentence: SentenceIdx,
 }
 
 /// A quantity of the text as edited: its words, its tokens in the whole
@@ -174,6 +177,7 @@ fn candidate(
             label,
         },
         parts: vec![found.words],
+        sentence: found.sentence,
     })
 }
 

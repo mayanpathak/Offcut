@@ -101,6 +101,7 @@ fn pair(
             label: None,
         },
         parts: vec![a.words, b.words],
+        sentence: a.sentence,
     })
 }
 
