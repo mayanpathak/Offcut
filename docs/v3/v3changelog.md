@@ -15,7 +15,6 @@
 |---|---|---|---|
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. Prompt 87 writes it into `ci.yml`: check it then, and choose there between a newer build of the same day and a copy kept on the asset host | Agent | Prompt 87 |
-| 9 | **`fixtures/gen_fixtures.sh` may be checked out with CRLF on the Windows runner.** The repository has no `.gitattributes`; GitHub's Windows images set `core.autocrlf=true`, and `sh` cannot run a script with CRLF line endings. D1 (`core.autocrlf=input`) and Linux check it out LF. Today no Windows job runs a `.sh` file; Prompt 87 makes `e2e-media.yml` run `pnpm fixtures`. Then either a `git config --global core.autocrlf false` step before the checkout, or a root `.gitattributes` with `*.sh text eol=lf` (a new file: TS §5 entry in the same change) | Agent | Prompt 87 |
 | 15 | **`CLOCK_WORDS` holds `a.m` and `p.m` since Prompt 77**, the forms `tokenize` gives "a.m." and "p.m." (they never equalled `a.m.` / `p.m.`). Copy back into §9.1's lexicon table | Agent | Prompt 89 |
 | 17 | **Prompt 77 as built** (its entry): `Candidate` gains `sentence` (§9.3's struct; `resolve` keeps one KeywordPop per sentence and has no transcript); `lib.rs` step 5 takes a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth before the threshold (0.65 + 0.20 is 0.84999996 in `f32`: no marker-only list could reach 0.85); the X1-X5 bounds and `VERSION_DOTS` are named constants of `config.rs`. Copy back into §9.2 step 5, §9.3, §9.7, Appendix D, and §23 item 27 | Agent | Prompt 89 |
 | 20 | **The split decimal point, as built 2026-10-18** (entry "Outside a prompt: the split decimal point"): `offcut-text`'s `with_split_groups` also joins a word of a point and digits only (`4` `.7`) to the whole number before it. Copy back into v3implementation §8 (beside D-42's split groups, with the founder's two cases) and TS §17.2 | Agent | Prompt 89 |
@@ -854,4 +853,20 @@ CI on Prompt 83's `f70f38c`: `ci` and `e2e-media` success.
 - **SAB gate:** no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `pnpm test`: Rust **461 passed**, 3 ignored, Vitest 92; `pnpm build` exit 0 (bundles unchanged: only tests changed); `pnpm e2e` 12 of 12; the frozen check and the tracked-private check print nothing.
 
 **Found, not fixed.** None.
+
+---
+
+## 2026-10-19 - Outside a prompt: the Windows media job generates the fixtures (Prompt 87's `e2e-media.yml` part, brought forward)
+
+**Why.** CI's `e2e-media` on `a47b3a2` (Prompt 84) failed at "Playwright, the media cases that need no graphics card": the job runs `pnpm e2e:media --grep @no-gpu`, which since Prompt 84 selects the rejection suite's 15 `@no-gpu` cases. 14 of them read generated fixtures through `genFixture`, and the job never ran `pnpm fixtures` (Prompt 87 was to add it), so they failed with "run pnpm fixtures", as written to. `ci` passed. The plan's order put the tag (Prompt 84) before the job could serve it (Prompt 87).
+
+**Done.** `.github/workflows/e2e-media.yml`, as §18.6 and Prompt 87 give it for this file:
+
+- **A first step**, "Check out with LF line endings": `git config --global core.autocrlf false` before the checkout. The Windows image checks text out with CRLF, and `sh` cannot run `fixtures/gen_fixtures.sh` so. **Open item 9 is closed** with its first option; no `.gitattributes`, so no new file.
+- "Restore the model files and the reference clip" moves directly after "Install ffmpeg", followed by **"Generate the fixtures"** (`pnpm fixtures`). The script downloads the reference clip itself when the cache does not hold it; `VITE_ASSET_BASE_URL` is in the job's `env`.
+- The head comment names the rejection suite. The Playwright command is unchanged (`--grep @no-gpu`, now 23 cases and the 2 of `media-setup`).
+
+Nothing else changed: no app code and no test. Prompt 87 keeps its `ci.yml` work (the pinned Linux ffmpeg) and its guards; for `e2e-media.yml` it has this left to read (the `REJECT_DECODE_UNSUPPORTED` result on the runner, the job's time against open item 10).
+
+**Checked.** The step order and indentation, read back. A YAML parser is not installed on D1 and none was added; the runner is the check, read below.
 

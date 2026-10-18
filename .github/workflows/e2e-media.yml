@@ -1,6 +1,9 @@
 # The media suites of technicalspec.md §33, step 10, as far as a hosted
 # runner can run them: the cases tagged @no-gpu, which are the download of
-# the speech model and the import of the sample clip, in Chrome on Windows.
+# the speech model, the import of the sample clip and the rejection suite
+# (every refusal at import, "start over", an accepted file's record), in
+# Chrome on Windows. The rejection suite reads the generated fixtures, which
+# this job makes first (v3implementation D-93, D-94).
 #
 # A hosted runner has no graphics card. Its Chrome can be given a software
 # adapter, and the app then runs; but a clip took more than 20 minutes to
@@ -60,6 +63,11 @@ jobs:
 
     steps:
       # --- 10.1 Checkout and tools ------------------------------------------
+      # A Windows image checks text out with CRLF, and `sh` cannot run
+      # fixtures/gen_fixtures.sh so (V3 changelog, open item 9).
+      - name: Check out with LF line endings
+        run: git config --global core.autocrlf false
+
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -114,14 +122,7 @@ jobs:
           head -n 1 ffmpeg-version.txt
           head -n 1 ffprobe-version.txt
 
-      # --- 10.2 The build of the ci job --------------------------------------
-      - name: Take the build of the ci job
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: web-dist
-          path: web/dist
-
-      # --- 10.3 The model files and the reference clip -----------------------
+      # --- 10.2 The model files, the reference clip and the fixtures ---------
       # The setup project of the suites downloads what is missing and checks
       # every file's hash, so a cache that is old or empty costs time only.
       - name: Restore the model files and the reference clip
@@ -129,6 +130,18 @@ jobs:
         with:
           path: fixtures/.cache
           key: e2e-assets-${{ hashFiles('web/src/config/model-manifest.json', 'web/src/net/asset-fetch.ts') }}
+
+      # From the reference clip, which it downloads itself when the cache did
+      # not hold it (v3implementation §17.1). The rejection suite reads them.
+      - name: Generate the fixtures
+        run: pnpm fixtures
+
+      # --- 10.3 The build of the ci job --------------------------------------
+      - name: Take the build of the ci job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: web-dist
+          path: web/dist
 
       # --- 10.4 The cases a runner can run, against `vite preview` ------------
       # The setup project runs first, whatever is selected: it stops the step
