@@ -1266,12 +1266,15 @@ export function hashPrefix(file: Blob): Promise<string>;
 export function put(record: ClipRecord): Promise<void>;
 export function get(clipId: ClipId): Promise<ClipRecord | undefined>;
 export function toBytes(n: number): Bytes;        // the one cast of D-103
+export function clear(): Promise<void>;            // section 23, item 26 (decided 2026-10-18)
 // persistence/transcript-repo.ts
 export function put(clipId: ClipId, record: TranscriptRecord): Promise<void>;
 export function get(clipId: ClipId): Promise<TranscriptRecord | undefined>;
+export function clear(): Promise<void>;
 // persistence/edits-repo.ts
 export function put(clipId: ClipId, record: EditsRecord): Promise<void>;
 export function get(clipId: ClipId): Promise<EditsRecord | undefined>;
+export function clear(): Promise<void>;
 ```
 
 | Situation | Result |
@@ -1281,6 +1284,7 @@ export function get(clipId: ClipId): Promise<EditsRecord | undefined>;
 | `hashPrefix` of an empty blob | SHA-256 of eight zero bytes |
 | `put` then `get` | The same record |
 | `get` of an absent key | `undefined` |
+| `clear()` | Every record of the store removed. `import-clip.ts` step 4 calls the three, so the device holds the records of one clip at most, as OPFS holds its media (D-40; section 23, item 26). "Start over" alone removes nothing; the next import does. V7's `remove(clipId)` and eviction take its place |
 | A stored value with `schemaVersion: 2` | `get` returns `undefined` and the value is deleted |
 | The browser refuses the write for lack of room | `OpfsError` with kind `quota` |
 | Any other failure | `OpfsError` with kind `io` |
@@ -1324,16 +1328,16 @@ Signatures unchanged (V2 §19.2). The steps, with V3's changes in bold:
 | 1 | `blockers.forImport()` non-null: return | - |
 | 2 | Clip not `idle`: `dismissClip()`; ask the blockers again (V2 as built) | - |
 | 3 | `clipId = newClipId()`; `clipStore.begin(clipId, source)` | - |
-| 4 | Stand-in until V7 (D-40): remove `clips/` | Ignored |
+| 4 | Stand-in until V7 (D-40): remove `clips/`; **`clipsRepo.clear()`, `transcriptRepo.clear()`, `editsRepo.clear()`** (section 23, item 26) | Ignored |
 | 5 | `startTimer(clipId)` | - |
 | 6 | **`sourceHashPrefix = await clipsRepo.hashPrefix(file)`**: before the file is posted, so the main thread reads its first 4 MiB once | `OpfsError` is impossible here (no storage is written); a `NotReadableError` from the `Blob` is `E_STORAGE_IO`, stage `import`: `importFailed` |
 | 7 | `r = pool.media.importAndProbe({ clipId, file })` | As V2 |
 | 8 | `r.rejected`: `clipStore.rejected(reason)`; **`track clip_rejected { reject_reason: reason }`** (D-97); remove `clipDir`; return | - |
-| 9 | `clipStore.accepted(r.ok)`; `track clip_accepted` | - |
-| 10 | **`clipsRepo.put({ clipId, createdAt: now, lastOpenedAt: now, clipInfo: r.ok, sourceBytes: toBytes(file.size), sourceHashPrefix })`** (TS C-2), `now = Date.now()` | `clipStore.failed({ code: E_STORAGE_QUOTA or E_STORAGE_IO, stage: "storage", retryable: true })`; remove `clipDir`; return |
+| 9 | **`clipsRepo.put({ clipId, createdAt: now, lastOpenedAt: now, clipInfo: r.ok, sourceBytes: toBytes(file.size), sourceHashPrefix })`** (TS C-2), `now = Date.now()`, while the clip is still `importing` | `clipStore.failed({ code: E_STORAGE_QUOTA or E_STORAGE_IO, stage: "storage", retryable: true })` (importing to failed); remove `clipDir`; return. No `clip_accepted` |
+| 10 | `clipStore.accepted(r.ok)`; `track clip_accepted` | - |
 | 11 | `void runPipeline(clipId)` | - |
 
-The `File`'s name is still never read (P-11). `clip_rejected` carries the code alone (TS §15.3, INV-18).
+The `File`'s name is still never read (P-11). `clip_rejected` carries the code alone (TS §15.3, INV-18). The record is written before `accepted` (Prompt 80 as built): the clip machine (TS §12.2, `state/**` untouched in V3) lets an `accepted` clip go only to `processing` or `idle`, so a failure after `accepted` could not be stored.
 
 ### 15.2 `run-pipeline.ts` (C-3, C-4)
 
@@ -1349,7 +1353,7 @@ Signature unchanged. The steps of V2 §19.3 with the two stand-ins replaced (D-2
 | 6 | `await model` | `model_download` as V2 | **`await chain`** (so no job is left running), then `failed(modelFailure)` |
 | 7 | (B1) `processing("asr")`; `load`; `transcribe` with `transfer: [pcm16.buffer]` | "Transcribing…"; `stage_timing asr` | **`await chain`; `unload()`; the failure stored is the earlier in time of B1's and the chain's (by `at`, D-90)** |
 | 8 | (C) `await pool.asr.unload()` (INV-12) | | As V2 |
-| 9 | `heard.rejected` (fewer than `MIN_WORDS` words): **`await chain`**; `clipStore.noSpeech()`; **`track clip_rejected { reject_reason: "REJECT_NO_SPEECH" }`**; remove `clipDir`; return. The `clips` record of import step 10 stays until V7 (section 23, item 26) | `clip_rejected` (D-97) | - |
+| 9 | `heard.rejected` (fewer than `MIN_WORDS` words): **`await chain`**; `clipStore.noSpeech()`; **`track clip_rejected { reject_reason: "REJECT_NO_SPEECH" }`**; remove `clipDir`; return. The `clips` record of import step 9 stays until the next import clears it (section 23, item 26) | `clip_rejected` (D-97) | - |
 | 10 | **`c = await chain`; `c.failure`: throw it** | | `failed(E_DSP …)`, stage `audio_chain` |
 | 11 | **(D) `{ out48, prosody } = pool.audio.measureProsody({ words: transcript.words, sentences: transcript.sentences })`** | | `failed`, stage `audio_chain` |
 | 12 | (E) `processing("detect_scene")`; `openSession`; `detect`; `setScene({ … profile: "preview" })` | One feed line per event, **FromTo with `displayTo` (D-83)**; `stage_timing detect_scene` | As V2 |
