@@ -125,12 +125,38 @@ Numbers: sentence 4 ("This is literally brutal way to make anything."): "literal
 Date: 2026-10-17, D1.
 Decision: none yet. The pitch rise on "literally brutal" is measurable; whether "brutal" passes KeywordPop is read at S8 with real word times and the detector of Prompt 77.
 
+Question: (S8 reading, Prompt 82) do the five derived clips give the events of §17.3 through the whole V3 pipeline (the chain, the recognizer on the cleaned voice, prosody, the detector)?
+Method: each clip dropped once in `pnpm dev` on D1 (Chrome, the model on WebGPU, a persistent profile), waited for `ready`, the transcript read from IndexedDB by the clip's id, the feed recorded from before the page loaded, the analytics batches read from the in-page fake API. A temporary Playwright file, deleted after.
+Numbers (`d1`):
+
+| Clip | `ready` after | `audio_chain` | `asr` (`webgpu`, dev build) | Feed's "Found:" lines | `pipeline_done` counts (number, list, from_to, keyword) |
+|---|---|---|---|---|---|
+| `speech_60s_portrait.mp4` | 65.4 s | 1,141 ms | 61,808 ms | "3,000 hours", "90 minutes to 10 minutes" | 1, 0, 1, 0 |
+| `speech_60s_landscape.mp4` | 60.1 s | 900 ms | 58,240 ms | the same | 1, 0, 1, 0 |
+| `speech_20s_noevents.mp4` | 20.7 s | 431 ms | 19,606 ms | none | 0, 0, 0, 0 |
+| `speech_20s_long_pause.mp4` | 21.3 s | 728 ms | 20,069 ms | "3,000 hours", "90 minutes to 10 minutes" | 1, 0, 1, 0 |
+| `speech_30s_sparse.mp4` | 16.3 s | 962 ms | 14,782 ms | none | 0, 0, 0, 0 |
+
+"brutal" on the cleaned voice with the recognizer's word times: energy_z +0.56, pitch_z +0.57 (both clips alike); "This", which opens its sentence, has pitch_z +2.21. No KeywordPop on any derived clip. The 60 s clips have no ListReveal: the recognizer writes the three items as one sentence ("First the captions write themselves, second the numbers animate automatically, third everything runs on my laptop."), so "second" and "third" are not at a sentence start (D-105) and "three reasons" is a partial list. The long-pause clip's second part starts at 9,960 ms, 40 ms before the 10,000 ms of §17.3. Each difference is written into `fixtures/speech/README.md` with its reason.
+Date: 2026-10-18, D1 (`d1`).
+Decision: the README's expectations follow the clips as recognized; the detector is not changed to fit (§20.1). V4 input: on the derived 60 s clips the list depends on how the recognizer punctuates three short items said in a row, and the KeywordPop on "brutal" is not carried by the measured prosody; Prompt 85's E2E cases take the README as written.
+
 ## Second recording
-Question:
-Method:
-Numbers:
-Date:
-Decision:
+Question: is the founder's second recording, `testclips/v3testclip.mp4` (78.9 s, 1280x720, variable frame rate), accepted and taken to `ready` by the V3 pipeline, and which events does V3 find in it (§20.1, D-99)?
+Method: as for the derived clips (above): one run in `pnpm dev` on D1, the transcript read from IndexedDB by its clip id. Its recognized sentences, numbers and events are in `fixtures/speech/README.md`, "The V3 test clip as recognized". Nothing about the file's location tag is written anywhere (D-100).
+Numbers (`d1`): accepted (`clip_accepted`, `lte90`, landscape); `ready` after 88.2 s; `audio_chain` 2,180 ms, `asr` 84,350 ms (`webgpu`, dev build); `pipeline_done` 86,453 ms with 3 NumberReveals, 0 lists, 0 FromTo, 1 KeywordPop; 159 words, 159 prosody entries. Feed: "Cleaning voice", "Transcribing…", "Found: 3 months", "Found: $2k", "Found: 4 months", "Found: that's". Against the frozen labels of `a02-v3testclip.json`: `$2k` matches; "500 paying users" and "500 paying customers" are missed (the count noun is not right after its number, D-101); "3 months", "4 months" and "that's" are events the labels do not expect.
+
+Further readings (2026-10-18), three more recordings by the founder of that day, read from `docs/v3/testvideo_scripts/` (saved as `testclips/v3testclip1 (1).mp4`, `v3testclip2 (2).mp4`, `v3testclip3 (3).mp4`, all 1280x720 webcam, variable frame rate; each carries a location tag and stays on D1). Run the same way; all three accepted and `ready`. Events only; their transcripts are not committed (D-112 names the founder's two clips):
+
+| File | Script | Length; `ready` after | Found | Expected by the script, not found | Found, not expected |
+|---|---|---|---|---|---|
+| `v3testclip3 (3).mp4` | 1 (all four kinds) | 61.3 s; 73.3 s | 10,000 subscribers; 6 hours to 45 minutes; 4-item list; 3x | $80 (inside the list's last item: the recognizer runs "Fourth a fixed upload day the microphone costs $80 …" into one sentence, and a list holds its words); 40% (written `40 %`, two words: the `%` is not read as the number's unit); UNREAL, ENOUGH | none |
+| `v3testclip1 (1).mp4` | 2 (the traps) | 68.8 s; 80.4 s | 400 ms; $240 to $60 | 1.5 million views (see the next column); the marker-only list (the recognizer runs "… here is what I learned first ship small second measure everything third …" into the sentence before); WHOLE | **"5 million views"**: the recognizer writes `1 .5 million`, and the number grammar reads `.5` as a new token, so 1.5 million is shown as 5 million |
+| `v3testclip2 (2).mp4` | 3 (noise, pause) | 45.2 s; 57.7 s | ₹50k; 6 months to 2 weeks; 120 clients | 250 GB (written `250GB`, one word); CHEAPEST | **"7 minutes"**: written `4 .7 minutes`, read as 4 and 7 minutes, so 4.7 minutes is shown as 7 minutes |
+
+No trap of script 2 or script 1 became an event: the versions (`3 .11`, `3 .12`, `iPhone 15 Pro`, "version two"), the years (`2019`, `2024`), the phone digits, the clock times (`9 a .m.`, `7 PM`), the small counts and "ten pounds".
+Date: 2026-10-18, D1 (`d1`).
+Decision: **accepted, `ready`: the second recording passes (§20.1).** Recorded, not tuned to (D-87, §20.1): the founder decides whether the two wrong values (a decimal written with its point as a separate word) are fixed in V3 or in V4; see `v3changelog.md`, Prompt 82's entry. `a02`'s labels stay as frozen and meet this transcript at Prompt 88, where its three unexpected events count as false positives of the precision gate.
 
 ## Bundle size
 Question: how much does the voice chain (`nnnoiseless`, `ebur128` and `offcut-dsp`'s chain) add to `offcut_core_bg-*.wasm` (G 4.4; growth over 2 MB is the signal to find the crate)?
