@@ -16,11 +16,15 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use offcut_text::tokenize;
-use offcut_types::{Confidence, DetectedEvent, EventKind, Prosody, Transcript, WordIdx};
+use offcut_types::{
+    Confidence, DetectedEvent, EventKind, Prosody, Sentence, SentenceIdx, Transcript, WordIdx,
+    WordRange,
+};
 
 pub use crate::config::DetectorConfig;
 use crate::config::SCORE_NOISE;
 pub use crate::event_id::event_id;
+use crate::number::Candidate;
 
 /// The events of a transcript, in the order they are spoken. `edits` are the
 /// user's word edits: detection reads the text as edited (TS §17.2). The
@@ -32,6 +36,47 @@ pub fn detect(
     edits: &BTreeMap<WordIdx, String>,
     cfg: &DetectorConfig,
 ) -> Vec<DetectedEvent> {
+    let cands = candidates(t, p, edits, cfg);
+    // 6-7: what competes is resolved, and each kept candidate is an event.
+    into_events(resolve::resolve(cands, &[], cfg), Vec::new())
+}
+
+/// The events after an edit in sentence `s` (section 9.2, D-86): the events
+/// of `prev` outside the scope stay as they are, and the scope is detected
+/// again with them fixed, so the rules of TS §17.5 hold for the whole clip.
+/// An event whose kind and anchors did not change keeps its id (D-47). `s`
+/// out of range returns `prev` unchanged.
+pub fn redetect_sentence(
+    t: &Transcript,
+    p: &Prosody,
+    edits: &BTreeMap<WordIdx, String>,
+    s: SentenceIdx,
+    prev: &[DetectedEvent],
+    cfg: &DetectorConfig,
+) -> Vec<DetectedEvent> {
+    let Some(sentence) = t.sentences.get(s.get() as usize) else {
+        return prev.to_vec();
+    };
+    let scope = scope(t, sentence, prev, cfg);
+    let outside: Vec<DetectedEvent> = prev
+        .iter()
+        .filter(|e| !meets(e.anchors, scope))
+        .cloned()
+        .collect();
+    let mut cands = candidates(t, p, edits, cfg);
+    cands.retain(|c| scope.start <= c.anchors.start && c.anchors.end <= scope.end);
+    let kept = resolve::resolve(cands, &outside, cfg);
+    into_events(kept, outside)
+}
+
+/// Steps 1-5 of `detect`: the candidates of the text as edited that clear
+/// the threshold of their kind.
+fn candidates(
+    t: &Transcript,
+    p: &Prosody,
+    edits: &BTreeMap<WordIdx, String>,
+    cfg: &DetectorConfig,
+) -> Vec<Candidate> {
     // 1-3: the text as edited, and the candidates of the four finders, each
     // reading the quantities of each sentence again (D-104, D-109).
     let toks = tokenize(&t.words, edits);
@@ -47,24 +92,69 @@ pub fn detect(
         cand.score = settled(cand.score);
     }
     cands.retain(|c| c.score >= cfg.threshold(c.kind));
-    // 6-7: what competes is resolved, and each kept candidate is an event.
-    let mut events: Vec<DetectedEvent> = resolve::resolve(cands, &[], cfg)
-        .into_iter()
-        .filter_map(|c| {
-            Some(DetectedEvent {
-                id: event_id(c.kind, c.anchors),
-                kind: c.kind,
-                span: c.span,
-                anchors: c.anchors,
-                params: c.params,
-                // A score is within 0 to 1; one that is not makes no event.
-                confidence: Confidence::new(c.score)?,
-                enabled: true,
-            })
+    cands
+}
+
+/// Step 7: each kept candidate as an event, beside the `fixed` ones, all in
+/// spoken order.
+fn into_events(kept: Vec<Candidate>, fixed: Vec<DetectedEvent>) -> Vec<DetectedEvent> {
+    let mut events = fixed;
+    events.extend(kept.into_iter().filter_map(|c| {
+        Some(DetectedEvent {
+            id: event_id(c.kind, c.anchors),
+            kind: c.kind,
+            span: c.span,
+            anchors: c.anchors,
+            params: c.params,
+            // A score is within 0 to 1; one that is not makes no event.
+            confidence: Confidence::new(c.score)?,
+            enabled: true,
         })
-        .collect();
+    }));
     events.sort_by(spoken_order);
     events
+}
+
+/// The words `redetect_sentence` reads again (D-86): from sentence `s` to
+/// the last sentence that starts within `list_window_ms` after it, a list
+/// announced in `s` finding its markers there; then the sentences of every
+/// event of `prev` that reaches into the scope, until none crosses its edge.
+/// An event of `prev` is so either wholly inside, detected again, or wholly
+/// outside, kept: none is lost at the edge.
+fn scope(t: &Transcript, s: &Sentence, prev: &[DetectedEvent], cfg: &DetectorConfig) -> WordRange {
+    let from = s.start_ms.get();
+    let until = from.saturating_add(cfg.list_window_ms);
+    let mut scope = s.words;
+    for later in &t.sentences {
+        let at = later.start_ms.get();
+        if from < at && at < until {
+            scope = hull(scope, later.words);
+        }
+    }
+    loop {
+        let mut grown = scope;
+        for e in prev.iter().filter(|e| meets(e.anchors, scope)) {
+            for touched in t.sentences.iter().filter(|x| meets(x.words, e.anchors)) {
+                grown = hull(grown, touched.words);
+            }
+        }
+        if grown == scope {
+            return scope;
+        }
+        scope = grown;
+    }
+}
+
+/// Two word ranges that share a word.
+fn meets(a: WordRange, b: WordRange) -> bool {
+    a.start < b.end && b.start < a.end
+}
+
+fn hull(a: WordRange, b: WordRange) -> WordRange {
+    WordRange {
+        start: a.start.min(b.start),
+        end: a.end.max(b.end),
+    }
 }
 
 /// A score within `SCORE_NOISE` of a whole hundredth, as that hundredth: the
