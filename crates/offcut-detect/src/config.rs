@@ -26,7 +26,7 @@ pub struct DetectorConfig {
     /// and a number this long after its last: the hold and the fade of TS §19.5.
     pub number_hold_ms: u32,
 
-    // V3: FromTo (TS §17.4).
+    // FromTo, new in V3 (TS §17.4).
     pub from_to_base: f32,
     /// "from a to b".
     pub from_to_frame_bonus: f32,
@@ -44,7 +44,7 @@ pub struct DetectorConfig {
     /// Hold 1,500 and fade 200 (TS §19.5).
     pub from_to_hold_ms: u32,
 
-    // V3: ListReveal (TS §17.4, D-105).
+    // ListReveal, new in V3 (TS §17.4, D-105).
     pub list_base: f32,
     pub list_all_markers_bonus: f32,
     /// Every marker is an ordinal word.
@@ -61,7 +61,7 @@ pub struct DetectorConfig {
     /// Hold 1,500 after the last item and fade 200 (TS §19.5).
     pub list_hold_ms: u32,
 
-    // V3: KeywordPop (TS §17.4, §17.5).
+    // KeywordPop, new in V3 (TS §17.4, §17.5).
     pub keyword_base: f32,
     pub keyword_energy_weight: f32,
     pub keyword_pitch_weight: f32,
@@ -70,7 +70,7 @@ pub struct DetectorConfig {
     pub keyword_min_letters: usize,
     pub keyword_min_gap_ms: u32,
 
-    // V3: NumberReveal and resolution (TS §17.4, §17.5).
+    // NumberReveal and resolution, new in V3 (TS §17.4, §17.5).
     pub number_label_max_words: usize,
     /// At most this many overlays start in any `overlay_window_ms` (`OVERLAY_MAX_PER_10S`).
     pub overlay_max_per_window: usize,

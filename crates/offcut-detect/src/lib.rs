@@ -246,7 +246,7 @@ mod tests {
             EventParams::NumberReveal { value, label } => {
                 assert_eq!(value.display, "$10k");
                 assert_eq!((value.value, &value.unit), (10_000.0, &Unit::Usd));
-                // V3: the words after the number, up to the full stop (D-107).
+                // As of V3, the words after the number, up to the full stop (D-107).
                 assert_eq!(label.as_deref(), Some("there"));
             }
             EventParams::ListReveal { .. }
@@ -271,7 +271,7 @@ mod tests {
             (1, 3)
         );
 
-        // V3: a number whose word was edited is read again from the new text
+        // As of V3, a number whose word was edited is read again from the new text
         // (D-109); a hidden one is not shown; an edit somewhere else changes nothing.
         let t = transcript(&spoken);
         let with = |word: u32, text: &str| {
@@ -303,7 +303,7 @@ mod tests {
             ("about", 1_000, 1_300, 1.0),
             ("ten", 1_400, 1_600, 1.0),
             ("thousand", 1_650, 2_100, 1.0),
-            // V3: "people" is a count noun, a unit (v3implementation D-101), so the
+            // As of V3, "people" is a count noun, a unit (v3implementation D-101), so the
             // number is followed by words that are none.
             ("of", 2_200, 2_400, 1.0),
             ("them", 2_450, 2_700, 1.0),

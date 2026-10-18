@@ -65,6 +65,15 @@ function manifestFile(index: number): { path: string; bytes: number; localName: 
 
 const panel = (page: Page) => page.getByText(PANEL_TEXT);
 const feedLines = (page: Page) => page.getByTestId("feed").locator("li");
+/**
+ * The feed has begun: its first two lines are "Cleaning voice" and
+ * "Transcribing…", in either order. The voice chain starts beside the model
+ * wait (v3implementation D-90; D-91 as extended on 2026-10-18).
+ */
+async function expectFeedBegun(page: Page, timeout: number): Promise<void> {
+  const begun = [messages.feed.cleaningVoice, messages.feed.transcribing].sort();
+  await expect.poll(async () => (await feedLines(page).allTextContents()).slice(0, 2).sort(), { timeout }).toEqual(begun);
+}
 const failure = (page: Page) => page.getByTestId("clip-failed");
 
 const header = (request: AssetRequest, name: string) => request.headers.filter((entry) => entry.name === name);
@@ -125,7 +134,7 @@ test("first run: the panel says what is downloaded, its bar moves, and the feed 
   expect(new Set(bar).size).toBeGreaterThanOrEqual(3);
   expect(bar.at(-1)).toBe("100");
 
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
+  await expectFeedBegun(page, patient(180_000));
   expect(await modelDownloadEvent(page, api)).toEqual({
     name: "model_download",
     props: { outcome: "ok", resumed: false, duration_ms: expect.any(Number) },
@@ -189,7 +198,7 @@ test("an interrupted download goes on from the bytes it has", { tag: NO_GPU }, a
   const first = resumed.modelRequests()[0];
   expect(first?.path).toBe(interrupted.path);
   expect(rangeStart(first)).toBe(3 * PART_BYTES);
-  await expect(feedLines(second).first()).toHaveText(messages.feed.transcribing, { timeout: patient(240_000) });
+  await expectFeedBegun(second, patient(240_000));
   expect(await modelDownloadEvent(second, api)).toEqual({
     name: "model_download",
     props: { outcome: "ok", resumed: true, duration_ms: expect.any(Number) },
@@ -222,7 +231,7 @@ test("a file with a wrong hash is removed and downloaded again", { tag: NO_GPU }
   const again = assets.modelRequests().find((request) => request.path === damaged.path);
   expect(rangeStart(again)).toBe(0);
   // The model is ready when the recognizer has loaded it.
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(240_000) });
+  await expectFeedBegun(page, patient(240_000));
   expect(await opfsList(page, MODEL_DIR)).toEqual(modelManifest.files.map((_, index) => manifestFile(index).localName).sort());
 });
 
@@ -231,7 +240,7 @@ test("a second session downloads nothing and shows no panel", { tag: NO_GPU }, a
   const { api, assets } = await openEditor(page);
   await dropClip(page, referenceClip());
 
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
+  await expectFeedBegun(page, patient(180_000));
   expect(assets.modelRequests()).toEqual([]);
   expect(await page.evaluate(() => window.e2ePanelSeen)).toBe(false);
   // Nothing was downloaded, so nothing is reported.
@@ -298,7 +307,7 @@ test("loading and transcribing: nothing leaves the page but analytics", async ({
   await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
 
   await dropClip(page, referenceClip());
-  await expect(feedLines(page).first()).toHaveText(messages.feed.transcribing, { timeout: patient(180_000) });
+  await expectFeedBegun(page, patient(180_000));
   const transcribingFrom = requests.length;
   await expect(page.getByTestId("preview-canvas")).toBeVisible({ timeout: patient(240_000) });
   const all = requests.filter((request) => /^https?:/.test(request.url));

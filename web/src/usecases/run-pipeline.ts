@@ -7,9 +7,11 @@
 
 import { track } from "../analytics/client";
 import type { DownloadOutcome } from "../gen/api";
-import type { ClipId, DetectedEvent, EventKind, FailureStage, Prosody, Transcript } from "../gen/domain";
+import type { ClipId, DetectedEvent, EventKind, FailureStage, Transcript } from "../gen/domain";
 import * as modelManager from "../models/model-manager";
+import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
+import * as transcriptRepo from "../persistence/transcript-repo";
 import * as clipStore from "../state/clip-store";
 import { useModelStore } from "../state/model-store";
 import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
@@ -54,6 +56,16 @@ function owned(pcm: Float32Array): Float32Array<ArrayBuffer> {
   return new Float32Array(buffer, pcm.byteOffset, pcm.length);
 }
 
+/** How a job that runs beside others ended, and when. Never a rejection (D-90). */
+type Settled<T> = { ok: T; at: number } | { failure: unknown; at: number };
+
+function settle<T>(job: Promise<T>): Promise<Settled<T>> {
+  return job.then(
+    (ok) => ({ ok, at: performance.now() }),
+    (failure: unknown) => ({ failure, at: performance.now() }),
+  );
+}
+
 /** What was thrown, as the failure the clip store keeps; `null` for what is a fault of this file. */
 function failureOf(error: unknown): AppFailure | null {
   if (error instanceof WorkerCallError) {
@@ -72,7 +84,8 @@ function assertNever(value: never): never {
 
 /**
  * What a line of the feed shows of an event: the event's own figure, never a
- * sentence. It stays on the device (TS §14.1). V2 finds numbers only (D-49).
+ * sentence. It stays on the device (TS §14.1). A FromTo shows its first value
+ * here and its second in `displayToOf` (D-83).
  */
 function displayOf(event: DetectedEvent, transcript: Transcript): string {
   const params = event.params;
@@ -80,7 +93,7 @@ function displayOf(event: DetectedEvent, transcript: Transcript): string {
     case "number_reveal":
       return params.value.display;
     case "from_to":
-      return params.to.display;
+      return params.from.display;
     case "list_reveal":
       return String(params.count);
     case "keyword_pop":
@@ -88,6 +101,11 @@ function displayOf(event: DetectedEvent, transcript: Transcript): string {
     default:
       return assertNever(params);
   }
+}
+
+/** The second value of a FromTo's line (D-83); the other kinds have none. */
+function displayToOf(event: DetectedEvent): string | undefined {
+  return event.params.kind === "from_to" ? event.params.to.display : undefined;
 }
 
 // --- The speech model (C-3) --------------------------------------------------
@@ -148,14 +166,14 @@ function modelReady(): Promise<AppFailure | null> {
 /** What a run has got to: read when it fails. */
 type Run = { stage: FailureStage; sessionOpened: boolean };
 
-/** Steps 2 to 12 of v2implementation §19.3. A failure is thrown; `runPipeline` stores it. */
+/** Steps 2 to 14 of v3implementation §15.2. A failure is thrown; `runPipeline` stores it. */
 async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void> {
   const { clipInfo, edit } = clipStore.useClipStore.getState();
   if (clipInfo === undefined) {
     throw new Error("runPipeline: the clip has no ClipInfo");
   }
 
-  // 2. The model, beside the audio (C-3). The clip waits for it at step 5.
+  // 2. The model, beside the audio (C-3). The clip waits for it at step 6.
   const model = modelReady();
   if (useModelStore.getState().status !== "ready") {
     clipStore.processing("probe_audio", true);
@@ -165,27 +183,38 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   const audio = answered(await pool.media.extractAudio({ clipId }), run.stage);
   track({ name: "stage_timing", props: { stage: "probe_audio", duration_ms: capMs(performance.now() - startedAt) } });
   const pcm16 = owned(audio.pcm16);
+  const pcm48 = owned(audio.pcm48);
 
-  // 4. V3: the voice chain's output takes the place of `pcm48` (v2implementation §25).
-  //    Until then nothing is cleaned, and the feed has no line that says so (D-22).
-  const out48 = owned(audio.pcm48);
+  // 4, 5. (B2) The voice chain runs beside the model wait and ASR, and owns
+  //    `pcm48` from here (D-90). Every path below waits for it.
+  clipStore.pushFeed({ kind: "cleaning_voice" });
+  const chainAt = performance.now();
+  const chain = settle(
+    pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain")),
+  ).then((c) => {
+    if ("ok" in c) {
+      track({ name: "stage_timing", props: { stage: "audio_chain", duration_ms: capMs(c.at - chainAt) } });
+    }
+    return c;
+  });
 
-  // 5. A model that cannot be had ends the clip. `pcm16` is dropped with it.
+  // 6. A model that cannot be had ends the clip, once the chain has settled.
   const modelFailure = await model;
   if (modelFailure !== null) {
+    await chain;
     clipStore.failed(modelFailure);
     return;
   }
 
-  // 6. (B1) The model is loaded for this clip and hears it.
+  // 7, 8. (B1, C) The model is loaded for this clip, hears it, and gives its
+  //    memory back before the render session opens (INV-12).
   run.stage = "asr";
   clipStore.processing("asr", false);
-  const { modelId } = await modelManager.cacheInfo();
-  const asrStartedAt = performance.now();
-  let backend: "webgpu" | "wasm";
   let heard: { ok: Transcript } | { rejected: "NoSpeech" };
   try {
-    ({ backend } = answered(await pool.asr.load({ modelId, backend: "webgpu" }), run.stage));
+    const { modelId } = await modelManager.cacheInfo();
+    const asrStartedAt = performance.now();
+    const { backend } = answered(await pool.asr.load({ modelId, backend: "webgpu" }), run.stage);
     heard = answered(
       await pool.asr.transcribe(
         { pcm16 },
@@ -201,32 +230,46 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
       ),
       run.stage,
     );
+    track({
+      name: "stage_timing",
+      props: { stage: "asr", duration_ms: capMs(performance.now() - asrStartedAt), asr_backend: backend },
+    });
+    answered(await pool.asr.unload(), run.stage);
   } catch (error) {
-    // Step 7 runs all the same, and the first failure is the one that is stored.
+    // The chain is joined and the model unloaded; the earlier failure is stored (D-90).
+    const failedAt = performance.now();
+    const c = await chain;
     await pool.asr.unload().catch(() => undefined);
-    throw error;
+    throw "failure" in c && c.at < failedAt && failureOf(error) !== null ? c.failure : error;
   }
-  track({
-    name: "stage_timing",
-    props: { stage: "asr", duration_ms: capMs(performance.now() - asrStartedAt), asr_backend: backend },
-  });
 
-  // 7. (C) The model's memory is given back before the render session opens (INV-12).
-  answered(await pool.asr.unload(), run.stage);
-
-  // 8. Too few words to caption: the clip cannot be used, and its file goes.
+  // 9. Too few words to caption: once the chain has settled, the clip cannot
+  //    be used, and its file goes. Its record stays until the next import.
   if ("rejected" in heard) {
+    await chain;
     clipStore.noSpeech();
+    track({ name: "clip_rejected", props: { reject_reason: "REJECT_NO_SPEECH" } });
     await opfs.remove(opfs.paths.clipDir(clipId)).catch(() => undefined);
     return;
   }
   const transcript = heard.ok;
 
-  // 9. V3: `measureProsody` takes this line's place (v2implementation §25).
-  //    Until then no word stands out from its sentence (D-22).
-  const prosody: Prosody = { per_word: transcript.words.map(() => ({ energy_z: 0, pitch_z: 0 })) };
+  // 10. The chain's failure, if it had one.
+  run.stage = "audio_chain";
+  const c = await chain;
+  if ("failure" in c) {
+    throw c.failure;
+  }
 
-  // 10. (E) The events and the scene.
+  // 11. (D) The prosody, on the cleaned voice; the cleaned voice comes back.
+  const measured = answered(
+    await pool.audio.measureProsody({ words: transcript.words, sentences: transcript.sentences }),
+    run.stage,
+  );
+  const { prosody } = measured;
+  const out48 = owned(measured.out48);
+
+  // 12. (E) The events and the scene.
   run.stage = "detect_scene";
   clipStore.processing("detect_scene", false);
   const sceneStartedAt = performance.now();
@@ -234,7 +277,13 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   answered(await pool.render.openSession({ clipId, clipInfo }), run.stage);
   const events = answered(await pool.render.detect({ transcript, prosody }), run.stage);
   for (const event of events) {
-    clipStore.pushFeed({ kind: "event_found", eventKind: event.kind, display: displayOf(event, transcript) });
+    const displayTo = displayToOf(event);
+    clipStore.pushFeed({
+      kind: "event_found",
+      eventKind: event.kind,
+      display: displayOf(event, transcript),
+      ...(displayTo !== undefined && { displayTo }),
+    });
   }
   answered(await pool.render.setScene({ transcript, events, edit, profile: "preview" }), run.stage);
   track({
@@ -242,11 +291,13 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
   });
 
-  // 11. (F) The audio the export will read (D-51).
+  // 13. (F) The audio the export will read (D-51), then the clip's records.
   run.stage = "storage";
   await opfs.writeAudio(clipId, out48);
+  await transcriptRepo.put(clipId, { transcript, prosody });
+  await editsRepo.put(clipId, { editState: edit });
 
-  // 12.
+  // 14.
   clipStore.ready({ transcript, prosody, events, out48 });
   const count = (kind: EventKind): number =>
     Math.min(MAX_COUNT, events.filter((event) => event.kind === kind).length);

@@ -628,3 +628,58 @@ CI on Prompt 79's `8acbc06`: `ci` and `e2e-media` success.
 **Found, not fixed.**
 
 - **A clip failed at stage `storage` during import looks to "start over" like one with a render session.** `dismissClip`'s `sessionOpened` (V2) counts `failed` at `detect_scene` or `storage` as having opened a session, so after a failed record write it calls `previewPause` and `closeSession` on the render worker, which starts it for nothing; both calls are caught. Harmless and rare (a full or failing IndexedDB at import); the stage `storage` is the plan's. Left for V4's review of `dismissClip`.
+
+---
+
+## 2026-10-18 - Prompt 81 (V3 21/30): run-pipeline with the voice chain, prosody and records
+
+CI on Prompt 80's `7dbe851`: `ci` and `e2e-media` success.
+
+**Done.**
+
+- **`web/src/usecases/run-pipeline.ts`** (§15.2, C-4, D-90), 349 lines (298 before). Both `V3:` stand-ins are gone.
+  - **Step 4 (B2):** right after `extractAudio`, `pushFeed({ kind: "cleaning_voice" })`. Then `pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] })`, its `Cancelled` turned into a failure by `answered`, wrapped by `settle`, which never rejects and gives `{ ok, at } | { failure, at }`. On `ok`, `stage_timing audio_chain` is tracked, measured on the main thread from the call to the settling (D-35).
+  - **Step 5:** V2's `out48 = owned(audio.pcm48)` is gone; the audio worker owns `pcm48`.
+  - **Step 6:** a model failure waits for the chain, then `failed(modelFailure)`.
+  - **Steps 7-8 (B1, C):** `cacheInfo`, `load`, `transcribe`, the `asr` timing and `unload` run in one `try`. Any failure there waits for the chain, unloads the model, and throws the earlier failure by time. A fault of the code is never hidden behind the chain's failure.
+  - **Step 9:** no speech waits for the chain, then `noSpeech()`, `clip_rejected { reject_reason: "REJECT_NO_SPEECH" }`, `clipDir` removed.
+  - **Step 10:** the chain's failure is thrown, stage `audio_chain`.
+  - **Step 11 (D):** `measureProsody({ words, sentences })` on the cleaned voice; `out48` comes back.
+  - **Step 12 (E):** detection with the real prosody. A FromTo's feed line has `display` = `from.display` and `displayTo` = `to.display` (new `displayToOf`, D-83); the `assertNever` default stays.
+  - **Step 13 (F):** `opfs.writeAudio`, then `transcriptRepo.put(clipId, { transcript, prosody })`, then `editsRepo.put(clipId, { editState: edit })`.
+  - **Step 14:** `ready` and `pipeline_done`, as V2.
+  - `failureOf`, `answered`, `owned`, the model wait and `runPipeline` are unchanged. The cancel and `client_error` notes of V4 stay.
+- **Every path from the chain's start to step 10 waits for it** (D-90): the model failure (6), any throw in the joined B1 block (7-8, including `cacheInfo` and the closing `unload`, which V2 had outside its `try`), no speech (9), and step 10 itself. Every failure path ends in one store transition.
+- **`crates/offcut-detect/src/config.rs`, `lib.rs`:** seven comments that began `V3:` (labels of what V3 added, from Prompts 73-77) are reworded ("FromTo, new in V3 (…)", "As of V3, …"), so that `git grep -n "V3: " -- web/src crates` prints nothing, as the prompt checks. No code changed.
+- **`web/tests-e2e/model-download.spec.ts`**: **REOPENED CONTRACT (D-91, extended by the founder on 2026-10-18).** Five assertions said the feed's first line is "Transcribing…". The chain starts beside the model wait (D-90), so "Cleaning voice" comes first, and four `@no-gpu` cases failed. The fifth assertion is in the non-`@no-gpu` case. D-91 named only three `pipeline-preview.spec.ts` cases, so the founder was asked. The five now go through one helper, `expectFeedBegun`: the feed's first two lines are "Cleaning voice" and "Transcribing…", in either order (G 9.5's rule). Nothing else in those cases changed. D-91's row in the plan records the extension.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The B1 `try` holds `cacheInfo` and the closing `unload` too**, so that no throw leaves the chain unawaited (D-90's "no path leaves the chain running"). V2 had both outside; a failure of either is still stored as before, after the join.
+- **D-91 extended** (above). Without it `pnpm e2e:media --grep @no-gpu` gives 6 of 10 (the prompt expects V2's 8 cases to pass), and CI's `e2e-media` would fail on every push.
+- **Comment wording in `offcut-detect`** (above): the prompt's grep covers `crates`, where V3's own labels used the marker's form.
+- `git grep -n "V4: " -- web/src` prints one line (`video-source.ts`), not the prompt's expected list. The render worker's handlers and the use-case's cancel and retry places say "V4" in prose (`notYet`, "the cancel arrives in V4", "before V4"), not as `V4:` markers. Nothing removed.
+
+**Checked.**
+
+- **Browser check (G 9.5), dev server, Chrome on D1.** A temporary `web/zz-pw.config.ts` and `web/tests-e2e/zz-pipeline-v3.spec.ts`, both deleted. The model was put on the context's device from `fixtures/.cache`, the asset host answered locally, the API a fake.
+- **Reference clip:** `ready` after 61.8 s.
+  - Feed, recorded with a `MutationObserver` from before load: "Cleaning voice", "Transcribing…", "Found: 3,000 hours", "Found: 90 minutes to 10 minutes", "Found: 3-item list", "Found: $12k". No KeywordPop: "brutal" did not pass on the measured prosody, which the plan allows.
+  - `stage_timing`: `probe_audio` 708 ms, `audio_chain` 1,283 ms, `asr` 59,588 ms (`webgpu`, dev build), `detect_scene` 115 ms.
+  - `pipeline_done`: `total_ms` 60,908, `n_number` 2, `n_list` 1, `n_from_to` 1, `n_keyword` 0. No `model_download`, no `clip_rejected`.
+  - IndexedDB: one record each in `clips`, `transcripts` and `edits`, under the same key. `transcripts` has 157 words and 157 `per_word` entries; `edits` holds V2's default `EditState`.
+  - OPFS `out48.f32`: 14,343,360 bytes.
+  - The 3 request bodies hold 23 strings; none is a word of the transcript, or holds one of six letters or more.
+- **`rej_silent.mp4`** after "Start over": the rejected stub; one more `clip_rejected`, `{"reject_reason":"REJECT_NO_SPEECH"}`; `clips/` empty in OPFS. Its `clips` record stays (item 26: the next import clears it), and the reference clip's `transcripts` record is gone (cleared by this import).
+- **`pnpm e2e:media --grep @no-gpu`** (unkeyed build), three runs:
+  - The first gave 5 passed. Cases 3-6 failed in the model download itself (no model request recorded, no aborted request within 120 s, "could not be downloaded" where the hash message was expected), and case 7 on the feed's first line.
+  - Two runs since showed no download failure: the requests case alone passed (13.6 s), and a full run gave 6 passed, its four failures all the feed's first line.
+  - The first run started right after a full `pnpm build`; it is recorded as a load-related flake on D1, not reproduced. With D-91 extended: **10 passed** (1.7 min).
+- **The rest:** `wc -l web/src/usecases/run-pipeline.ts` 349; `git grep -n "V3: " -- web/src crates` prints nothing. SAB gate: no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0 (run again after the spec change), `pnpm test`: Rust **460 passed**, 3 ignored, Vitest 92; `pnpm build` exit 0 (`offcut_core_bg` 713,091, `offcut_render_bg` 6,113,457 bytes, both unchanged); `pnpm e2e` 12 of 12; the frozen check and the tracked-private check print nothing.
+
+**Human (optional):** listen to the preview of the reference clip: the voice should sound cleaner and stay in sync.
+
+**Found, not fixed.**
+
+- **ASR took 59.6 s for the 74.7 s reference clip in the dev build on D1** (about 48 s per 60 s, under D-67's 145 s line, over E-3's 20 s target). The dev server serves unminified modules; E-3 is read on the production build by the bench at S12 (Prompt 88).
+- The full `pnpm e2e:media` (not only `@no-gpu`) still has the three D-91 cases of `pipeline-preview.spec.ts` to rewrite (Prompt 85); they assert V2's stand-ins, as the SAB expects between Prompts 73 and 85.
