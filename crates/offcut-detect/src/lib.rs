@@ -4,6 +4,24 @@
 
 pub mod config;
 pub mod event_id;
+// V3: the three finders of section 9.4-9.6. `detect` calls them from Prompt 77
+// on (section 9.2); until then only their tests do, and `expect` fails the
+// build once they are used, so that Prompt 77 removes it.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "detect calls it from Prompt 77")
+)]
+mod from_to;
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "detect calls it from Prompt 77")
+)]
+mod keyword;
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "detect calls it from Prompt 77")
+)]
+mod list;
 pub mod number;
 
 use std::collections::BTreeMap;

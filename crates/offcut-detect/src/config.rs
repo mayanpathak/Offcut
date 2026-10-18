@@ -154,6 +154,22 @@ impl DetectorConfig {
 pub const NUMBER_MAGNITUDE_MIN: f64 = 1_000.0;
 /// A word said this much louder than its sentence earns `number_energy_bonus`.
 pub const NUMBER_EMPHASIS_Z: f32 = 1.0;
+/// A change verb is looked for among this many tokens before a FromTo's first
+/// quantity (section 9.4), as well as between the two.
+pub const FROM_TO_VERB_REACH: usize = 3;
+/// A list without an announcer needs at least this many markers (D-105).
+pub const LIST_MARKER_ONLY_MIN: usize = 3;
+/// A list item ends at a comma once it holds this many words (D-107).
+pub const LIST_ITEM_COMMA_WORDS: usize = 2;
+
+// The grammar words the finders look for. They say what a frame is; they are
+// not tuned.
+
+/// "from 90 minutes to 10 minutes" (section 9.4).
+pub const FROM: &str = "from";
+pub const TO: &str = "to";
+/// "number two, …": a cardinal after it is a list marker (D-105).
+pub const NUMBER: &str = "number";
 
 // The lexicons (section 9.1). Each is sorted, without duplicates, lower-case,
 // and matched against whole effective tokens.

@@ -2313,7 +2313,7 @@ pub fn detect(t: &Transcript, p: &Prosody, edits: &BTreeMap<WordIdx, String>, cf
 ### Implementation Requirements
 
 #### 1. Rows
-Exactly §19.11's 34 rows, including: "$2k to $20k." → no FromTo, `$2k` kept and `$20k` dropped (overlapping windows); "Costs dropped 40% to 25%." → FromTo 0.90; "I have 3 tools." → none (X5); "Four NumberReveals with currency inside 9 s, 2.5 s apart" → at most three; "First, we saved $10,000." → list kept, number dropped; edit `$12,000` → `$20,000` → `$20k` with a new id; hide "Second," → no list.
+Exactly §19.11's 34 rows, including: "$2k to $20k." → no FromTo, `$2k` kept and `$20k` dropped (overlapping windows); "Costs dropped 40% to 25%." → FromTo 0.90; "I have 3 tools." → none (X5); "Four NumberReveals with currency inside 9 s, 2.5 s apart" → at most three; "First, we saved $10,000." → list kept, number dropped; edit `$12,000` → `$20,000` → `$20k` with the same id as before (open item 14, decided 2026-10-18); hide "Second," → no list.
 
 #### 2. Guards (G 7.6)
 Comment out X1 → row 11 fails; let touching windows pass → row 10 fails (both kept); `threshold_list = 0.60` → row 17 fails. Undo all.
@@ -2397,7 +2397,7 @@ V4's review flow calls `redetect_sentence` (§21.4); it must exist and be tested
 #### Implement
 
 - `src/lib.rs`: `redetect_sentence(t, p, edits, s, prev, cfg)` — scope = `s`, every sentence intersected by the anchors of a `prev` event that intersects `s`, every sentence whose `start_ms` lies in `(start_ms(s), start_ms(s) + list_window_ms)`; `outside` = `prev` events wholly outside; steps 1–5 of `detect` over the whole transcript, keep candidates wholly inside scope; `resolve(cands, &outside, cfg)`; result = `outside` + kept as events, sorted as `detect`; `s` out of range → `prev` unchanged.
-- `tests/redetect.rs` (§19.13): 7 cases on Script A as recognized (the sentences of `a01-scriptA.json` with synthesized timing; the word indices 23 = `3000`, 79 = `First`, sentences 3, 8, 9–11 are the README's): equal to `prev` without edits; edit 23 → 4,000 with a new id, others unchanged; hide 79 → list gone; edit in the announcer sentence reaches 9–11; a new currency in sentence 1 overlapping the `3,000 hours` window is dropped; out of range; timing printed in release, not asserted.
+- `tests/redetect.rs` (§19.13): 7 cases on Script A as recognized (the sentences of `a01-scriptA.json` with synthesized timing; the word indices 23 = `3000`, 79 = `First`, sentences 3, 8, 9–11 are the README's): equal to `prev` without edits; edit 23 → 4,000 with the same id (open item 14, decided 2026-10-18), others unchanged; hide 79 → list gone; edit in the announcer sentence reaches 9–11; a new currency in sentence 1 overlapping the `3,000 hours` window is dropped; out of range; timing printed in release, not asserted.
 - `tests/determinism.rs` (§19.14): 3 cases (every labeled file twice; proptest random transcripts of 0–200 words from a mixed vocabulary with random prosody ±3, checking equality, anchors in range, sorted output, no overlapping overlay windows, ≤ 1 KeywordPop per sentence, INV-6; same raw words built twice). Labeled files with null data (`a02`) are skipped.
 
 #### Do Not Implement Yet
