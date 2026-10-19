@@ -145,16 +145,12 @@ fn rows() -> Vec<Row<'static>> {
             vec![(NumberReveal, "3,000 users", Some(1.0))],
         ),
         row(4, said("I have 3 tools."), vec![]),
-        row(
-            5,
-            said("It costs 40% less."),
-            vec![(NumberReveal, "40%", Some(0.80))],
-        ),
-        row(
-            6,
-            said("About 900 people came."),
-            vec![(NumberReveal, "900 people", Some(0.80))],
-        ),
+        // Rows 5 and 6 score 0.80 (a unit, no magnitude, said plainly): events
+        // while the NumberReveal threshold was 0.80, none since the precision
+        // gate raised it to 0.85 (v3implementation §20.3). `number.rs` keeps
+        // such scores under test ("$500", "a hundred people": 0.80).
+        row(5, said("It costs 40% less."), vec![]),
+        row(6, said("About 900 people came."), vec![]),
         row(7, said("About 900 came."), vec![]),
         row(
             8,

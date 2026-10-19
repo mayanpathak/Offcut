@@ -318,13 +318,26 @@ mod tests {
 
     #[test]
     fn forty_percent_is_an_event_at_confidence_1_and_none_at_0_99() {
-        let sure = events(&[("40%", 1_000, 1_500, 1.0)]);
+        // "40%" scores 0.80, the NumberReveal threshold until the precision gate
+        // raised it to 0.85 (v3implementation §20.3). The line is kept at 0.80
+        // here: a score equal to the threshold is in, a confidence under 1 is out.
+        let cfg = DetectorConfig {
+            threshold_number: 0.80,
+            ..DetectorConfig::default()
+        };
+        let at_080 = |words: &[Spoken<'_>]| {
+            let t = transcript(words);
+            detect(&t, &flat(&t), &BTreeMap::new(), &cfg)
+        };
+        let sure = at_080(&[("40%", 1_000, 1_500, 1.0)]);
         assert_eq!(sure.len(), 1);
         assert_eq!(sure[0].confidence.get(), 0.80);
-        assert_eq!(events(&[("40%", 1_000, 1_500, 0.99)]), []);
+        assert_eq!(at_080(&[("40%", 1_000, 1_500, 0.99)]), []);
         // The least certain word of a number counts.
         let split = [("$12", 1_000, 1_300, 1.0), (",000", 1_300, 1_600, 0.7)];
-        assert_eq!(events(&split), []);
+        assert_eq!(at_080(&split), []);
+        // At the default threshold, said plainly, it is no event.
+        assert_eq!(events(&[("40%", 1_000, 1_500, 1.0)]), []);
     }
 
     #[test]
@@ -389,8 +402,10 @@ mod tests {
         for event in &found {
             assert!(event.confidence.get() >= cfg.threshold_number, "{event:?}");
         }
-        // A word said with emphasis lifts a number over the line, and only then.
-        let said = [("70%", 1_000, 1_500, 0.9)];
+        // A word said with emphasis lifts a number over the line, and only then:
+        // 0.80 x 0.95 = 0.76 plainly, 0.90 x 0.95 = 0.855 with emphasis (the
+        // confidence was 0.9 while the threshold was 0.80, §20.3).
+        let said = [("70%", 1_000, 1_500, 0.95)];
         assert_eq!(events(&said), []);
         let t = transcript(&said);
         let loud = Prosody {

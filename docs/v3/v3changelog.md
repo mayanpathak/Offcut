@@ -14,6 +14,7 @@
 | # | Item | Owner | Version |
 |---|---|---|---|
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
+| 21 | **Prompt 88's precision gate as built** (its entry): the NumberReveal threshold is 0.85, raised from 0.80 by §20.3. Copy back into the plan's detector configuration (§9, Appendix D) and §19.11 rows 5 and 6 (now no event), and add to SAB's list of V2 expectations V3 changes the two `lib.rs` tests (`forty_percent_is_an_event_at_confidence_1_and_none_at_0_99`, `no_returned_event_is_below_the_threshold_of_its_kind`). Correct G 12.3 and Prompt 88: `pnpm corpus --grep founder-02` (with `--` the grep is ignored), and `a02` gains `words` and `prosody`, not `sentences` | Agent | Prompt 89 |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. On 2026-10-19 it still downloads (Prompt 87); it is in `ci.yml` and in `check-external-facts.mjs` with its date. Choose before about 2026-11-27: a newer dated build (new URL and SHA-256 in both files) or a copy on the asset host (an upload with the R2 keys). CI fails at the checksum step the day it is gone | Founder (choice), Agent (the edit) | Before 2026-11-27 |
 | 15 | **`CLOCK_WORDS` holds `a.m` and `p.m` since Prompt 77**, the forms `tokenize` gives "a.m." and "p.m." (they never equalled `a.m.` / `p.m.`). Copy back into §9.1's lexicon table | Agent | Prompt 89 |
 | 17 | **Prompt 77 as built** (its entry): `Candidate` gains `sentence` (§9.3's struct; `resolve` keeps one KeywordPop per sentence and has no transcript); `lib.rs` step 5 takes a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth before the threshold (0.65 + 0.20 is 0.84999996 in `f32`: no marker-only list could reach 0.85); the X1-X5 bounds and `VERSION_DOTS` are named constants of `config.rs`. Copy back into §9.2 step 5, §9.3, §9.7, Appendix D, and §23 item 27 | Agent | Prompt 89 |
@@ -1081,3 +1082,88 @@ CI on Prompt 86's `32da057` (run 39217492169): `ci` success (7.0 min), `e2e-medi
 **Found, not fixed.**
 
 - **No Chrome this project runs refuses `rej_h264_444.mp4`** (D1 and the Windows runner, both Chrome stable of October 2026). The `REJECT_DECODE_UNSUPPORTED` case therefore runs its assertions nowhere. D-78 foresaw this; there is nothing to do in V3.
+
+---
+
+## 2026-10-19 - Prompt 88 (V3 28/30): measurements, experiment records, the first `d1` bench files, and the precision gate on 31 files
+
+CI on Prompt 87's `c838c7f` (run 39220365483, the end state after the guard drills): `ci` success (7.1 min), `e2e-media` success (12.2 min); the deploys skipped.
+
+**Done.** Every reading is on D1, under the label `d1` (D-74), in `docs/v3/experiments.md` with its decision. The commands ran detached, one after another, on one production build made with the test key: the key was given to that `pnpm build` only, and `env` held it 0 times after.
+
+- **G 12.1, the bench** (`bench/results/d1-2026-10-19-portrait.json`, `…-v3testclip.json`, committed). Each file has 10 measured runs, six stages, `webgpu`, Chrome 155.0.8059.82; the runs took 20.1 and 18.7 min. Medians, with `v3testclip` normalised by 60,000 / 78,918:
+
+  | Stage | Portrait (60 s) | `v3testclip` (78.9 s) | Per 60 s | Budget per 60 s | Decision |
+  |---|---|---|---|---|---|
+  | `audio_chain` (TE-13) | 1,963 ms | 1,111 ms | 844 ms | 4,000 ms | S6's decision confirmed, denoise stays on |
+  | `asr` (E-3) | 69,469 ms | 62,729 ms | 47,692 ms | 20 s target, 145 s line | continue, the target recorded as missed |
+  | `render_encode` (E-4) | 30,848 ms | 29,010 ms | 22,055 ms | 90 s (150 s line) | continue |
+  | `mux` | 16 ms | 5.5 ms | 4 ms | 2 s | - |
+  | whole run | 102,690 ms | 93,220 ms | 70,874 ms | - | - |
+
+  Peak page memory: 1.09 GB and 1.17 GB. Both files stamp commit `c838c7f`: the build also held this prompt's uncommitted threshold change, which does not touch timing.
+- **G 12.2, the second recording.** `pnpm e2e:media` was run in full on that build, not only `--grep "second recording\|no metadata"`, because the threshold change alters what the app shows. It read **49 passed, 1 skipped** (`REJECT_DECODE_UNSUPPORTED`, D-78's fixme), 12.5 min. "second recording" passed (1.8 min; recognizer 80,623 ms on `webgpu`, chain 1,612 ms). "no metadata" passed (2.0 min; verifier checks 1-6). `experiments.md`, "Second recording", has the S12 reading.
+- **G 12.3, `a02`'s data.** `CORPUS_MODE=transcripts pnpm corpus -- --grep founder-02` wrote 159 words and their prosody into `fixtures/labeled/a02-v3testclip.json`: **a02-v3testclip.json: data filled from IndexedDB, labels unchanged (D-87, D-112).** `git diff fixtures/labeled` changes that file only, and no `"expected"` line: the diff replaces the two lines `"words": null` and `"prosody": null`. `sentences` stays `null` (Prompt 86's entry: the gate refuses an `asr` file with both).
+  - **`say` against the recognized words:** `$2,000` matches (`$2` `,000`, one quantity). "500 paying users" and "500 paying customers" have their words in the transcript, but no event spans them (recall misses, not label edits).
+  - **The gate at the default thresholds:** 31 files read, 0 skipped, **overall precision 0.87, under 0.90**. NumberReveal is at 0.72, with five false positives at exactly 0.80: `a02`'s "three months" and "four months", and Prompt 79's three (`w19`, `w28` x 2). KeywordPop is at 0.90, with one false positive, `a02`'s "that's" (0.84).
+- **§20.3's contingency, applied: `threshold_number` 0.80 → 0.85** (`crates/offcut-detect/src/config.rs`), the lowest value of the sweep at which NumberReveal reaches 0.90.
+  - **Re-run:** overall **0.98**, recall 0.91. NumberReveal 1.00 / 0.80, ListReveal 1.00 / 1.00, FromTo 1.00 / 0.92, KeywordPop 0.90 / 1.00. Every recall is at or above 0.30.
+  - **Unchanged:** ListReveal, FromTo and KeywordPop (KeywordPop is at 0.90, not under it).
+  - **Lost:** one true NumberReveal of the set, "16 weeks" (`w02`).
+  - **What it means for a person:** a quantity under 1,000 with its unit ("40 seconds", "$500", "120 clients") is shown only when said with emphasis; "3,000 hours", "$12k", "$2k" are unaffected.
+  - Both printouts and the sweep are in `experiments.md`, "Precision gate".
+- **Tests that asserted the old default** (the gate's change, not a rule change; recorded as **REOPENED** expectations, see "Differs"):
+  - `offcut-detect/src/config.rs`, two V3 tests: the default thresholds are now `[0.85, 0.80]` and `[0.85, 0.85, 0.85, 0.80]`.
+  - `offcut-detect/src/lib.rs`, two V2 tests:
+    - `forty_percent_is_an_event_at_confidence_1_and_none_at_0_99` keeps its assertions at an explicit `threshold_number: 0.80` (a score equal to the threshold is in, any confidence under 1 is out). It gains one assertion: at the default, "40%" said plainly is no event.
+    - `no_returned_event_is_below_the_threshold_of_its_kind` says "70%" at confidence 0.95, not 0.9: 0.76 plainly, 0.855 with emphasis. The case is still "emphasis lifts a number over the line, and only then".
+  - `offcut-detect/tests/rules_table.rs`: §19.11's rows 5 ("It costs 40% less.") and 6 ("About 900 people came.") score 0.80 and now expect no event. `number.rs`'s score test keeps 0.80 scores of the same kind under test.
+- **`fixtures/speech/README.md`, "The V3 test clip as recognized".** A paragraph says why `3 months` and `4 months` are no longer events. The expected feed is now "Found: $2k", "Found: that's" (the E2E case reads it from there). The reference clip's expectations are unchanged: its numbers score 1.0, and the full media run confirmed them.
+- **G 12.4, TE-12:** 2 clips present (the founder's; `OFFCUT_CORPUS_DIR` holds no lent clip), 2 accepted as expected, 0 crashes → **"TE-12: inconclusive (2 clips)"**, re-checked in V9 (D-88).
+- **G 12.5, E-10 smoke** (smoke, not E-10, carried to V9, D-88). `founder-01` WER 0.1069 against Script A as written (159 words; spelled numbers against digits count as substitutions). `founder-02` WER 0.1065 against `~/v3testclip-words.txt` (169 words). The two `.txt` files are in `corpus/.clips/`, git-ignored, never committed.
+- **G 12.6, the founder's reading** (Human, done in this session, 2026-10-19). Files drawn with `shuf -n 5`: `w22-ai-tool-review`, `w06-fitness`, `w20-battery-life`, `w21-writing-a-book`, `w04-newsletter`. The founder was shown each file's sentences and labels and answered **yes** for all five. No label changed. Recorded in `experiments.md` under "Precision gate", as a table: a section of its own would make 15 headings, where G 12.6's check expects 14.
+- **G 12.7, `docs/technicalspec.md`, measured values only:**
+  - §17.4: the NumberReveal threshold, 0.85;
+  - §18.3: a `DENOISE_DELAY_SAMPLES` row (480, compensated exactly), and the TE-13 contingency's measured outcome;
+  - §15's `REJECT_DECODE_UNSUPPORTED` row: Chrome on D1 and on the runner decodes `rej_h264_444.mp4`;
+  - §26: `rej_silent.mp4` is 5 s and gives fewer than `MIN_WORDS` words; the generator takes 118-166 s on D1 and 83-94 s on the runners (sourced to this changelog, Prompts 63 and 87, where those times are);
+  - §39.3: items 10, 11 and 27 say what V3 measured. The other items stay listed.
+- **`experiments.md`:** TE-12, E-3 re-read, E-4 re-read and E-10 smoke are written. TE-13 browser, Precision gate and Second recording gain their S12 readings. E-10 (carried to V9) has its question, method and decision; its `Numbers:` stays empty.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The precision gate needed the contingency**, so `crates/offcut-detect/src/config.rs`, `lib.rs` and `tests/rules_table.rs` and `fixtures/speech/README.md` change, though the prompt's file list names none of them. §20.3 names `config.rs`. The four unit tests and two table rows asserted the old default (above), and the README is the E2E case's source (§20.1: an expectation that no longer holds is changed in the README with its reason). Two of the four tests are V2's: the SAB's list of V2 expectations V3 may rewrite does not foresee a threshold raise. Each keeps what it tests, at an explicit 0.80 or with a confidence that clears the new line: none is deleted, skipped or loosened. Open item 21 copies this back.
+- **G 12.3 says `a02` gains `sentences`**: it stays `null` (Prompt 86's entry).
+- **TS §5 changes** (`bench/results/.gitkeep` becomes `bench/results/`, a listed directory), so that committed bench files pass `check-file-tree.mjs`. V2 committed no bench file, so the rule never met one.
+- **`pnpm corpus -- --grep founder-02` (G 12.3's command) does not filter.** pnpm appends `"--" "--grep" "founder-02"` to the script's last command, and Playwright ignores every option after a `--` (checked: `pnpm corpus -- --grep founder-02 --list` ran both demux cases instead of listing one). `pnpm corpus --grep founder-02` filters. Here `founder-01` also ran and skipped itself (`transcripts` mode never writes it), so the result is the same. That check also re-ran demux on both clips (both `accept` again, the local result file rewritten with the same values). The guide's command is to be corrected in the copy-back (open item 21).
+- **G 12.2 ran as part of the full media suite**, not on its own (above).
+- **The five-file reading sits in the "Precision gate" section**, not a new one (above).
+- **`v3testclip`'s length:** the bench reads 78,914 ms (the video stream, by `ffprobe`). Normalisation uses the 78,918 ms that the prompt and §20.2 give; the difference is 0.005%.
+
+**Checked.**
+
+- **The prompt's validation commands:**
+  - `ls bench/results/ | grep -E '^d1-.*-(portrait|v3testclip)\.json$' | wc -l`: 2;
+  - `grep -cE "^## " docs/v3/experiments.md`: 14;
+  - `grep -c "Numbers: $"`: 1 (E-10);
+  - the gate: "31 files read, 0 skipped", overall 0.98, `test result: ok. 1 passed`;
+  - `git status --short corpus fixtures/labeled`: only `a02-v3testclip.json`.
+- **`cargo test -p offcut-detect`:** all binaries pass; `cargo fmt --check` and `clippy -D warnings` are clean.
+- **SAB gate**, on a fresh build without the key (it is in no file of `web/dist`):
+  - no `zz` file, no test key in the environment;
+  - `pnpm fixtures` up to date;
+  - `pnpm check`: exit 0 on its second run. The first failed in `check-file-tree`: the two bench files were not in TS §5. TS §5 now lists `bench/results/` as a directory of committed runs, which covers `.gitkeep` and every bench file to come; the script is unchanged.
+  - `pnpm test`: Rust **461 passed**, 3 ignored; Vitest 92;
+  - `pnpm build` exit 0 (`offcut_render_bg` changes with the threshold; `offcut_core_bg` does not);
+  - `pnpm e2e` 12 of 12;
+  - the frozen check and the tracked-private check print nothing; the two bench files hold field names, fixture names and numbers only.
+
+  Counts equal Prompt 87's.
+
+**Pinned versions.** No dependency added.
+
+**Found, not fixed.**
+
+- **"500 paying users" / "500 paying customers"**: a count noun counts as a unit only right after its number (D-101), so an adjective between them leaves a bare 500 (0.70). A V4 rule question (E-7), not a label.
+- **KeywordPop sits at exactly 0.90 precision** (`a02`'s "that's", 0.84). One more false positive on the next set would put it under. V4 starts from this margin.
+- **Per 60 s, the founder's 720p recording transcribes faster than the 1080x1920 portrait clip** (47.7 s against 69.5 s). Not investigated (`experiments.md`, E-3 re-read).

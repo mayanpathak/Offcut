@@ -713,7 +713,7 @@ offcut/
 │   └── run_corpus.ts
 ├── bench/
 │   ├── device-bench.ts
-│   └── results/.gitkeep
+│   └── results/                       committed runs, <device>-<date>-<clip>.json (v3implementation §19.19); .gitkeep
 ├── scripts/
 │   ├── build-wasm.sh
 │   ├── gen-types.sh
@@ -1842,7 +1842,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
 | `REJECT_DURATION` | longer than 90 s | actual duration, the 90 s limit, trim advice (PS §9.4 copy) | `rej_too_long_91s.mp4` | same |
 | `REJECT_RESOLUTION` | long side > 1920 px | PS §9.4 4K copy | `rej_4k.mp4` | same |
 | `REJECT_FRAME_RATE` | average above 60 fps | record at 60 fps or lower | `rej_120fps.mp4` | same |
-| `REJECT_DECODE_UNSUPPORTED` | browser cannot decode this H.264 config | re-export with standard settings | mocked `isConfigSupported` | `rejections.spec.ts` |
+| `REJECT_DECODE_UNSUPPORTED` | browser cannot decode this H.264 config | re-export with standard settings | mocked `isConfigSupported`; `rej_h264_444.mp4` (High 4:4:4) is decoded by Chrome stable on D1 and on the CI runner, so its case is `test.fixme` there (measured in V3, docs/v3/experiments.md) | `rejections.spec.ts` |
 | `REJECT_NO_SPEECH` | fewer than `MIN_WORDS` words transcribed | no English speech found | `rej_silent.mp4` | `rejections.spec.ts` |
 
 ### 15.4 Edge cases
@@ -2008,7 +2008,7 @@ Scores are clamped to 1.0 and multiplied by the minimum ASR confidence of the an
 |---|---|---|---|
 | FromTo | Two quantities in one sentence with compatible units, different values, at most `FROMTO_MAX_GAP = 8` words apart | 0.55 base; +0.25 "from … to" frame, or +0.15 change-verb frame ("went", "dropped", "grew", "down", "up" … "to"); +0.15 both carry the same explicit unit, or +0.05 one inherits the other's; +0.05 gap of 6 words or fewer | 0.85 |
 | ListReveal | Announcer (count 2-7 + list noun from the lexicon) followed by that many ordered markers within `LIST_WINDOW = 45 s`; or at least 3 ordered ordinal-word markers starting at "first" | Announcer form: 0.60 base; +0.30 all markers found in order; +0.10 markers are ordinal words. Marker-only form: 0.65 base; +0.20 | 0.85 |
-| NumberReveal | A `NormalizedSpan` not consumed by FromTo or a list announcer/marker | 0.50 base; +0.30 currency, percent or explicit unit; +0.20 magnitude at least 1,000 or a suffix; +0.10 `energy_z >= 1.0` | 0.80 |
+| NumberReveal | A `NormalizedSpan` not consumed by FromTo or a list announcer/marker | 0.50 base; +0.30 currency, percent or explicit unit; +0.20 magnitude at least 1,000 or a suffix; +0.10 `energy_z >= 1.0` | 0.85 (measured in V3, docs/v3/experiments.md: raised from 0.80 by the precision gate on 31 labeled files) |
 | KeywordPop | Content word of at least 4 letters, not a stop word, outside every other event's anchors | 0.50 base; +0.20 x clamp(`energy_z` - 1, 0, 1); +0.20 x clamp(`pitch_z` - 1, 0, 1); +0.20 preceded by an intensifier or in the emphasis lexicon | 0.80 |
 
 **Exclusions (`exclusions.rs`, score set to 0):** bare integers 1900-2099 without unit (years); tokens adjacent to a version/product pattern ("Python 3.12", "iPhone 15"); clock times ("at 5 pm", "10:30"); phone-like digit runs; bare integers below 10 without unit; a number that is a list marker.
@@ -2109,6 +2109,7 @@ measure_prosody:
 | Compressor | threshold -18 dBFS, ratio 3:1, attack 5 ms, release 80 ms, knee 6 dB | |
 | Limiter look-ahead | 5 ms | Compensated; adds no delay to `out48` |
 | `ALIGN_TOLERANCE` | 1 ms (48 samples) | Largest allowed shift of any signal feature between input and output |
+| `DENOISE_DELAY_SAMPLES` | 480 (10 ms, one RNNoise frame) | The denoiser's delay, the same for every impulse, compensated exactly: measured in V3, docs/v3/experiments.md |
 
 No constant in this table is a silence threshold for cutting, a minimum pause, a kept-pause length or a crossfade. `ABSOLUTE_SILENCE` only stops the loudness stage from applying gain to a clip with no measurable programme.
 
@@ -2123,7 +2124,7 @@ No constant in this table is a silence threshold for cutting, a minimum pause, a
 
 **Acceptance.** Output integrated loudness within ±1 LU of `TARGET_LOUDNESS` (PS §20.1): `loudness_target.rs` on five synthetic and three speech fixtures, and independently by `verify_mp4.py`. No click at block boundaries: `chain_no_clicks.rs` asserts the sample-to-sample step across every 1 s block boundary is at most 2x the local RMS (assumption, M1.2). Duration and alignment (INV-10), `duration_preserved.rs`: `out48.len() == pcm48.len()` for every fixture and for random lengths including non-multiples of the block and frame sizes (proptest); the regression layout 0-5 s speech, 5-10 s silence, 10-20 s speech comes out as 20 s with speech, silence and speech at the same positions (never 15 s); an impulse train through the chain stays within `ALIGN_TOLERANCE`; a clip that is 95% silence and a clip of pure digital silence both return the input length. Chain at most 4 s for the reference clip on R1 (PS §20.2).
 
-**Contingency (PS §20.4, TE-13).** Denoise exceeds the 4 s budget on R1 → `ChainConfig.denoise = false` (high-pass + loudness + limiter only); decided at M1.
+**Contingency (PS §20.4, TE-13).** Denoise exceeds the 4 s budget on R1 → `ChainConfig.denoise = false` (high-pass + loudness + limiter only); decided at M1. Measured in V3 on D1, not R1 (v3implementation D-74): 828 ms per 60 s alone, a median of 1,963 ms per 60 s in the bench beside the recognizer; denoise stays on (docs/v3/experiments.md, TE-13).
 
 **Seams (not built now).** User-supplied music with ducking (P1): a `mix_bgm` step after `run_chain` and a `BgmTrack` record; it does not exist in code. Future versions may introduce explicit user-controlled timeline editing; the MVP deliberately does not implement automatic timeline modification, and no type, argument, message or flag is reserved for it.
 
@@ -2867,7 +2868,7 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | Benchmark | Stage timings and memory on R1/R2 | `bench/device-bench.ts`; results committed to `bench/results/` |
 | Regression | 40+ clip corpus; labeled detector set; benchmark deltas against the last committed result | `corpus/run_corpus.ts`; `precision_recall.rs`; `device-bench.ts --compare` |
 
-**Fixture matrix.** Committed speech clips are recorded by the founder reading scripts in `fixtures/speech/README.md`. Derived and synthetic fixtures are produced by `fixtures/gen_fixtures.sh` (ffmpeg CLI, development tool only) and are not committed. `fixtures/manifest.json` maps each name to its expected outcome.
+**Fixture matrix.** Committed speech clips are recorded by the founder reading scripts in `fixtures/speech/README.md`. Derived and synthetic fixtures are produced by `fixtures/gen_fixtures.sh` (ffmpeg CLI, development tool only) and are not committed. It takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs on every pull request (measured in V3, docs/v3/v3changelog.md, Prompts 63 and 87). `fixtures/manifest.json` maps each name to its expected outcome.
 
 | Fixture | Properties | Expected | Used by |
 |---|---|---|---|
@@ -2893,7 +2894,7 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | `rej_120fps.mp4` | 120 fps | `REJECT_FRAME_RATE` | §15.3 tests |
 | `rej_no_video.m4a` | Audio only | `REJECT_NO_VIDEO` | §15.3 tests |
 | `rej_truncated.mp4` | Cut inside `moov` | `REJECT_CORRUPT` | §15.3 tests |
-| `rej_silent.mp4` | Valid video, silent AAC | `REJECT_NO_SPEECH` | `rejections.spec.ts` |
+| `rej_silent.mp4` | Valid video, 5 s of silent AAC (measured in V3: the recognizer gives fewer than `MIN_WORDS` words, docs/v3/experiments.md) | `REJECT_NO_SPEECH` | `rejections.spec.ts` |
 | oversize (generated in the test) | Sparse file over 500 MB | `REJECT_FILE_SIZE` | `rejections.spec.ts` |
 | `bad_audio_payload.mp4` | Valid tables, corrupted AAC frames | `E_DECODE_AUDIO` | `failure-recovery.spec.ts` |
 | `bad_video_payload.mp4` | Valid tables, corrupted H.264 after 2 s | `E_DECODE_VIDEO` | `failure-recovery.spec.ts` |
@@ -3533,8 +3534,8 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 7. Per-word ASR confidence (§16.4) — TE-2. Run on 2026-10-09 (`docs/v2/experiments.md`): the runtime of V2 returns no probability, so every word has `Confidence(1.0)` and detector scores do not use ASR confidence. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
 8. Non-English speech and multiple speakers are not detected at import; these two PS §9.4 constraints have copy but no rejection test (§15.4) — E-2, E-10.
 9. Sentence segmentation constants (§17.2) — E-10.
-10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7.
-11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` and whether the denoiser's delay can be compensated to within it (§18.3) — M1.2, TE-13, E-2.
+10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7. Measured in V3 (docs/v3/experiments.md): the precision gate over 31 labeled files raised the NumberReveal threshold to 0.85; the other three thresholds held.
+11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` (§18.3) — M1.2, TE-13, E-2. Measured in V3 (docs/v3/experiments.md): the denoiser's delay is 480 samples, constant, and compensated exactly; TE-13 passes on D1 (not R1) with denoise on.
 12. Safe-area insets, zones, style values, event timings, emoji fallback font (§19) — E-2, M1.4.
 13. Watermark text, size, opacity, placement (§19.6; PS §19 minor) — alpha.
 14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6.
@@ -3550,4 +3551,4 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4.
 25. 400-line file limit (§29) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
-27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28.
+27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.

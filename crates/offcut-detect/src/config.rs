@@ -82,7 +82,10 @@ impl Default for DetectorConfig {
         Self {
             threshold_from_to: 0.85,
             threshold_list: 0.85,
-            threshold_number: 0.80,
+            // 0.80 until the precision gate on 31 files (v3implementation §20.3,
+            // docs/v3/experiments.md): a number under 1,000 with its unit scores
+            // 0.80, and now needs the emphasis bonus to be shown.
+            threshold_number: 0.85,
             threshold_keyword: 0.80,
             number_base: 0.50,
             number_unit_bonus: 0.30,
@@ -293,11 +296,13 @@ mod tests {
             [cfg.number_magnitude_bonus, cfg.number_energy_bonus],
             (cfg.overlay_lead_ms, cfg.number_hold_ms),
         );
+        // V2's ten, but for `threshold_number`: 0.80 until the precision gate
+        // of Prompt 88 raised it (v3implementation §20.3).
         assert_eq!(
             v2,
             (
                 [0.85, 0.85],
-                [0.80, 0.80],
+                [0.85, 0.80],
                 [0.50, 0.30],
                 [0.20, 0.10],
                 (150, 1_400)
@@ -367,7 +372,7 @@ mod tests {
             EventKind::KeywordPop,
         ];
         let thresholds = kinds.map(|kind| cfg.threshold(kind));
-        assert_eq!(thresholds, [0.80, 0.85, 0.85, 0.80]);
+        assert_eq!(thresholds, [0.85, 0.85, 0.85, 0.80]);
         let holds = kinds.map(|kind| cfg.hold_ms(kind));
         assert_eq!(holds, [1_400, 1_700, 1_700, 0]);
         // A threshold read by kind is the field, so tuning one moves the other.
