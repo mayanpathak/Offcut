@@ -222,9 +222,6 @@ jobs:
           path: fixtures/.cache/media
           key: reference-clip-${{ hashFiles('web/src/net/asset-fetch.ts') }}
 
-      - name: Generate the fixtures
-        run: pnpm fixtures
-
       - name: cargo test
         run: cargo test --workspace
 
