@@ -59,6 +59,19 @@ export default defineConfig({
       workers: 1,
       use: { ...MEDIA_USE, headless: false },
     },
+    // `pnpm corpus`: the clips of corpus/manifest.json this machine has. Some
+    // are lent by people other than the founder, so nothing the page showed is
+    // kept, not even of a failure (v3implementation §17.6, D-112).
+    {
+      name: "corpus",
+      testDir: "../corpus",
+      testMatch: "run_corpus.ts",
+      dependencies: ["media-setup"],
+      timeout: MEDIA_TIMEOUT_MS * 2,
+      fullyParallel: false,
+      workers: 1,
+      use: { ...MEDIA_USE, screenshot: "off", video: "off", trace: "off" },
+    },
   ],
   ...(deployedUrl === undefined && {
     webServer: {

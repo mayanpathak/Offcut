@@ -916,3 +916,102 @@ CI on `7d8980b`: `ci` and `e2e-media` success (above).
 
 **Found, not fixed.** None. No V2 case other than the three of D-91 failed, so no app regression was found.
 
+
+---
+
+## 2026-10-19 - Prompt 86 (V3 26/30): bench `audio_chain` stage and file name; corpus fetcher, runner and project
+
+CI on Prompt 85's `1c994d7`: `ci` success (7.1 min), `e2e-media` success (8.2 min); the deploys skipped.
+
+**Done.**
+
+- **`bench/device-bench.ts`, REOPENED V2 CONTRACT (D-91).**
+  - `STAGES` has six entries: `probe_audio`, `audio_chain`, `asr`, `detect_scene`, `render_encode`, `mux`. A run that lacks one of them still fails at `wholeNumber`, as in V2.
+  - `BENCH_CLIP` picks the clip from a table `CLIPS`, each looked up only when chosen:
+    - `reference` (the default): `referenceClip()`, named by its file name as V2 named it;
+    - `portrait`: `genFixture("speech/speech_60s_portrait.mp4")`, named `speech/speech_60s_portrait.mp4`;
+    - `v3testclip`: `v3TestClip()`, refused with "BENCH_CLIP=v3testclip needs testclips/v3testclip.mp4, which is on D1 only" when absent.
+  - Any other value is refused, naming the three. The result's `clip` is the table's name, never a path.
+  - The result file is `bench/results/<device>-<date>-<clip>.json`, `<clip>` being the `BENCH_CLIP` key. The head comment and the test's title say so.
+- **`corpus/fetch_corpus.sh`** (POSIX `sh`, LF):
+  - Reads `corpus/manifest.json` with one `node -e` (id, SHA-256, owner per line).
+  - Founder clips come from `testclips/` by a fixed `case`: `founder-01` from `speech_scriptA_landscape_720p.mp4`, `founder-02` from `v3testclip.mp4`. A lent clip comes from `$OFFCUT_CORPUS_DIR/<id>.<ext>`, the first such file that is not `.txt` or `.part`.
+  - Each clip is copied to `corpus/.clips/<id>.mp4.part`, hashed with `sha256sum`, and renamed only on a match; a copy already there with the right hash is kept as it is.
+  - Prints `<id> ok`, `<id> missing` or `<id> hash mismatch`, and nothing else of a clip (no path, no file name). No network call. Exit 1 only when no clip is ready, with "no corpus clip is ready" on stderr.
+- **`corpus/run_corpus.ts`** (a Playwright file, 350 lines). One test per manifest clip present in `corpus/.clips/`, titled `corpus <mode>: <id>`, each in its own browser context.
+  - **Modes**, by `CORPUS_MODE` (anything else is refused when the file loads):
+    - `demux` (default): drop, then wait for accepted, refused or failed. "Accepted" is the "Cleaning voice" line, which the pipeline adds once `importClip` has accepted the clip (Prompt 84's entry). Writes `corpus/.results/<date>-demux.json`.
+    - `export`: wait for `ready` and for "Play" (known issue 4), seed a Creator token, export, save the file in a `mkdtemp` folder of the system temp directory (removed in a `finally`), and run `verifyMp4(file, "creator", sourceDurationMs(clip))`. The six booleans are its `PASS n` lines. Writes `<date>-export.json`.
+    - `wer`: wait for `ready`; read `transcripts[clipId]` in the page with `readIndexedDb` (the clip id is the one folder of `clips/` in OPFS); compare its words with `corpus/.clips/<id>.txt` by Levenshtein over words, split into substitutions, deletions and insertions. Writes `<date>-wer.json`, counts only. A clip without its `.txt` is skipped ("no reference text").
+    - `transcripts`: the constant map `TRANSCRIPT_FILES` has two entries, `founder-01` → `null` (never written: `a01` stays in the written form; the test is skipped saying so) and `founder-02` → `fixtures/labeled/a02-v3testclip.json`. A clip not of `owner: "founder"`, or not in the map, is refused by a thrown error before its context is made, so nothing of it is read. The labeled file gets `words` (`text`, `startMs`, `endMs`, `confidence`) and `prosody` (`per_word` of `energy_z`, `pitch_z`), in the files' own layout (one line per word).
+  - **Result files** hold ids, codes, booleans and numbers. A result entry replaces the same clip's entry of the same day and mode; it is written before the test asserts, so a mismatch is listed too.
+  - **Each test asserts only** that the outcome is not `E_INTERNAL` or `E_WORKER_CRASH` and equals the manifest's `expect`. A failure's message is `<id>: <code>`, or `<id>: <fixed words>` for a wait that timed out (`quietly` replaces Playwright's own message, which can quote the page).
+  - **The outcome** is read in the page as a state and a code, never as text:
+    - the rejection panel's `data-reject`;
+    - for a failure, the code where the page states it (the three model failures' titles, D-57), else `E_INTERNAL` when the page threw (how `runPipeline` surfaces an unexpected fault), else `"failed"`;
+    - in `export` mode, an export's failure code from its `export_failed` event.
+  - In `demux` mode an `expect: "REJECT_NO_SPEECH"` clip is followed to its end, with the model put on the device first; any other clip stops at its acceptance and needs no model.
+- **`web/playwright.config.ts`**: project `corpus` as §18.3 gives it (`testDir: "../corpus"`, `testMatch: "run_corpus.ts"`, `dependencies: ["media-setup"]`, `timeout: MEDIA_TIMEOUT_MS * 2`, `fullyParallel: false`, `workers: 1`, `use: { ...MEDIA_USE, screenshot: "off", video: "off", trace: "off" }`).
+- **`web/tests-e2e/tsconfig.json`**: `include` gains `"../../corpus"`.
+- **`package.json`**: `"corpus": "sh corpus/fetch_corpus.sh && pnpm --filter web exec playwright test --project=corpus"`.
+- TS §5 already listed both corpus files (V1), so `check-file-tree.mjs` needed nothing.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **A failed test's `error-context.md` would have held the page's text (D-112).** Playwright 1.63 writes that file for every failed test. If the test fails while a context of it is open (a test timeout), it adds an ARIA snapshot of that context's first page, which for a corpus clip is the feed with its "Found:" lines. The project's `screenshot`, `video` and `trace` settings do not cover it. `run_corpus.ts` therefore does two things:
+  - it sets `PLAYWRIGHT_NO_COPY_PROMPT=1` in its worker, the switch Playwright reads before taking that snapshot (`lib/index.js`, `_takePageSnapshot`);
+  - an `afterEach` closes a test's pages before its context, so that no page is left to snapshot.
+
+  Drill, on a copy of `founder-01` under a lent id with `--timeout 25000` in `export` mode:
+  - with both in place, `error-context.md` held no "Page snapshot" and the error was "lent-99: no outcome in time";
+  - with both taken out (temporarily), it held one, with two `listitem` lines of the feed.
+
+  The content was counted, not printed; the file and the copy are deleted.
+- **`transcripts` mode writes `words` and `prosody`, not `sentences`.** §17.6 and SCHEMA name `words` and `prosody`. SCHEMA says an `asr` file has `sentences: null`, and `precision_recall.rs` panics ("sentences and words do not match its source") on an `asr` file with both. The prompt's "`words`/`prosody`/`sentences`" is read as the three fields the map concerns, with `sentences` kept `null`.
+- **The normalisation turns every other character into a space; it does not delete it.** §17.6 says "remove every character but…". SCHEMA's `say` normalisation, which calls itself the WER mode's, and `normalized()` of `precision_recall.rs`, make it a space, so "3-item" is two words and not "3item". Commas inside digit groups are removed first, as §17.6 says, so "$2,000" is "$2000".
+- **A failure whose code the page does not show is recorded as `"failed"`.** The `Outcome` type is `"accept" | RejectReason | ErrorCode | "failed"`. The "failed" page shows a code only for the model's three failures, and V3 sends no `client_error` for a pipeline failure (V4). No app file was changed to show more. `expect` is never a failure, so such a clip fails its test either way.
+- **The tsconfig entry is `"../../corpus"`, not `"../corpus"`.** The file is `web/tests-e2e/tsconfig.json`, and the prompt's path is relative to `web/`; `bench` is included the same way (`"../../bench"`).
+- **"Both `tsc` programs see `corpus/`":** the second program (`tests-e2e/tsconfig.json`) includes `corpus/`, as it includes `bench/`. The app's program includes `src` alone (D-63 (a)), so a Node type never reaches app code. Both `tsc` runs of `pnpm check` pass.
+- **`--list` prints "Total: 4 tests in 2 files"**: the 2 corpus cases and the 2 of `media-setup`, which `--list` always includes (as in Prompt 84's entry). The guide expects 2.
+- In `export` mode `verifier` is present only for a clip that was exported.
+
+**Checked.**
+
+- **The prompt's commands:**
+  - `sh corpus/fetch_corpus.sh` with `OFFCUT_CORPUS_DIR=$HOME/offcut-corpus` (empty): `founder-01 ok`, `founder-02 ok`, exit 0, 1.6 s; a second run keeps both copies.
+  - `--project=corpus --list`: the two cases (above).
+  - `git ls-files --eol corpus/fetch_corpus.sh`: `i/lf w/lf`.
+  - `pnpm check`: exit 0 (gate below).
+  - `git status --short corpus`: only the two new files.
+- **The fetcher's other paths**, on a copy of the script and a made-up manifest in the scratchpad: a lent clip with the wrong hash → `hash mismatch`, no file left; an id with no file → `missing`; a lent `.webm` → `ok`, copied as `<id>.mp4`; a `.txt` beside it is not taken; no clip ready → exit 1; `OFFCUT_CORPUS_DIR` unset → the lent clips `missing`.
+- **The `lent` refusal (failure-path test).** The manifest was given a fake `lent-99` entry (`owner: "lent"`, a copy of `founder-01` under that id), not committed. `CORPUS_MODE=transcripts ... --grep lent-99` failed with "lent-99: refused, transcripts mode takes the founder's clips of its map only". The MD5 of `a02-v3testclip.json` was unchanged, no `corpus/.results/` was made, and no page was opened. The manifest was restored and the copy deleted.
+- **The labeled-file writer**, cut out of the runner into a scratch file and run with Node:
+  - today's `a02-v3testclip.json` is written back byte for byte, and a second pass is identical;
+  - Levenshtein counts match hand-worked cases (a substitution and an insertion; all deletions; empty reference; equal);
+  - "We made $2,000 in revenue, 3-item list; 4.7%!" gives `we made $2000 in revenue 3 item list 4 7% done`.
+- **The bench, shortened (`RUNS = 1` for one run, put back to 10).** A build with the test key (worked out from `ci.yml`'s public key, given to that one `pnpm build:vite` only; unset after), `BENCH_DEVICE=d1 BENCH_CLIP=portrait pnpm bench:device`: 3 passed, 4.7 min. It wrote `bench/results/d1-2026-10-19-portrait.json` with `clip` `speech/speech_60s_portrait.mp4`, `clip_duration_ms` 60,000, `asr_backend` `webgpu` and six stages. One run, so not a measurement: `probe_audio` 1,324 ms, `audio_chain` 3,116, `asr` 79,935, `detect_scene` 254, `render_encode` 37,643, `mux` 19; peak memory 994,987,537 bytes. The file was deleted (Prompt 88 commits the runs).
+- **The four modes on the founder clips**, with the same keyed build (beyond the prompt's tests; every output since deleted):
+  - `demux`: 2 passed, 3.2 s each, both `accept`, `match: true`.
+  - `export`: 2 passed (2.8 and 3.3 min), verifier `[true x 6]` for both.
+  - `wer` on `founder-01`, against a temporary `founder-01.txt` of Script A as written in `fixtures/speech/README.md`: `words_ref` 159, `words_hyp` 157, 13 substitutions, 3 deletions, 1 insertion, WER 0.1069. The script spells "three thousand", the recognizer writes "3,000": a smoke reading only, not E-10 (D-88). `founder-02` was skipped (no text).
+  - `transcripts`: `founder-01` skipped (written form); `founder-02` wrote 159 words. The diff changed only the `words` and `prosody` lines, and `precision_recall.rs` read it ("31 files read, 0 skipped"). Then `a02` was restored from its copy: filling it is Prompt 88's. What the gate said with that data is under "Found, not fixed".
+- **SAB gate**, on a fresh build without the key (`grep` finds the key in no file of `web/dist`):
+  - no `zz` file, no test key in the environment;
+  - `pnpm fixtures` up to date;
+  - `pnpm check` exit 0;
+  - `pnpm test`: Rust **461 passed**, 3 ignored; Vitest 92;
+  - `pnpm build` exit 0 (bundles unchanged: no app code changed);
+  - `pnpm e2e` 12 of 12;
+  - the frozen check, the tracked-private check and the untracked-private check print nothing.
+
+  Counts equal Prompt 85's.
+
+**Pinned versions.** No dependency added.
+
+**Found, not fixed.**
+
+- **For Prompt 88: with `a02`'s recognized data the precision gate fails, overall precision 0.872 (under 0.90).**
+  - Missed: "500 paying users" and "500 paying customers". Both are in the transcript (words 65-67, 82-84), with the adjective "paying" between the number and its noun.
+  - False positives: NumberReveal on "three months" (words 72-73) and on "three to four months" (93-94), both at 0.80, which the labels call no events; and a KeywordPop on "that's" (word 152), at 0.84.
+  - Also: the `$2,000` label reads "in revenue in" where "in revenue" was labeled (reported, not matched).
+  - Prompt 88 fills `a02` and applies §20.3: labels are not edited (D-87).

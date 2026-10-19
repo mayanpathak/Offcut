@@ -1,16 +1,17 @@
 // The device benchmark (TS §30): how long this machine takes for each stage
-// of the reference clip. One run to warm up, then ten that are measured:
-// each opens a page, drops the clip, waits for the preview, exports with a
-// Creator token and waits for the download. The times are the app's own, read
-// from the analytics events its fake API receives.
+// of a clip. One run to warm up, then ten that are measured: each opens a
+// page, drops the clip, waits for the preview, exports with a Creator token
+// and waits for the download. The times are the app's own, read from the
+// analytics events its fake API receives.
 //
 // It runs as the Playwright project `bench`, headed, against `vite preview`
 // of a build made with the test key:
 //
-//   BENCH_DEVICE=<name> pnpm bench:device
+//   BENCH_DEVICE=<name> [BENCH_CLIP=reference|portrait|v3testclip] pnpm bench:device
 //
-// and writes bench/results/<name>-<yyyy-mm-dd>.json. The file holds numbers
-// and words from fixed lists: nothing that was said in the clip.
+// and writes bench/results/<name>-<yyyy-mm-dd>-<clip>.json, so that two clips
+// can be benched on one day (v3implementation §19.19). The file holds numbers
+// and words from fixed lists: nothing that was said in the clip, and no path.
 
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -20,7 +21,7 @@ import { type BrowserContext, expect, test } from "@playwright/test";
 
 import { messages } from "../web/src/copy/messages";
 import { installFakeApi, mintEntitlementToken, seedEntitlement } from "../web/tests-e2e/helpers/fake-api";
-import { dropClip, ensureModelCached, referenceClip, routeAssets, sourceDurationMs } from "../web/tests-e2e/helpers/fixtures";
+import { dropClip, ensureModelCached, genFixture, referenceClip, routeAssets, sourceDurationMs, v3TestClip } from "../web/tests-e2e/helpers/fixtures";
 
 declare global {
   interface Window {
@@ -34,8 +35,30 @@ declare global {
 }
 
 const RUNS = 10;
-const STAGES = ["probe_audio", "asr", "detect_scene", "render_encode", "mux"] as const;
+// V3 cleans the voice before the recognizer hears it (v3implementation D-91).
+const STAGES = ["probe_audio", "audio_chain", "asr", "detect_scene", "render_encode", "mux"] as const;
 type Stage = (typeof STAGES)[number];
+
+/**
+ * The clips `BENCH_CLIP` may name: the file, and the name the result gives
+ * it, a fixture's and never a path. Each is looked up only when chosen.
+ */
+const CLIPS = {
+  // The D-64 clip, as V2 benched it.
+  reference: () => {
+    const file = referenceClip();
+    return { file, name: path.basename(file) };
+  },
+  portrait: () => ({ file: genFixture("speech/speech_60s_portrait.mp4"), name: "speech/speech_60s_portrait.mp4" }),
+  v3testclip: () => {
+    const file = v3TestClip();
+    if (file === null) {
+      throw new Error("BENCH_CLIP=v3testclip needs testclips/v3testclip.mp4, which is on D1 only");
+    }
+    return { file, name: "v3testclip.mp4" };
+  },
+} satisfies Record<string, () => { file: string; name: string }>;
+type ClipKey = keyof typeof CLIPS;
 
 /** How often the page's memory is read (v2implementation §23.10). */
 const MEMORY_SAMPLE_MS = 2_000;
@@ -81,7 +104,7 @@ function wholeNumber(value: unknown, what: string): number {
 }
 
 /** One clip, from the drop to the downloaded file, in a new page of `context`. */
-async function oneRun(context: BrowserContext): Promise<Run> {
+async function oneRun(context: BrowserContext, clip: string): Promise<Run> {
   const page = await context.newPage();
   try {
     await page.addInitScript((everyMs) => {
@@ -105,7 +128,7 @@ async function oneRun(context: BrowserContext): Promise<Run> {
     await page.goto("/app");
     await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
 
-    await dropClip(page, referenceClip());
+    await dropClip(page, clip);
     await expect(page.getByTestId("preview-canvas")).toBeVisible({ timeout: READY_TIMEOUT_MS });
     await seedEntitlement(page, mintEntitlementToken());
     const arriving = page.waitForEvent("download", { timeout: EXPORT_TIMEOUT_MS });
@@ -140,39 +163,44 @@ async function oneRun(context: BrowserContext): Promise<Run> {
   }
 }
 
-test("device bench: one warm-up, then ten measured runs of the reference clip", async ({ context, browser }) => {
+test("device bench: one warm-up, then ten measured runs of the clip BENCH_CLIP names", async ({ context, browser }) => {
   test.setTimeout(BENCH_TIMEOUT_MS);
   const device = process.env.BENCH_DEVICE;
   if (device === undefined || !/^[a-z0-9]+$/.test(device)) {
     throw new Error("BENCH_DEVICE names the machine in lower-case letters and digits, as in BENCH_DEVICE=d1");
   }
+  const clipKey = process.env.BENCH_CLIP ?? "reference";
+  const chosen: ClipKey | undefined = Object.keys(CLIPS).find((key): key is ClipKey => key === clipKey);
+  if (chosen === undefined) {
+    throw new Error(`BENCH_CLIP is one of ${Object.keys(CLIPS).join(", ")} (reference when unset)`);
+  }
+  const clip = CLIPS[chosen]();
   await ensureModelCached(context);
 
   // The first run of a browser is slower than the ones after it, and is kept out of the numbers.
-  await oneRun(context);
+  await oneRun(context, clip.file);
   const runs: Run[] = [];
   for (let index = 0; index < RUNS; index += 1) {
-    runs.push(await oneRun(context));
+    runs.push(await oneRun(context, clip.file));
   }
 
   const peaks = runs.map((run) => run.peakBytes).filter((bytes) => bytes !== null);
   const now = new Date();
   const date = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const clip = referenceClip();
   const result = {
     device,
     date,
     commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(),
     chrome: browser.version(),
-    clip: path.basename(clip),
-    clip_duration_ms: sourceDurationMs(clip),
+    clip: clip.name,
+    clip_duration_ms: sourceDurationMs(clip.file),
     asr_backend: runs[0]?.asrBackend ?? "unknown",
     runs: runs.length,
     stages: Object.fromEntries(STAGES.map((stage) => [stage, series(runs.map((run) => run.stages[stage]))])),
     total: series(runs.map((run) => run.totalMs)),
     peak_memory_bytes: peaks.length === 0 ? null : Math.max(...peaks),
   };
-  const file = path.join(ROOT, "bench/results", `${device}-${date}.json`);
+  const file = path.join(ROOT, "bench/results", `${device}-${date}-${chosen}.json`);
   writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
   process.stdout.write(`      wrote ${path.relative(ROOT, file)}: total median ${String(result.total.median)} ms, p90 ${String(result.total.p90)} ms\n`);
   // Every run of the ten used the same backend: a mix would make the medians mean nothing.
