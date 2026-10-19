@@ -5,9 +5,12 @@
 //
 // The clip is processed once, and the cases export it in the order they are
 // written: with no token, with a token of another key, with a Creator token,
-// with a Free token. A case that fails stops the ones after it.
+// with a Free token. A case that fails stops the ones after it. The case of
+// the founder's second recording runs on its own after them, on the
+// development machine only (D-99, D-100).
 
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -15,7 +18,17 @@ import { type BrowserContext, type Download, expect, type Page, test } from "@pl
 
 import { messages } from "../src/copy/messages";
 import { type FakeApi, installFakeApi, mintEntitlementToken, seedEntitlement } from "./helpers/fake-api";
-import { dropClip, ensureModelCached, opfsList, patient, referenceClip, routeAssets, sourceDurationMs, verifyMp4 } from "./helpers/fixtures";
+import {
+  dropClip,
+  ensureModelCached,
+  opfsList,
+  patient,
+  referenceClip,
+  routeAssets,
+  sourceDurationMs,
+  v3TestClip,
+  verifyMp4,
+} from "./helpers/fixtures";
 
 declare global {
   interface Window {
@@ -75,6 +88,56 @@ async function watchExport(page: Page): Promise<void> {
       }
     }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
   }, messages.export.renderingLocally);
+}
+
+type Tag = { where: string; key: string; value: string };
+
+/** Every tag of `file`, at format and stream level, as `ffprobe` reads them. */
+function tagsOf(file: string): Tag[] {
+  const probe = JSON.parse(
+    execFileSync("ffprobe", ["-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", file], { encoding: "utf8" }),
+  ) as { format?: { tags?: Record<string, string> }; streams?: { tags?: Record<string, string> }[] };
+  return [
+    ...Object.entries(probe.format?.tags ?? {}).map(([key, value]) => ({ where: "format", key, value })),
+    ...(probe.streams ?? []).flatMap((stream, index) =>
+      Object.entries(stream.tags ?? {}).map(([key, value]) => ({ where: `stream ${String(index)}`, key, value })),
+    ),
+  ];
+}
+
+/** The tags D-100 names: none of these may carry the source's value. */
+const SOURCE_TAGS = ["creation_time", "title", "comment", "encoder"];
+
+/**
+ * What of `source`'s metadata `file` carries, as a list of problems; `[]` for
+ * none (D-100, an early part of the verifier's check 11): no tag whose key
+ * names a location, no `creation_time` but the muxer's epoch 0, no `title`,
+ * `comment`, `encoder` or `creation_time` with the source's value, and
+ * neither `©xyz` nor `ISO6709` anywhere in its bytes.
+ */
+function metadataProblems(file: string, source: string): string[] {
+  const problems: string[] = [];
+  const ofSource = new Set(tagsOf(source).map((tag) => `${tag.key.toLowerCase()}=${tag.value}`));
+  for (const tag of tagsOf(file)) {
+    const key = tag.key.toLowerCase();
+    if (key.includes("location") || key.includes("iso6709")) {
+      problems.push(`${tag.where}: a location tag, ${tag.key}`);
+    }
+    if (key === "creation_time" && !tag.value.startsWith("1970-01-01T00:00:00")) {
+      problems.push(`${tag.where}: a creation_time other than the epoch, ${tag.value}`);
+    }
+    if (SOURCE_TAGS.includes(key) && ofSource.has(`${key}=${tag.value}`)) {
+      problems.push(`${tag.where}: the source's ${tag.key}`);
+    }
+  }
+  const bytes = readFileSync(file);
+  if (bytes.includes(Buffer.from([0xa9, 0x78, 0x79, 0x7a]))) {
+    problems.push("the bytes of a ©xyz atom");
+  }
+  if (bytes.includes(Buffer.from("ISO6709"))) {
+    problems.push("the bytes ISO6709");
+  }
+  return problems;
 }
 
 async function forgetProgress(page: Page): Promise<void> {
@@ -299,4 +362,47 @@ test.describe("one clip, exported", () => {
     expect(await opfsList(page, "exports/tmp")).toEqual([]);
     expect(downloads).toHaveLength(2);
   });
+});
+
+// The founder's second recording carries a location tag (D-99, D-100): its
+// export must carry none of its metadata. On the development machine only.
+// The file lives in the system's temp directory and is deleted however the
+// case ends; no picture or trace of it is kept (V2 CL item 41).
+test("no metadata: an export of the second recording carries none of the source's", async ({ browser }, testInfo) => {
+  const clip = v3TestClip();
+  test.skip(clip === null, "testclips/v3testclip.mp4 is on D1 only");
+  test.setTimeout(patient(900_000));
+  const source = clip ?? "";
+  const { baseURL } = testInfo.project.use;
+  const scratch = mkdtempSync(path.join(tmpdir(), "offcut-e2e-"));
+  const context = await browser.newContext({ acceptDownloads: true, ...(baseURL === undefined ? {} : { baseURL }) });
+  try {
+    await ensureModelCached(context);
+    const page = await context.newPage();
+    await installFakeApi(page);
+    await routeAssets(page);
+    await page.goto("/app");
+    await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+    await dropClip(page, source);
+    await expect(canvas(page).or(page.getByTestId("clip-failed")).or(page.getByTestId("clip-rejected"))).toBeVisible({ timeout: patient(360_000) });
+    await expect(canvas(page), "the second recording was processed").toBeVisible();
+    // The preview is attached before the export locks it (V3 changelog, known issue 4).
+    await expect(button(page, messages.preview.play)).toBeEnabled({ timeout: 30_000 });
+
+    await seedEntitlement(page, mintEntitlementToken());
+    const arriving = page.waitForEvent("download", { timeout: EXPORT_TIMEOUT_MS });
+    await exportButton(page).click();
+    const file = path.join(scratch, "second-recording.mp4");
+    await (await arriving).saveAs(file);
+    await expect(page.getByTestId("export-done")).toHaveText(messages.export.done, { timeout: 30_000 });
+
+    expect(metadataProblems(file, source)).toEqual([]);
+    const verdict = verifyMp4(file, "creator", sourceDurationMs(source));
+    expect(verdict.output).toContain("PASS 6");
+    expect(verdict.output).not.toContain("FAIL");
+    expect(verdict.status, verdict.output).toBe(0);
+  } finally {
+    await context.close();
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });

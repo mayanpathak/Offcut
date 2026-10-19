@@ -5,7 +5,9 @@
 //
 // The clip is processed once. The cases of "one clip" read that one session
 // in the order they are written, and the last of them lets the clip go; a
-// case that fails stops the ones after it.
+// case that fails stops the ones after it. The case of the founder's second
+// recording runs on its own after them, on the development machine only, so
+// that it cannot hide one of theirs (D-99).
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -15,7 +17,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from "@pla
 
 import { messages } from "../src/copy/messages";
 import { ANALYTICS_EVENT_DOCS } from "../src/gen/api";
-import { UNSUPPORTED_REASONS } from "../src/gen/domain";
+import { REJECT_REASONS, UNSUPPORTED_REASONS } from "../src/gen/domain";
 import { DB_NAME, STORES } from "../src/persistence/schema";
 import { type FakeApi, installFakeApi } from "./helpers/fake-api";
 import {
@@ -26,10 +28,12 @@ import {
   opfsList,
   opfsSize,
   patient,
+  readIndexedDb,
   referenceClip,
   routeAssets,
   sampleClipPath,
   sourceDurationMs,
+  v3TestClip,
 } from "./helpers/fixtures";
 
 declare global {
@@ -98,11 +102,59 @@ async function twoPictures(target: Locator, page: Page, gapMs: number): Promise<
   return [first, await target.screenshot()];
 }
 
-/** The amounts of the README's expected feed: what a "Found:" line may name for the reference clip. */
-function expectedAmounts(): string[] {
-  const readme = readFileSync(path.resolve(import.meta.dirname, "../../fixtures/speech/README.md"), "utf8");
-  const feed = readme.slice(readme.indexOf("**Expected feed.**"));
-  return [...feed.slice(0, feed.indexOf("\n## ")).matchAll(/^\| \d+ \| "Found: [^"]+" \| `([^`]+)` \|$/gm)].map((row) => row[1] ?? "");
+const README = path.resolve(import.meta.dirname, "../../fixtures/speech/README.md");
+
+/** One "Found:" line the README expects, and whether the clip may lack it. */
+type ExpectedLine = { line: string; optional: boolean };
+
+/**
+ * The "Found:" lines of the README's "Expected feed of V3" for the reference
+ * clip, in time order (fixtures/speech/README.md, v3implementation §17.7). A
+ * row marked "(only if …)" is a line the clip may lack: the KeywordPop.
+ */
+function expectedFeedV3(): ExpectedLine[] {
+  const readme = readFileSync(README, "utf8");
+  const feed = readme.slice(readme.indexOf("**Expected feed of V3.**"));
+  return [...feed.slice(0, feed.indexOf("\n**", 2)).matchAll(/^\| \d+ \| "(Found: [^"]+)"( \(only if [^)]*\))? \|$/gm)].map((row) => ({
+    line: row[1] ?? "",
+    optional: row[2] !== undefined,
+  }));
+}
+
+/**
+ * The "Found:" lines the README expects for the second recording, in time
+ * order ("The V3 test clip as recognized", its "Expected feed"). The README
+ * says the KeywordPop may be absent on another run: its line is the one that
+ * names a word, where the others name a quantity (a digit or a currency sign).
+ */
+function expectedFeedOfTestClip(): ExpectedLine[] {
+  const readme = readFileSync(README, "utf8");
+  const section = readme.slice(readme.indexOf("## The V3 test clip as recognized"));
+  const paragraph = section.slice(section.indexOf("**Expected feed**"));
+  const lines = [...paragraph.slice(0, paragraph.indexOf("\n")).matchAll(/"(Found: [^"]+)"/g)].map((match) => match[1] ?? "");
+  return lines.map((line) => ({ line, optional: !/[\d$€£₹]/.test(line) }));
+}
+
+/** The feed's last state, from the recorder installed before the page loaded. */
+async function lastFeed(page: Page): Promise<string[]> {
+  return (await page.evaluate(() => window.e2eFeed ?? [])).at(-1) ?? [];
+}
+
+/**
+ * The feed of a processed clip: "Cleaning voice" and "Transcribing…" first,
+ * in either order (the chain starts before the recognizer, D-90), then the
+ * "Found:" lines, which are those of `expected` in its order, each line the
+ * clip may lack being present or absent.
+ */
+function expectFeed(lines: string[], expected: ExpectedLine[]): void {
+  expect(expected.length).toBeGreaterThan(0);
+  expect(lines.slice(0, 2).sort()).toEqual([messages.feed.cleaningVoice, messages.feed.transcribing].sort());
+  const found = lines.slice(2);
+  expect(found.filter((line) => !line.startsWith(FOUND_PREFIX))).toEqual([]);
+  // Every line is expected, and none comes out of its order.
+  expect(found).toEqual(expected.map((row) => row.line).filter((line) => found.includes(line)));
+  // And every line that is not optional is there.
+  expect(expected.filter((row) => !row.optional && !found.includes(row.line)).map((row) => row.line)).toEqual([]);
 }
 
 /** The bodies of the page's `POST /api/v1/events`, each checked to be a batch. */
@@ -133,6 +185,7 @@ const EVENT_PROPS: Record<string, Record<string, PropKind>> = {
     platform: ["windows", "macos", "linux", "chromeos", "android", "other", "unknown"],
   },
   clip_accepted: { duration_bucket: ["lt30", "lt60", "lte90"], orientation: ["portrait", "landscape"], source: ["user", "sample"] },
+  clip_rejected: { reject_reason: REJECT_REASONS },
   stage_timing: { stage: STAGES, duration_ms: INT, "asr_backend?": ["webgpu", "wasm"] },
   pipeline_done: { total_ms: INT, n_number: INT, n_list: INT, n_from_to: INT, n_keyword: INT },
   preview_played: {},
@@ -199,26 +252,28 @@ test.describe("one clip, from the drop to the preview", () => {
     await context.close();
   });
 
-  test("feed: \"Transcribing…\" comes first, a \"Found:\" line follows, and no voice is said to be cleaned", async () => {
+  // V3 (D-91): the voice is cleaned beside the recognizer, so its line comes
+  // first or second, and the "Found:" lines follow in time order.
+  test("feed: \"Cleaning voice\" and \"Transcribing…\" come first, then the \"Found:\" lines in time order", async () => {
     const states = await page.evaluate(() => window.e2eFeed ?? []);
     const last = states.at(-1) ?? [];
-    expect(last[0]).toBe(messages.feed.transcribing);
-    expect(last.slice(1).filter((line) => line.startsWith(FOUND_PREFIX)).length).toBeGreaterThanOrEqual(1);
-    expect(states.flat()).not.toContain(messages.feed.cleaningVoice);
+    expect(last.slice(0, 2).sort()).toEqual([messages.feed.cleaningVoice, messages.feed.transcribing].sort());
+    expect(last.slice(2).length).toBeGreaterThanOrEqual(1);
+    expect(last.slice(2).filter((line) => !line.startsWith(FOUND_PREFIX))).toEqual([]);
+    // In time order: the order of the README's expected feed.
+    const order = expectedFeedV3().map((row) => row.line);
+    expect(last.slice(2)).toEqual(order.filter((line) => last.includes(line)));
     // A line is added and never taken away or changed: each state begins with the one before it.
     for (const [index, state] of states.entries()) {
       expect(state.slice(0, states[index - 1]?.length ?? 0)).toEqual(states[index - 1] ?? []);
     }
   });
 
-  test("real detections only: every \"Found:\" line names an amount the README expects", async () => {
-    const lines = (await page.evaluate(() => window.e2eFeed ?? [])).at(-1) ?? [];
-    const amounts = lines.filter((line) => line.startsWith(FOUND_PREFIX)).map((line) => line.slice(FOUND_PREFIX.length));
-    const expected = expectedAmounts();
-    expect(expected.length).toBeGreaterThan(0);
-    expect(amounts.filter((amount) => !expected.includes(amount))).toEqual([]);
-    // And no line that is neither of the two kinds V2 has.
-    expect(lines.filter((line) => line !== messages.feed.transcribing && !line.startsWith(FOUND_PREFIX))).toEqual([]);
+  // V3 (D-91): every line is one of the README's V3 expected feed; the four
+  // that are always expected are all there; "Found: brutal" may be or not.
+  test("real detections only: every \"Found:\" line is one the README expects of V3, and the four sure ones are there", async () => {
+    expectFeed(await lastFeed(page), expectedFeedV3());
+    expect(expectedFeedV3().filter((row) => !row.optional)).toHaveLength(4);
   });
 
   test("quiet processing: from the drop to the player the page sends analytics and nothing else", ({ baseURL }) => {
@@ -257,6 +312,35 @@ test.describe("one clip, from the drop to the preview", () => {
       return all;
     });
     expect(names.filter((name) => name.includes("clip.mp4"))).toEqual([]);
+
+    // V3: the clip's three records, one each, under its id (v3implementation §19.17).
+    const clipId = clips[0] ?? "";
+    const counts = await page.evaluate(
+      ({ name, stores }) =>
+        new Promise<number[]>((resolve, reject) => {
+          const open = indexedDB.open(name);
+          open.onerror = () => {
+            reject(new Error("the database could not be opened"));
+          };
+          open.onsuccess = () => {
+            const tx = open.result.transaction(stores);
+            const reads = stores.map((store) => tx.objectStore(store).count());
+            tx.oncomplete = () => {
+              open.result.close();
+              resolve(reads.map((read) => read.result));
+            };
+          };
+        }),
+      { name: DB_NAME, stores: [STORES.clips, STORES.transcripts, STORES.edits] },
+    );
+    expect(counts).toEqual([1, 1, 1]);
+    const stored = (await readIndexedDb(page, "transcripts", clipId)) as
+      | { value: { transcript: { words: unknown[] }; prosody: { per_word: unknown[] } } }
+      | undefined;
+    expect(stored?.value.transcript.words.length).toBeGreaterThan(0);
+    expect(stored?.value.prosody.per_word.length).toBe(stored?.value.transcript.words.length);
+    expect(await readIndexedDb(page, "clips", clipId)).toMatchObject({ value: { clipId } });
+    expect(await readIndexedDb(page, "edits", clipId)).toMatchObject({ value: { editState: expect.any(Object) } });
   });
 
   test("long tasks: the longest main-thread task while processing is written down", async ({}, testInfo) => {
@@ -318,29 +402,39 @@ test.describe("one clip, from the drop to the preview", () => {
     await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
   });
 
-  test("events: the clip, its three stages, the result, and one preview for two plays", async ({}, testInfo) => {
+  // V3 (D-91): four stages, the chain's beside the recognizer's, and the
+  // reference clip's counts of the four kinds.
+  test("events: the clip, its four stages, the result, and one preview for two plays", async ({}, testInfo) => {
     await expect.poll(() => api.eventsOf("preview_played").length, { timeout: FLUSH_WAIT_MS }).toBe(1);
     expect(api.eventsOf("clip_accepted")).toEqual([
       { name: "clip_accepted", props: { source: "user", orientation: "landscape", duration_bucket: "lte90" } },
     ]);
     const timings = api.eventsOf("stage_timing") as { props: Record<string, unknown> }[];
-    expect(timings.map((event) => event.props.stage)).toEqual(["probe_audio", "asr", "detect_scene"]);
+    const stages = timings.map((event) => event.props.stage);
+    // `audio_chain` and `asr` run side by side: either may end first.
+    expect([
+      ["probe_audio", "audio_chain", "asr", "detect_scene"],
+      ["probe_audio", "asr", "audio_chain", "detect_scene"],
+    ]).toContainEqual(stages);
     for (const event of timings) {
       expect(Number.isInteger(event.props.duration_ms)).toBe(true);
       expect(event.props.asr_backend === undefined || event.props.asr_backend === null).toBe(event.props.stage !== "asr");
     }
-    expect(["webgpu", "wasm"]).toContain(timings[1]?.props.asr_backend);
+    const asr = timings.find((event) => event.props.stage === "asr");
+    expect(["webgpu", "wasm"]).toContain(asr?.props.asr_backend);
     // Which of the two it was is the machine's to say, and is written down: a
     // graphics processor that cannot run the model leaves it to the processor.
-    const backendLine = `the speech model ran on: ${String(timings[1]?.props.asr_backend)}, ${String(timings[1]?.props.duration_ms)} ms`;
+    const chain = timings.find((event) => event.props.stage === "audio_chain");
+    const backendLine = `the speech model ran on: ${String(asr?.props.asr_backend)}, ${String(asr?.props.duration_ms)} ms; the voice chain took ${String(chain?.props.duration_ms)} ms`;
     testInfo.annotations.push({ type: "asr backend", description: backendLine });
     process.stdout.write(`      ${backendLine}
 `);
     expect(api.eventsOf("pipeline_done")).toEqual([
-      { name: "pipeline_done", props: { total_ms: expect.any(Number), n_number: expect.any(Number), n_list: 0, n_from_to: 0, n_keyword: 0 } },
+      { name: "pipeline_done", props: { total_ms: expect.any(Number), n_number: 2, n_list: 1, n_from_to: 1, n_keyword: expect.any(Number) } },
     ]);
-    const done = api.eventsOf("pipeline_done")[0] as { props: { n_number: number } };
-    expect(done.props.n_number).toBeGreaterThanOrEqual(1);
+    const done = api.eventsOf("pipeline_done")[0] as { props: { n_keyword: number } };
+    // "brutal" is a KeywordPop only if the measured prosody carries it (README).
+    expect([0, 1]).toContain(done.props.n_keyword);
     // The model was on the device: nothing was downloaded, and nothing failed.
     expect(api.eventsOf("model_download")).toEqual([]);
     expect(api.eventsOf("client_error")).toEqual([]);
@@ -361,8 +455,8 @@ test.describe("one clip, from the drop to the preview", () => {
 
     // Nothing the feed showed is in any request the page or its workers made:
     // not in an address, not in a body (INV-2).
-    const amounts = expectedAmounts();
-    const feedText = [messages.feed.transcribing, FOUND_PREFIX.trim(), ...amounts];
+    const shown = expectedFeedV3().map((row) => row.line.slice(FOUND_PREFIX.length));
+    const feedText = [messages.feed.transcribing, messages.feed.cleaningVoice, FOUND_PREFIX.trim(), ...shown];
     const carrying = requests.filter(isHttp).filter((request) => {
       // An address is read as it is and as it reads once its escapes are undone.
       const sent = `${request.url}\n${decodeURI(request.url)}\n${request.body ?? ""}`;
@@ -396,4 +490,36 @@ test("sample clip: the button fetches the clip from the asset host and imports i
   await expect.poll(() => api.eventsOf("clip_accepted"), { timeout: FLUSH_WAIT_MS }).toEqual([
     { name: "clip_accepted", props: { source: "sample", orientation: "landscape", duration_bucket: "lte90" } },
   ]);
+});
+
+// The founder's second recording (D-99), on the development machine only. It
+// runs on its own, after the group above, so that it hides none of its cases.
+test("second recording: it is taken, processed, its feed is the README's, and its preview plays", async ({ page, context }) => {
+  const clip = v3TestClip();
+  test.skip(clip === null, "testclips/v3testclip.mp4 is on D1 only");
+  test.setTimeout(patient(600_000));
+  await ensureModelCached(context);
+  const api = await installFakeApi(page);
+  await routeAssets(page);
+  await watchPage(page);
+  await page.goto("/app");
+  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+
+  await dropClip(page, clip ?? "");
+  await expect(canvas(page).or(page.getByTestId("clip-failed")).or(page.getByTestId("clip-rejected"))).toBeVisible({ timeout: patient(360_000) });
+  await expect(canvas(page), "the second recording was processed").toBeVisible();
+  await expect.poll(() => api.eventsOf("clip_accepted"), { timeout: FLUSH_WAIT_MS }).toEqual([
+    { name: "clip_accepted", props: { source: "user", orientation: "landscape", duration_bucket: "lte90" } },
+  ]);
+  expectFeed(await lastFeed(page), expectedFeedOfTestClip());
+
+  // The preview plays: two pictures a second apart differ, and are kept nowhere.
+  await expect(button(page, messages.preview.play)).toBeEnabled({ timeout: 30_000 });
+  await button(page, messages.preview.play).click();
+  await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(2_500);
+  const [first, second] = await twoPictures(canvas(page), page, 1_000);
+  expect(first.equals(second)).toBe(false);
+  expect(hasDetail(second)).toBe(true);
+  await button(page, messages.preview.pause).click();
 });

@@ -870,3 +870,49 @@ Nothing else changed: no app code and no test. Prompt 87 keeps its `ci.yml` work
 
 **Checked.** The step order and indentation, read back. A YAML parser is not installed on D1 and none was added; the runner is the check, read below.
 
+**Read on the runner:** `7d8980b` gave `ci` success and `e2e-media` success. The Windows job generated the fixtures (the LF checkout worked) and ran the 23 `@no-gpu` cases.
+
+---
+
+## 2026-10-19 - Prompt 85 (V3 25/30): pipeline and export cases for V3; full media suite on D1
+
+CI on `7d8980b`: `ci` and `e2e-media` success (above).
+
+**Done.**
+
+- **`web/tests-e2e/pipeline-preview.spec.ts`, REOPENED CONTRACT (D-91).** 525 lines. The three cases that asserted V2's stand-ins are rewritten to §19.17; the other V2 cases keep their expectations.
+  - **"Feed"**: "Cleaning voice" and "Transcribing…" are the first two lines in either order; then only "Found:" lines, in the order of the README's V3 expected feed. Lines are only ever added (V2's check, kept).
+  - **"Real detections only"**: through `expectFeed`, every "Found:" line is one of the README's "Expected feed of V3" table, in its order, and the four rows not marked "(only if …)" are all there. "Found: brutal" (row 4, marked) is optional. The README's table is read by `expectedFeedV3`, which replaces V2's `expectedAmounts`.
+  - **"Events"**: `stage_timing` is `probe_audio`, then `audio_chain` and `asr` in either order, then `detect_scene`, with `asr_backend` on `asr` only. `pipeline_done` has `n_number` 2, `n_list` 1, `n_from_to` 1 and `n_keyword` 0 or 1. The printed line also gives the chain's time.
+  - **Extended, "OPFS"**: IndexedDB `clips`, `transcripts` and `edits` hold one record each (counted in one transaction). The clip's records are read with `readIndexedDb`, and `prosody.per_word.length` equals `transcript.words.length`.
+  - **"Event shape"**: its allowed events gain `clip_rejected` (`REJECT_REASONS`); `audio_chain` was already in its stages. The feed text that must reach no request is now the V3 lines, "Cleaning voice" included.
+  - **New, D1 only: "second recording"**, a test of its own after the group, so a failure in it hides none of the group's cases. Skipped with "testclips/v3testclip.mp4 is on D1 only" when the clip is absent. It drops the clip, waits for `ready`, and checks `clip_accepted` `{ source: "user", orientation: "landscape", duration_bucket: "lte90" }`. The feed is the README's "The V3 test clip as recognized" expected feed through `expectFeed`. The README says the KeywordPop may be absent: `expectedFeedOfTestClip` treats as optional the one line that names a word, not a quantity (no digit or currency sign), which is "Found: that's". Then the preview plays: two pictures a second apart differ, held in memory only.
+- **`web/tests-e2e/export-creator.spec.ts`: new, D1 only, "no metadata" (D-100).** 408 lines, after the group; the eleven V2 cases are unchanged.
+  - **The export:** drop `v3testclip.mp4`, wait for `ready` and for "Play" to be enabled (known issue 4), seed a Creator token, export, and save the file in a `mkdtemp` folder of the system temp directory. The context and the folder are removed in a `finally`.
+  - **`metadataProblems(file, source)`** lists what it finds; the case expects `[]`. Checked:
+    - `ffprobe -show_entries format_tags:stream_tags`: no tag key containing `location` or `iso6709`;
+    - no `creation_time` but the epoch;
+    - no `creation_time`, `title`, `comment` or `encoder` with the source's value;
+    - a byte search for `©xyz` and `ISO6709`.
+  - **Then** `verifyMp4(file, "creator", sourceDurationMs(source))`: "PASS 6", no "FAIL", exit 0.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The full run has 1 skipped, not 0.** It is `REJECT_DECODE_UNSUPPORTED`, which marks itself `test.fixme` because Chrome on D1 decodes the High 4:4:4 file (D-78; Prompt 84's entry). It is not the skip the prompt warns of (a missing test clip): both D1-only cases ran and passed.
+- **The test clip's optional line is told by its content**, not by a mark in the README. That README paragraph says the KeywordPop may be absent, but marks no line. Today's rule (no digit and no currency sign) singles out "Found: that's" only.
+- `pnpm e2e:media --grep "second recording\|no metadata"` was not run on its own: both cases ran in the full keyed run. The gate's build carries no key, under which the export case would fail at the entitlement.
+
+**Checked.**
+
+- **The list:** `pnpm e2e:media --list`: "Total: 50 tests in 5 files" (48 cases: V2's 30, the rejection suite's 16, these 2; and the 2 of `media-setup`).
+- **Drill:** the metadata check, copied into a temporary `zz-metadata.spec.ts` and pointed at `testclips/v3testclip.mp4` itself, failed with 10 problems: `format: a location tag, location`, `format: a location tag, location-eng`, the source's `creation_time` (format and both streams), the source's `encoder` (stream 0), and the bytes of a `©xyz` atom. The copy and its config are deleted. No coordinate is written here.
+- **The full suite on D1, keyed.** The test key was worked out from the seed of `fake-api.ts` in one shell (it equals `ci.yml`'s `E2E_TEST_PUBLIC_KEY`), exported there for one `pnpm build`, and unset after (`env` then holds it 0 times; it entered no file). `pnpm e2e:media`, detached: **49 passed, 1 skipped, 0 failed, 10.5 min**. Notes from the run:
+  - The recognizer ran on `webgpu`: 58,169 ms, with the voice chain 1,273 ms.
+  - The longest main-thread task while processing was 200 ms.
+  - The Creator export: `render_encode` 24,871 ms.
+  - "second recording" took 1.2 min and "no metadata" 2.0 min.
+  - No `offcut-e2e-*` folder is left in the temp directory.
+- **SAB gate**, on a fresh build without the key (the key's text is in no bundle file): no `zz` file, no test key, `pnpm fixtures` up to date, `pnpm check` exit 0, `pnpm test`: Rust **461 passed**, 3 ignored, Vitest 92; `pnpm build` exit 0 (bundles unchanged); `pnpm e2e` 12 of 12; the frozen check and the tracked-private check print nothing.
+
+**Found, not fixed.** None. No V2 case other than the three of D-91 failed, so no app regression was found.
+
