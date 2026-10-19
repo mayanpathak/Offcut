@@ -56,7 +56,7 @@ env:
   # 9.0.2, by its dated release, refused unless its checksum is this one.
   # BtbN deletes a dated release after about six weeks (v3changelog open item 7).
   FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz
-  FFMPEG_LINUX_SHA256: 1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29457
+  FFMPEG_LINUX_SHA256: 1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29458
   # The public half of the E2E test key (v2implementation D-24): the key of
   # the fixed seed in web/tests-e2e/helpers/fake-api.ts. It is no secret. A
   # build made with it accepts the entitlement tokens the tests mint, so it
