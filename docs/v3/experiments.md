@@ -107,9 +107,9 @@ Decision:
 ## rej_h264_444 in Chrome
 Question: does Chrome refuse to decode H.264 High 4:4:4 Predictive, so that `rej_h264_444.mp4` tests `REJECT_DECODE_UNSUPPORTED` with a real file (D-78)?
 Method: `ffprobe` on the generated file; then `VideoDecoder.isConfigSupported({ codec, codedWidth: 1280, codedHeight: 720 })` in Chrome stable through Playwright on a page of the app's origin, for `avc1.f4001f` (High 4:4:4, level 3.1), D-78's fallback `avc1.6e001f` (High 10) and `avc1.64001f` (High) as a control.
-Numbers: the file is `High 4:4:4 Predictive`, level 31. Chrome answers `supported: true` for all three.
-Date: 2026-10-17, D1.
-Decision: D-78's last branch: both files would decode, so the `REJECT_DECODE_UNSUPPORTED` case of `rejections.spec.ts` is written as `test.fixme` with this reason (Prompt 84), and the code path is covered by the inline unit test of `validate_probe`. The fixture stays, unchanged: `probe_rejections.rs` uses it natively with `decode_supported = false`. No `rej_h264_hi10.mp4` is made (it would decode too). The Windows runner's Chrome is not read here.
+Numbers: the file is `High 4:4:4 Predictive`, level 31. Chrome answers `supported: true` for all three. On CI's Windows runner (job `e2e-media / media` of run 39217492169, on `32da057`) the case asked the runner's Chrome the same question for `avc1.f4001f`, was told `true`, and marked itself `test.fixme`: the job read "24 passed, 1 skipped", the skip being this case.
+Date: 2026-10-17, D1; 2026-10-19, CI's Windows runner (Prompt 87).
+Decision: D-78's last branch: both files would decode, so the `REJECT_DECODE_UNSUPPORTED` case of `rejections.spec.ts` is written as `test.fixme` with this reason (Prompt 84), and the code path is covered by the inline unit test of `validate_probe`. The fixture stays, unchanged: `probe_rejections.rs` uses it natively with `decode_supported = false`. No `rej_h264_hi10.mp4` is made (it would decode too). The Windows runner's Chrome decodes the file as well (Prompt 87), so no Chrome this project runs today refuses it, and the case runs its assertions nowhere yet. It runs them by itself on a Chrome that refuses the file.
 
 ## rej_silent
 Question: does the recognizer give fewer than `MIN_WORDS` (3) words for 5 s of digital silence, so that `rej_silent.mp4` is refused with `REJECT_NO_SPEECH` (D-111)?

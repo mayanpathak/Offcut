@@ -14,7 +14,7 @@
 | # | Item | Owner | Version |
 |---|---|---|---|
 | 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
-| 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. Prompt 87 writes it into `ci.yml`: check it then, and choose there between a newer build of the same day and a copy kept on the asset host | Agent | Prompt 87 |
+| 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. On 2026-10-19 it still downloads (Prompt 87); it is in `ci.yml` and in `check-external-facts.mjs` with its date. Choose before about 2026-11-27: a newer dated build (new URL and SHA-256 in both files) or a copy on the asset host (an upload with the R2 keys). CI fails at the checksum step the day it is gone | Founder (choice), Agent (the edit) | Before 2026-11-27 |
 | 15 | **`CLOCK_WORDS` holds `a.m` and `p.m` since Prompt 77**, the forms `tokenize` gives "a.m." and "p.m." (they never equalled `a.m.` / `p.m.`). Copy back into §9.1's lexicon table | Agent | Prompt 89 |
 | 17 | **Prompt 77 as built** (its entry): `Candidate` gains `sentence` (§9.3's struct; `resolve` keeps one KeywordPop per sentence and has no transcript); `lib.rs` step 5 takes a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth before the threshold (0.65 + 0.20 is 0.84999996 in `f32`: no marker-only list could reach 0.85); the X1-X5 bounds and `VERSION_DOTS` are named constants of `config.rs`. Copy back into §9.2 step 5, §9.3, §9.7, Appendix D, and §23 item 27 | Agent | Prompt 89 |
 | 20 | **The split decimal point, as built 2026-10-18** (entry "Outside a prompt: the split decimal point"): `offcut-text`'s `with_split_groups` also joins a word of a point and digits only (`4` `.7`) to the whole number before it. Copy back into v3implementation §8 (beside D-42's split groups, with the founder's two cases) and TS §17.2 | Agent | Prompt 89 |
@@ -24,7 +24,6 @@
 | 13 | **§8.6 and §9.9 miscount the V2 tests V3 changes** (each says one): eleven `offcut-text` assertions and one `offcut-detect` test asserted V2's stand-ins and were set to V3 values (Prompt 73's table). Copy back into §8.6, §9.9 and G 6.4, and correct the prompt's "exactly one" check | Agent | Prompt 89 |
 | 12 | **§7.9's "best τ*" halves the pitch of a periodic voice at random**: `prosody.rs` takes the first autocorrelation peak within 0.9 of the best (`FIRST_PEAK_SHARE`, Prompt 68). Copy back into v3implementation §7.9 and Appendix D | Agent | Prompt 89 |
 | 11 | **§19.4's pink-noise row contradicts P4**: pink noise at -40 dBFS RMS reads -40.1 LUFS, beyond `MAX_GAIN_DB` of the target, so P4's capped-gain exception applies; `loudness_target.rs` asserts P4 (Prompt 67). Copy back into v3implementation §19.4: that expectation, or a level of -35 dBFS RMS | Agent | Prompt 89 |
-| 10 | **`pnpm fixtures` takes 118-166 s on D1**, not the "under a minute" D-94 and §17.1 assume (40 s); on the Linux runner, where it runs since Prompt 67, it takes 58 s. The two 1080p 60 s clips take most of it even with 4 x264 threads (Entry of Prompt 63). It runs on every `ci` run and every `e2e-media` run: Prompt 87 reads the Linux runner's time and decides between paying it and caching `fixtures/.gen/` by the `STAMP` key (D-94 says no cache) | Agent | Prompt 87 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -1015,3 +1014,70 @@ CI on Prompt 85's `1c994d7`: `ci` success (7.1 min), `e2e-media` success (8.2 mi
   - False positives: NumberReveal on "three months" (words 72-73) and on "three to four months" (93-94), both at 0.80, which the labels call no events; and a KeywordPop on "that's" (word 152), at 0.84.
   - Also: the `$2,000` label reads "in revenue in" where "in revenue" was labeled (reported, not matched).
   - Prompt 88 fills `a02` and applies §20.3: labels are not edited (D-87).
+
+---
+
+## 2026-10-19 - Prompt 87 (V3 27/30): CI, pinned Linux ffmpeg, fixtures before `cargo test`, the rejection cases on Windows
+
+CI on Prompt 86's `32da057` (run 39217492169): `ci` success (7.0 min), `e2e-media` success (10.8 min); the deploys skipped. The readings below are from that run.
+
+**Done.**
+
+- **`scripts/check-external-facts.mjs` (§18.4)**: one fact, `D-94`. It names the Linux ffmpeg archive by its URL, and its date is 2026-10-16, when the checksum was taken (Entry 1). Its note says that a dated release is deleted after about six weeks, so the archive is expected gone near the end of November 2026. The script prints it with the TE facts.
+- **`.github/workflows/ci.yml` and `e2e-media.yml`: no change in this prompt.** Both already do what §18.5 and §18.6 ask:
+  - **`ci.yml` since Prompt 67.** `env` holds `FFMPEG_LINUX_URL` and `FFMPEG_LINUX_SHA256`. "Install the build tools" (after pnpm is set up) fetches the archive through the job's `fetch`, which runs `sha256sum --check` and refuses a mismatch. It installs `ffmpeg` and `ffprobe` and prints the version line. Before `cargo test`, "Restore the reference clip" (`actions/cache`, the pinned v6 SHA) and "Generate the fixtures" (`pnpm fixtures`, with `VITE_ASSET_BASE_URL` in the job's `env`) run, in that order. Step 4's command, the test-key guard and the deploy order are unchanged.
+  - **`e2e-media.yml` since `7d8980b`.** It has the LF checkout, "Restore the model files and the reference clip" directly after "Install ffmpeg", then `pnpm fixtures`, and a head comment that names the rejection suite. The Playwright command is unchanged, and the failure report stays.
+- **The push and the pull request.** `v3-build` already tracks `origin/v3-build` (set by an earlier push), so `git push -u` changed nothing. Pull request #5 (`v3-build` → `main`) is open as a draft and is not merged. Every push of this prompt went to `v3-build` only (the founder's standing instruction of 2026-10-18).
+- **G 11.9, the CI logs.** `gh` 2.102.0 is now installed on D1 and logged in as the founder's account, so the agent read the logs itself (Assumptions (a) of the guide no longer hold).
+  - **Linux:** `ffmpeg version n9.0.2-28-g669f5ab083-20261016`.
+  - **The six fixture-reading binaries all ran in step 4**, none skipped:
+
+    | Binary | Passed | Ignored | Time |
+    |---|---|---|---|
+    | `demux_fixtures` | 12 | 0 | 0.12 s |
+    | `probe_rejections` | 15 | 0 | 0.02 s |
+    | `loudness_target` | 10 | 0 | 48.51 s |
+    | `duration_preserved` | 7 | 0 | 42.78 s |
+    | `chain_no_clicks` | 7 | 1 | 12.27 s |
+    | `prosody` | 10 | 0 | 2.35 s |
+
+    The one ignored test of `chain_no_clicks` is its hand-read timing (`#[ignore = "a timing, read by hand…"]`), as on D1.
+  - **`cargo test` on the runner: 461 passed, 3 ignored**, D1's count. The whole job log sums to 465, because `pnpm gen:types` (step 3) runs four one-test binaries first.
+  - **Windows:** `ffmpeg version 9.0.2-essentials_build`. Playwright selected 25 cases (the 23 `@no-gpu` and the 2 of `media-setup`): **24 passed, 1 skipped**, 7.1 min.
+  - **The skip is `REJECT_DECODE_UNSUPPORTED`.** The runner's Chrome, too, says it can decode `avc1.f4001f`, so the case marked itself `test.fixme` (Prompt 84). Recorded in `experiments.md` under "rej_h264_444 in Chrome".
+- **G 11.10, the two guard drills**, each a throwaway commit pushed to `v3-build` and undone with `git revert` (no force-push):
+  - `6b0d8cd`: the last hex digit of `FFMPEG_LINUX_SHA256` changed (`…457` to `…458`). Run 39219674623: `ci` failed at "Install the build tools" with `sha256sum: WARNING: 1 computed checksum did NOT match` and `ffmpeg.tar.xz: FAILED`; `e2e-media` and the deploys were skipped. Reverted by `506cb5e`.
+  - `299afb9`: the step "Generate the fixtures" removed. Run 39219919464: `ci` failed at `cargo test`, in `chain_no_clicks`, with "the generated fixtures are stale or missing: run `pnpm fixtures`"; `e2e-media` and the deploys were skipped. Reverted by `5b3d35d`.
+
+  After the reverts `git diff 32da057 HEAD` is empty. The drill commits carry no changelog line of their own: this entry records them.
+- **Open item 10 is closed: the fixtures are generated on every run, not cached** (D-94 stands). On the runners "Generate the fixtures" took 94 s on Linux (58 s at Prompt 67) and 83 s on Windows. The jobs took 7.0 and 10.8 min, well inside their 45- and 30-minute limits. Caching `fixtures/.gen/` by its `STAMP` would save about a minute and a half per job, at the cost of a cache whose staleness the generator's own check would have to catch. Not worth it now.
+- **Open item 7 is updated, not closed.** On 2026-10-19 the URL still downloads (HTTP 200, 151,156,356 bytes, the same as on 2026-10-16). It stays in `ci.yml` and is now in `check-external-facts.mjs` with its date. The choice between a newer dated build (a new URL and SHA-256 in both files) and a copy on the asset host (an upload with the R2 keys) is the founder's. It is due before about 2026-11-27, six weeks after the build. CI fails at the checksum step the day the release is gone, as drill 1 showed.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **The ffmpeg install is not two separate steps named "Install ffmpeg (Linux, pinned)" and "ffmpeg version".** Prompt 67 put it in "Install the build tools", beside the other checksum-pinned tools, through the same `fetch` and into `~/.cargo/bin`, which is already on the path. G 11.7's sketch extracts to `$RUNNER_TEMP/ffmpeg` and appends to `$GITHUB_PATH` instead. The behaviour is the one asked for: a pinned URL, the checksum refused on mismatch (drill 1), the version line in the log, and all of it before `pnpm fixtures`. Moving it would change working steps for no gain, and "change only the steps named" argues against it.
+- **"Restore the reference clip" keeps Prompt 67's key and path** (`reference-clip-<hash of asset-fetch.ts>`, `fixtures/.cache/media`), not `e2e-media.yml`'s (`e2e-assets-<hash of model-manifest.json and asset-fetch.ts>`, `fixtures/.cache`). An `actions/cache` entry saved on Linux is not restored on Windows: the cache version differs by OS unless `enableCrossOsArchive` is set. So the same key would share nothing between the jobs. It would only make the Linux entry expire when the model changes, which the Linux job does not use. The clip is still downloaded at most once per key, and its hash is still checked by the generator (exit 3).
+- **G 11.9 expects `REJECT_DECODE_UNSUPPORTED` to pass on the runner; it is skipped there as fixme**, as on D1 (above). The import-time refusal of a file Chrome cannot decode is covered by `validate_probe`'s inline unit test and natively by `probe_rejections.rs` (`decode_supported = false`), both of which ran in step 4.
+- **The Human steps were done by the agent.** The push and the reading of the logs are the founder's in the prompt. The founder asked on 2026-10-18 for every V3 commit to be pushed to `v3-build` by the agent, and `gh` made the logs readable.
+
+**Checked.**
+
+- **`actionlint` 1.7.12**, downloaded for this check into the scratchpad from the `rhysd/actionlint` release (its `checksums.txt` line verified): `ci.yml` and `e2e-media.yml` give no finding, exit 0. `shellcheck` is not installed on D1, so the `run:` scripts were not linted by it.
+- **`node scripts/check-external-facts.mjs`** prints the `D-94` line with its date; "Without a date" is unchanged (TE-5, TE-6, TE-7, TE-8, TE-9, TE-11).
+- **SAB gate** (before the drills; the tree after them is the same):
+  - no `zz` file, no test key in the environment;
+  - `pnpm check` exit 0;
+  - `pnpm fixtures` up to date;
+  - `pnpm test`: Rust **461 passed**, 3 ignored; Vitest 92;
+  - `pnpm build` exit 0;
+  - `pnpm e2e` 12 of 12;
+  - the frozen check and the tracked-private check print nothing.
+
+  Counts equal Prompt 86's.
+- **The end state** (the branch green after the drills) is this commit's own run, whose tree equals `32da057`'s plus the three files above; it is recorded at the head of the next entry, as every entry's CI is.
+
+**Pinned versions.** No dependency added. `actionlint` 1.7.12 was used from the scratchpad and is not part of the repository.
+
+**Found, not fixed.**
+
+- **No Chrome this project runs refuses `rej_h264_444.mp4`** (D1 and the Windows runner, both Chrome stable of October 2026). The `REJECT_DECODE_UNSUPPORTED` case therefore runs its assertions nowhere. D-78 foresaw this; there is nothing to do in V3.
