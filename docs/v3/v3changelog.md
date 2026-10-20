@@ -1302,7 +1302,7 @@ The server went first, then the web build. Every step of `deploy-web` succeeded:
 - §1A items 2-10 are ticked with their evidence from Entry 1 and Prompt 61, which recorded them and did not tick them.
 - §21.3 is ticked but for the tag. Open item 22 is closed there: the places V4 fills are marked "(V4)" and "arrives in V4", which `git grep -nE "\bV4\b"` lists.
 - §22 is ticked but for "Section 21.3 is fully ticked" and "Tagged `v3`".
-- The tag is the founder's: `v3` on `7f091fb`, the commit deployed and verified above. Its boxes are ticked in this pull request once `git ls-remote --tags origin v3` shows it.
+- **Tagged.** The founder pushed the annotated tag `v3` on `7f091fb` on 2026-10-21, the commit deployed and verified above. `git ls-remote --tags origin v3 'v3^{}'` gives `refs/tags/v3` (`b8303a0`) and `refs/tags/v3^{}` = `7f091fb`. With it, every box of §1A, §21.3 and §22 is ticked: `grep -c "^- \[ \]" docs/v3/v3implementation.md` is 0.
 
 **Differs from the prompt, the guide or the plan.**
 - **The tag points at the merge, not at this changelog commit** (G 13.6 tags `main`'s head after it). Prompt 90 asks for the tag on "the deployed commit", and `7f091fb` is the one every check above read; this pull request changes documents only.

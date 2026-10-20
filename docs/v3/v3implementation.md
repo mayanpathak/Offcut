@@ -2224,7 +2224,7 @@ Every row is additive: a function body, a new file, a new case, a new row. No V3
 
 ### 21.3 What must be true on V4's first morning
 
-- [ ] V3 is tagged `v3`, merged into `main` and deployed; the deployed page refuses `rej_4k.mp4` with its message.
+- [x] V3 is tagged `v3`, merged into `main` and deployed; the deployed page refuses `rej_4k.mp4` with its message. *Evidence (P90, 2026-10-21): `git ls-remote --tags origin v3 'v3^{}'` gives `refs/tags/v3` (annotated, `b8303a0`) and `refs/tags/v3^{}` = `7f091fb`, the merge deployed by run 39509258056 and verified from D1 (V3 changelog, Prompt 90).*
 - [x] TE-13's decision is written and `ChainConfig::default()` says it. *Evidence (P90, 2026-10-21): `docs/v3/experiments.md` TE-13 and §20.2's outcome; `ChainConfig::default().denoise` is `true`.*
 - [x] The precision gate's table, sweep and thresholds are in `docs/v3/experiments.md`, and TS §17.4 holds the thresholds in use. *Evidence (P90, 2026-10-21): `experiments.md` "Precision gate" (P88); TS §17.4 "Thresholds in use" (P89).*
 - [x] `fixtures/speech/README.md` lists the derived clips' and the second recording's events: V4's golden frames and snapshots are drawn from them. *Evidence (P90, 2026-10-21): P82 and P88.*
@@ -2286,8 +2286,8 @@ V3 is done when every box is ticked (BP §1.2, BP §5.4, TS §28 M1.1-M1.3).
 - [x] Every (assumption) V3 measured is replaced by its value in TS §39.3, or still listed there. *Evidence (P89, 2026-10-21): TS §39.3 items 10, 11, 24, 27 (P88, P89), item 28 lists what V3 leaves open.*
 - [x] `docs/v3/v3changelog.md` lists every pinned version, every recipe change, every label change after the freeze, and the ffmpeg build used on each machine. *Evidence (P89, 2026-10-21): Entry 1 (`nnnoiseless` 0.5.2, `ebur128` 0.1.10, ffmpeg on D1 and both runners), P63 (recipes), P88 (`a02`'s data, labels unchanged: `git diff 9c96667 -- fixtures/labeled` changes no label), P89 (`rustls-webpki`, `webpki-roots`).*
 - [x] `docs/v2/experiments.md` has its closing M0 entry (section 1A). *Evidence (P89, 2026-10-21): "M0 gate decision (recorded 2026-10-16, at V3 S1)" (P61).*
-- [ ] Section 21.3 is fully ticked.
-- [ ] Tagged `v3`.
+- [x] Section 21.3 is fully ticked. *Evidence (P90, 2026-10-21): every box of §21.3 ticked.*
+- [x] Tagged `v3`. *Evidence (P90, 2026-10-21): `git ls-remote --tags origin v3 'v3^{}'` gives `refs/tags/v3` (annotated, `b8303a0`) and `refs/tags/v3^{}` = `7f091fb`, the merge deployed by run 39509258056 and verified from D1 (V3 changelog, Prompt 90).*
 
 ---
 
