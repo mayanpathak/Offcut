@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "w01-saas-pricing",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "Last spring I changed how I price my small invoicing app.",
+    "The basic plan went from $12 a month to $29 a month, and I was sure people would leave.",
+    "Almost nobody left.",
+    "Revenue that quarter came to $48,000, which paid for a second developer.",
+    "The lesson was *simple*, charge for the value, not for the hours.",
+    "If your customers save time with your tool, they will pay for it."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "from $12 a month to $29 a month", "occurrence": 1,
+      "from": { "value": 12, "unit": "usd" }, "to": { "value": 29, "unit": "usd" } },
+    { "kind": "number_reveal", "say": "$48,000", "occurrence": 1, "value": 48000, "unit": "usd" },
+    { "kind": "keyword_pop", "say": "simple", "occurrence": 1 }
+  ],
+  "tags": ["from_frame"],
+  "notes": "FromTo with a from-frame between two monthly prices; a quarterly revenue figure; one emphasized word"
+}

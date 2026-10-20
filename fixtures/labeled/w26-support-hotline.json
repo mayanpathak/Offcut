@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "w26-support-hotline",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "We finally set up a support line for our app.",
+    "For billing questions, customers call 5550147 during office hours.",
+    "For outages, the on-call engineer answers on 5550193 at any time.",
+    "Most calls are about passwords, so we wrote a better reset page.",
+    "Support taught us more about the product than any survey."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [],
+  "tags": ["X4", "X4"],
+  "notes": "two phone-like runs of digits, both made up, and no event"
+}

@@ -9,7 +9,7 @@ const PREVIEW_URL = "http://localhost:4173";
 // The media suites take a clip through the pipeline in a real Chrome. They
 // need a build made with the test key (v2implementation D-24), and the model
 // in `fixtures/.cache/`, which `media-setup` puts there.
-const MEDIA_SUITES = ["model-download.spec.ts", "pipeline-preview.spec.ts", "export-creator.spec.ts"];
+const MEDIA_SUITES = ["model-download.spec.ts", "pipeline-preview.spec.ts", "export-creator.spec.ts", "rejections.spec.ts"];
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).
 const TIMEOUT_SCALE = Number(process.env.E2E_TIMEOUT_SCALE ?? "1");
@@ -58,6 +58,19 @@ export default defineConfig({
       fullyParallel: false,
       workers: 1,
       use: { ...MEDIA_USE, headless: false },
+    },
+    // `pnpm corpus`: the clips of corpus/manifest.json this machine has. Some
+    // are lent by people other than the founder, so nothing the page showed is
+    // kept, not even of a failure (v3implementation §17.6, D-112).
+    {
+      name: "corpus",
+      testDir: "../corpus",
+      testMatch: "run_corpus.ts",
+      dependencies: ["media-setup"],
+      timeout: MEDIA_TIMEOUT_MS * 2,
+      fullyParallel: false,
+      workers: 1,
+      use: { ...MEDIA_USE, screenshot: "off", video: "off", trace: "off" },
     },
   ],
   ...(deployedUrl === undefined && {

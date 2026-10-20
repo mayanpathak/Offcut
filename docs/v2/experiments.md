@@ -263,3 +263,10 @@ Other `render_encode` readings of the same day, labelled `dev`: 28,282 ms (Promp
 | The cases run but a clip takes longer than a case may | The runner transcribes without a GPU. Read how long, and decide between a longer limit for the job and the fallback |
 
 **What this does not show yet.** Whether a page on the runner gets WebGPU and the two encoders, and how long a clip takes there. The workflow's own steps have run once and work.
+
+## M0 gate decision (recorded 2026-10-16, at V3 S1)
+Decision: continue (the founder's, 2026-10-15).
+E-3: about 150 s for 60 s on the founder's machine (D-67); 62-96 s on D1.
+E-4: 29,641 ms on D1.
+E-1: inconclusive; the page was not announced.
+S15 of V2 was not run; V3's Step 12.1 commits the first `d1` bench file.

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "w20-battery-life",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I tested battery life on my work laptop for a full month.",
+    "With every setting at the default, it went from 11 hours to 6 hours over two years of use.",
+    "A clean install helped more than I expected.",
+    "My compile time was 14 minutes, and the clean install brought it down to 9 minutes.",
+    "Old background apps were eating both the battery and the processor.",
+    "Check what starts with your machine before you buy a new one."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "from_to", "say": "from 11 hours to 6 hours", "occurrence": 1,
+      "from": { "value": 11, "unit": "hours" }, "to": { "value": 6, "unit": "hours" } },
+    { "kind": "from_to", "say": "14 minutes, and the clean install brought it down to 9 minutes", "occurrence": 1,
+      "from": { "value": 14, "unit": "minutes" }, "to": { "value": 9, "unit": "minutes" } }
+  ],
+  "tags": ["from_frame", "change_verb"],
+  "notes": "two FromTos in two sentences, one with a from-frame (hours) and one with a change verb (brought it down to, minutes). over two years of use is a duration, not part of the change"
+}

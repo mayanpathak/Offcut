@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "w04-newsletter",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My newsletter had its second birthday this month.",
+    "Every Sunday it goes out to 14,000 subscribers.",
+    "For a long time the open rate was 26 percent, and then it went up to 52 percent when I cut each issue in half.",
+    "Shorter is kinder to your readers.",
+    "I also stopped sending links I had not read myself."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "14,000 subscribers", "occurrence": 1, "value": 14000, "unit": "count:subscribers" },
+    { "kind": "from_to", "say": "26 percent, and then it went up to 52 percent", "occurrence": 1,
+      "from": { "value": 26, "unit": "percent" }, "to": { "value": 52, "unit": "percent" } }
+  ],
+  "tags": ["change_verb"],
+  "notes": "FromTo with a change verb (went up to), percent to percent; a subscriber count over 1,000. second in sentence 1 is not a list marker"
+}

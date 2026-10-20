@@ -10,3 +10,9 @@ workspace = true
 [dependencies]
 offcut-types = { workspace = true }
 offcut-text = { workspace = true }
+
+[dev-dependencies]
+# precision_recall.rs reads the labeled files (v3implementation §19.12).
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+proptest = { workspace = true, features = ["std"] }

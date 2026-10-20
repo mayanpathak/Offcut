@@ -16,7 +16,9 @@
     "e2e:media": "pnpm --filter web exec playwright test --project=media",
     "e2e:device": "pnpm --filter web exec playwright test --project=non-media --project=media --headed",
     "bench:device": "pnpm --filter web exec playwright test --project=bench",
-    "verify": "python verify/verify_mp4.py"
+    "verify": "python verify/verify_mp4.py",
+    "fixtures": "sh fixtures/gen_fixtures.sh",
+    "corpus": "sh corpus/fetch_corpus.sh && pnpm --filter web exec playwright test --project=corpus"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

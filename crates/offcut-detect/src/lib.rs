@@ -1,62 +1,186 @@
-//! Which moments of a transcript become visual events. V2 finds NumberReveal
-//! only. An event below its kind's threshold is never made (INV-6), and
-//! nothing here lays out or draws.
+//! Which moments of a transcript become visual events: NumberReveal,
+//! ListReveal, FromTo and KeywordPop (TS §17). An event below its kind's
+//! threshold is never made (INV-6), the same inputs give the same events
+//! (INV-7), and nothing here lays out or draws.
 
 pub mod config;
 pub mod event_id;
+mod exclusions;
+mod from_to;
+mod keyword;
+mod list;
 pub mod number;
+mod resolve;
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use offcut_text::tokenize;
-use offcut_types::{Confidence, DetectedEvent, Prosody, Transcript, WordIdx};
+use offcut_types::{
+    Confidence, DetectedEvent, EventKind, Prosody, Sentence, SentenceIdx, Transcript, WordIdx,
+    WordRange,
+};
 
 pub use crate::config::DetectorConfig;
+use crate::config::SCORE_NOISE;
 pub use crate::event_id::event_id;
 use crate::number::Candidate;
 
 /// The events of a transcript, in the order they are spoken. `edits` are the
 /// user's word edits: detection reads the text as edited (TS §17.2). The
-/// same inputs give the same events, with the same ids.
+/// same inputs give the same events, with the same ids. An empty transcript
+/// gives none; nothing here fails.
 pub fn detect(
     t: &Transcript,
     p: &Prosody,
     edits: &BTreeMap<WordIdx, String>,
     cfg: &DetectorConfig,
 ) -> Vec<DetectedEvent> {
-    let toks = tokenize(&t.words, edits);
-    let mut cands = number::find(&toks, t, p, cfg);
-    cands.retain(|c| c.score >= cfg.threshold_number);
-    cands.sort_by_key(|c| c.span.start);
+    let cands = candidates(t, p, edits, cfg);
+    // 6-7: what competes is resolved, and each kept candidate is an event.
+    into_events(resolve::resolve(cands, &[], cfg), Vec::new())
+}
 
-    // V3: `exclusions::apply`, the filter by kind and `resolve::resolve`
-    // take the place of the threshold above and of this rule (D-49): two
-    // overlays are never on the screen at once, and the earlier one stays.
-    let mut kept: Vec<Candidate> = Vec::new();
-    for cand in cands {
-        let shown_from = cand.span.start.get().saturating_sub(cfg.overlay_lead_ms);
-        let free = kept.last().is_none_or(|before| {
-            shown_from > before.span.end.get().saturating_add(cfg.number_hold_ms)
-        });
-        if free {
-            kept.push(cand);
+/// The events after an edit in sentence `s` (section 9.2, D-86): the events
+/// of `prev` outside the scope stay as they are, and the scope is detected
+/// again with them fixed, so the rules of TS §17.5 hold for the whole clip.
+/// An event whose kind and anchors did not change keeps its id (D-47). `s`
+/// out of range returns `prev` unchanged.
+pub fn redetect_sentence(
+    t: &Transcript,
+    p: &Prosody,
+    edits: &BTreeMap<WordIdx, String>,
+    s: SentenceIdx,
+    prev: &[DetectedEvent],
+    cfg: &DetectorConfig,
+) -> Vec<DetectedEvent> {
+    let Some(sentence) = t.sentences.get(s.get() as usize) else {
+        return prev.to_vec();
+    };
+    let scope = scope(t, sentence, prev, cfg);
+    let outside: Vec<DetectedEvent> = prev
+        .iter()
+        .filter(|e| !meets(e.anchors, scope))
+        .cloned()
+        .collect();
+    let mut cands = candidates(t, p, edits, cfg);
+    cands.retain(|c| scope.start <= c.anchors.start && c.anchors.end <= scope.end);
+    let kept = resolve::resolve(cands, &outside, cfg);
+    into_events(kept, outside)
+}
+
+/// Steps 1-5 of `detect`: the candidates of the text as edited that clear
+/// the threshold of their kind.
+fn candidates(
+    t: &Transcript,
+    p: &Prosody,
+    edits: &BTreeMap<WordIdx, String>,
+    cfg: &DetectorConfig,
+) -> Vec<Candidate> {
+    // 1-3: the text as edited, and the candidates of the four finders, each
+    // reading the quantities of each sentence again (D-104, D-109).
+    let toks = tokenize(&t.words, edits);
+    let mut cands = from_to::find(&toks, t, p, cfg);
+    cands.extend(list::find(&toks, t, p, cfg));
+    cands.extend(number::find(&toks, t, p, cfg));
+    cands.extend(keyword::find(&toks, t, p, cfg));
+    // 4: years, versions, clock times, phone-like runs, bare small numbers,
+    // markers, hidden words.
+    exclusions::apply(&mut cands, &toks, t, edits);
+    // 5: the threshold of each kind, on the score without f32 noise.
+    for cand in &mut cands {
+        cand.score = settled(cand.score);
+    }
+    cands.retain(|c| c.score >= cfg.threshold(c.kind));
+    cands
+}
+
+/// Step 7: each kept candidate as an event, beside the `fixed` ones, all in
+/// spoken order.
+fn into_events(kept: Vec<Candidate>, fixed: Vec<DetectedEvent>) -> Vec<DetectedEvent> {
+    let mut events = fixed;
+    events.extend(kept.into_iter().filter_map(|c| {
+        Some(DetectedEvent {
+            id: event_id(c.kind, c.anchors),
+            kind: c.kind,
+            span: c.span,
+            anchors: c.anchors,
+            params: c.params,
+            // A score is within 0 to 1; one that is not makes no event.
+            confidence: Confidence::new(c.score)?,
+            enabled: true,
+        })
+    }));
+    events.sort_by(spoken_order);
+    events
+}
+
+/// The words `redetect_sentence` reads again (D-86): from sentence `s` to
+/// the last sentence that starts within `list_window_ms` after it, a list
+/// announced in `s` finding its markers there; then the sentences of every
+/// event of `prev` that reaches into the scope, until none crosses its edge.
+/// An event of `prev` is so either wholly inside, detected again, or wholly
+/// outside, kept: none is lost at the edge.
+fn scope(t: &Transcript, s: &Sentence, prev: &[DetectedEvent], cfg: &DetectorConfig) -> WordRange {
+    let from = s.start_ms.get();
+    let until = from.saturating_add(cfg.list_window_ms);
+    let mut scope = s.words;
+    for later in &t.sentences {
+        let at = later.start_ms.get();
+        if from < at && at < until {
+            scope = hull(scope, later.words);
         }
     }
+    loop {
+        let mut grown = scope;
+        for e in prev.iter().filter(|e| meets(e.anchors, scope)) {
+            for touched in t.sentences.iter().filter(|x| meets(x.words, e.anchors)) {
+                grown = hull(grown, touched.words);
+            }
+        }
+        if grown == scope {
+            return scope;
+        }
+        scope = grown;
+    }
+}
 
-    kept.into_iter()
-        .filter_map(|c| {
-            Some(DetectedEvent {
-                id: event_id(c.kind, c.anchors),
-                kind: c.kind,
-                span: c.span,
-                anchors: c.anchors,
-                params: c.params,
-                // A score is within 0 to 1; one that is not makes no event.
-                confidence: Confidence::new(c.score)?,
-                enabled: true,
-            })
-        })
-        .collect()
+/// Two word ranges that share a word.
+fn meets(a: WordRange, b: WordRange) -> bool {
+    a.start < b.end && b.start < a.end
+}
+
+fn hull(a: WordRange, b: WordRange) -> WordRange {
+    WordRange {
+        start: a.start.min(b.start),
+        end: a.end.max(b.end),
+    }
+}
+
+/// A score within `SCORE_NOISE` of a whole hundredth, as that hundredth: the
+/// sums of `config.rs`'s two-decimal values, free of `f32` rounding.
+fn settled(score: f32) -> f32 {
+    let hundredths = (score * 100.0).round();
+    if (score * 100.0 - hundredths).abs() < SCORE_NOISE * 100.0 {
+        hundredths / 100.0
+    } else {
+        score
+    }
+}
+
+/// By start, then the kind order of D-47, then the first word.
+fn spoken_order(a: &DetectedEvent, b: &DetectedEvent) -> Ordering {
+    let rank = |kind: EventKind| match kind {
+        EventKind::NumberReveal => 0u8,
+        EventKind::ListReveal => 1,
+        EventKind::FromTo => 2,
+        EventKind::KeywordPop => 3,
+    };
+    a.span
+        .start
+        .cmp(&b.span.start)
+        .then(rank(a.kind).cmp(&rank(b.kind)))
+        .then(a.anchors.start.cmp(&b.anchors.start))
 }
 
 #[cfg(test)]
@@ -122,7 +246,8 @@ mod tests {
             EventParams::NumberReveal { value, label } => {
                 assert_eq!(value.display, "$10k");
                 assert_eq!((value.value, &value.unit), (10_000.0, &Unit::Usd));
-                assert_eq!(*label, None);
+                // As of V3, the words after the number, up to the full stop (D-107).
+                assert_eq!(label.as_deref(), Some("there"));
             }
             EventParams::ListReveal { .. }
             | EventParams::FromTo { .. }
@@ -146,14 +271,28 @@ mod tests {
             (1, 3)
         );
 
-        // A number whose word was edited or hidden is not shown; an edit
-        // somewhere else changes nothing.
+        // As of V3, a number whose word was edited is read again from the new text
+        // (D-109); a hidden one is not shown; an edit somewhere else changes nothing.
         let t = transcript(&spoken);
         let with = |word: u32, text: &str| {
             let edits = BTreeMap::from([(WordIdx::new(word), text.to_owned())]);
             detect(&t, &flat(&t), &edits, &DetectorConfig::default())
         };
-        assert_eq!(with(2, "$20,000"), []);
+        let edited = with(2, "$20,000");
+        assert_eq!(edited.len(), 1);
+        match &edited[0].params {
+            EventParams::NumberReveal { value, .. } => {
+                assert_eq!((value.value, value.display.as_str()), (20_000.0, "$20k"));
+            }
+            EventParams::ListReveal { .. }
+            | EventParams::FromTo { .. }
+            | EventParams::KeywordPop { .. } => panic!("{:?}", edited[0].params),
+        }
+        // The id is a hash of the kind and the anchors only (D-47), and an edit of
+        // one word keeps the anchors: the id is the one the old event had. Not the
+        // "new id" of v3implementation §9.9 (V3 changelog, open item 14).
+        assert_eq!(edited[0].anchors, event.anchors);
+        assert_eq!(edited[0].id, event.id);
         assert_eq!(with(2, ""), []);
         assert_eq!(with(1, "earned"), found);
     }
@@ -164,7 +303,10 @@ mod tests {
             ("about", 1_000, 1_300, 1.0),
             ("ten", 1_400, 1_600, 1.0),
             ("thousand", 1_650, 2_100, 1.0),
-            ("people", 2_200, 2_600, 1.0),
+            // As of V3, "people" is a count noun, a unit (v3implementation D-101), so the
+            // number is followed by words that are none.
+            ("of", 2_200, 2_400, 1.0),
+            ("them", 2_450, 2_700, 1.0),
         ]);
         assert_eq!(found, []);
         // A bare number in digits scores the same 0.70, and a small one 0.50.
@@ -176,13 +318,26 @@ mod tests {
 
     #[test]
     fn forty_percent_is_an_event_at_confidence_1_and_none_at_0_99() {
-        let sure = events(&[("40%", 1_000, 1_500, 1.0)]);
+        // "40%" scores 0.80, the NumberReveal threshold until the precision gate
+        // raised it to 0.85 (v3implementation §20.3). The line is kept at 0.80
+        // here: a score equal to the threshold is in, a confidence under 1 is out.
+        let cfg = DetectorConfig {
+            threshold_number: 0.80,
+            ..DetectorConfig::default()
+        };
+        let at_080 = |words: &[Spoken<'_>]| {
+            let t = transcript(words);
+            detect(&t, &flat(&t), &BTreeMap::new(), &cfg)
+        };
+        let sure = at_080(&[("40%", 1_000, 1_500, 1.0)]);
         assert_eq!(sure.len(), 1);
         assert_eq!(sure[0].confidence.get(), 0.80);
-        assert_eq!(events(&[("40%", 1_000, 1_500, 0.99)]), []);
+        assert_eq!(at_080(&[("40%", 1_000, 1_500, 0.99)]), []);
         // The least certain word of a number counts.
         let split = [("$12", 1_000, 1_300, 1.0), (",000", 1_300, 1_600, 0.7)];
-        assert_eq!(events(&split), []);
+        assert_eq!(at_080(&split), []);
+        // At the default threshold, said plainly, it is no event.
+        assert_eq!(events(&[("40%", 1_000, 1_500, 1.0)]), []);
     }
 
     #[test]
@@ -247,8 +402,10 @@ mod tests {
         for event in &found {
             assert!(event.confidence.get() >= cfg.threshold_number, "{event:?}");
         }
-        // A word said with emphasis lifts a number over the line, and only then.
-        let said = [("70%", 1_000, 1_500, 0.9)];
+        // A word said with emphasis lifts a number over the line, and only then:
+        // 0.80 x 0.95 = 0.76 plainly, 0.90 x 0.95 = 0.855 with emphasis (the
+        // confidence was 0.9 while the threshold was 0.80, §20.3).
+        let said = [("70%", 1_000, 1_500, 0.95)];
         assert_eq!(events(&said), []);
         let t = transcript(&said);
         let loud = Prosody {

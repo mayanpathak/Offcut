@@ -1,6 +1,7 @@
 // Helpers shared by the E2E tests: the analytics flush, the files of the asset
-// host served from this machine, the reference clip, and the speech model put
-// on the browser's device without a download.
+// host served from this machine, the reference clip, the generated fixtures,
+// the speech model put on the browser's device without a download, and what
+// the page keeps in its storage.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -12,6 +13,7 @@ import { pipeline } from "node:stream/promises";
 import type { BrowserContext, Page, Route } from "@playwright/test";
 
 import { paths } from "../../src/persistence/opfs";
+import { DB_NAME } from "../../src/persistence/schema";
 
 // FLUSH_INTERVAL_MS of src/analytics/client.ts, and API_TIMEOUT_MS of
 // src/net/http.ts: both 10 s. Neither file can be imported here: they read
@@ -121,6 +123,42 @@ export function referenceClip(): string {
   const sample = sampleClipPath();
   const local = path.join(ROOT, "testclips", storedName(sample).plain);
   return existsSync(local) ? local : path.join(CACHE, sample);
+}
+
+// --- The generated fixtures (v3implementation §19.15) ---------------------------
+
+const MANIFEST = path.join(ROOT, "fixtures/manifest.json");
+
+/** Where `pnpm fixtures` writes: `OFFCUT_FIXTURES_DIR`, or `fixtures/.gen` of this repository. */
+export function fixturesDir(): string {
+  const dir = process.env.OFFCUT_FIXTURES_DIR;
+  return dir === undefined || dir === "" ? path.join(ROOT, "fixtures/.gen") : dir;
+}
+
+/**
+ * The path of the generated fixture `name` (as `fixtures/manifest.json` names
+ * it). A fixture that is absent, or that was made from another manifest than
+ * this one (its `STAMP`), fails the case with "run pnpm fixtures"; it is never
+ * skipped. Call it in a test, never while a file loads (V2 CL item 40).
+ */
+export function genFixture(name: string): string {
+  const file = path.join(fixturesDir(), name);
+  const stamp = path.join(fixturesDir(), "STAMP");
+  if (!existsSync(file) || !existsSync(stamp)) {
+    throw new Error(`${name} is not in ${fixturesDir()}: run pnpm fixtures`);
+  }
+  const made = (JSON.parse(readFileSync(stamp, "utf8")) as { manifest_sha256?: unknown }).manifest_sha256;
+  const now = createHash("sha256").update(readFileSync(MANIFEST)).digest("hex");
+  if (made !== now) {
+    throw new Error(`${name} was made from another fixtures/manifest.json: run pnpm fixtures`);
+  }
+  return file;
+}
+
+/** The founder's second recording (D-99), on the development machine only: its path, or `null`. */
+export function v3TestClip(): string | null {
+  const clip = path.join(ROOT, "testclips/v3testclip.mp4");
+  return existsSync(clip) ? clip : null;
 }
 
 /** The length of the video stream of `fixture`, in whole milliseconds, as `ffprobe` reads it. */
@@ -369,24 +407,97 @@ export async function routeAssets(page: Page, o: AssetOptions = {}): Promise<Ass
 // --- The page's device -----------------------------------------------------------
 
 /**
- * Drops `fixture` on the drop zone as a person would: a `DataTransfer` that
- * holds the file's bytes under the name "clip.mp4". The name is the same for
- * every fixture, so that a test can assert it appears nowhere (P-11).
+ * Drops `file` on the drop zone as a person would: a `DataTransfer` that holds
+ * the file's bytes under `name`. Every case uses a name of its own choosing,
+ * never the fixture's, so that a test can assert it appears nowhere (P-11).
  */
-export async function dropClip(page: Page, fixture: string): Promise<void> {
+export async function dropFile(page: Page, file: string, name = "clip.mp4"): Promise<void> {
   // The bytes reach the page through a request the test answers itself.
   const address = `/e2e-fixture/${randomUUID()}`;
   const pattern = `**${address}`;
-  await page.route(pattern, (route) => route.fulfill({ path: fixture, contentType: "video/mp4" }));
-  const transfer = await page.evaluateHandle(async (url) => {
-    const blob = await (await fetch(url)).blob();
-    const data = new DataTransfer();
-    data.items.add(new File([blob], "clip.mp4", { type: "video/mp4" }));
-    return data;
-  }, address);
+  await page.route(pattern, (route) => route.fulfill({ path: file, contentType: "video/mp4" }));
+  const transfer = await page.evaluateHandle(
+    async ({ url, name }) => {
+      const blob = await (await fetch(url)).blob();
+      const data = new DataTransfer();
+      data.items.add(new File([blob], name, { type: "video/mp4" }));
+      return data;
+    },
+    { url: address, name },
+  );
   await page.unroute(pattern);
   await page.getByTestId("drop-zone").dispatchEvent("drop", { dataTransfer: transfer });
   await transfer.dispose();
+}
+
+/** `dropFile` under the name "clip.mp4", the same for every fixture. */
+export async function dropClip(page: Page, fixture: string): Promise<void> {
+  await dropFile(page, fixture);
+}
+
+const MIB = 1024 * 1024;
+const OVERSIZE_PARTS = 501;
+/** The size of the file `dropOversize` drops: 525,336,576 bytes, over `MAX_FILE_SIZE` (D-79). */
+export const OVERSIZE_BYTES = OVERSIZE_PARTS * MIB;
+
+/**
+ * Drops a file over the size limit, made in the page (D-79): 501 references
+ * to one 1 MiB `Blob`, which a `File` does not copy, named "clip.mp4". The
+ * worker refuses it by its size before it reads a byte, so nothing is
+ * written to disk or sent anywhere for it.
+ */
+export async function dropOversize(page: Page): Promise<void> {
+  const transfer = await page.evaluateHandle(
+    ({ mib, parts }) => {
+      const part = new Blob([new Uint8Array(mib)]);
+      const data = new DataTransfer();
+      data.items.add(new File(Array.from({ length: parts }, () => part), "clip.mp4", { type: "video/mp4" }));
+      return data;
+    },
+    { mib: MIB, parts: OVERSIZE_PARTS },
+  );
+  await page.getByTestId("drop-zone").dispatchEvent("drop", { dataTransfer: transfer });
+  await transfer.dispose();
+}
+
+/**
+ * The value stored under `key` in `store` of the app's database, as stored:
+ * the `Versioned` wrapper and its value. `undefined` when there is none, or
+ * when the app has not made its database yet (it is not made here).
+ */
+export function readIndexedDb(page: Page, store: "clips" | "transcripts" | "edits", key: string): Promise<unknown> {
+  return page.evaluate(
+    ({ name, store, key }) =>
+      new Promise<unknown>((resolve, reject) => {
+        const open = indexedDB.open(name);
+        open.onupgradeneeded = () => {
+          open.transaction?.abort();
+        };
+        open.onerror = (event) => {
+          event.preventDefault();
+          resolve(undefined);
+        };
+        open.onsuccess = () => {
+          const db = open.result;
+          const read = db.transaction(store, "readonly").objectStore(store).get(key);
+          read.onsuccess = () => {
+            db.close();
+            resolve(read.result);
+          };
+          read.onerror = () => {
+            db.close();
+            reject(read.error ?? new Error(`readIndexedDb: ${store} ${key}`));
+          };
+        };
+      }),
+    { name: DB_NAME, store, key },
+  );
+}
+
+/** The code the rejection panel shows (its `data-reject`), or `null` when the page shows none. */
+export async function rejectCodeOf(page: Page): Promise<string | null> {
+  const panel = page.getByTestId("clip-rejected");
+  return (await panel.count()) === 0 ? null : panel.getAttribute("data-reject");
 }
 
 /** The names in a directory of the page's origin private file system, sorted. An absent directory gives `[]`. */

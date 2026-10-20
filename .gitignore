@@ -30,3 +30,8 @@ fixtures/.cache/
 
 # The founder's script for the introduction video: a working note, never committed.
 introvideoscript.md
+
+# Generated fixtures, and the corpus clips and results that stay on the machine (v3implementation D-98).
+fixtures/.gen/
+corpus/.clips/
+corpus/.results/

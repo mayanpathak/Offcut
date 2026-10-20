@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "w15-podcast",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My podcast workflow is boring, and that is the point.",
+    "First, I record both voices on separate tracks.",
+    "Second, I write the show notes while the episode is fresh.",
+    "Third, I publish on the same morning every week.",
+    "That routine has not failed me yet."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "list_reveal", "say": "First, I record both voices on separate tracks. Second, I write the show notes while the episode is fresh. Third, I publish on the same morning every week.", "occurrence": 1,
+      "count": 3 }
+  ],
+  "tags": ["marker_only"],
+  "notes": "a list of three ordinal markers with no announcer"
+}

@@ -228,3 +228,23 @@
   font-weight: 400;
   color: var(--color-muted);
 }
+
+/* A clip Offcut cannot use: the limit and what to do (v3implementation §16.4). */
+.rejection {
+  composes: stub from "./pages.module.css";
+}
+
+.rejectionTitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--color-problem);
+}
+
+.rejectionBody {
+  margin: 0;
+}
+
+.rejectionAction {
+  margin: 0;
+  color: var(--color-muted);
+}

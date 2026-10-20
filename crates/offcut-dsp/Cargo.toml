@@ -12,6 +12,11 @@ offcut-types = { workspace = true }
 # The FFT resampler: synchronous, for a fixed pair of rates.
 rubato = { workspace = true, features = ["fft_resampler"] }
 thiserror = { workspace = true }
+# The denoiser and the loudness meter of the voice chain (v3implementation D-89).
+nnnoiseless = { workspace = true }
+ebur128 = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true, features = ["std"] }
+# The stamp check of the generated fixtures (v3implementation §6.4).
+sha2 = { workspace = true }

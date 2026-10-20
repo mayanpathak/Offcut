@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w17-interview-tips",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I have sat on both sides of a lot of technical interviews.",
+    "Here are 4 tips that would have helped me early on.",
+    "1, think out loud, even when you are unsure.",
+    "2, ask what the input looks like before you write code.",
+    "3, test your solution with a tiny example by hand.",
+    "4, say what you would improve if you had more time.",
+    "None of this needs a clever trick."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "list_reveal", "say": "4 tips that would have helped me early on. 1, think out loud, even when you are unsure. 2, ask what the input looks like before you write code. 3, test your solution with a tiny example by hand. 4, say what you would improve if you had more time.", "occurrence": 1,
+      "count": 4, "header": "4 TIPS" }
+  ],
+  "tags": ["announcer"],
+  "notes": "a list announced as 4 tips, with digit markers followed by a comma"
+}

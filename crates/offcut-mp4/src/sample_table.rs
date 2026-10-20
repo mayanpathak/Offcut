@@ -6,6 +6,7 @@ use offcut_types::Bytes;
 
 use crate::ContainerError;
 use crate::boxes::{BoxHeader, load};
+use crate::edit_list::resolve_edits;
 use crate::reader::{Cursor, RandomAccess};
 
 /// A track with more samples than this is not expanded (v2implementation
@@ -173,8 +174,8 @@ fn mark_keyframes(sync: &[u32], samples: &mut [Sample]) {
     }
 }
 
-/// Step 5: the edit list. Returns `(edit_offset, presented)`. It needs the
-/// runs of `stts` only, so it is also right for a track left unresolved.
+/// Step 5: the edit list (edit_list.rs). Returns `(edit_offset, presented)`. It
+/// needs the runs of `stts` only, so it is also right for a track left unresolved.
 fn edits(t: &RawTables) -> Result<(i64, i64), ContainerError> {
     let mut media_duration = 0u64;
     for &(run, delta) in &t.stts {
@@ -184,34 +185,8 @@ fn edits(t: &RawTables) -> Result<(i64, i64), ContainerError> {
     }
     let media_duration =
         i64::try_from(media_duration).map_err(|_| ContainerError::Malformed("stts"))?;
-
-    // Ticks of the movie timescale as ticks of the media timescale, to the nearest.
-    let to_media = |movie_ticks: u64| -> Result<i64, ContainerError> {
-        if t.movie_timescale == 0 {
-            return Err(ContainerError::Malformed("mvhd"));
-        }
-        let per = u128::from(t.movie_timescale);
-        let ticks = (u128::from(movie_ticks) * u128::from(t.timescale) + per / 2) / per;
-        i64::try_from(ticks).map_err(|_| ContainerError::Malformed("elst"))
-    };
-    // An edit of length 0 shows the media from its start time to its end.
-    let shown = |media: &Edit| -> Result<i64, ContainerError> {
-        if media.segment_duration == 0 {
-            Ok(media_duration.saturating_sub(media.media_time).max(0))
-        } else {
-            to_media(media.segment_duration)
-        }
-    };
-
-    match t.elst.as_slice() {
-        [] => Ok((0, media_duration)),
-        [media] if media.media_time >= 0 => Ok((media.media_time, shown(media)?)),
-        [empty, media] if empty.media_time == -1 && media.media_time >= 0 => {
-            let lead = to_media(empty.segment_duration)?;
-            Ok((media.media_time.saturating_sub(lead), shown(media)?))
-        }
-        _ => Err(ContainerError::Unsupported("elst")),
-    }
+    let plan = resolve_edits(&t.elst, t.timescale, t.movie_timescale, media_duration)?;
+    Ok((plan.edit_offset, plan.presented))
 }
 
 // --- The table boxes ---------------------------------------------------------------

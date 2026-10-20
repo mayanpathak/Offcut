@@ -134,6 +134,8 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 
 Enforcement of every row: §7.
 
+**Edges added in V2** (v2implementation D-27, D-58), each a named entry in `web/eslint.config.js`: `usecases/import-clip.ts` may import `net/asset-fetch` (the sample clip); `workers/**` may import `persistence/opfs` (the path builder); `workers/render.worker.ts` may import `config/entitlement-public-key`; `models/**` may import `state/model-store` and `config/model-manifest.json`; `models/model-manager.ts` may import `persistence/db` (`metaGet`, `metaSet`); `state/**`, `models/**` and `usecases/**` may import types only from `workers/protocol.ts` (`FeedLine`, `AppFailure`). Two use-case pairs may import each other: `import-clip.ts` to `run-pipeline.ts`, and `start-export.ts` to `control-preview.ts` (which also exports `detach()`, `lockForExport()` and `unlockAfterExport()`; `import-clip.ts` also exports `dismissClip()`).
+
 ---
 
 ## 3. Technology Stack
@@ -168,8 +170,8 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 | `wgpu` (WebGPU backend), `vello` | GPU device, vector renderer | Pinned as a matching pair; upgraded together only |
 | `parley` | Text shaping, line breaking | Pinned with `vello` |
 | `rubato` | Resampling | Pinned |
-| `nnnoiseless` (candidate) | Denoise; TE-13 decides | Pinned |
-| `ebur128` (pure-Rust build) | Loudness measurement | Pinned |
+| `nnnoiseless` | Denoise (RNNoise in pure Rust) in `offcut-dsp/src/denoise.rs`; TE-13 kept it on (v3implementation D-89) | Pinned at 0.5.2 (V3 S1); built for `wasm32-unknown-unknown` without threads |
+| `ebur128` (pure-Rust build) | BS.1770 integrated loudness with gating, in `offcut-dsp/src/loudness.rs` (v3implementation D-89) | Pinned at 0.1.10 (V3 S1); built for `wasm32-unknown-unknown` without threads |
 | `ed25519-dalek`, `sha2` | Entitlement verification, model hashing | Pinned |
 | `thiserror` | Error enums | Pinned |
 | `proptest`, `insta`, `trybuild` | Property, snapshot, compile-fail tests | Pinned |
@@ -231,7 +233,7 @@ offcut/
 ├── server/            offcut-api: the Axum service, migrations, Dockerfile
 ├── web/               React + Vite app, workers, E2E tests, vercel.json
 ├── verify/            independent MP4 verifier (Python + ffprobe); shares no code with crates/
-├── fixtures/          fixture generators, small committed speech clips, labeled transcripts, golden frames
+├── fixtures/          fixture generator and manifest, labeled transcripts, golden frames; generated and derived fixtures in fixtures/.gen/, not committed (v3implementation D-76, D-77)
 ├── corpus/            manifest + runner for the 40+ real-clip corpus (clips stored outside git)
 ├── bench/             device benchmark runner and committed results for R1/R2
 ├── scripts/           build, codegen and CI check scripts
@@ -289,6 +291,7 @@ offcut/
 │   │   │   ├── reader.rs              RandomAccess trait (read_at)
 │   │   │   ├── boxes.rs               box header parsing and typed boxes
 │   │   │   ├── sample_table.rs        stts/ctts/stsc/stsz/stco/co64/stss/elst resolution
+│   │   │   ├── edit_list.rs           edit-list shapes E0-E4 (v3implementation D-92)
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
 │   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
@@ -304,6 +307,7 @@ offcut/
 │   │   ├── src/
 │   │   │   ├── lib.rs
 │   │   │   ├── tokenize.rs
+│   │   │   ├── cardinals.rs           spelled cardinals and "point" decimals (v3implementation D-92)
 │   │   │   ├── sentences.rs           segment_sentences()
 │   │   │   ├── numbers.rs             [ONLY] spoken/written number parsing and display formatting
 │   │   │   ├── units_lex.rs           unit and currency lexicon
@@ -415,7 +419,7 @@ offcut/
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs                 panic hook, init
-│   │       ├── media_api.rs           open_demuxer, probe_and_validate, resample
+│   │       ├── media_api.rs           open_demuxer, probe_and_validate, resample; the DemuxerHandle probe and audio-sample methods, validate (v2implementation D-53)
 │   │       ├── text_api.rs            normalize_transcript
 │   │       ├── audio_api.rs           run_chain, measure_prosody
 │   │       └── hash_api.rs            Sha256Stream
@@ -425,7 +429,7 @@ offcut/
 │           ├── lib.rs                 panic hook, init
 │           ├── session.rs             RenderSession (owns Renderer, Scene, Demuxer)
 │           ├── detect_api.rs          detect, redetect_sentence
-│           ├── profile_api.rs         export_profile_from_token
+│           ├── profile_api.rs         export_profile_from_token, preview_profile (v2implementation D-53)
 │           └── mux_api.rs             Mp4MuxerHandle
 ├── server/
 │   ├── Cargo.toml
@@ -692,15 +696,10 @@ offcut/
 │   ├── requirements.txt
 │   └── README.md
 ├── fixtures/
-│   ├── gen_fixtures.sh                generates synthetic fixtures with the ffmpeg CLI (dev tool only)
-│   ├── manifest.json                  fixture name -> expected outcome
-│   ├── speech/speech_60s_portrait.mp4
-│   ├── speech/speech_60s_landscape.mp4
-│   ├── speech/speech_20s_noevents.mp4
-│   ├── speech/speech_20s_long_pause.mp4
-│   ├── speech/speech_30s_sparse.mp4
-│   ├── speech/README.md               scripts read aloud, expected transcript and events
-│   ├── labeled/                       >= 30 hand-labeled transcripts (JSON), one file each
+│   ├── gen_fixtures.sh                generates the synthetic and derived fixtures with the ffmpeg CLI into .gen/ (dev and CI tool)
+│   ├── manifest.json                  fixture name -> recipe kind, expected outcome, probe properties, tests (25 fixtures)
+│   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
+│   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
 │   └── golden/                        PNG goldens per style x event kind
 ├── corpus/
@@ -709,7 +708,7 @@ offcut/
 │   └── run_corpus.ts
 ├── bench/
 │   ├── device-bench.ts
-│   └── results/.gitkeep
+│   └── results/                       committed runs, <device>-<date>-<clip>.json (v3implementation §19.19); .gitkeep
 ├── scripts/
 │   ├── build-wasm.sh
 │   ├── gen-types.sh
@@ -736,6 +735,14 @@ offcut/
     ├── v2/coding-promptsv2.md         the 30 V2 coding prompts (31 to 60), run in order
     ├── v2/experiments.md              outcome of every experiment V2 runs (TE-n, E-n) and the M0 gate decision
     ├── v2/v2changelog.md              record of every change made while building V2
+    ├── v3/v3implementation.md         file-by-file implementation plan for V3 (M1.1 to M1.3)
+    ├── v3/v3buildguide.md             step-by-step build order for V3, with a milestone per phase
+    ├── v3/coding-promptsv3.md         the 30 V3 coding prompts (61 to 90), run in order
+    ├── v3/v3changelog.md              record of every change made while building V3
+    ├── v3/experiments.md              outcome of every experiment V3 runs (TE-n, E-n) and the precision gate
+    ├── v3/testvideo_scripts/script1.md   founder's recording script: phone, portrait, all four event kinds
+    ├── v3/testvideo_scripts/script2.md   founder's recording script: laptop webcam, the exclusion traps
+    ├── v3/testvideo_scripts/script3.md   founder's recording script: noisy room and a long pause (voice chain)
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
@@ -785,6 +792,8 @@ offcut-wasm-render ─► offcut-render ─► offcut-scene ─┐              
 offcut-api (server) ─► offcut-api-types, offcut-entitlement[sign] ─────┘
 ```
 
+`offcut-scene` also depends on `offcut-text`, for `format_quantity` only (count-up values, §19.5). `check-file-tree.mjs` allows that pair, and the `offcut-text` ban in `deny.toml` lists `offcut-scene` as a wrapper (v2implementation D-28). It creates no cycle.
+
 **Web (arrows point to what may be imported)**
 
 ```text
@@ -818,7 +827,7 @@ everything ─► gen (types only)
 **Circularity guards**
 - `offcut-types` imports no `offcut-*` crate. New shared types go there, never into a sibling.
 - `workers/protocol.ts` imports only `gen`; workers and `pool.ts` both import it, never each other.
-- `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call; checked by a `boundaries` rule.
+- `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call, and the two pairs of §2 "Edges added in V2" (`import-clip.ts` to `run-pipeline.ts`, `start-export.ts` to `control-preview.ts`); checked by a `boundaries` rule.
 - Stores never import use-cases; use-cases write stores through exported action functions only.
 
 ---
@@ -906,6 +915,8 @@ main.tsx → startApp()
       ✗ error                               ⇒ importing → failed           [evt client_error]
 ```
 
+**C-2 as built in V3.** Before `importAndProbe`, until V7's eviction exists, the previous clip's `clips/` directory and the `clips`, `transcripts` and `edits` records are removed (`clear()` on each repo), so the device holds the records of one clip at most (v3implementation §23 item 26). `sourceHashPrefix` is computed on the main thread before the file is posted (`clipsRepo.hashPrefix(file)`, §23.1, v3implementation D-81). `clipsRepo.put` runs while the clip is still `importing`, and `clip_accepted` follows it; a storage failure there fails the clip with no `clip_accepted`. `clip_rejected` carries `reject_reason` alone, sent here for the 13 codes `importAndProbe` returns and from `run-pipeline.ts` for `REJECT_NO_SPEECH`; `client_error` is not sent before V4 (v3implementation D-97).
+
 **C-3. First-run model download (J4)**
 ```text
 runPipeline(clipId) → modelManager.ensureReady(onProgress)
@@ -942,6 +953,8 @@ runPipeline(clipId)                           ⇒ clip: accepted → processing(
                                               ⇒ processing → ready              [evt pipeline_done]
   any ✗ ⇒ processing → failed(code)           [evt client_error]  → <ErrorPanel> with retry (C-14)
 ```
+
+**The C-4 order as built** (v3implementation D-90). After step A, `pool.audio.runChain({ pcm48 })` starts at once, in parallel with the model wait (C-3) and with ASR (B1); its feed line "Cleaning voice" is pushed when it starts. `stage_timing audio_chain` is measured on the main thread around the `runChain` call (v2implementation D-35). Step D (`measureProsody`) waits for both B1 and B2. A failure of B2 while B1 runs is held until B1 has settled and `asr.unload()` has run (INV-12); then the clip fails with the first failure in time order. A `REJECT_NO_SPEECH` from B1 waits for B2 to settle, then the clip is rejected; `measureProsody` is not called and the worker is sent nothing, so its `out48` stays in the worker's memory until its next `runChain` replaces it (v3implementation §23 item 25, open until V4). The feed's first two lines are therefore "Cleaning voice" and "Transcribing…", in either order.
 
 **C-5. Preview and AHA (J7)**
 ```text
@@ -1171,7 +1184,7 @@ pub struct WordRange { pub start: WordIdx, pub end: WordIdx }   // half-open
 pub struct JobId(u32);
 ```
 
-TypeScript mirrors these as branded types generated into `web/src/gen/domain.ts` (`type TimeMs = number & { readonly __unit: "TimeMs" }`). `as TimeMs` casts are allowed only in `gen/` and `workers/`; ESLint `no-restricted-syntax` rejects them elsewhere.
+TypeScript mirrors these as branded types generated into `web/src/gen/domain.ts` (`type TimeMs = number & { readonly __unit: "TimeMs" }`). `as TimeMs` casts are allowed only in `gen/` and `workers/`, and in one minting line per file listed in the `MINTING` table of `web/eslint.config.js`: `persistence/opfs.ts`, `models/download.ts`, `models/model-manager.ts` and `state/model-store.ts` (`Bytes`), `usecases/import-clip.ts` (`ClipId`), `usecases/start-export.ts` (`ExportId`), `usecases/control-preview.ts` (`TimeMs`) (v2implementation D-59), and `persistence/clips-repo.ts` (`Bytes`, for `ClipRecord.sourceBytes`; v3implementation D-103); ESLint `no-restricted-syntax` rejects them elsewhere.
 
 ### 10.2 Limits (copied from the product spec)
 
@@ -1363,7 +1376,7 @@ All request structs use `#[serde(deny_unknown_fields)]`.
 ### 10.8 Notes
 
 - **Why these representations.** One timeline type, `TimeMs`, because source time and output time are the same instant for the whole recording (INV-5); a second type would encode a distinction that does not exist. `DurMs` stays separate so a length is never passed where a position is expected. Integer milliseconds match the PS data model (PS §12.5) and are exact at 30 fps to within 1 ms; frame timestamps are derived from `FrameIdx`, never accumulated. `Sentence.words` is a range because sentences never overlap.
-- **Serialization.** Rust ↔ worker JS: `serde-wasm-bindgen` for structs; PCM as `Float32Array`; frames as `web_sys::VideoFrame` handles; file access through the `RandomAccess` callback. Worker ↔ main: structured clone of generated types; PCM buffers are transferred, never copied. Client ↔ server: JSON of `offcut-api-types`. Storage: IndexedDB structured clone of generated types wrapped in `{ schemaVersion, value }` (§23.2). Entitlement token: `base64url(JSON claims) "." base64url(Ed25519 signature)`.
+- **Serialization.** Rust ↔ worker JS: `serde-wasm-bindgen` for structs; PCM as `Float32Array`; frames as `web_sys::VideoFrame` handles; file access through the `RandomAccess` callback. Worker ↔ main: structured clone of generated types; PCM buffers are transferred, never copied. Client ↔ server: JSON of `offcut-api-types`. Storage: IndexedDB structured clone of generated types wrapped in `{ schemaVersion, value }` (§23.2). Entitlement token: `base64url(JSON claims) "." base64url(Ed25519 signature)`, both without padding; the signature covers the ASCII bytes of the first segment, so no JSON canonicalization is needed. The claims JSON uses the Rust field names of §10.6, `plan` is `"free"` or `"creator"` and `sub` is a UUID string (v2implementation D-25).
 - **Ownership (who may write).** `ClipInfo`: `validate_probe` only. `Transcript`: `normalize_transcript` only; user edits never mutate it (they live in `EditState`). `DetectedEvent`: `offcut-detect` only; `enabled` is overlaid from `EditState.event_overrides` in `build_scene`. `EditState`: use-cases through `edits-repo.ts`. `EntitlementClaims`: `server/src/entitlement/issue.rs` only. `ExportProfile`: `offcut-entitlement/src/profile.rs::export_profile` only.
 
 ---
@@ -1679,9 +1692,11 @@ export type Progress = { type: "progress"; jobId: JobId; stage: PipelineStage | 
 export type Cancel = { type: "cancel"; jobId: JobId };
 export type FeedLine =                                   // J6 feed; rendered through messages.ts
   | { kind: "transcribing" } | { kind: "cleaning_voice" }
-  | { kind: "event_found"; eventKind: EventKind; display: string };   // display stays on device
+  | { kind: "event_found"; eventKind: EventKind; display: string; displayTo?: string };   // display stays on device
 export type AppFailure = { code: ErrorCode; stage: FailureStage; retryable: boolean; detail?: string };
 ```
+
+`displayTo` (v3implementation D-83, a reopened V1 contract): for a FromTo, `display` is `from.display` and `displayTo` is `to.display`; for the other three kinds `displayTo` is absent. `messages.feed.eventFound.from_to` is `(display: string, displayTo: string) => string`, "Found: {display} to {displayTo}" (PS §10 J6's "Found: $2k to $20k"); `ProcessingFeed`'s `switch` passes the second value, so the word "to" stays in `messages.ts` (INV-15).
 
 ### 14.2 Methods
 
@@ -1782,7 +1797,7 @@ export function importToOpfs(clipId: ClipId, file: File, isCancelled: () => bool
 export function decodeAudio(handle: FileSystemSyncAccessHandle, info: ClipInfo, isCancelled: () => boolean): Promise<Float32Array>; // mono, source rate
 ```
 
-Timestamps returned by the demuxer are presentation times with edit lists applied and the first presented video frame at 0. Audio is shifted by the same offset; `decodeAudio` pads leading silence or trims so that audio sample 0 is video time 0, and pads or trims the tail to the video duration. This is container-level track alignment (the two tracks rarely start and end on the same instant); it never looks at the audio content and removes nothing from inside the recording. After it, `pcm48.len() == round(ClipInfo.duration x 48)` and that length is carried unchanged to `out48` (INV-10).
+Timestamps returned by the demuxer are presentation times with edit lists applied and the first presented video frame at 0. Audio is shifted by the same offset; `decodeAudio` pads leading silence or trims so that audio sample 0 is video time 0, and pads or trims the tail to the video duration. This is container-level track alignment (the two tracks rarely start and end on the same instant); it never looks at the audio content and removes nothing from inside the recording. After it, `pcm48.len() == round(ClipInfo.duration x 48)` and that length is carried unchanged to `out48` (INV-10). "The video duration" is `ProbeInfo.duration`: the presented duration of the video track with edit lists applied, rounded to the nearest millisecond; the media worker pads or truncates each resampler output by at most one sample to hold the equality exactly (v2implementation D-34).
 
 ### 15.2 Pipeline
 
@@ -1814,9 +1829,11 @@ validate_probe(p, decode_supported):      // first failing rule wins
 
 Each message is specific and actionable and lives in `messages.ts`; each fires `clip_rejected {reject_reason}` and nothing else (no file name, no content).
 
+**What a message states** (v3implementation D-80). Each of the 14 messages is `{ title, body, action }` in `messages.rejections`; the body states the limit and the advice, interpolating the limit from the generated `LIMITS` (INV-15), for example "Offcut handles clips up to 90 seconds right now." with "Trim it in your phone's gallery or in your editor, then drop it again." as its action. The measured size or duration is not shown: `{ rejected: RejectReason }` carries no value, and `MediaWorkerApi`, `CoreApi` and the clip store do not change for it. `scripts/check-copy-codes.mjs` checks that every `RejectReason` has its message.
+
 | Code | Trigger | Message must state | Fixture | Test |
 |---|---|---|---|---|
-| `REJECT_FILE_SIZE` | size > 500 MB | actual size, the 500 MB limit, how to shrink | generated sparse file | `rejections.spec.ts` |
+| `REJECT_FILE_SIZE` | size > 500 MB | the 500 MB limit, how to shrink | built in the page: a `File` of 501 references to one 1 MiB `Blob` (525,336,576 bytes), dropped in a `DataTransfer` (v3implementation D-79) | `rejections.spec.ts` |
 | `REJECT_CONTAINER` | not MP4/MOV | accepted containers | `rej_vp9.webm` | `probe_rejections.rs`, `rejections.spec.ts` |
 | `REJECT_CORRUPT` | parse failure | file looks damaged; re-export | `rej_truncated.mp4` | same |
 | `REJECT_NO_VIDEO` | no video track | needs a video | `rej_no_video.m4a` | same |
@@ -1825,11 +1842,11 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
 | `REJECT_NO_AUDIO` | no audio track | needs speech audio | `rej_no_audio.mp4` | same |
 | `REJECT_MULTI_AUDIO_TRACK` | more than 1 audio track | one audio track only | `rej_two_audio.mp4` | same |
 | `REJECT_AUDIO_CODEC` | non-AAC audio | export with AAC audio | `rej_mp3_audio.mp4` | same |
-| `REJECT_DURATION` | longer than 90 s | actual duration, the 90 s limit, trim advice (PS §9.4 copy) | `rej_too_long_91s.mp4` | same |
+| `REJECT_DURATION` | longer than 90 s | the 90 s limit, trim advice (PS §9.4 copy, with the limit in place of the measured duration) | `rej_too_long_91s.mp4` | same |
 | `REJECT_RESOLUTION` | long side > 1920 px | PS §9.4 4K copy | `rej_4k.mp4` | same |
 | `REJECT_FRAME_RATE` | average above 60 fps | record at 60 fps or lower | `rej_120fps.mp4` | same |
-| `REJECT_DECODE_UNSUPPORTED` | browser cannot decode this H.264 config | re-export with standard settings | mocked `isConfigSupported` | `rejections.spec.ts` |
-| `REJECT_NO_SPEECH` | fewer than `MIN_WORDS` words transcribed | no English speech found | `rej_silent.mp4` | `rejections.spec.ts` |
+| `REJECT_DECODE_UNSUPPORTED` | browser cannot decode this H.264 config | re-export with standard settings | `rej_h264_444.mp4` (H.264 High 4:4:4, a real file, not a mock: `isConfigSupported` runs inside `media.worker`, where a Playwright init script does not run; v3implementation D-78). Chrome stable decodes it on D1 and on the CI runner, so its case is `test.fixme` there with the reason, and the code path is covered by the inline unit test of `validate_probe` and by `probe_rejections.rs` with `decode_supported = false` (measured in V3, docs/v3/experiments.md) | `probe_rejections.rs`, `rejections.spec.ts` |
+| `REJECT_NO_SPEECH` | fewer than `MIN_WORDS` words transcribed | no English speech found | `rej_silent.mp4` | `rejections.spec.ts` (D1 only: it needs a whole ASR pass) |
 
 ### 15.4 Edge cases
 
@@ -1863,7 +1880,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
   "totalBytes": 0 }
 ```
 
-Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB.
+Candidates (TE-1, E-3, E-10 decide; values filled at M0.2): small-size English model (default candidate; the founder's decision of 2026-10-09, D-66 of `docs/v2/v2implementation.md`), base-size English model (first PS §20.4 fallback), tiny-size English model (second fallback). Constraint: `totalBytes` at most 260 MB, which is 260,000,000 bytes (PS §10 J4, §20.2). The J4 copy interpolates `totalBytes` rounded to 10 MB. `Transcript.model_version` is the manifest's `modelId`: `AsrWorkerApi.load` carries `modelId` and no version, and workers do not import the manifest (v2implementation D-50).
 
 ### 16.2 Interfaces
 
@@ -1908,7 +1925,7 @@ ensureReady:
 loadModel: configure the runtime so that                  // exact option names confirmed in TE-1
    - remote model loading is disabled
    - the model cache is asr/model-cache-adapter.ts (reads OPFS final files only; a miss throws, never fetches)
-   - runtime .wasm files load from "/ort/" on the app origin
+   - runtime .wasm files load from "/ort/<runtime version>/" on the app origin (versioned: vercel.json marks /ort/* immutable; v2implementation D-37)
    - backend = "webgpu"; on failure → "wasm" with threads = clamp(hardwareConcurrency - 2, 1, 4)
 transcribe(pcm16):
    windows of ASR_WINDOW = 30 s with ASR_OVERLAP = 5 s; word-level timestamps requested
@@ -1960,29 +1977,45 @@ pub fn redetect_sentence(t: &Transcript, p: &Prosody, edits: &BTreeMap<WordIdx, 
 pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;           // FNV-1a 64 over (kind, start, end)
 ```
 
+The event-id hash input is 9 bytes: the kind as `u8` (NumberReveal 0, ListReveal 1, FromTo 2, KeywordPop 3), then `anchors.start` and `anchors.end` as little-endian `u32` (v2implementation D-47). Ids are stored from V3 on, so this layout is fixed. `Token` and `TokenKind` are defined in `offcut-text/src/tokenize.rs` (v2implementation §8.2, D-42); the recognizer writes an amount such as "$12,000" as two words, `$12` and `,000`, and `parse_quantity` reads that split form as one quantity (v2implementation §8.4).
+
 ### 17.2 Normalization
 
-- **Sentences.** A boundary after terminal punctuation (`.`, `?`, `!`) or a gap of at least `SENTENCE_GAP = 700 ms`; a sentence longer than `SENTENCE_MAX_WORDS = 40` is split at its longest internal gap (assumptions, E-10).
-- **Numbers (`numbers.rs`).** Parses: digit forms with separators and decimals; spelled cardinals from zero to trillions ("ten thousand" → 10,000, PS §9.6); "point" decimals; magnitude suffixes k, m, b, "grand"; currency symbols and words (USD, EUR, GBP, INR); percent; multipliers ("3x", "ten times"); units from `units_lex.rs` (time, data size, count nouns). Not parsed: fractions in words, ranges, dates.
+- **Sentences.** A boundary after terminal punctuation (`.`, `?`, `!`) or a gap of at least `SENTENCE_GAP = 700 ms`; a sentence longer than `SENTENCE_MAX_WORDS = 40` is split at its longest internal gap, the earliest of equal gaps, each half checked again (assumptions, E-10; the tie-break makes one-word sentences when every gap is equal, v3implementation §23 item 28, open).
+- **Numbers (`numbers.rs`).** Parses: digit forms with separators and decimals; spelled cardinals from zero to trillions ("ten thousand" → 10,000, PS §9.6; the grammar is in `cardinals.rs`, v3implementation D-92); "point" decimals; magnitude suffixes k, m, b, "grand"; currency symbols and words (USD, EUR, GBP, INR); percent; multipliers ("3x", "ten times"); units from `units_lex.rs` (time, data size, count nouns). Not parsed: fractions in words, ranges, dates, ordinals, Indian digit grouping ("2,00,000": the number is not shown rather than misread; v3implementation §23 item 16, open), terabytes (`Unit` has no variant; item 17, open).
+  - **Word lists** (v3implementation D-84). The unit, currency, magnitude, percent and count-noun lists and `COMPARATIVES` are the sorted `const` slices of `offcut-text/src/units_lex.rs` (v3implementation §8.4), all (assumption, M1.3), re-checked by E-7, matched against whole lower-cased tokens, never read from a file at run time. `units_lex` is public only because `offcut-detect` reads `COMPARATIVES`.
+  - **A wider `Digits` token.** After at most one leading currency symbol (`$ € £ ₹`), at most one trailing sign or suffix (`% k m b x`) and thousands separators are removed, the rest parses as a decimal: `10k`, `$1.5m`, `3x`, `€500` are one `Digits` token each. A clock time (`10:30`) and a range (`5-10`) stay words.
+  - **Count nouns** (v3implementation D-101). A number followed by a word of `COUNT_NOUNS` gets `Unit::Count { noun }`, with the noun as spoken. The list nouns of `offcut-detect/src/config.rs` (reasons, ways, tips, …) are never count nouns, so "three reasons" stays a bare 3 for the list announcer.
+  - **Two ambiguous unit words** (v3implementation D-102). `Unit::Times` is given only by an `x` written after digits (`3x`) or by "times" followed by a word of `COMPARATIVES` ("ten times faster"); "three times" alone is no unit. "pound" and "pounds" are not a currency word (weight is as likely); `£` and "gbp" are. (assumption, M1.3), re-checked by E-7.
+  - **Split groups and a split decimal point.** The recognizer writes "$12,000" as `$12` `,000` and "4.7 minutes" as `4` `.7` `minutes`. After a plain whole number, `parse_quantity` joins split thousands groups and then at most one word of a point and digits only, straight after the number, as its fraction, which ends the number ("4.7 minutes", "1.5 million views"; v2implementation D-42, the founder's decision of 2026-10-18 in the V3 changelog). A point that ends a word ("3." then "5") stays a full stop; a fraction with a sign or suffix (`.7%`), a word in between, or a core that already has a point or a sign is not joined.
+  - **A number never crosses a sentence boundary** (v3implementation D-104). `normalize_transcript` parses each sentence's tokens separately, so a `NormalizedSpan` lies inside one sentence.
 - **Display.** `Quantity.display` is produced only by `format_quantity`; captions show it in place of the spoken words of the span.
-- **Edits.** Detection and captions read effective text: `edits[idx]` when present, else `Word.text`. The transcript itself is immutable.
+- **Edits.** Detection and captions read effective text: `edits[idx]` when present, else `Word.text`. The transcript itself is immutable. An edited number is read again (v3implementation D-109): `number::find`, `from_to::find` and `list::find` read quantities from the effective tokens of each sentence with `parse_quantity`, not from `Transcript.numbers`, so a span whose words were edited yields the quantity of the new text and a hidden word inside it yields none.
 
 ### 17.3 Detection
 
 ```text
 detect(t, p, edits, cfg):
   toks  = effective tokens (lower-cased, punctuation split)
-  cands = from_to::find(toks) ++ list::find(toks) ++ number::find(toks, t.numbers) ++ keyword::find(toks, p)
-  cands = exclusions::apply(cands)                    // may zero a score
-  cands = cands.filter(c => c.score >= cfg.threshold[c.kind])
+  cands = from_to::find(toks) ++ list::find(toks) ++ number::find(toks) ++ keyword::find(toks, p)
+                                                      // each reads the quantities of the effective tokens, per sentence
+  cands = exclusions::apply(cands, toks, t, edits)    // may zero a score
+  cands = cands.filter(c => settled(c.score) >= cfg.threshold[c.kind])
   kept  = resolve::resolve(cands, cfg)                // §17.5
   kept.map(c => DetectedEvent { id: event_id(c.kind, c.anchors), enabled: true, confidence: c.score, .. })
 
 redetect_sentence(.., s, prev, ..):
-  scope = sentence s ∪ sentences touched by any prev event intersecting s ∪ next cfg.list_window sentences
-  new   = detect restricted to scope
-  return prev.filter(e => e.anchors outside scope) ++ new       // ids stable where anchors are unchanged
+  s out of range → return prev
+  scope = sentence s ∪ every sentence whose start_ms lies in (start_ms(s), start_ms(s) + LIST_WINDOW_MS)
+          ∪ the sentences of every prev event that shares a word with the scope, repeated until none crosses its edge
+  fixed = prev.filter(e => e.anchors share no word with scope)
+  new   = steps 1-5 of detect over the whole transcript, the candidates wholly inside scope
+  return fixed ++ resolve(new, fixed)                 // ids stable where kind and anchors are unchanged
 ```
+
+**As built in V3.**
+- **`settled`** (v3implementation §9.2 step 5, V3 changelog Prompt 77): a score within `SCORE_NOISE` (1e-6) of a whole hundredth is taken as that hundredth before the threshold, because sums of the config's two-decimal values carry `f32` noise (0.65 + 0.20 is 0.84999996, under 0.85). A score really between two hundredths (0.795) is not moved, and `score >= threshold` is otherwise unchanged, which errs toward a missed event rather than a wrong one. An event's confidence is the settled score, so INV-6 holds.
+- **The re-detection scope** (v3implementation D-86): `LIST_WINDOW` is a time (45 s), not a sentence count, and a list announced in `s` may find its markers up to 45 s later. The scope is always whole sentences, and it closes over the events of `prev` that cross its edge: an event that reached into the scope without lying wholly inside it would otherwise be neither kept nor detected again, and be lost on an edit elsewhere (V3 changelog, Prompt 78). `resolve` runs with the events outside the scope fixed, so the rules of §17.5 hold for the whole clip. Measured: 142-290 µs per call on a 157-word transcript on D1, release (`redetect.rs`).
 
 ### 17.4 Scoring (`config.rs`; all values are (assumption), tuned at M1.3 against `fixtures/labeled/` and re-checked in E-7)
 
@@ -1991,16 +2024,36 @@ Scores are clamped to 1.0 and multiplied by the minimum ASR confidence of the an
 | Kind | Candidate requires | Score | Threshold |
 |---|---|---|---|
 | FromTo | Two quantities in one sentence with compatible units, different values, at most `FROMTO_MAX_GAP = 8` words apart | 0.55 base; +0.25 "from … to" frame, or +0.15 change-verb frame ("went", "dropped", "grew", "down", "up" … "to"); +0.15 both carry the same explicit unit, or +0.05 one inherits the other's; +0.05 gap of 6 words or fewer | 0.85 |
-| ListReveal | Announcer (count 2-7 + list noun from the lexicon) followed by that many ordered markers within `LIST_WINDOW = 45 s`; or at least 3 ordered ordinal-word markers starting at "first" | Announcer form: 0.60 base; +0.30 all markers found in order; +0.10 markers are ordinal words. Marker-only form: 0.65 base; +0.20 | 0.85 |
-| NumberReveal | A `NormalizedSpan` not consumed by FromTo or a list announcer/marker | 0.50 base; +0.30 currency, percent or explicit unit; +0.20 magnitude at least 1,000 or a suffix; +0.10 `energy_z >= 1.0` | 0.80 |
+| ListReveal | Announcer (count 2-7 + list noun from the lexicon) followed by that many ordered markers within `LIST_WINDOW = 45 s`; or at least 3 ordered ordinal-word markers starting at "first" | Announcer form: 0.60 base; +0.30 all markers found in order; +0.10 markers are ordinal words. Marker-only form: 0.65 base; +0.20 when no gap between consecutive markers exceeds `LIST_MARKER_GAP_MS = 15,000` | 0.85 |
+| NumberReveal | A `NormalizedSpan` not consumed by FromTo or a list announcer/marker | 0.50 base; +0.30 currency, percent, `Times`, a time or data unit, or a count of at least `COUNT_UNIT_MIN = 100` (v3implementation D-101); +0.20 magnitude at least 1,000 or a suffix, magnitude word or "grand"; +0.10 `energy_z >= 1.0` on any word of the span | 0.85 (measured in V3, docs/v3/experiments.md: raised from 0.80 by the precision gate on 31 labeled files) |
 | KeywordPop | Content word of at least 4 letters, not a stop word, outside every other event's anchors | 0.50 base; +0.20 x clamp(`energy_z` - 1, 0, 1); +0.20 x clamp(`pitch_z` - 1, 0, 1); +0.20 preceded by an intensifier or in the emphasis lexicon | 0.80 |
 
-**Exclusions (`exclusions.rs`, score set to 0):** bare integers 1900-2099 without unit (years); tokens adjacent to a version/product pattern ("Python 3.12", "iPhone 15"); clock times ("at 5 pm", "10:30"); phone-like digit runs; bare integers below 10 without unit; a number that is a list marker.
+**Thresholds in use** (`offcut-detect/src/config.rs`, V3): FromTo 0.85, ListReveal 0.85, NumberReveal 0.85, KeywordPop 0.80. Every other default is v3implementation §9.1's table. A quantity under 1,000 with its unit ("40 seconds", "$500", "120 clients") scores 0.80 and is shown only when said with emphasis (0.90); "3,000 hours", "$12k", "$2k" score 1.00.
 
-**Derived fields.**
-- `NumberReveal.label`: up to `NUMBER_LABEL_MAX_WORDS = 3` following words, stopping at punctuation or a stop-list verb; `None` if empty.
-- `ListReveal.header`: `"{count} {NOUN}"` in the announcer form; empty in the marker-only form (the header row is not drawn).
-- `ListItem.text`: words after the marker up to a clause boundary, the next marker or `LIST_ITEM_MAX_WORDS = 5`, leading fillers removed.
+**Lexicons** (v3implementation D-84). `LIST_NOUNS`, `ORDINAL_MARKERS`, `CHANGE_VERBS`, `INTENSIFIERS`, `EMPHASIS_WORDS`, `STOP_WORDS`, `LABEL_STOP_VERBS`, `FILLERS`, `VERSION_CONTEXT`, `VERSION_AFTER` and `CLOCK_WORDS` are the eleven sorted `const` slices of `offcut-detect/src/config.rs`, listed word by word in v3implementation §9.1, all (assumption, M1.3), re-checked by E-7. `CLOCK_WORDS` holds `a.m` and `p.m`, the forms `tokenize` gives "a.m." and "p.m." (its trailing point is split as punctuation). "always" and "never" are not emphasis words.
+
+**FromTo units** (v3implementation D-85). Two quantities are compatible when, after inheritance (a `Unit::None` takes the other's unit), they have the same `Unit` variant, or both are in one dimension group: time (`Milliseconds` to `Years`), data (`Bytes` to `Gigabytes`); `Count { noun }` only with the identical noun; two different currencies never. "+0.15 same explicit unit" applies when both carry the identical `Unit` variant from their own words, `None` and `None` included (so "from 2019 to 2024" scores 1.00 before the year exclusion); "+0.05 inherits" when exactly one is `None`. The change-verb frame looks for a `CHANGE_VERBS` word among the 3 tokens before the first quantity in its sentence, or between the two, with "to" right before the second. For each first quantity only the best second is kept (highest score, then nearest). The side that inherited is formatted again with its unit ("90" becomes "90 minutes", v3implementation D-106). `FromTo.label` is `None` in V3; no label row is drawn for it.
+
+**List markers** (v3implementation D-105). A marker is an ordinal word (`first` … `seventh`, `firstly`, `secondly`, `thirdly`), the phrase "number" + a cardinal 1-7, or a cardinal 1-7 in digits or words followed by `,` `.` or `:`; it counts only as the first effective word of a sentence, after any punctuation and words of `FILLERS` ("So, first, …"). The markers of a list name 1, 2, 3, … one after the other (a stray marker in between ends the run), each in a later sentence and each starting before the announcer's start + `LIST_WINDOW_MS`. **A count followed by a list noun claims the markers after it, whatever its count** (V3 changelog, Prompt 76): only an in-range count with all its markers is a candidate, and the marker-only form skips claimed markers, so "eight reasons" or "five tips" with four markers gives no list rather than a partial one. A list's score, like every kind's, is multiplied by the least confidence of its anchor words.
+
+**Candidate parts** (v3implementation D-106). `Candidate` carries `parts: Vec<WordRange>`, the word range of each quantity or marker it is built from (NumberReveal: its span; FromTo: from and to; ListReveal: the announcer's count and every marker; KeywordPop: none), and `sentence`, the sentence of its first word (for §17.5 step 4). Both are crate-internal. `exclusions::apply` inspects the parts.
+
+**Exclusions (`exclusions.rs`, score set to 0).** A part is checked with the quantity's own unit, before a FromTo's inheritance. X1-X5 apply to NumberReveal and FromTo parts, X6 to NumberReveal parts, X7 to every kind; a ListReveal's announcer count is checked by X7 only, so it is exempt from X5.
+
+| # | Rule (named constants in `config.rs`) |
+|---|---|
+| X1 | Year: `Unit::None`, a whole number in `YEAR_FIRST..=YEAR_LAST` (1900-2099), one plain `Digits` token without a separator |
+| X2 | Version or product: a `VERSION_CONTEXT` word right before the part, a `VERSION_AFTER` word right after it, or `VERSION_DOTS` (2) decimal points in its text ("Python 3.12", "iPhone 15 Pro", "version 2") |
+| X3 | Clock time: a `CLOCK_WORDS` word right after the part ("at 5 pm"); "10:30" is never a quantity |
+| X4 | Phone-like: one plain `Digits` token of `PHONE_DIGITS_MIN` (7) or more digits, `Unit::None` |
+| X5 | Bare small number: `Unit::None` and `abs(value) < BARE_NUMBER_MIN` (10) |
+| X6 | List marker: the part's words equal a marker's words |
+| X7 | A hidden word: an edit that is empty or only spaces for any word inside the candidate's anchors (§17.6); the only rule that reads `edits` itself |
+
+**Derived fields** (v3implementation D-107).
+- `NumberReveal.label`: the effective text of up to `NUMBER_LABEL_MAX_WORDS = 3` Word tokens after the span, in the same sentence, stopping at punctuation or at a word of `LABEL_STOP_VERBS`; joined by one space; `None` if empty ("3,000 hours editing by hand" → `editing by hand`).
+- `ListReveal.header`: `"{count} {NOUN}"` with the noun upper-cased ("3 REASONS") in the announcer form; empty in the marker-only form (the header row is not drawn).
+- `ListItem.text`: up to `LIST_ITEM_MAX_WORDS = 5` tokens after the marker (Word tokens and numbers in digits), leading fillers removed, stopping at `.` `?` `!` `;` `:`, at a `,` once 2 words are taken, at the next marker or at the sentence end; `ListItem.at` is the start of the marker's first word.
 
 ### 17.5 Resolution (`resolve.rs`)
 
@@ -2018,11 +2071,11 @@ priority: FromTo > ListReveal > NumberReveal > KeywordPop
 - "from 2019 to 2024": both excluded as years → no FromTo.
 - "three reasons" with fewer than three markers found: no event (a partial list is worse than none).
 - "$2k to $20k" without "from" and without a change verb: 0.55 + 0.15 + 0.05 = 0.75 → not shown.
-- A word edit that changes a number re-parses that sentence; the old event disappears and a new id is created; its toggle state is not inherited.
+- A word edit that changes a number re-parses that sentence (v3implementation D-109). The event keeps its id when its kind and anchors are unchanged (v2implementation D-47 hashes the kind and the anchors only, and an edit of one word keeps the anchors), and so keeps its toggle in `EditState.event_overrides`: a number the user switched off stays off when its text is corrected ("$10,000" edited to "$20,000" gives `$20k` with the old id; decided 2026-10-18, V3 changelog open item 14). An edit that changes the kind or the anchors gives a new id.
 - A hidden word (`""` edit) inside an event's anchors removes the event.
 - Empty transcript or zero events: `detect` returns an empty list; the UI shows `NO_EVENTS_FOUND` (PS §10 J7).
 
-**Acceptance.** Precision at least 0.90 per run over at least 30 hand-labeled transcripts covering all four kinds (PS §20.1); `precision_recall.rs` fails below it and prints per-kind precision, recall and a threshold sweep. A prediction is a true positive when kind matches, anchor ranges overlap by at least 50% intersection-over-union, and for FromTo/NumberReveal the parsed values are equal. Same inputs → identical output; `determinism.rs`. Detection at most 1 s for 150 words on R1 (PS §20.2). `redetect_sentence` at most 50 ms (assumption, M1.5).
+**Acceptance.** Precision at least 0.90 per run over at least 30 labeled transcripts covering all four kinds (PS §20.1; written as text and frozen before the rules, v3implementation D-87; V3 read 0.98 on 31 files, docs/v3/experiments.md); `precision_recall.rs` fails below it and prints per-kind precision, recall and a threshold sweep. A prediction is a true positive when kind matches, anchor ranges overlap by at least 50% intersection-over-union, and for FromTo/NumberReveal the parsed values are equal. Same inputs → identical output; `determinism.rs`. Detection at most 1 s for 150 words on R1 (PS §20.2). `redetect_sentence` at most 50 ms (assumption, M1.5).
 
 **Contingency.** Precision under 0.90: raise the per-kind threshold to the lowest value in the sweep that reaches 0.90; if a kind's recall then falls under 0.30 (assumption, E-7), keep it shipped but report it as the E-7 "tune rules or reconsider the wedge" input.
 
@@ -2060,6 +2113,10 @@ pub fn measure_prosody(out48: &[f32], words: &[Word], sentences: &[Sentence]) ->
 
 `resample_mono` changes the sample rate, not the duration: `output.len() == round(input.len() x to / from)`. No function in this crate takes word timings and returns audio, and none returns audio of a different duration than it was given.
 
+**The binding takes no configuration** (v3implementation D-110). `offcut-wasm-core/src/audio_api.rs::run_chain(pcm48, on_block)` runs `ChainConfig::default()`: `AudioWorkerApi.runChain` (§14.2, frozen) has no field for a `cfg`, so `ChainConfig::default()` is the only configuration the app runs, and `offcut-dsp/src/config.rs` is the one place where TE-13's fallback (`denoise: false`) is written. PCM crosses the WASM boundary by copy (in: `&[f32]`; out: a new `Float32Array`), 2 x 17.3 MB for 90 s; between threads it is transferred, never copied (§31).
+
+**The limiter reports its guard.** `limiter.rs::limit(samples, ceiling, rate) -> usize` limits in place and returns how many samples its final guard clamp had to touch (0 when the gain did its work), so `loudness_target.rs` can assert the clamp count.
+
 ### 18.2 Pipeline
 
 ```text
@@ -2080,6 +2137,11 @@ measure_prosody:
   z-scores against the words of the same sentence; sentences with fewer than 3 words or zero variance → 0.0
 ```
 
+**Prosody parameters** (v3implementation D-96, D-108; all (assumption, M1.2)).
+- **Energy:** RMS in dB over the word's samples, floor `ENERGY_FLOOR_DB = -100 dB`.
+- **Pitch on an 8 kHz copy:** each word's samples are decimated by `PROSODY_DECIMATE = 6` with a 6-tap box filter. The normalized autocorrelation runs over lags `PITCH_MIN_LAG = 20` to `PITCH_MAX_LAG = 134` (400 to 60 Hz) in `PITCH_FRAME = 320`-sample frames (40 ms) with a `PITCH_HOP = 80`-sample hop (10 ms). A frame is voiced when its peak is at least `VOICING_MIN = 0.45` and its level at least `VOICED_FRAME_MIN_DB = -60 dB`. The period is the first autocorrelation peak (shortest lag) that comes within `FIRST_PEAK_SHARE = 0.9` of the best one, refined by parabolic interpolation: a periodic voice correlates almost as well at two and three periods, and the plain maximum halves the pitch at random (V3 changelog, Prompt 68). The word's F0 is the median of its voiced frames; no voiced frame gives no pitch. At 48 kHz the autocorrelation over the reference clip's words would cost about 6 x 10^9 multiply-adds, far over the prosody allowance (under 1 s, §8); at 8 kHz about 2 x 10^8, and F0 lies under 400 Hz, so the decimation keeps what is measured.
+- **z-scores:** of energy and of `log2(F0)`, within the sentence over the words that have a value; a word without pitch gets `pitch_z = 0.0`; a sentence of fewer than `PROSODY_MIN_WORDS = 3` such words, or of zero variance, gives 0.0 for all its words.
+
 ### 18.3 Constants (`config.rs`; all (assumption), tuned at M1.2 and in E-2)
 
 | Constant | Default | Note |
@@ -2093,6 +2155,7 @@ measure_prosody:
 | Compressor | threshold -18 dBFS, ratio 3:1, attack 5 ms, release 80 ms, knee 6 dB | |
 | Limiter look-ahead | 5 ms | Compensated; adds no delay to `out48` |
 | `ALIGN_TOLERANCE` | 1 ms (48 samples) | Largest allowed shift of any signal feature between input and output |
+| `DENOISE_DELAY_SAMPLES` | 480 (10 ms, one RNNoise frame) | The denoiser's delay, the same for every impulse, compensated exactly: measured in V3 by `impulses_stay_aligned`, docs/v3/experiments.md (v3implementation D-89) |
 
 No constant in this table is a silence threshold for cutting, a minimum pause, a kept-pause length or a crossfade. `ABSOLUTE_SILENCE` only stops the loudness stage from applying gain to a clip with no measurable programme.
 
@@ -2107,7 +2170,7 @@ No constant in this table is a silence threshold for cutting, a minimum pause, a
 
 **Acceptance.** Output integrated loudness within ±1 LU of `TARGET_LOUDNESS` (PS §20.1): `loudness_target.rs` on five synthetic and three speech fixtures, and independently by `verify_mp4.py`. No click at block boundaries: `chain_no_clicks.rs` asserts the sample-to-sample step across every 1 s block boundary is at most 2x the local RMS (assumption, M1.2). Duration and alignment (INV-10), `duration_preserved.rs`: `out48.len() == pcm48.len()` for every fixture and for random lengths including non-multiples of the block and frame sizes (proptest); the regression layout 0-5 s speech, 5-10 s silence, 10-20 s speech comes out as 20 s with speech, silence and speech at the same positions (never 15 s); an impulse train through the chain stays within `ALIGN_TOLERANCE`; a clip that is 95% silence and a clip of pure digital silence both return the input length. Chain at most 4 s for the reference clip on R1 (PS §20.2).
 
-**Contingency (PS §20.4, TE-13).** Denoise exceeds the 4 s budget on R1 → `ChainConfig.denoise = false` (high-pass + loudness + limiter only); decided at M1.
+**Contingency (PS §20.4, TE-13).** Denoise exceeds the 4 s budget on R1 → `ChainConfig.denoise = false` (high-pass + loudness + limiter only); decided at M1. Measured in V3 on D1, not R1 (v3implementation D-74): 828 ms per 60 s alone, a median of 1,963 ms per 60 s in the bench beside the recognizer; denoise stays on (docs/v3/experiments.md, TE-13).
 
 **Seams (not built now).** User-supplied music with ducking (P1): a `mix_bgm` step after `run_chain` and a `BgmTrack` record; it does not exist in code. Future versions may introduce explicit user-controlled timeline editing; the MVP deliberately does not implement automatic timeline modification, and no type, argument, message or flag is reserved for it.
 
@@ -2167,6 +2230,8 @@ impl RenderSession {
     pub fn summary(&self) -> JsValue;
 }
 ```
+
+`offcut-scene/src/display_list.rs` defines `Rect`, `Rgba`, `PathEl`, `PositionedGlyph`, `Stroke`, `Affine` and a closed `FontId` enum with four members, one per font instance, because `GlyphRun` has no weight field (v2implementation D-29, §11.4). `JsRandomAccess` is private to each binding crate and wraps a `FileSystemSyncAccessHandle`; there is no shared binding crate (v2implementation D-30).
 
 ### 19.3 Build and frame evaluation
 
@@ -2269,6 +2334,8 @@ export function runPreview(session: RenderSession, source: VideoSource,
 export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs };
 ```
 
+`DemuxerHandle` is a TypeScript interface declared in `video-source.ts`; `RenderSession` satisfies it through four extra exported methods, so the render worker reads samples through the session that owns the demuxer and loads only `offcut_render.wasm` (v2implementation D-30, §13.5).
+
 ### 20.2 Algorithm
 
 ```text
@@ -2327,7 +2394,7 @@ export function runExport(a: { session: RenderSession; source: VideoSource; prof
 // workers/render/encoders.ts  [ONLY]
 export const VIDEO_ENCODE_LADDER: readonly VideoLadderEntry[];
 export const AAC_ENCODE_CONFIG: AudioEncoderConfig;
-export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // first supported entry, else E_ENCODE_VIDEO
+export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // first supported entry, else E_ENCODE_VIDEO; bitrate from profile.video_bitrate (v2implementation D-26)
 // workers/render/opfs-sink.ts
 export class OpfsSink { static open(path: string): Promise<OpfsSink>; writeAt(offset: Bytes, data: Uint8Array): void;
                         close(): Promise<void>; abort(): Promise<void>; }
@@ -2358,7 +2425,7 @@ pub fn export_profile(claims: Option<&EntitlementClaims>, now: UnixSecs) -> Expo
 | Level check | 1080x1920 = 68 x 120 = 8,160 macroblocks ≤ 8,192 (level 4.0 frame limit); 8,160 x 30 = 244,800 MB/s ≤ 245,760 | derived |
 | Common video settings | `framerate: 30`, `bitrateMode: "variable"`, `latencyMode: "quality"`, `avc: {format: "avc"}` | |
 | Keyframe interval | 60 frames (2 s) | (assumption, TE-4) |
-| Video bitrate | Creator 8,000,000 b/s; Free 4,000,000 b/s; Preview not encoded | (assumption, TE-4) |
+| Video bitrate | Creator 8,000,000 b/s; Free 4,000,000 b/s; Preview not encoded. The values live in `offcut-entitlement/src/profile.rs`, the only builder of an `ExportProfile`; the Preview profile is 540x960, `watermark: false`, both bitrates 0. `CREATOR_VIDEO_BITRATE` in `encoders.ts` is the capability probe's bitrate only and must equal the `profile.rs` constant; TE-4 changes both or neither (v2implementation D-26) | (assumption, TE-4) |
 | Audio | `mp4a.40.2`, 48,000 Hz, 2 channels (mono duplicated), 160,000 b/s | (assumption, TE-4) |
 | Largest output | 90 s x (8,000,000 + 160,000) / 8 = 91.8 MB | derived |
 | MP4 | brands `isom`/`mp42`; video timescale 30,000 with sample delta 1,000 (exact 30 fps CFR); audio timescale 48,000; chunks of 0.5 s; `moov` before `mdat` | |
@@ -2399,7 +2466,7 @@ AAC priming: the first audio chunk's timestamp/duration and the encoder's report
 
 - **Frame accounting.** Every output frame `0..N` is rendered and encoded exactly once; the loop never drops or duplicates an output frame, and it runs from the first instant of the recording to the last. Source frames may repeat (VFR, source below 30 fps) or be skipped (source above 30 fps) only because of the frame-rate conversion to 30 fps; none is skipped or repeated because of what the audio contains.
 - **Duration.** Output duration equals source duration to within one video frame, for any amount of silence in the clip. `timeline-preserved.spec.ts` and verifier checks 5 and 8.
-- **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end (dev builds).
+- **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end. The counter runs in every build, since E2E runs production builds: a non-zero count at the end of an export or after a preview stop fails that call with `E_INTERNAL` (v2implementation D-45).
 - **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`. TE-3 picked method A on 2026-10-09: a readback was 2.8 times slower, and a frame made from a buffer of RGBA bytes is encoded with full-range brightness that the stream does not declare (`docs/v2/experiments.md`; read on the development machine, v2implementation D-69).
 - **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted.
 - **GPU device lost.** `E_GPU_LOST`; the user retries; no partial resume.
@@ -2603,14 +2670,18 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 |---|---|---|
 | `clips` | `clipId` | `{ clipId, createdAt, lastOpenedAt, clipInfo, sourceBytes, sourceHashPrefix }` (no file name, no path) |
 | `transcripts` | `clipId` | `{ transcript, prosody }` |
-| `events` | `clipId` | `DetectedEvent[]` |
+| `events` | `clipId` | `DetectedEvent[]`. No writer and no repo file in V3: on a restore the events are recomputed by `detect` from the stored transcript and prosody, which gives the same events and ids (INV-7), and toggles live in `EditState.event_overrides`, keyed by `EventId` (v3implementation D-82). V7 gives the store a writer or removes it here and from `schema.ts` through a version-2 migration |
 | `edits` | `clipId` | `{ editState }` |
 | `renderCache` | cache key (hex) | `{ clipId, exportId, opfsPath, bytes, createdAt }` |
 | `entitlement` | `"current"` | `{ token, storedAt }` |
 | `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts }` |
 | `meta` | string | `anonId`, `persistRequested` |
 
-Every value is wrapped as `{ schemaVersion: number, value }`. `sourceHashPrefix` is SHA-256 over the first 4 MiB of the source plus its length.
+Every value is wrapped as `{ schemaVersion: number, value }`.
+
+**`sourceHashPrefix`** (v3implementation D-81) is the lower-case hex SHA-256 of the first `min(4 MiB, size)` bytes of the source file followed by its size as an unsigned 64-bit little-endian integer. It is computed on the main thread by `persistence/clips-repo.ts::hashPrefix(file)` with `crypto.subtle.digest("SHA-256", …)` over `file.slice(0, 4 MiB)`, before `importAndProbe` transfers the file, and stored in the `clips` record. No WASM runs for it; V7's restore compares it to tell a re-dropped file from another.
+
+**Writers in V3.** `persistence/clips-repo.ts`, `transcript-repo.ts` and `edits-repo.ts` write `clips` (C-2, while the clip is `importing`), `transcripts` and `edits` (C-4 step F). `sourceBytes` is `file.size`, minted by `clips-repo.ts`'s one `MINTING` entry `toBytes` (v3implementation D-103). Each repo has `clear()`, called at import beside the OPFS sweep until V7's eviction exists (C-2). The repos throw `opfs.OpfsError` (kind `quota` for a `QuotaExceededError`, `io` for any other IndexedDB failure), which `run-pipeline.ts` maps to `E_STORAGE_QUOTA` / `E_STORAGE_IO`.
 
 ### 23.2 Server schema (`server/migrations/0001_init.sql`)
 
@@ -2761,7 +2832,7 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 
 - Model files are SHA-256-verified against the bundled manifest before first use (PS §17).
 - `cargo deny check` (licenses, advisories, bans) and `pnpm audit --prod --audit-level high` run in CI.
-- The ONNX Runtime `.wasm` files are copied from the pinned npm package at build time and served from the app origin.
+- The ONNX Runtime `.wasm` files are copied from the pinned npm package at build time to `web/public/ort/<runtime version>/` and served from the app origin; the version in the path keeps the year-long immutable cache of `/ort/*` from serving a stale runtime after an upgrade (v2implementation D-37).
 
 ### 24.7 Edge cases
 
@@ -2793,6 +2864,7 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 | P-9 | "Export my account data" returns server-side records only (PS §17) | §22.7 | `account_export.rs` | Account page |
 | P-10 | Analytics retained 90 days; not joined to users (PS §16) | No `user_id` column on `analytics_events`; purge task | `analytics_allowlist.rs` (schema assertion + purge) | Stated on the settings page |
 | P-11 | File names and paths are never stored or sent (PS §15) | `clips` store has no name field; download name is generated | `privacy-network.spec.ts` assertion 3; `restore.spec.ts` inspects the store | Recent clips show date and duration only |
+| P-13 | No metadata of a founder recording reaches anything the app or the tests publish (v3implementation D-100) | `gen_fixtures.sh` writes every derived fixture with `-map_metadata -1 -map_chapters -1 -fflags +bitexact`, so no `creation_time`, `location` or `encoder` tag of the reference clip is copied; a recording that carries a location (`testclips/v3testclip.mp4`) is never committed, uploaded or derived into a fixture; the muxer writes no `udta` and zero timestamps | One D1-only case of `export-creator.spec.ts` exports `v3testclip.mp4` and asserts with `ffprobe` that the output has no tag whose key contains `location` or `ISO6709`, no `creation_time`, `title`, `comment` or `encoder` from the source, and no `udta`, `meta` or XMP `uuid` box carrying `©xyz` or `ISO6709` (an early slice of verifier check 11) | Not user-facing: a rule for the fixtures and the corpus. The same promise covers clips lent to the corpus, whose transcripts are never written anywhere (v3implementation D-112) |
 | P-12 | No public compliance claim or absolute "never leaves your device" wording before legal review (PS §17) | All copy in `messages.ts` | `messages.test.ts` fails on the banned phrases list ("never leaves", "GDPR", "DPDP", "CCPA", "SOC 2", "compliant") | Landing uses the PS §10 J1 and J4 wording |
 
 ### 25.2 `privacy-network.spec.ts`
@@ -2847,21 +2919,29 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | Benchmark | Stage timings and memory on R1/R2 | `bench/device-bench.ts`; results committed to `bench/results/` |
 | Regression | 40+ clip corpus; labeled detector set; benchmark deltas against the last committed result | `corpus/run_corpus.ts`; `precision_recall.rs`; `device-bench.ts --compare` |
 
-**Fixture matrix.** Committed speech clips are recorded by the founder reading scripts in `fixtures/speech/README.md`. Derived and synthetic fixtures are produced by `fixtures/gen_fixtures.sh` (ffmpeg CLI, development tool only) and are not committed. `fixtures/manifest.json` maps each name to its expected outcome.
+**Fixture matrix.** No fixture is committed and none is a new recording (v3implementation D-76, D-77). `fixtures/gen_fixtures.sh` (ffmpeg 9.0 CLI, development and CI tool only; `pnpm fixtures`) writes every fixture into `fixtures/.gen/` (git-ignored):
+- **Speech fixtures are derived** from the reference clip (v2implementation D-64; `testclips/` or the asset-host copy in `fixtures/.cache/`, D-39) and keep the names below: the portrait and landscape clips are the cut 0.960-60.960 s of the reference scaled to 1080x1920 and 1920x1080 at 30 fps CFR, with a white frame at 5.000 s and 55.000 s; the no-events clip is sentences 12-14; the long-pause and sparse clips splice reference speech with generated room tone (`anoisesrc` pink noise, seed 7). `fixtures/speech/README.md` says, per clip, that it is derived and from which seconds. A real recording stored later in `testclips/` under the same name is preferred by the generator, and no code changes (v3implementation D-76).
+- **Every `ok_*` and `rej_*` fixture is synthetic**, made from ffmpeg's `lavfi` sources (`testsrc2` video, a 440 Hz `sine`, `anullsrc` silence), never from a recording (v3implementation D-77).
+- **Deterministic and small** (v3implementation D-111). The input options (`-y -hide_banner -loglevel error -nostdin`) come before the first `-i` and the output options (`-threads 1 -fflags +bitexact -flags:v +bitexact -flags:a +bitexact -map_metadata -1 -map_chapters -1`) after the last, since an output option placed before an input applies to that input; H.264 adds `-bf 0 -g 30`. Each recipe uses the lowest size that shows its property (320x180 where size does not matter). Two derived clips keep their names though their lengths differ: `speech_20s_noevents.mp4` is 14.4 s and `speech_30s_sparse.mp4` 30.0 s. The version check accepts `ffmpeg version 9.0` and `n9.0` (Linux static builds print the `n`).
+- **PCM for the five speech fixtures only**: `<file>.pcm48.f32`, mono 48 kHz `f32le`, decoded by ffmpeg, because Rust has no AAC decoder. The synthetic signals of `loudness_target.rs` are made inside the test.
+- **`fixtures/.gen/STAMP`** holds the ffmpeg version and the SHA-256 of the script, the manifest and the reference clip. A test that reads a fixture first checks it and fails with "run pnpm fixtures" when it does not match. **Six Rust test files read generated fixtures**: `demux_fixtures.rs`, `probe_rejections.rs`, `loudness_target.rs`, `duration_preserved.rs`, `chain_no_clicks.rs` and `prosody.rs` (the last two through their speech PCM cases).
+
+The generator takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs on every pull request (measured in V3, docs/v3/v3changelog.md, Prompts 63 and 87). `fixtures/manifest.json` (committed) lists every generated and derived fixture (25): name, recipe kind, expected outcome (`accept` with the `ClipInfo` fields a test asserts, or the `RejectReason`), the `ffprobe` properties step 8 checks, and the tests that read it.
 
 | Fixture | Properties | Expected | Used by |
 |---|---|---|---|
-| `speech/speech_60s_portrait.mp4` | Reference clip (PS §20.2): 1080x1920, 30 fps, H.264/AAC, about 150 words, two numbers, one 3-item list, one from-to, one emphasized word, two white-flash frames | Accepted; 4+ events | Most E2E suites, bench, verifier |
-| `speech/speech_60s_landscape.mp4` | 1920x1080, same script | Accepted; crop control shown | `review-edit.spec.ts`, `framing.rs` |
-| `speech/speech_20s_noevents.mp4` | No numbers or lists | Accepted; zero events; `NO_EVENTS_FOUND` | `pipeline-preview.spec.ts` |
-| `speech/speech_20s_long_pause.mp4` | 0-5 s speech, 5-10 s silence (room tone only), 10-20 s speech; one white-flash frame in each speech part | Accepted; export is 20 s (never 15 s); words after the pause keep timestamps of 10 s or later; A/V in sync on both sides of the pause | `timeline-preserved.spec.ts`, `duration_preserved.rs` (its audio), verifier |
-| `speech/speech_30s_sparse.mp4` | Five short phrases separated by four pauses of 3-6 s; under 20% of the clip is speech; one white-flash frame near each end | Accepted; export is 30 s; every pause keeps its length | `timeline-preserved.spec.ts`, verifier |
-| `ok_vfr.mp4` | Reference re-encoded with variable frame timing | Accepted; CFR output | `demux_fixtures.rs`, corpus smoke |
-| `ok_rotated_90.mov` | Landscape-coded with 90° rotation metadata | Accepted as portrait | `demux_fixtures.rs`, `golden_frames.rs` |
+| `speech/speech_60s_portrait.mp4` | Derived from the reference clip (PS §20.2): its 0.960-60.960 s, cropped and scaled to 1080x1920, 30 fps CFR, H.264/AAC, sentences 1-14, white frames 150 and 1650 (v3implementation D-76) | Accepted; four events (the 60 s cut ends before the $12k sentence) | Most E2E suites, bench, verifier, `demux_fixtures.rs`, `loudness_target.rs`, `chain_no_clicks.rs`, `prosody.rs` |
+| `speech/speech_60s_landscape.mp4` | The same cut scaled to 1920x1080 | Accepted; crop control shown | `review-edit.spec.ts`, `framing.rs`, `loudness_target.rs` |
+| `speech/speech_20s_noevents.mp4` | The reference's sentences 12-14 (46.600-61.000 s), 14.4 s, no numbers or lists | Accepted; zero events; `NO_EVENTS_FOUND` | `pipeline-preview.spec.ts` |
+| `speech/speech_20s_long_pause.mp4` | 0-5 s reference speech, 5-10 s generated room tone, 10-20 s reference speech; one white-flash frame in each speech part | Accepted; export is 20 s (never 15 s); words after the pause keep timestamps of 10 s or later; A/V in sync on both sides of the pause | `timeline-preserved.spec.ts`, `duration_preserved.rs` (its audio), `demux_fixtures.rs`, `loudness_target.rs`, verifier |
+| `speech/speech_30s_sparse.mp4` | Five 1.1 s pieces of reference speech in generated room tone; under 20% of the clip is speech; one white-flash frame near each end | Accepted; export is 30 s; every pause keeps its length | `timeline-preserved.spec.ts`, `loudness_target.rs`, verifier |
+| `ok_vfr.mp4` | Synthetic, 1280x720, 10 s at 30 fps with every fourth frame dropped and timestamps kept | Accepted; `is_vfr`; `avg_fps` 22,000-23,000 milli; duration 9,967 ms; CFR output | `demux_fixtures.rs`, `rejections.spec.ts` (accept case) |
+| `ok_rotated_90.mov` | Landscape-coded with 90° rotation metadata (`-display_rotation 90`) | Accepted as portrait; `R270` by ffmpeg's sign convention, display 720x1280 | `demux_fixtures.rs`, `golden_frames.rs` |
 | `ok_60fps.mp4` | 60 fps | Accepted; 30 fps output | `demux_fixtures.rs` |
 | `ok_90s_exact.mp4` | Exactly 90,000 ms | Accepted | `probe_rejections.rs` |
 | `ok_moov_at_end.mp4` | `moov` after `mdat` | Accepted | `demux_fixtures.rs` |
-| `ok_portrait_3x4.mp4` | 1080x1440 | Accepted; cropped to 9:16 | `framing.rs` |
+| `ok_portrait_3x4.mp4` | 1080x1440 | Accepted; cropped to 9:16 | `demux_fixtures.rs`, `framing.rs` |
+| `ok_two_video_first_disabled.mp4` | Two video tracks (320x180 disabled, 640x360 default) and one audio track | Accepted; the 640x360 track is the video (§15.4) | `demux_fixtures.rs` |
 | `rej_too_long_91s.mp4` | 91 s | `REJECT_DURATION` | §15.3 tests |
 | `rej_4k.mp4` | 3840x2160 | `REJECT_RESOLUTION` | §15.3 tests |
 | `rej_hevc.mov` | HEVC | `REJECT_HEVC` | §15.3 tests |
@@ -2873,14 +2953,17 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | `rej_120fps.mp4` | 120 fps | `REJECT_FRAME_RATE` | §15.3 tests |
 | `rej_no_video.m4a` | Audio only | `REJECT_NO_VIDEO` | §15.3 tests |
 | `rej_truncated.mp4` | Cut inside `moov` | `REJECT_CORRUPT` | §15.3 tests |
-| `rej_silent.mp4` | Valid video, silent AAC | `REJECT_NO_SPEECH` | `rejections.spec.ts` |
+| `rej_silent.mp4` | Valid video, 5 s of silent AAC (measured in V3: the recognizer gives fewer than `MIN_WORDS` words, docs/v3/experiments.md) | `REJECT_NO_SPEECH` | `rejections.spec.ts` (D1 only) |
+| `rej_h264_444.mp4` | H.264 High 4:4:4 Predictive (`yuv444p`), 1280x720, 30 fps, AAC, 2 s; passes rules 1-10 (v3implementation D-78) | `REJECT_DECODE_UNSUPPORTED` where Chrome's `isConfigSupported` refuses it | `probe_rejections.rs` (with `decode_supported = false`), `rejections.spec.ts` (`test.fixme` where Chrome decodes it, §15.3) |
 | oversize (generated in the test) | Sparse file over 500 MB | `REJECT_FILE_SIZE` | `rejections.spec.ts` |
 | `bad_audio_payload.mp4` | Valid tables, corrupted AAC frames | `E_DECODE_AUDIO` | `failure-recovery.spec.ts` |
 | `bad_video_payload.mp4` | Valid tables, corrupted H.264 after 2 s | `E_DECODE_VIDEO` | `failure-recovery.spec.ts` |
-| `labeled/*.json` (30 or more) | Hand-labeled transcripts with expected events | Precision at least 0.90 | `precision_recall.rs`, `layout_safe_area.rs` |
+| `labeled/*.json` (30 or more; 31 in V3) | Labeled transcripts with expected events, written as text and frozen before the detector's rules (v3implementation D-87): 29 written transcripts, `a01` (the reference clip's transcript in the written form, no emphasis marks) and `a02` (the second recording as recognized, `source: "asr"`, its `words` and `prosody` read from IndexedDB after S8). Format in `labeled/SCHEMA.md`: optional `tags` (the coverage vocabulary the coverage check counts) and `edits` (word index to replacement, `""` hides); an `asr` file whose `words` are still `null` is skipped ("no data yet"), and a file whose `sentences` and `words` do not match its source (a written file holds `sentences` only, an `asr` file `words` and `prosody` only) is refused. A label changes only with a changelog line naming the file, the label and the reason | Precision at least 0.90 | `precision_recall.rs`, `layout_safe_area.rs` |
 | `golden/*.png` (14) | 3 styles x 4 event kinds, watermark on, watermark off | Similarity at least 0.98 | `golden_frames.rs` |
-| Corpus (40+, external) | Real clips tagged vfr, rotated, noisy, accent (PS §9.6) | At least 90% export; rest rejected; none crash | `corpus/run_corpus.ts` |
-| ASR accuracy set (20, external) | 10 US, 10 Indian/other English accents with reference text (E-10) | WER at most 12% | `corpus/run_corpus.ts --wer` |
+| Corpus (40+, external) | Real clips tagged vfr, rotated, noisy, accent (PS §9.6), read from the local directory `OFFCUT_CORPUS_DIR` and listed in `corpus/manifest.json` by id, SHA-256 and tags only, never uploaded (v3implementation D-88); `founder-01` is the reference clip and `founder-02` the second recording | At least 90% export; rest rejected; none crash. TE-12 is "inconclusive" under 10 clips (2 in V3) | `corpus/run_corpus.ts` (Playwright project `corpus`) |
+| ASR accuracy set (20, external) | 10 US, 10 Indian/other English accents with reference text (E-10). Does not exist in V3: E-10 is carried to V9, and V3 reads `--wer` on the founder's clips as a smoke reading only (v3implementation D-88) | WER at most 12% | `corpus/run_corpus.ts --wer` |
+
+**What `run_corpus.ts` writes** (v3implementation D-112). Numbers, ids, codes and tags only: a transcript of a clip from anyone but the founder is never written to the repository, a result file or a log. Its `transcripts` mode writes the founder's clips only, through a fixed map from corpus id to labeled file (`founder-02` to `fixtures/labeled/a02-v3testclip.json`; `founder-01` has no `asr` file, `a01` being written), filling `words` and `prosody` and never `expected`.
 
 ---
 
@@ -2894,7 +2977,7 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | `capability.spec.ts` | J3: check finishes within 3 s; `capability_check` event carries enums only; supported state reaches the editor |
 | `unsupported.spec.ts` | Each `UNSUPPORTED_*` (injected) shows its specific message, the supported list, the demo video and the email form (PS §9.3) |
 | `model-download.spec.ts` | J4: progress and copy shown; interrupted download resumes from stored bytes; hash mismatch re-downloads; second session skips download |
-| `rejections.spec.ts` | J5: every `REJECT_*` fixture shows its message with interpolated limits; `clip_rejected` carries only the code |
+| `rejections.spec.ts` | J5: every `REJECT_*` fixture shows its message with interpolated limits; `clip_rejected` carries only the code. 16 cases: one per code (14), "start over" and the `ok_vfr.mp4` accept case (its `clips` record). 15 are tagged `@no-gpu` and run on CI's Windows runner; `REJECT_NO_SPEECH` needs a whole ASR pass and runs on the development machine (v3implementation D-93). The oversize file is built in the page (v3implementation D-79); `REJECT_DECODE_UNSUPPORTED` is `test.fixme` where Chrome decodes its fixture (§15.3) |
 | `pipeline-preview.spec.ts` | J6-J7: feed shows only real detections; preview plays before sign-in; zero-event clip shows `NO_EVENTS_FOUND`; no long task over 100 ms |
 | `preview-sync.spec.ts` | Drift at most 80 ms over 60 s; late frames at most 5% |
 | `review-edit.spec.ts` | J8: word edit re-detects its sentence; toggles persist across re-detection by `EventId`; style switch; crop control only for landscape; no control named or behaving like "tighten pauses" / "remove silence" exists; clip duration and audio are identical before and after every edit |
@@ -2938,6 +3021,7 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 - A step is done only when every test named in its Definition of Done passes in CI, or the named measurement is committed under `bench/results/`.
 - A failed experiment triggers its "If it fails" action (§37) before any dependent step starts.
 - No P1 item starts before M2 passes. M3 and M4 contain no build work; they are the PS §20.5 decisions.
+- **Read on D1 until R1 exists** (v2implementation D-69, v3implementation D-74). Every gate and measurement that names R1 is read on D1, the development machine, and recorded under the label `d1` (`BENCH_DEVICE=d1`); thresholds do not change. For a budget defined for a 60 s clip, a clip of another length is read against the budget times its length over 60 s (v2implementation D-64). A pass on D1 does not show a pass on an 8 GB laptop with an integrated GPU: TE-13 and the re-read budgets passed on a machine about twice as fast, and are re-read on testers' devices after the final deploy (v3implementation §23 item 21).
 
 | # | Milestone | Depends on | Definition of Done | Experiments |
 |---|---|---|---|---|
@@ -2946,8 +3030,8 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 | M0.3 | Render/encode spike (weeks 1-2): Vello in `render.worker`, frames → H.264 + AAC → MP4 | M0.1 | `mux_roundtrip.rs` passes; `verify_mp4.py` checks 1-6 pass on a spike export; render + encode timings on R1 and R2 committed | E-4, TE-3, TE-4 |
 | M0.4 | Proof of concept (week 3): one clip end to end with captions, NumberReveal, Clean style | M0.2, M0.3 | `pipeline-preview.spec.ts` and `export-creator.spec.ts` pass on the reference clip locally on R1 and R2; `e2e-media.yml` runs them in CI | TE-10, TE-14. **M0 gate: E-1, E-3, E-4 (PS §9.9, §20.4)** |
 | M1.1 | Ingest and rejections | M0.4 | `demux_fixtures.rs`, `probe_rejections.rs`, `rejections.spec.ts` | TE-12 |
-| M1.2 | Audio enhancement chain, prosody | M0.4 | `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs`, `ui.rs` | TE-13 |
-| M1.3 | Normalization and detector, four kinds | M0.4 | `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs`, `rules_table.rs`, `redetect.rs`, `determinism.rs` (detect); `precision_recall.rs` at 0.90 or above | E-10 |
+| M1.2 | Audio enhancement chain, prosody | M0.4 | `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs`; `ui.rs` is satisfied by the existing trybuild test still passing: no compile-fail case is added, because `offcut-types` cannot depend on `offcut-dsp` and the unit types the chain uses (`Hz`, `Lufs`, `Dbfs`, `SampleCount`) are covered by `bare_ms_rejected.rs`'s rule (v3implementation D-95) | TE-13 |
+| M1.3 | Normalization and detector, four kinds | M0.4 | `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs`, `rules_table.rs`, `redetect.rs`, `determinism.rs` (detect); `precision_recall.rs` at 0.90 or above | E-10 (carried to V9: the 20-clip accent set does not exist; V3 reads a smoke WER on the founder's clips, v3implementation D-88) |
 | M1.4 | Scene: three styles, four event visuals, framing, watermark | M1.3 | `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` | none |
 | M1.5 | Preview and review UI | M1.2, M1.4 | `pipeline-preview.spec.ts`, `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts`, `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` | none |
 | M1.6 | Export, verifier, render cache | M1.4 | `export-creator.spec.ts` with all 11 verifier checks; `timeline-preserved.spec.ts`; `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` | E-4 re-measured |
@@ -2984,7 +3068,9 @@ Technical additions to PS §20.1. All must hold at M2.5.
 
 ## 30. Performance Requirements
 
-**Reference conditions (PS §20.2).** 60-second clip, 1080x1920 or 1920x1080, 30 fps, H.264, about 150 words; model cached. R1: 2021-class Windows laptop, 8 GB RAM, integrated GPU, Chrome stable, plugged in. R2: Apple M1, 8 GB, Chrome stable. Fixture: `speech_60s_portrait.mp4` and `speech_60s_landscape.mp4`. Measurement: `bench/device-bench.ts`, median and p90 of 10 runs.
+**Reference conditions (PS §20.2).** 60-second clip, 1080x1920 or 1920x1080, 30 fps, H.264, about 150 words; model cached. R1: 2021-class Windows laptop, 8 GB RAM, integrated GPU, Chrome stable, plugged in. R2: Apple M1, 8 GB, Chrome stable. Fixture: `speech_60s_portrait.mp4` and `speech_60s_landscape.mp4`. Measurement: `bench/device-bench.ts`, median and p90 of 10 runs, one result file per device, date and clip (`<device>-<date>-<clip>.json`, six stages from V3: `audio_chain` added).
+
+**Read on D1 until R1 exists** (v2implementation D-69, v3implementation D-74). Every gate and measurement that names R1 is read on D1, the development machine, and recorded under the label `d1` (`BENCH_DEVICE=d1`); thresholds do not change. For a budget defined for a 60 s clip, a clip of another length is read against the budget times its length over 60 s (v2implementation D-64). A pass on D1 does not show a pass on an 8 GB laptop with an integrated GPU: TE-13 and the re-read budgets passed on a machine about twice as fast, and are re-read on testers' devices after the final deploy (v3implementation §23 item 21).
 
 | Metric | Budget on R1 | Source |
 |---|---|---|
@@ -3062,7 +3148,7 @@ Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.
 
 ## 32. Observability and Diagnostics
 
-- **Client, production.** The only telemetry is the allowlisted events of §22.6, batched by `analytics/client.ts` (flush every 10 s, on `visibilitychange`, and at 20 queued events; failures dropped silently). Stage timings come from `performance.now()` deltas in workers. No console output in production builds (`no-console` lint; dev logging is behind `import.meta.env.DEV` in `config/env.ts`). No third-party error tracker.
+- **Client, production.** The only telemetry is the allowlisted events of §22.6, batched by `analytics/client.ts` (flush every 10 s, on `visibilitychange`, and at 20 queued events; failures dropped silently). Pipeline stage timings are `performance.now()` deltas measured on the main thread around each worker call: `probe_audio` = `importAndProbe` + `extractAudio`, `asr` = `load` + `transcribe`; export timings come from the worker's `stageTimings` (v2implementation D-35). No console output in production builds (`no-console` lint; dev logging is behind `import.meta.env.DEV` in `config/env.ts`). No third-party error tracker.
 - **Client, "Report this" button (PS §14).** Sends one `client_error {error_code, stage}` event. Nothing else.
 - **Client, local diagnostics.** `AppFailure.detail` and a ring buffer of the last 200 state transitions are kept in memory, shown on `/settings` in dev builds only, and never sent.
 - **Server.** Structured JSON logs to stdout (§24.4), retained by Render per its free-tier policy (external; TE-11). Uptime: the free monitor on `/api/v1/healthz` (PS §20.1) with email alerts.
@@ -3087,22 +3173,22 @@ Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.
 | `pnpm check` | fmt, clippy, deny, ESLint, `tsc`, `check-file-tree`, `check-gen-clean`, `check-copy-codes` |
 | `pnpm test` | `cargo test --workspace` + `vitest run` |
 | `pnpm e2e` / `pnpm e2e:media` / `pnpm e2e:device` | Playwright: non-media suites / media suites / all suites headed on this machine |
-| `pnpm fixtures` | `fixtures/gen_fixtures.sh` |
-| `pnpm corpus` | `corpus/fetch_corpus.sh` + `corpus/run_corpus.ts` |
-| `pnpm bench:device` | `bench/device-bench.ts`, writes `bench/results/<device>-<date>.json` |
+| `pnpm fixtures` | `fixtures/gen_fixtures.sh`: every generated and derived fixture into `fixtures/.gen/`, then `STAMP` (§26) |
+| `pnpm corpus` | `corpus/fetch_corpus.sh` (checks the local clips of `OFFCUT_CORPUS_DIR` against the manifest's SHA-256) + `corpus/run_corpus.ts`, run as Playwright project `corpus` (v3implementation D-88). Options go straight after the script name (`pnpm corpus --grep founder-02`): after a `--`, Playwright ignores them |
+| `pnpm bench:device` | `bench/device-bench.ts` (Playwright project `bench`), writes `bench/results/<device>-<date>-<clip>.json` with six stages, `audio_chain` included (v3implementation D-91) |
 | `pnpm verify <file>` | `verify/verify_mp4.py` |
 
 **CI pipeline, in order (`ci.yml` unless noted)**
 1. Checkout; restore Cargo and pnpm caches; secret scan.
 2. `cargo fmt --check`; `cargo clippy --workspace -D warnings`; `cargo deny check`.
 3. `pnpm gen:types`; `scripts/check-gen-clean.sh`.
-4. `cargo test --workspace` (Postgres service container for the server; software GPU adapter for `golden_frames.rs`).
+4. `cargo test --workspace` (Postgres service container for the server; software GPU adapter for `golden_frames.rs`). Before it, the Linux job installs a pinned static ffmpeg 9.0.2 build (archive URL and SHA-256 in `ci.yml`'s `env`, refused on mismatch), restores `fixtures/.cache/` (the reference clip, by the hash in its name) and runs `pnpm fixtures`, so the six fixture-reading test files run, not skip. No fixture is cached between runs (v3implementation D-94).
 5. `pnpm build:wasm`.
 6. ESLint; `tsc --noEmit`; `check-file-tree.mjs`; `check-copy-codes.mjs`.
 7. `vitest run`.
 8. `vite build`; `check-hosts.mjs`.
 9. Playwright non-media suites on Linux with Chrome: `landing`, `unsupported`, `signin`, `checkout`, `settings-what-leaves`, `api-cold-start`.
-10. `e2e-media.yml` on `windows-latest` with Chrome stable: every other suite in §27.1, then `verify_mp4.py` on each export (TE-10).
+10. `e2e-media.yml` on `windows-latest` with Chrome stable, called by `ci.yml` before any deploy, on the `web/dist` it built with the E2E test key: `pnpm fixtures` with the ffmpeg the job installs, then the cases tagged `@no-gpu`. A hosted runner has no graphics processor and a clip took over 20 minutes there (TE-10), so the cases that need a processed clip (pipeline, preview, export with `verify_mp4.py`, and `REJECT_NO_SPEECH`) run as `pnpm e2e:media` on the development machine on a keyed build before every merge into `main` (v2implementation D-72; v3implementation D-93, D-94). The rejection suite's 15 `@no-gpu` cases (the 13 refusals before the pipeline, "start over" and the `ok_vfr.mp4` accept case) run on the runner.
 11. On `main`: `deploy-api.yml` builds `server/Dockerfile`, pushes to GHCR, calls the Render deploy hook; the web build output is deployed to Vercel as a prebuilt deployment (no Rust toolchain on the host's builders).
 12. After deploy: header check against the deployment URL (§24.3).
 
@@ -3207,7 +3293,8 @@ Algorithm:
 Not in this file, by design: silence detection, gap or pause analysis, cutting, crossfading, concatenation of
 segments, time-stretching. The function takes no word timings.
 
-Callers:     crates/offcut-wasm-core/src/audio_api.rs::run_chain   (only caller)
+Callers:     crates/offcut-wasm-core/src/audio_api.rs::run_chain   (only caller; it passes ChainConfig::default(),
+             since the binding takes no configuration: v3implementation D-110, §18.1)
 Callees:     highpass, denoise, compressor, loudness, limiter modules of this crate
 Concurrency: called on audio.worker inside one job; cancellation point per block
 Performance: at most 4 s for the 60 s reference clip on R1 (PS §20.2, TE-13)
@@ -3240,7 +3327,7 @@ Definition of done: the three test files pass; clippy clean; file under 400 line
 | INV-8 | Every export has exactly `frame_count` frames at exactly 30 fps and passes the independent verifier | `verify_mp4.py` (3) in both export suites and the corpus run |
 | INV-9 | Output size and watermark are functions of the verified entitlement token only, computed in `export_profile` | `offcut-entitlement/tests/profile.rs`; `export-free.spec.ts`; `export-creator.spec.ts` |
 | INV-10 | `AUDIO_DURATION_PRESERVATION`. The audio enhancement pipeline does not change the duration of the recording: `out48.len() == pcm48.len()`, aligned within `ALIGN_TOLERANCE`; no sample is deleted or shifted because it is quiet | `duration_preserved.rs`; `timeline-preserved.spec.ts`; `verify_mp4.py` (5, 8) |
-| INV-11 | Every obtained `VideoFrame` is closed; the live-frame counter is 0 after preview stop and after export | Dev-build counter asserted in `pipeline-preview.spec.ts` and `export-creator.spec.ts` |
+| INV-11 | Every obtained `VideoFrame` is closed; the live-frame counter is 0 after preview stop and after export | Counter in every build; a non-zero count fails the call with `E_INTERNAL` (v2implementation D-45), exercised by `pipeline-preview.spec.ts` and `export-creator.spec.ts` |
 | INV-12 | The ASR session and the render session never coexist | `run-pipeline.test.ts` (ordering of `unload` and `openSession`) |
 | INV-13 | A usage receipt is stored at most once per `export_id`; a webhook is applied at most once per `provider_event_id` | `usage_receipts.rs`; `webhook_idempotency.rs` |
 | INV-14 | Limits are visible before the action they gate; no upgrade prompt renders during processing, editing or rendering | `export-free.spec.ts` |
@@ -3298,6 +3385,8 @@ Definition of done: the three test files pass; clippy clean; file under 400 line
 
 PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states the technical instrument this document provides.
 
+**Read on D1 until R1 exists** (v2implementation D-69, v3implementation D-74). Every gate and measurement that names R1 is read on D1, the development machine, and recorded under the label `d1` (`BENCH_DEVICE=d1`); thresholds do not change. For a budget defined for a 60 s clip, a clip of another length is read against the budget times its length over 60 s (v2implementation D-64). A pass on D1 does not show a pass on an 8 GB laptop with an integrated GPU: TE-13 and the re-read budgets passed on a machine about twice as fast, and are re-read on testers' devices after the final deploy (v3implementation §23 item 21).
+
 | ID | Question | Method | Pass criteria | When | If it fails |
 |---|---|---|---|---|---|
 | E-1 | Do technical creators want this? (PS §19) | `LandingPage`, `/notify-me` with `wanted = launch`, `landing_view` counts | At least 1,000 visitors and at least 5% join the waitlist; fewer than 1,000 visitors is inconclusive (PS) | M0.1 → M0 gate | Rewrite the pitch once; under 3% again → stop at M0 (PS §20.4) |
@@ -3309,7 +3398,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | E-7 | Are events kept? (PS §19) | `export_done.events_kept / (events_kept + events_disabled)`; `precision_recall.rs` | At least 60% kept; precision at least 90% (PS) | M2.5 → M3 | Tune rules or reconsider the wedge (PS) |
 | E-8 | How many visitors can run it? (PS §19) | `capability_check` on the landing page | At least 55% pass (PS) | M0.1 → M3 | 40-55%: Safari/Firefox earlier; under 40%: re-plan (PS) |
 | E-9 | Do users return? (PS §19) | `usage_receipts`: second export within 14 days | At least 35% (PS) | M3 | Study why before adding features (PS) |
-| E-10 | ASR accuracy on accents and noise? (PS §19) | `corpus/run_corpus.ts --wer` on 20 clips; `export_done.word_edits` | WER at most 12%; median edits at most 8 per 60 s (PS) | M1.3 | Larger model, stronger edit UX, or narrower claims (PS) |
+| E-10 | ASR accuracy on accents and noise? (PS §19) | `corpus/run_corpus.ts --wer` on 20 clips; `export_done.word_edits` | WER at most 12%; median edits at most 8 per 60 s (PS) | V9 (moved from M1.3: no 20-clip accent set exists; V3 read a smoke WER of 0.107 on the founder's two clips, which is not E-10; v3implementation D-88) | Larger model, stronger edit UX, or narrower claims (PS) |
 | TE-1 | Can the ASR runtime load only from OPFS, make zero third-party requests, and return word timestamps in a worker? | Spike in `asr.worker` under the production CSP; network capture | Zero requests outside §24.1; word timestamps for the reference clip; both backends run | M0.2 | Second runtime candidate behind `whisper-runtime.ts` (§16) |
 | TE-2 | Does the runtime expose per-word confidence? | Inspect outputs on the reference clip | A probability per word is available at no more than 10% time cost | M0.2 | `Confidence(1.0)` for all words; detector scores ignore ASR confidence |
 | TE-3 | Does Vello on WebGPU run in a worker on an `OffscreenCanvas`, with `VideoFrame` import, and which capture method is faster? | Spike: render 1,800 frames on R1/R2 with method A (canvas → `VideoFrame`) and B (texture readback); hidden-tab run | A correct frame every time; at least 30 frames/s render-only on R1; works with the tab hidden | M0.3 | Other capture method; then Canvas2D backend (§19) |
@@ -3321,7 +3410,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | Account approved within 2 weeks; all six `BillingEventKind`s observed; a timed-out webhook is retried | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18) |
 | TE-10 | Can CI run the media suites (WebGPU + H.264 + AAC encode) on a hosted Windows runner within free minutes? | Run `e2e-media.yml` | Suites pass headless; monthly minutes within the free allowance | M0.4 | Run on `main` and pre-release only; `pnpm e2e:device` locally |
 | TE-11 | Does the API fit the Render free instance: memory, cold-start time, instance hours with keep-warm, image deploy, log retention? | Deploy; measure RSS, cold start over 10 sleeps, monthly hour use | RSS under 400 MB; cold start under 70 s; one always-on service fits the monthly hours | M0.1, M2.4 | Another free container host for the same image (§22.9) |
-| TE-12 | Does `offcut-mp4` demux the real-clip corpus (edit lists, rotation, VFR, phone encoders)? | `corpus/run_corpus.ts` | At least 90% of clips demux and export | M1.1, M2.3 | JS demuxer behind the same interface (§15) |
+| TE-12 | Does `offcut-mp4` demux the real-clip corpus (edit lists, rotation, VFR, phone encoders)? | `corpus/run_corpus.ts` | At least 90% of clips demux and export; "inconclusive" with fewer than 10 corpus clips (V3: 2 clips, inconclusive, v3implementation D-88) | M1.1, re-checked at V9 and M2.3 | JS demuxer behind the same interface (§15) |
 | TE-13 | Does the denoiser fit the audio budget in WASM on R1? | `bench/device-bench.ts`, stage `audio_chain` | Chain at most 4 s for the reference clip | M1.2 | `ChainConfig.denoise = false` (PS §20.4) |
 | TE-14 | Is peak memory within budget on R1 for a 90 s, 1080p, 60 fps input? | Memory measurement per phase (§31) | Peak under 1.5 GB; no tab crash in 10 runs | M0.4, M2.4 | Smaller queues; preview at 360x640; smaller model |
 
@@ -3513,8 +3602,8 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 7. Per-word ASR confidence (§16.4) — TE-2. Run on 2026-10-09 (`docs/v2/experiments.md`): the runtime of V2 returns no probability, so every word has `Confidence(1.0)` and detector scores do not use ASR confidence. Hallucinated words over silence are not filtered (§16.6); long mid-clip pauses are now always kept, so E-10 also counts hallucinated words and timestamp drift inside and after pauses of 3 s or more — E-10.
 8. Non-English speech and multiple speakers are not detected at import; these two PS §9.4 constraints have copy but no rejection test (§15.4) — E-2, E-10.
 9. Sentence segmentation constants (§17.2) — E-10.
-10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7.
-11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` and whether the denoiser's delay can be compensated to within it (§18.3) — M1.2, TE-13, E-2.
+10. Every detector score, threshold, window and lexicon (§17.4, §17.5); empty header for marker-only lists — M1.3, E-7. Measured in V3 (docs/v3/experiments.md): the precision gate over 31 labeled files raised the NumberReveal threshold to 0.85; the other three thresholds held.
+11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` (§18.3) — M1.2, TE-13, E-2. Measured in V3 (docs/v3/experiments.md): the denoiser's delay is 480 samples, constant, and compensated exactly; TE-13 passes on D1 (not R1) with denoise on.
 12. Safe-area insets, zones, style values, event timings, emoji fallback font (§19) — E-2, M1.4.
 13. Watermark text, size, opacity, placement (§19.6; PS §19 minor) — alpha.
 14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6.
@@ -3527,7 +3616,8 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
-24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4.
+24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3).
 25. 400-line file limit (§29) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
-27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28.
+27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
+28. Left open by V3, each with the version that handles it (v3implementation §23): an `Edit` that ignores `media_rate` (a dwell edit taken as a media edit) — TE-12, V9; Indian digit grouping not parsed — E-7; no `Unit` for terabytes — a shared-type revision; the `events` store without a writer (§23.1) — V7; KeywordPop precision measured on synthetic emphasis — E-7 from V10; the derived portrait clip is an enlarged 405-pixel strip, cheaper to decode than a real phone clip — a real portrait recording; the capability check admits a software adapter, on which a clip takes over 20 minutes — V8; the cleaned audio of a clip that ends early stays in `audio.worker` until the next clip (C-4) — V4; the 40-word split's tie-break makes one-word sentences (§17.2) — M1.3.

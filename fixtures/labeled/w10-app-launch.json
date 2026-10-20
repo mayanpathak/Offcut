@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "w10-app-launch",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "Our habit tracker app launched last month.",
+    "It passed 25,000 downloads in the first week.",
+    "Here are the five steps we followed.",
+    "First, we wrote the store page before the code.",
+    "Second, we invited friends to a private beta.",
+    "Third, we fixed every crash they reported.",
+    "Fourth, we picked a launch day and told our mailing list.",
+    "Fifth, we answered every review in the first week."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "number_reveal", "say": "25,000 downloads", "occurrence": 1, "value": 25000, "unit": "count:downloads" },
+    { "kind": "list_reveal", "say": "five steps we followed. First, we wrote the store page before the code. Second, we invited friends to a private beta. Third, we fixed every crash they reported. Fourth, we picked a launch day and told our mailing list. Fifth, we answered every review in the first week.", "occurrence": 1,
+      "count": 5, "header": "5 STEPS" }
+  ],
+  "tags": ["announcer"],
+  "notes": "a list announced as five steps, with ordinal markers; downloads over 1,000. first in sentence 2 is not a list marker"
+}

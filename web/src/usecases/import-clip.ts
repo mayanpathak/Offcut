@@ -7,7 +7,10 @@ import { track } from "../analytics/client";
 import type { ClipSource, DurationBucket } from "../gen/api";
 import type { ClipId, DurMs } from "../gen/domain";
 import { fetchAsset, SAMPLE_CLIP_PATH } from "../net/asset-fetch";
+import * as clipsRepo from "../persistence/clips-repo";
+import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
+import * as transcriptRepo from "../persistence/transcript-repo";
 import { forImport } from "../state/blockers";
 import * as clipStore from "../state/clip-store";
 import * as exportStore from "../state/export-store";
@@ -90,9 +93,9 @@ async function importFailed(clipId: ClipId, failure: AppFailure): Promise<void> 
 }
 
 /**
- * Brings a clip in: the nine steps of v2implementation §19.2. Resolves when
- * the clip is accepted, rejected or failed; the pipeline of an accepted clip
- * runs on after that.
+ * Brings a clip in: the steps of v3implementation §15.1. Resolves when the
+ * clip is accepted, rejected or failed; the pipeline of an accepted clip runs
+ * on after that.
  */
 export async function importClip(file: File, source: ClipSource): Promise<void> {
   // 1. The component shows the words of the blocker.
@@ -113,13 +116,29 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
   clipStore.begin(clipId, source);
 
   // 4. V7: `quota.ensureFree` takes this sweep's place (v2implementation §25).
-  //    Until then one clip is kept (D-40). A failure is ignored: step 6 reports a full disk.
+  //    Until then one clip is kept (D-40), and so are its records: those of the
+  //    clip before go with its files (v3implementation §23, item 26). A failure
+  //    is ignored: step 7 reports a full disk, step 9 a database that fails.
   await opfs.remove(opfs.paths.clipsRoot()).catch(() => undefined);
+  await Promise.all([clipsRepo.clear(), transcriptRepo.clear(), editsRepo.clear()]).catch(() => undefined);
 
   // 5. `probe_audio` and the total are counted from here (D-35).
   startTimer(clipId);
 
-  // 6.
+  // 6. Before the file is posted: the media worker may take it (D-81).
+  let sourceHashPrefix: string;
+  try {
+    sourceHashPrefix = await clipsRepo.hashPrefix(file);
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === "NotReadableError")) {
+      await importFailed(clipId, { code: "E_INTERNAL", stage: "import", retryable: false });
+      throw error;
+    }
+    await importFailed(clipId, { code: "E_STORAGE_IO", stage: "import", retryable: true });
+    return;
+  }
+
+  // 7.
   let probed: Awaited<ReturnType<typeof pool.media.importAndProbe>>;
   try {
     probed = await pool.media.importAndProbe({ clipId, file });
@@ -137,21 +156,41 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
     return;
   }
 
-  // 7. A clip that cannot be used is not an error (TS §11.3). No event before V3.
+  // 8. A clip that cannot be used is not an error (TS §11.3). Its code alone is sent (D-97, INV-18).
   if ("rejected" in probed) {
     clipStore.rejected(probed.rejected);
+    track({ name: "clip_rejected", props: { reject_reason: probed.rejected } });
     await opfs.remove(opfs.paths.clipDir(clipId)).catch(() => undefined);
     return;
   }
 
-  // 8.
+  // 9. The clip's record, written while it is still importing: an accepted
+  // clip can only go on to processing (TS §12.2). A record that cannot be
+  // written fails the import, and `clip_accepted` is not sent.
+  const now = Date.now();
+  try {
+    await clipsRepo.put({
+      clipId,
+      createdAt: now,
+      lastOpenedAt: now,
+      clipInfo: probed.ok,
+      sourceBytes: clipsRepo.toBytes(file.size),
+      sourceHashPrefix,
+    });
+  } catch (error) {
+    const quota = error instanceof opfs.OpfsError && error.kind === "quota";
+    await importFailed(clipId, { code: quota ? "E_STORAGE_QUOTA" : "E_STORAGE_IO", stage: "storage", retryable: true });
+    return;
+  }
+
+  // 10.
   clipStore.accepted(probed.ok);
   track({
     name: "clip_accepted",
     props: { duration_bucket: bucketOf(probed.ok.duration), orientation: probed.ok.orientation, source },
   });
 
-  // 9. Not waited for: the page shows the feed while it runs.
+  // 11. Not waited for: the page shows the feed while it runs.
   void runPipeline(clipId);
 }
 

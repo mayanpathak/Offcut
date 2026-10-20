@@ -6,7 +6,7 @@
 // the video is not uploaded. Legal and certification terms are not used.
 
 import type { AnalyticsEvent, Wanted } from "../gen/api";
-import { type ErrorCode, type EventKind, LIMITS, type UnsupportedReason } from "../gen/domain";
+import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
 
 type EventName = AnalyticsEvent["name"];
 type ErrorCopy = { title: string; body: string; action: string };
@@ -29,6 +29,11 @@ type ErrorCodeWithCopy = Extract<
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
+/** MB is 10^6 bytes, as `limits.rs` reads PS §9.4. */
+const BYTES_PER_MB = 1_000_000;
+/** `MAX_INPUT_FPS` is in thousandths of a frame per second. */
+const FPS_MILLI_PER_FPS = 1000;
+const MAX_FPS = LIMITS.MAX_INPUT_FPS / FPS_MILLI_PER_FPS;
 
 /** "45 seconds", "1 minute", "12 minutes": a wait, rounded up to whole minutes from one minute on. */
 function waitText(seconds: number): string {
@@ -67,16 +72,21 @@ export const messages = {
   },
 
   // The processing feed (PS §10 J6). A line is shown for something that
-  // happened, and for nothing else. `display` is the event's own figure.
+  // happened, and for nothing else. `display` is the event's own figure; a
+  // FromTo has two, its start and its end (v3implementation D-83).
   feed: {
     transcribing: "Transcribing…",
     cleaningVoice: "Cleaning voice",
     eventFound: {
       number_reveal: (display: string) => `Found: ${display}`,
       list_reveal: (display: string) => `Found: ${display}-item list`,
-      from_to: (display: string) => `Found: ${display}`,
+      // An empty `displayTo` is for type completeness only: no line is made without one.
+      from_to: (display: string, displayTo: string) =>
+        displayTo === "" ? `Found: ${display}` : `Found: ${display} to ${displayTo}`,
       keyword_pop: (display: string) => `Found: ${display}`,
-    } satisfies Record<EventKind, (display: string) => string>,
+    } satisfies Record<Exclude<EventKind, "from_to">, (display: string) => string> & {
+      from_to: (display: string, displayTo: string) => string;
+    },
   },
 
   preview: {
@@ -99,7 +109,6 @@ export const messages = {
   },
 
   editor: {
-    rejectedStub: "This clip could not be used.",
     failedStub: "Something went wrong on this device.",
     startOver: "Start over",
   },
@@ -251,4 +260,79 @@ export const messages = {
       action: "Free some disk space and try again.",
     },
   } satisfies Record<ErrorCodeWithCopy, ErrorCopy>,
+
+  // A file Offcut cannot use (TS §15.3, PS §9.4): what the limit is and what
+  // to do, never the measured value (v3implementation D-80).
+  rejections: {
+    REJECT_FILE_SIZE: {
+      title: "This file is too large",
+      body: `Offcut takes files up to ${String(LIMITS.MAX_FILE_SIZE / BYTES_PER_MB)} MB.`,
+      action: "Trim the clip or export it at a lower resolution, then drop it again.",
+    },
+    REJECT_CONTAINER: {
+      title: "Offcut cannot open this kind of file",
+      body: "Offcut takes MP4 and MOV files with H.264 video and AAC audio.",
+      action: "Save or export the clip as an MP4, then drop it again.",
+    },
+    REJECT_CORRUPT: {
+      title: "This file looks damaged",
+      body: "Offcut could not read the inside of this file. It may be incomplete.",
+      action: "Export the clip again from your camera or editor, then drop the new file.",
+    },
+    REJECT_NO_VIDEO: {
+      title: "This file has no video",
+      body: "Offcut makes a short from a video of you talking, and this file holds sound only.",
+      action: "Drop the video file instead.",
+    },
+    REJECT_HEVC: {
+      title: "This video uses HEVC",
+      body: "This file uses HEVC, which this browser cannot decode here.",
+      action: 'Export it as H.264, or choose "Most Compatible" in your camera settings and record again.',
+    },
+    REJECT_VIDEO_CODEC: {
+      title: "This video format is not supported",
+      body: "Offcut reads H.264 video, and this file uses another format.",
+      action: "Export the clip as H.264, then drop it again.",
+    },
+    REJECT_NO_AUDIO: {
+      title: "This video has no sound",
+      body: "Offcut needs your voice to write the captions, and this file has no audio track.",
+      action: "Record with the microphone on, then drop the new file.",
+    },
+    REJECT_MULTI_AUDIO_TRACK: {
+      title: "This video has more than one audio track",
+      body: "Offcut takes clips with one audio track.",
+      action: "Export the clip with a single audio track, then drop it again.",
+    },
+    REJECT_AUDIO_CODEC: {
+      title: "This audio format is not supported",
+      body: "Offcut reads AAC audio, and this file uses another format.",
+      action: "Export the clip with AAC audio, then drop it again.",
+    },
+    REJECT_DURATION: {
+      title: "This clip is too long",
+      body: `Offcut handles clips up to ${String(LIMITS.MAX_CLIP_DURATION / MS_PER_SECOND)} seconds right now.`,
+      action: "Trim it in your phone's gallery or in your editor, then drop it again.",
+    },
+    REJECT_RESOLUTION: {
+      title: "This video is larger than Offcut handles",
+      body: `Offcut handles video up to ${String(LIMITS.MAX_LONG_SIDE)} pixels on its long side.`,
+      action: "Record or export at a lower resolution, then drop it again.",
+    },
+    REJECT_FRAME_RATE: {
+      title: "This video has too many frames per second",
+      body: `Offcut handles up to ${String(MAX_FPS)} frames per second.`,
+      action: `Record or export at ${String(MAX_FPS)} frames per second or fewer, then drop it again.`,
+    },
+    REJECT_DECODE_UNSUPPORTED: {
+      title: "This browser cannot play this video",
+      body: "The video uses settings this browser cannot decode.",
+      action: "Export it again with your editor's standard H.264 settings, then drop it again.",
+    },
+    REJECT_NO_SPEECH: {
+      title: "No English speech was found",
+      body: "Offcut could not hear enough English words in this clip to write captions.",
+      action: "Drop a clip of you talking in English.",
+    },
+  } satisfies Record<RejectReason, ErrorCopy>,
 };

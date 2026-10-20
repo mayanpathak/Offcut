@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "w06-fitness",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "I have kept a workout habit for a full year now, and it is simpler than it sounds.",
+    "First, I train at the same time every day.",
+    "Second, I write down every workout in a notebook.",
+    "Third, I stop while I still feel good.",
+    "Most days I just do 3 sets of push-ups and a short walk.",
+    "Consistency beat intensity for me."
+  ],
+  "words": null,
+  "prosody": null,
+  "expected": [
+    { "kind": "list_reveal", "say": "First, I train at the same time every day. Second, I write down every workout in a notebook. Third, I stop while I still feel good.", "occurrence": 1,
+      "count": 3 }
+  ],
+  "tags": ["marker_only", "X5"],
+  "notes": "a list of three ordinal markers with no announcer, a few seconds apart; 3 sets is a bare small number and no event"
+}

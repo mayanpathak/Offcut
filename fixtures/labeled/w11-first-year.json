@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "w11-first-year",
+  "source": "written",
+  "author": "agent",
+  "frozen": "2026-10-17",
+  "sentences": [
+    "My channel had its first birthday today.",
+    "It went from 200 subscribers to 9,500 subscribers this year.",
+    "The best video earned $3,200 from ads alone.",
+    "Most of my time went into scripts, not editing.",
+    "Thank you for watching, all of you."
+  ],
+  "words": null,
+  "prosody": null,
+  "edits": { "21": "$4,200" },
+  "expected": [
+    { "kind": "from_to", "say": "from 200 subscribers to 9,500 subscribers", "occurrence": 1,
+      "from": { "value": 200, "unit": "count:subscribers" }, "to": { "value": 9500, "unit": "count:subscribers" } },
+    { "kind": "number_reveal", "say": "$3,200", "occurrence": 1, "value": 4200, "unit": "usd" }
+  ],
+  "tags": ["from_frame", "edit_number"],
+  "notes": "FromTo with a from-frame between subscriber counts. Word 21, $3,200, is edited to $4,200, as a creator correcting a misheard amount would: the expected NumberReveal is the edited value 4,200 on the same word (D-109)"
+}

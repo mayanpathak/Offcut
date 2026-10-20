@@ -14,7 +14,7 @@ function assertNever(value: never): never {
   throw new Error("a line of the feed this build does not know");
 }
 
-function eventText(eventKind: EventKind, display: string): string {
+function eventText(eventKind: EventKind, display: string, displayTo: string): string {
   const found = messages.feed.eventFound;
   switch (eventKind) {
     case "number_reveal":
@@ -22,7 +22,7 @@ function eventText(eventKind: EventKind, display: string): string {
     case "list_reveal":
       return found.list_reveal(display);
     case "from_to":
-      return found.from_to(display);
+      return found.from_to(display, displayTo);
     case "keyword_pop":
       return found.keyword_pop(display);
     default:
@@ -37,7 +37,7 @@ function lineText(line: FeedLine): string {
     case "cleaning_voice":
       return messages.feed.cleaningVoice;
     case "event_found":
-      return eventText(line.eventKind, line.display);
+      return eventText(line.eventKind, line.display, line.displayTo ?? "");
     default:
       return assertNever(line);
   }

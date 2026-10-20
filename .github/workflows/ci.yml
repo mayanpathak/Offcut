@@ -51,6 +51,12 @@ env:
   BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
   GITLEAKS_VERSION: 8.18.4
   GITLEAKS_SHA256: ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d
+  # The ffmpeg that `pnpm fixtures` generates the test fixtures with, before
+  # `cargo test` reads them (v3implementation D-94): a static Linux build of
+  # 9.0.2, by its dated release, refused unless its checksum is this one.
+  # BtbN deletes a dated release after about six weeks (v3changelog open item 7).
+  FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz
+  FFMPEG_LINUX_SHA256: 1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29457
   # The public half of the E2E test key (v2implementation D-24): the key of
   # the fixed seed in web/tests-e2e/helpers/fake-api.ts. It is no secret. A
   # build made with it accepts the entitlement tokens the tests mint, so it
@@ -173,10 +179,16 @@ jobs:
           tar -xzf gitleaks.tar.gz gitleaks
           install gitleaks "$bin/gitleaks"
 
+          fetch "$FFMPEG_LINUX_URL" ffmpeg.tar.xz "$FFMPEG_LINUX_SHA256"
+          tar -xJf ffmpeg.tar.xz --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
+          install ffmpeg-*/bin/ffmpeg "$bin/ffmpeg"
+          install ffmpeg-*/bin/ffprobe "$bin/ffprobe"
+
           wasm-bindgen --version
           cargo deny --version
           wasm-opt --version
           gitleaks version
+          ffmpeg -hide_banner -version | head -n 1
 
       - name: Scan for secrets
         run: gitleaks detect --source . --redact --no-banner
@@ -202,6 +214,17 @@ jobs:
         run: sh scripts/check-gen-clean.sh
 
       # --- 4. Rust tests, the server's against the Postgres service ---------
+      # The fixtures some of them read are generated here, from the reference
+      # clip of the asset host, kept between runs (v3implementation D-94).
+      - name: Restore the reference clip
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fixtures/.cache/media
+          key: reference-clip-${{ hashFiles('web/src/net/asset-fetch.ts') }}
+
+      - name: Generate the fixtures
+        run: pnpm fixtures
+
       - name: cargo test
         run: cargo test --workspace
 

@@ -3,7 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use offcut_types::{Confidence, NormalizedSpan, TimeMs, Transcript, Word, WordIdx, WordRange};
+use offcut_types::{
+    Confidence, NormalizedSpan, Sentence, TimeMs, Transcript, Word, WordIdx, WordRange,
+};
 use serde::Deserialize;
 
 use crate::numbers::parse_quantity;
@@ -26,7 +28,7 @@ pub struct RawWord {
 pub fn normalize_transcript(raw: Vec<RawWord>, model_version: &str) -> Transcript {
     let words: Vec<Word> = raw.into_iter().filter_map(word).collect();
     let sentences = segment_sentences(&words);
-    let numbers = numbers(&tokenize(&words, &BTreeMap::new()));
+    let numbers = numbers_by_sentence(&tokenize(&words, &BTreeMap::new()), &sentences);
     Transcript {
         words,
         sentences,
@@ -57,6 +59,24 @@ fn word(raw: RawWord) -> Option<Word> {
     })
 }
 
+/// The quantities of each sentence on its own, in word order: a quantity
+/// never crosses a sentence (D-104). Tokens are in word order, so each
+/// sentence's tokens are one run of them.
+fn numbers_by_sentence(tokens: &[Token], sentences: &[Sentence]) -> Vec<NormalizedSpan> {
+    let mut rest = tokens;
+    let mut spans = Vec::new();
+    for sentence in sentences {
+        let inside = rest
+            .iter()
+            .take_while(|t| t.word < sentence.words.end)
+            .count();
+        let (own, after) = rest.split_at(inside.min(rest.len()));
+        spans.extend(numbers(own));
+        rest = after;
+    }
+    spans
+}
+
 /// Every quantity in the tokens, with the words it was spoken in. A token
 /// that is part of one quantity is not read again as the start of another.
 fn numbers(tokens: &[Token]) -> Vec<NormalizedSpan> {
@@ -64,7 +84,12 @@ fn numbers(tokens: &[Token]) -> Vec<NormalizedSpan> {
     let mut rest = tokens;
     while let Some(first) = rest.first() {
         let Some((used, quantity)) = parse_quantity(rest) else {
-            rest = rest.get(1..).unwrap_or(&[]);
+            // A word that begins with a comma and three digits is the next group of a
+            // number the recognizer split (D-42). Without that number before it in
+            // its sentence, it is no quantity of its own.
+            let headless = matches!(rest, [comma, group, ..] if comma.text == "," && comma.word == group.word
+                && group.text.len() == 3 && group.text.bytes().all(|b| b.is_ascii_digit()));
+            rest = rest.get(if headless { 2 } else { 1 }..).unwrap_or(&[]);
             continue;
         };
         let last = rest.get(used.saturating_sub(1)).unwrap_or(first);
@@ -205,6 +230,36 @@ mod tests {
                 )
             })
             .collect();
-        assert_eq!(numbers, [(2, 6, "250"), (7, 8, "40%")]);
+        assert_eq!(numbers, [(2, 7, "250 days"), (7, 8, "40%")]);
+    }
+
+    /// v3implementation §8.7 and D-104: a sentence boundary between `$12` and
+    /// `,000` (a pause of 900 ms) leaves one number, `$12`.
+    #[test]
+    fn a_number_never_crosses_a_sentence() {
+        let transcript = normalize_transcript(
+            vec![
+                raw("it", 0, 200, 1.0),
+                raw("was", 250, 500, 1.0),
+                raw("$12", 550, 900, 1.0),
+                raw(",000", 1_800, 2_100, 1.0),
+                raw("in", 2_150, 2_300, 1.0),
+                raw("sales.", 2_350, 2_800, 1.0),
+            ],
+            "asr-en-v1",
+        );
+        assert_eq!(transcript.sentences.len(), 2);
+        let numbers: Vec<(u32, u32, &str)> = transcript
+            .numbers
+            .iter()
+            .map(|n| {
+                (
+                    n.words.start.get(),
+                    n.words.end.get(),
+                    n.quantity.display.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(numbers, [(2, 3, "$12")]);
     }
 }

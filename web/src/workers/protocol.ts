@@ -53,7 +53,7 @@ export type FeedLine =
   | { kind: "transcribing" }
   | { kind: "cleaning_voice" }
   // `display` stays on the device.
-  | { kind: "event_found"; eventKind: EventKind; display: string };
+  | { kind: "event_found"; eventKind: EventKind; display: string; displayTo?: string };
 
 /** `detail` is shown only in development builds and is never sent anywhere. */
 export type AppFailure = {

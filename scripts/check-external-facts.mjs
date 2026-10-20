@@ -65,6 +65,15 @@ const FACTS = [
     // TS §22.9 states these as external facts verified when the spec was written.
     note: "terms read 2026-10 for the spec; the deployment is not measured yet",
   },
+  {
+    id: "D-94",
+    host: "BtbN/FFmpeg-Builds (GitHub releases)",
+    fact: "The Linux ffmpeg of ci.yml (FFMPEG_LINUX_URL) still downloads, and its SHA-256 is still FFMPEG_LINUX_SHA256: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz",
+    // The checksum was taken from the downloaded archive on 2026-10-16, and
+    // equals the digest GitHub lists for the asset (v3implementation D-94).
+    checked: "2026-10-16",
+    note: "a dated release is deleted after about six weeks: expect this one gone near the end of November 2026",
+  },
 ];
 
 console.log("External facts to re-verify before launch (TS §37), one line each:");
