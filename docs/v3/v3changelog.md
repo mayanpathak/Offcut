@@ -13,18 +13,8 @@
 ## Open items
 | # | Item | Owner | Version |
 |---|---|---|---|
-| 6 | The `buildplan.md` half of V2 §27's copy-back list (the schedule moves of D-18, D-20, D-21, D-23, D-24, D-33) is not applied. Prompt 61 may change `technicalspec.md` only | Agent | Prompt 89 (copy-back) |
-| 21 | **Prompt 88's precision gate as built** (its entry): the NumberReveal threshold is 0.85, raised from 0.80 by §20.3. Copy back into the plan's detector configuration (§9, Appendix D) and §19.11 rows 5 and 6 (now no event), and add to SAB's list of V2 expectations V3 changes the two `lib.rs` tests (`forty_percent_is_an_event_at_confidence_1_and_none_at_0_99`, `no_returned_event_is_below_the_threshold_of_its_kind`). Correct G 12.3 and Prompt 88: `pnpm corpus --grep founder-02` (with `--` the grep is ignored), and `a02` gains `words` and `prosody`, not `sentences` | Agent | Prompt 89 |
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. On 2026-10-19 it still downloads (Prompt 87); it is in `ci.yml` and in `check-external-facts.mjs` with its date. Choose before about 2026-11-27: a newer dated build (new URL and SHA-256 in both files) or a copy on the asset host (an upload with the R2 keys). CI fails at the checksum step the day it is gone | Founder (choice), Agent (the edit) | Before 2026-11-27 |
-| 15 | **`CLOCK_WORDS` holds `a.m` and `p.m` since Prompt 77**, the forms `tokenize` gives "a.m." and "p.m." (they never equalled `a.m.` / `p.m.`). Copy back into §9.1's lexicon table | Agent | Prompt 89 |
-| 17 | **Prompt 77 as built** (its entry): `Candidate` gains `sentence` (§9.3's struct; `resolve` keeps one KeywordPop per sentence and has no transcript); `lib.rs` step 5 takes a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth before the threshold (0.65 + 0.20 is 0.84999996 in `f32`: no marker-only list could reach 0.85); the X1-X5 bounds and `VERSION_DOTS` are named constants of `config.rs`. Copy back into §9.2 step 5, §9.3, §9.7, Appendix D, and §23 item 27 | Agent | Prompt 89 |
-| 20 | **The split decimal point, as built 2026-10-18** (entry "Outside a prompt: the split decimal point"): `offcut-text`'s `with_split_groups` also joins a word of a point and digits only (`4` `.7`) to the whole number before it. Copy back into v3implementation §8 (beside D-42's split groups, with the founder's two cases) and TS §17.2 | Agent | Prompt 89 |
-| 18 | **`redetect_sentence` as built** (Prompt 78's entry): the scope also takes the sentences of every event of `prev` that reaches into it, repeated until none crosses its edge (D-86 and §9.2 step 1 take only the events that touch `s`; an event crossing the 45 s edge was then neither kept nor detected again, and was lost). §19.13's fixed-event row is played on the FromTo of sentence 5 and an amount in sentence 6: an event after `s` is always inside the scope, and no sentence after `3,000 hours` meets its window under synthesized timing. Copy back into D-86, §9.2 step 1 and §19.13 | Agent | Prompt 89 |
-| 14 | **An edited number keeps its id, decided 2026-10-18.** §9.9, §19.11's edit row and §19.13 of the plan and Prompts 77 and 78 now say so (Prompt 76's entry). Left: TS §17.6's edit bullet ("a new id is created; its toggle state is not inherited"), listed in §23.2's copy-back | Agent | Prompt 89 |
-| 16 | **§9.4 and §9.5 as built** (Prompt 76's entry): "the same explicit unit" read as the same `Unit` variant from the quantities' own words, `None` and `None` included (so "from 2019 to 2024" scores the plan's 1.00); a list announcer of any count claims the markers that follow it, so "eight reasons" leaves no marker-only list; an item's words include numbers in digits; a list's score is multiplied by the least confidence of its anchor words (TS §17.4). Copy back into §9.4, §9.5 and D-105, D-107 | Agent | Prompt 89 |
-| 13 | **§8.6 and §9.9 miscount the V2 tests V3 changes** (each says one): eleven `offcut-text` assertions and one `offcut-detect` test asserted V2's stand-ins and were set to V3 values (Prompt 73's table). Copy back into §8.6, §9.9 and G 6.4, and correct the prompt's "exactly one" check | Agent | Prompt 89 |
-| 12 | **§7.9's "best τ*" halves the pitch of a periodic voice at random**: `prosody.rs` takes the first autocorrelation peak within 0.9 of the best (`FIRST_PEAK_SHARE`, Prompt 68). Copy back into v3implementation §7.9 and Appendix D | Agent | Prompt 89 |
-| 11 | **§19.4's pink-noise row contradicts P4**: pink noise at -40 dBFS RMS reads -40.1 LUFS, beyond `MAX_GAIN_DB` of the target, so P4's capped-gain exception applies; `loudness_target.rs` asserts P4 (Prompt 67). Copy back into v3implementation §19.4: that expectation, or a level of -35 dBFS RMS | Agent | Prompt 89 |
+| 22 | **§21.3's check of the `V4:` markers names places that are written another way.** `git grep -n "V4: " -- web/src crates` lists nine lines, in `offcut-render`, `offcut-scene` and `video-source.ts`, but none of the four §21.3 names: the render worker's `redetectSentence` handler is `notYet` with "V2 has no word edits (V4)" (`render.worker.ts`, frozen in V3), and `run-pipeline.ts`'s cancel and retry say "the cancel arrives in V4" and "before V4". The places exist and are marked; the box's search does not find them. Prompt 90 ticks it with `git grep -nE "V4" -- web/src/usecases web/src/workers` as its evidence, or the plan's wording is corrected there | Agent | Prompt 90 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -1167,3 +1157,97 @@ CI on Prompt 87's `c838c7f` (run 39220365483, the end state after the guard dril
 - **"500 paying users" / "500 paying customers"**: a count noun counts as a unit only right after its number (D-101), so an adjective between them leaves a bare 500 (0.70). A V4 rule question (E-7), not a label.
 - **KeywordPop sits at exactly 0.90 precision** (`a02`'s "that's", 0.84). One more false positive on the next set would put it under. V4 starts from this margin.
 - **Per 60 s, the founder's 720p recording transcribes faster than the 1080x1920 portrait clip** (47.7 s against 69.5 s). Not investigated (`experiments.md`, E-3 re-read).
+
+---
+
+## 2026-10-21 - Prompt 89 (V3 29/30): spec copy-back and close-out checks
+
+CI on Prompt 88's `70cbd8e` (run 39285869287): `ci` success, with `e2e-media` inside it; the deploys skipped. `git grep -n "V3: " -- web/src crates` prints nothing.
+
+**Done.**
+
+- **`docs/technicalspec.md`**, every decision of §23.2, each cited "v3implementation D-n":
+  - §3: D-89, with the pinned versions.
+  - §4 and §26 (D-76, D-77, D-111): the fixture matrix rewritten.
+    - Speech fixtures are derived; every `ok_*`/`rej_*` fixture is synthetic; nothing is committed.
+    - The split input and output flags, PCM for the five speech fixtures only, `STAMP`, and the six fixture-reading test files.
+    - New rows `ok_two_video_first_disabled.mp4` and `rej_h264_444.mp4`; `ok_rotated_90` as `R270`.
+    - The labeled set as built (D-87; SCHEMA's `tags`, `edits`, the null-data rule, the written `a01`).
+    - The corpus and E-10 rows (D-88), and what `run_corpus.ts` writes with the `transcripts` file map (D-112).
+  - §5 tree: the five `speech/*.mp4` lines, which said committed clips, are replaced by the generator's own line (D-76); `check-file-tree` still passes.
+  - §9: C-2 as built (D-81, D-97, §23 item 26's `clear()`); C-4's order (D-90).
+  - §10.1: D-103's `MINTING` entry. §14.1: D-83's `displayTo`.
+  - §15.3: D-80 (the message column states the limit; a paragraph quotes the built copy) and D-78 (a real file, not a mock; `test.fixme` where Chrome decodes it); the oversize row (D-79).
+  - §17.2: D-84 (word lists), the wider `Digits`, D-101, D-102, the split decimal point (open item 20), D-104 and D-109.
+  - §17.3: the finder order, `settled` (open item 17), and the re-detection scope of D-86 with its closure (open item 18).
+  - §17.4: the thresholds in use (0.85, 0.85, 0.85, 0.80), the lexicons by reference to `config.rs` with `CLOCK_WORDS`' `a.m`/`p.m` (open item 15), D-85 with "same explicit unit" as built, D-105 with the announcer's claim (open item 16), D-106, X1-X7 with their constants, D-107.
+  - §17.6: the edit bullet (open item 14).
+  - §18.1: D-110 and `limit`'s clamp count. §18.2: D-96 and D-108 with `FIRST_PEAK_SHARE` (open item 12). §34.3: D-110.
+  - §23.1: D-81, D-82, the V3 repos. §25.1: D-100 as P-13. §27.1: D-93's 15 `@no-gpu` cases.
+  - §28, §30, §37: D-74 beside D-69. §28 also takes D-95 and E-10 to V9.
+  - §33: D-94, D-93, the `corpus` and `bench:device` scripts (`--grep` without `--`).
+  - §39.3: `redetect` measured; item 28 lists §23 items 15-28 that stay open.
+- **`docs/buildplan.md`**:
+  - §4.1 gains V2's six schedule moves (open item 6: v2implementation D-18, D-20, D-21, D-23, D-24, D-33), and §7.1 and §8.1 say those files exist since V2.
+  - §5: V3's eight days; D-76 (§5.1 B, §5.2), D-87 (§5.2), D-74 and D-88 (§5.3), D-93 and D-94 (§5.4).
+  - §11.1 and Appendix B: E-10 runs first in V9.
+- **`docs/product.md`** §9.4: D-80 only. The duration and resolution examples state the limit and quote the built advice; the HEVC example is unchanged.
+- **`docs/v3/v3implementation.md`**:
+  - Open items 11-13, 15-18, 20 and 21 are written into the sections they name, each "as built": §7.9, §8.3, §8.6, §9.1, §9.2, §9.3, §9.4, §9.5, §9.7, §9.9, §19.4, §19.11 rows 5 and 6, §19.13, Appendix D, §23 item 27, D-86, D-105 and D-107.
+  - §20.2 and §20.3 hold their outcomes, and §23.2 says it was applied.
+  - §23 items 25-28 already held their outcomes: 25 open (V4), 26 and 27 decided, 28 open (M1.3).
+  - 20 boxes of §22 are ticked, each with its evidence. Left for Prompt 90: the five deployment boxes, the founder's D-112 confirmation (the five-file reading is done), §21.3 and the tag.
+- **`docs/v3/v3buildguide.md`, `docs/v3/coding-promptsv3.md`**: the corrections open items 13 and 21 ask for.
+  - G 6.4 and Prompt 73: the rewritten V2 assertions, the check reading 7.
+  - The SAB's list of rewritten V2 expectations.
+  - G 12.3 and Prompt 88: `pnpm corpus --grep founder-02`, and `a02` gains `words` and `prosody` (with Prompt 65's line).
+- **`Cargo.lock`**: `rustls-webpki` 0.103.15 → 0.103.16 and `webpki-roots` 1.0.9 → 1.0.10 (below).
+- **Open items**: 6, 11-18, 20 and 21 closed; 22 opened.
+
+**Differs from the prompt, the guide or the plan.**
+
+- **`pnpm check` failed on the first gate run.** `cargo deny`'s advisories found RUSTSEC-2026-0382 (`rustls-webpki` 0.103.15) and RUSTSEC-2026-0381 (`webpki-roots` 1.0.9). Both were published after Prompt 88's CI and reach the build only through the server's `sqlx`.
+  - Fix: `cargo update -p rustls-webpki -p webpki-roots`, two lockfile entries, semver-compatible, the kind of change as the `rustls` fix of 2026-10-17. No source file and nothing under `server/` changes; `git diff --name-only 8a271a9 -- server` is still empty.
+  - Re-check: `cargo deny check advisories` is ok, and the whole gate was run again.
+  - `main` still locks the old versions, so `cargo deny` fails on `main` until this branch merges.
+- **The media suite was run on the lockfile before that update.** Neither crate is in either WASM bundle (`cargo tree -p offcut-wasm-core` and `-p offcut-wasm-render -i <crate> --target wasm32-unknown-unknown` match no package). The gate's build has the same bundle sizes, so the run holds for this head.
+- **"48+ / 0 failed / 0 skipped" reads 49 passed, 1 skipped.** The 49 are 47 media cases and the 2 `media-setup` cases. The skip is `REJECT_DECODE_UNSUPPORTED`, which D-78 marks `test.fixme` where Chrome decodes `rej_h264_444.mp4`, as on D1. D-78 is binding over the prompt's count, and Prompts 85 and 88 read the same.
+- **Files beyond the prompt's list.** The prompt names TS, BP, PS, the plan ("checkboxes and outcomes only") and this changelog. The open items it closes also name the guide and the prompts file (13, 21) and sections of the plan (11-21), so those were edited; `Cargo.lock` is the fix above. Open item 19 had been closed on 2026-10-18.
+- **The `offcut-dsp` word audit** prints more than comments and `ABSOLUTE_SILENCE`: the `absolute_silence` field of `ChainConfig`, its uses in `chain.rs` and `loudness.rs`, and three test names about silent input (`silence_stays_silent`, `digital_silence_is_none`, `below_absolute_silence_gets_no_gain`). None detects silence, classifies a pause or changes a length. §22's box reads it that way, with V2's `resample.rs` comments.
+- **§21.3's `V4:` check** is open item 22, for Prompt 90.
+
+**Checked.**
+
+- **The four audits**: `fetch(` none; TODO without a version none; length none over 400 (`check-file-tree`: the longest is `video-source.ts`, 399); `offcut-dsp` words as above.
+- **G 13.2 final local gate**, detached, after the lockfile update:
+  - no `zz` file, no test key in the environment;
+  - `pnpm install --frozen-lockfile` exit 0; `pnpm fixtures` "fixtures are up to date"; `pnpm check` exit 0;
+  - `cargo test --workspace` **461 passed, 0 failed, 3 ignored** (2 of V2 and `chain_timing`); Vitest **92**;
+  - `pnpm build` exit 0 (`offcut_core_bg` 713,306, `offcut_render_bg` 6,113,666 bytes);
+  - `pnpm e2e` **12 of 12**;
+  - the frozen check and the tracked-private check print nothing.
+- **`pnpm e2e:media`** on D1, keyed: **49 passed, 1 skipped, 0 failed**, 11.0 min. The test key was taken from `ci.yml` for that one `pnpm build`; `env` held it 0 times after.
+- **Final counts against Entry 1**: Rust 461 / 3 ignored (262 / 2), Vitest 92 (92), `pnpm e2e` 12 (12), media cases 48 (30). None fell.
+- **G 13.3, the real values**:
+  - `FFMPEG_LINUX_URL` answers 200 on 2026-10-21. Run 39285869287's Linux job printed `ffmpeg version n9.0.2-28-g669f5ab083-20261016` and "generated 25 fixtures", and the job refuses the archive on a checksum mismatch. Its log shows the six fixture-reading test files running.
+  - `sh corpus/fetch_corpus.sh`: `founder-01 ok`, `founder-02 ok`.
+  - `fixtures/manifest.json`'s observed values: `pnpm fixtures` up to date against its `STAMP`, whose step 8 checked them.
+  - `DENOISE_DELAY_SAMPLES` 480 (`impulses_stay_aligned` passes); `ChainConfig::default().denoise` is `true`.
+  - The thresholds of `config.rs` equal TS §17.4.
+  - The plain build: the test key is in 0 files of `web/dist` (its variable's name appears only in `env.ts`'s error messages).
+  - Render and Vercel: `server/`, `render.yaml` and `web/vercel.json` are unchanged since `8a271a9`.
+- `node scripts/check-file-tree.mjs`: ok, 276 files.
+- No label changed after the freeze: `git diff 9c96667 HEAD -- fixtures/labeled` changes `a02`'s `words` and `prosody` only.
+
+**Pinned versions.** `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10 (lockfile, transitive through `sqlx`). No dependency added.
+
+**Found, not fixed.**
+
+- Open item 22 (§21.3's marker check).
+- `main`'s `cargo deny` fails on the two advisories until the merge (above).
+
+**The branch is ready to merge (Prompt 90).** Human steps there, in order:
+1. Mark draft pull request #5 ready and merge it into `main`.
+2. Run G 13.5's SQL in the Neon SQL editor.
+3. Confirm D-112 for `a01` and `a02`.
+4. Push the tag `v3`.

@@ -148,7 +148,7 @@ Numbering continues from V2's D-72. Each is the smallest choice that keeps V4 ad
 | D-83 | **REOPENED V1 CONTRACT (`workers/protocol.ts`, `FeedLine`).** The `event_found` arm gains one optional field: `{ kind: "event_found"; eventKind: EventKind; display: string; displayTo?: string }`. For a FromTo, `display` is `from.display` and `displayTo` is `to.display`; for the other three kinds `displayTo` is absent. `messages.feed.eventFound.from_to` becomes `(display: string, displayTo: string) => string`, "Found: {display} to {displayTo}" | PS §10 J6 gives "Found: $2k to $20k" and V2 §20.3 left it to V3: one string cannot carry two values, and joining them in a use-case would put the word "to" outside `messages.ts` (INV-15). The founder's decision of 2026-10-15. Cost on the V1 side: one optional field in a frozen type, which no V2 reader breaks on; cost on the copy side: one signature changes, and `ProcessingFeed`'s `switch` passes the second value |
 | D-84 | **The lexicons of `offcut-detect/src/config.rs` and the unit table of `offcut-text/src/units_lex.rs` are the exact lists of sections 8.4 and 9.1**, all (assumption, M1.3), re-checked by E-7. Each list is a `const` slice of lower-case `&str`, sorted, matched against whole effective tokens. No list is read from a file at run time | TS §17.4 names list nouns, change verbs, intensifiers, an emphasis lexicon, stop words, a stop-list of verbs and fillers, and TS §17.2 units, without giving one word. A detector cannot be written or labeled against without them |
 | D-85 | **FromTo unit rules.** Two quantities are compatible when, after inheritance (a `Unit::None` takes the other's unit), they have the same `Unit` variant, or both are in one dimension group: time (`Milliseconds` to `Years`), data (`Bytes` to `Gigabytes`), or the same currency. "+0.15 same explicit unit" applies only when both carry the identical variant from their own words; "+0.05 inherits" when one is `None`. `Count { noun }` is compatible only with an identical noun. `FromTo.label` is `None` in V3 | TS §17.4 says "compatible units" without a definition, and `EventParams::FromTo` has a `label` that TS §17.4's "Derived fields" never derives. A label rule invented now would be tuned without a visual to judge it; V4 draws no label row when it is `None` |
-| D-86 | **`redetect_sentence` scope**, replacing "next `cfg.list_window` sentences" of TS §17.3: sentence `s`; every sentence touched by an event of `prev` whose anchors intersect `s`; and every sentence whose `start_ms` is less than `sentences[s].start_ms + LIST_WINDOW_MS` (45,000) and greater than it. Events of `prev` whose anchors lie wholly outside that scope are kept as they are; `detect`'s steps 1-5 run over the whole transcript, the candidates whose anchors lie wholly inside the scope are kept, and `resolve` runs over them with the kept events fixed (section 9.2), so the rules of TS §17.5 hold for the whole clip | `LIST_WINDOW` is a time (45 s, TS §17.4), not a sentence count. A list announced in `s` may find its markers up to 45 s later, so those sentences must be re-read |
+| D-86 | **`redetect_sentence` scope**, replacing "next `cfg.list_window` sentences" of TS §17.3: sentence `s`; every sentence touched by an event of `prev` whose anchors intersect `s`; and every sentence whose `start_ms` is less than `sentences[s].start_ms + LIST_WINDOW_MS` (45,000) and greater than it. Events of `prev` whose anchors lie wholly outside that scope are kept as they are; `detect`'s steps 1-5 run over the whole transcript, the candidates whose anchors lie wholly inside the scope are kept, and `resolve` runs over them with the kept events fixed (section 9.2), so the rules of TS §17.5 hold for the whole clip. **As built (Prompt 78):** the scope also takes the sentences of every event of `prev` that shares a word with it, repeated until none crosses its edge; an event crossing the 45 s edge was otherwise neither kept nor detected again, and was lost (V3 changelog, open item 18) | `LIST_WINDOW` is a time (45 s, TS §17.4), not a sentence count. A list announced in `s` may find its markers up to 45 s later, so those sentences must be re-read |
 | D-87 | **The labeled set is written text, not recordings, and is written before the detector exists.** At least 30 files in `fixtures/labeled/`, format in section 17.5: 29 written transcripts, the Script A transcript as recognized (`fixtures/speech/README.md`), written out in the written form (`a01`, no emphasis marks: V2 stores no word times or prosody), and `a02` for the second recording, whose labels are frozen at S2 with `words` and `prosody` null and whose data is filled after S8 (section 17.5). Written transcripts are composed by the agent at S2, from short scripts in the voice of a technical creator, covering every kind at least 8 times, every exclusion of TS §17.4 at least twice, every edge case of TS §17.6 that a person would label the way the spec decides (the others are `rules_table.rs` rows), and 6 files with no event. Word times are synthesized by the test (section 19.9); emphasis is marked per word in the file (`"emph": true`), which the test turns into `energy_z = 2.0, pitch_z = 2.0` (the founder's decision of 2026-10-16 on section 23, item 27), every other word 0.0. The labels are fixed in the commit of S2, before S7 writes `from_to.rs`, `list.rs`, `keyword.rs`, `exclusions.rs` or `resolve.rs`. After that a label changes only with a `v3changelog.md` line naming the file, the label and the reason, and never to match the detector's output. The founder reads five files chosen by the agent at random and says whether each label is what a person would expect; that reading is an exit box | BP §5.2 asks for 30 hand-labeled transcripts and says the labeling "cannot be delegated to the detector being tested". The founder's decision of 2026-10-15: no 30 recordings; "do what is optimal". Text is what the detector reads; a recording only adds the recognizer's errors, which E-10 measures separately. Writing the labels before the rules is what keeps them independent of the detector. Costs: KeywordPop precision is measured on synthetic emphasis, not on prosody measured from speech; recognizer errors (V2's "editing 8 every evening") are under-represented; a single author writes both the labels and, later, the rules, which the freeze and the founder's reading only partly offset. E-7 (V10 onward) measures events kept on real use |
 | D-88 | **(schedule) E-10 is carried to V9.** No 20-clip accent set exists and the founder will not record one now. V3 builds `corpus/run_corpus.ts` with its `--wer` mode and reads it on the reference clip alone (one clip against the README's expected text), as a smoke reading that is not E-10. The runner is a Playwright test file run as project `corpus` of `web/playwright.config.ts` (`testDir: "../corpus"`), as D-63 did for the bench. It reads each transcript back from the IndexedDB `transcripts` store, which V3 writes. Corpus clips are read from the local directory `OFFCUT_CORPUS_DIR`, are listed in `corpus/manifest.json` by id, SHA-256 and tags only, and are never uploaded anywhere. TE-12 is "inconclusive" when fewer than 10 corpus clips exist, and is re-checked at V9 (BP §11.1) | The pipeline runs only in a browser. Clips of other people are private: an asset host would publish them. BP §5.3 lists E-10 for V3 but its input set does not exist |
 | D-89 | Two new third-party crates: **`nnnoiseless`** (RNNoise in pure Rust) in `offcut-dsp` for `denoise.rs`, and **`ebur128`** (BS.1770 integrated loudness with gating) in `offcut-dsp` for `loudness.rs`. Both pinned at their latest stable release on the day S1 adds them, versions recorded in `v3changelog.md`, both built for `wasm32-unknown-unknown` without threads. The denoiser's delay is a named constant `DENOISE_DELAY_SAMPLES`, (assumption, measured at S4 by `impulses_stay_aligned`) | V2 §25.2 named both. TS §18.2 asks for an "RNNoise-class" denoiser and "BS.1770 gating": writing either by hand is more code than V3 can verify. `ebur128` is also what the verifier's check 7 uses, through ffmpeg, in V5 |
@@ -167,9 +167,9 @@ Numbering continues from V2's D-72. Each is the smallest choice that keeps V4 ad
 | D-102 | **Two ambiguous unit words.** `Unit::Times` is given only by an `x` written after digits (`3x`) or by the word "times" followed by a word of `COMPARATIVES` ("ten times faster"); "three times" alone is no unit. "pound" and "pounds" are not a currency word (weight is as likely); `£` and "gbp" are | Both rules protect precision against frequent spoken phrases ("I tried three times", "lost ten pounds"). (assumption, M1.3), re-checked by E-7 |
 | D-103 | **REOPENED V2 CONTRACT (`web/eslint.config.js`, `MINTING`).** `persistence/clips-repo.ts` gets one minting entry, `{ brand: "Bytes", helper: "toBytes" }`, for `ClipRecord.sourceBytes`, which is `file.size`. The three repos throw `opfs.OpfsError` (kind `quota` for a `QuotaExceededError`, `io` for any other IndexedDB failure), so `run-pipeline.ts::failureOf` maps them to `E_STORAGE_QUOTA` / `E_STORAGE_IO` with no change | `ClipRecord.sourceBytes: Bytes` (TS §23.1) must be minted from a browser number, and `ClipInfo` has no size field. Reusing V2's error class keeps the use-case's mapping in one function. Cost on the V2 side: one more entry in a list V2 froze (D-59); on the V3 side none |
 | D-104 | **A number never crosses a sentence boundary.** `normalize_transcript` parses each sentence's tokens separately, so a `NormalizedSpan` lies inside one sentence. FromTo's "one sentence" rule and the list announcer then need no extra check | TS §17.4 puts FromTo inside a sentence and says nothing about a quantity that would straddle two, which split recognizer words (D-42) could produce |
-| D-105 | **List markers.** A marker is an ordinal word (`first` … `seventh`, `firstly`, `secondly`, `thirdly`), the phrase "number" + a cardinal 1-7, or a cardinal 1-7 in digits or words followed by `,` `.` or `:`; it counts only as the first effective word of a sentence, after any of the fillers of section 9.1. The announcer form needs markers 1 to `count` in order, every one within `LIST_WINDOW_MS` of the announcer's start. The marker-only form needs at least 3 consecutive ordinal words starting at `first`; its +0.20 of TS §17.4 is given when no gap between two consecutive markers exceeds `LIST_MARKER_GAP_MS = 15,000` (assumption, M1.3) | TS §17.4 defines neither what a marker is nor when the marker-only bonus applies. "the first time" in the middle of a sentence must not start a list |
+| D-105 | **List markers.** A marker is an ordinal word (`first` … `seventh`, `firstly`, `secondly`, `thirdly`), the phrase "number" + a cardinal 1-7, or a cardinal 1-7 in digits or words followed by `,` `.` or `:`; it counts only as the first effective word of a sentence, after any of the fillers of section 9.1. The announcer form needs markers 1 to `count` in order, every one within `LIST_WINDOW_MS` of the announcer's start. The marker-only form needs at least 3 consecutive ordinal words starting at `first`; its +0.20 of TS §17.4 is given when no gap between two consecutive markers exceeds `LIST_MARKER_GAP_MS = 15,000` (assumption, M1.3). **As built (Prompt 76):** a count followed by a list noun claims the markers 1, 2, … after it whatever its count, so only an in-range count with all its markers is a candidate and the marker-only form skips claimed markers ("eight reasons" with eight ordinals gives no list of seven); the markers of a list name 1, 2, 3, … one after the other; punctuation and fillers before a marker are both skipped (V3 changelog, open item 16) | TS §17.4 defines neither what a marker is nor when the marker-only bonus applies. "the first time" in the middle of a sentence must not start a list |
 | D-106 | **`Candidate` gains `parts: Vec<WordRange>`**, the word range of each quantity or marker the candidate is built from (NumberReveal: its span; FromTo: from and to; ListReveal: the announcer's count and every marker; KeywordPop: none). `exclusions::apply` inspects the parts. A FromTo's two `Quantity` values carry the unit after inheritance, and their `display` is formatted again with it ("90" becomes "90 minutes") | `exclusions.rs` must zero a FromTo whose ends are years (TS §17.6), and V2's `Candidate` keeps only the anchors. `Candidate` is crate-internal: adding a field changes no frozen contract |
-| D-107 | **Derived text fields.** A NumberReveal label is the effective text of up to `NUMBER_LABEL_MAX_WORDS` (3) Word tokens after the span, in the same sentence, stopping at punctuation or at a word of `LABEL_STOP_VERBS`; `None` if empty. A ListReveal header is `"{count} {NOUN}"` with the noun upper-cased ("3 REASONS"). A `ListItem.text` is up to `LIST_ITEM_MAX_WORDS` (5) Word tokens after the marker, leading fillers removed, stopping at `.` `?` `!` `;` `:`, at a `,` once 2 words are taken, or at the next marker; `ListItem.at` is the start of the marker's first word | TS §17.4 gives the outline; Script A's expected labels ("editing by hand", "in sales") and header ("3 REASONS") fix the details |
+| D-107 | **Derived text fields.** A NumberReveal label is the effective text of up to `NUMBER_LABEL_MAX_WORDS` (3) Word tokens after the span, in the same sentence, stopping at punctuation or at a word of `LABEL_STOP_VERBS`; `None` if empty. A ListReveal header is `"{count} {NOUN}"` with the noun upper-cased ("3 REASONS"). A `ListItem.text` is up to `LIST_ITEM_MAX_WORDS` (5) Word tokens and numbers in digits after the marker (as built, Prompt 76: "we saved $10,000" keeps its amount), leading fillers removed, stopping at `.` `?` `!` `;` `:`, at a `,` once 2 words are taken, or at the next marker; `ListItem.at` is the start of the marker's first word | TS §17.4 gives the outline; Script A's expected labels ("editing by hand", "in sales") and header ("3 REASONS") fix the details |
 | D-108 | **Pitch is measured on an 8 kHz copy.** `measure_prosody` decimates each word's samples by 6 with a 6-tap box filter, computes the normalized autocorrelation over lags 20 to 134 (400 to 60 Hz) in 320-sample frames with an 80-sample hop, refines the peak by parabolic interpolation, and takes z-scores of `log2(F0)` (assumption, M1.2) | At 48 kHz the autocorrelation over the reference clip's words costs about 6 x 10^9 multiply-adds, far over the prosody allowance (under 1 s, TS §8); at 8 kHz about 2 x 10^8. F0 lies under 400 Hz, so the decimation keeps what is measured |
 | D-109 | **An edited number is read again.** `number::find`, `from_to::find` and `list::find` read quantities from the effective tokens of each sentence with `parse_quantity`, not from `Transcript.numbers`. A span whose words were edited yields the quantity of the new text (TS §17.6); a hidden word inside it yields none. This replaces V2's rule that skipped an edited number (V2 §9.3) | TS §17.6 asks for re-parsing; V2 marked it for V3 |
 | D-110 | **The chain's binding takes no configuration.** `run_chain(pcm48, on_block)` runs `ChainConfig::default()`; `config.rs` is the one place where TE-13's fallback (`denoise: false`) is written. PCM crosses the WASM boundary by copy (in: `&[f32]`; out: a new `Float32Array`); between threads it is transferred, never copied (TS §31) | TS §34.3 passes `cfg` to `run_chain`, but `AudioWorkerApi.runChain` (frozen) has no field for it. A copy into and out of WASM memory is unavoidable and costs 2 x 17.3 MB for 90 s |
@@ -697,7 +697,7 @@ pub fn measure_prosody(out48: &[f32], words: &[Word], sentences: &[Sentence]) ->
 |---|---|
 | 1 | For each word: sample range `[start_ms x 48, end_ms x 48)`, clamped to `0..out48.len()`; an empty range gives energy `ENERGY_FLOOR_DB` and no pitch |
 | 2 | Energy: `10 log10(mean(x^2))`, floor `ENERGY_FLOOR_DB` |
-| 3 | Pitch (D-108): decimate the word's samples by `PROSODY_DECIMATE` (mean of each group of 6); for each frame of `PITCH_FRAME` samples at hop `PITCH_HOP` that lies wholly inside the word: remove its mean; skip it if its RMS is under `VOICED_FRAME_MIN_DB`; normalized autocorrelation `r(τ) = Σ x[n]x[n+τ] / sqrt(Σ x[n]^2 Σ x[n+τ]^2)` for `τ` in `PITCH_MIN_LAG..=PITCH_MAX_LAG`; the best `τ*` with `r ≥ VOICING_MIN` is a voiced frame; parabolic interpolation over `τ*-1, τ*, τ*+1` refines the lag; `F0 = 8,000 / τ_refined`. The word's pitch is the median F0 of its voiced frames (the lower middle for an even count), or none |
+| 3 | Pitch (D-108): decimate the word's samples by `PROSODY_DECIMATE` (mean of each group of 6); for each frame of `PITCH_FRAME` samples at hop `PITCH_HOP` that lies wholly inside the word: remove its mean; skip it if its RMS is under `VOICED_FRAME_MIN_DB`; normalized autocorrelation `r(τ) = Σ x[n]x[n+τ] / sqrt(Σ x[n]^2 Σ x[n+τ]^2)` for `τ` in `PITCH_MIN_LAG..=PITCH_MAX_LAG`; a frame whose best `r` is at least `VOICING_MIN` is voiced, and its `τ*` is the first local peak (the shortest lag) that reaches `FIRST_PEAK_SHARE` (0.9) times the best and `VOICING_MIN` (as built, Prompt 68: a periodic voice correlates almost as well at two and three periods, and the plain maximum halved the pitch at random; V3 changelog, open item 12); parabolic interpolation over `τ*-1, τ*, τ*+1` refines the lag; `F0 = 8,000 / τ_refined`. The word's pitch is the median F0 of its voiced frames (the lower middle for an even count), or none |
 | 4 | Per sentence: the z-score of energy over the sentence's words, and of `log2(F0)` over the sentence's words that have a pitch; population standard deviation. Fewer than `PROSODY_MIN_WORDS` values, or a standard deviation below `1e-6`: 0.0 for every word of the sentence. A word without pitch gets `pitch_z = 0.0` |
 | 5 | A word in no sentence (never happens with `segment_sentences`, which covers every word) gets 0.0 and 0.0 |
 | 6 | `per_word.len() == words.len()`, in word order |
@@ -795,7 +795,7 @@ Signature unchanged: `pub fn parse_quantity(tokens: &[Token]) -> Option<(usize, 
 
 | Stage | Reads | Rules |
 |---|---|---|
-| 1. Core | A `Digits` token (symbol, number, suffix), or `cardinal` + optional `point_fraction`, or "a"/"an" + "hundred"/magnitude | A `Digits` token with both a currency symbol and `x`, or both `%` and a suffix, is `None`. V2's split groups (D-42) are read after a whole `Digits` core with no symbol after it, no suffix and no decimal point |
+| 1. Core | A `Digits` token (symbol, number, suffix), or `cardinal` + optional `point_fraction`, or "a"/"an" + "hundred"/magnitude | A `Digits` token with both a currency symbol and `x`, or both `%` and a suffix, is `None`. V2's split groups (D-42) are read after a whole `Digits` core with no symbol after it, no suffix and no decimal point. **The split decimal point** (as built 2026-10-18, the founder's decision; V3 changelog, open item 20): after the groups, at most one word of a point and digits only, straight after the number, is its fraction and ends the number: `4` `.7` `minutes` is 4.7 minutes, `1` `.5` `million` `views` 1,500,000 views. A point that ends a word ("3." then "5") stays a full stop; a fraction with a sign or suffix (`.7%`), a word in between, or a core that already has a point or a sign is not joined |
 | 2. Magnitude | One following Word from `thousand million billion trillion`, when the core had no suffix and no magnitude of its own | Multiplies. "2 million" = 2,000,000; "1.5 billion" = 1.5 x 10^9; "three point five million" = 3,500,000 |
 | 3. Grand | One following Word "grand" | Multiplies by 1,000; the unit becomes `Usd` unless a currency is already set. "five grand" = 5,000 USD |
 | 4. Unit | At most one unit, from the core's own symbol or sign, or from the following one or two tokens, by `units_lex` (section 8.4) | Symbol `$ € £ ₹` → currency; `%` → `Percent`; `x` → `Times`; then, if no unit yet: "percent" / "per cent" / "pct" → `Percent`; a currency word → that currency; "times" + a word of `COMPARATIVES` → `Times`, consuming "times" only (D-102); a time, data or count word → that unit (count: D-101). A currency word after a currency symbol of the same currency is consumed ("$500 dollars"); of another currency it is not |
@@ -867,7 +867,7 @@ A negative value is never produced by the parser; `format_quantity` of a negativ
 
 `normalize_transcript`: V2's five steps, with step 4 done per sentence (D-104): for each sentence, tokenize its words, then scan with `parse_quantity` and skip the tokens each quantity used. `Transcript.numbers` is in word order, as before.
 
-**The one V2 inline test that changes.** V2 §8.5 asserts that "ten million" parses as 10 consuming one token ("the V2 subset"). In V3 it parses as 10,000,000 consuming two. The test is rewritten to the V3 value; it is the only V2 test of the crate whose expectation changes, because it asserted the absence of a V3 feature.
+**The V2 inline tests that change.** V2 §8.5 asserts that "ten million" parses as 10 consuming one token ("the V2 subset"). In V3 it parses as 10,000,000 consuming two, and the test is rewritten to the V3 value, because it asserted the absence of a V3 feature. **As built (Prompt 73; V3 changelog, open item 13):** it is not the only one. Eleven V2 assertions of `offcut-text` asserted V2's stand-ins and were set to the values of sections 8.3 to 8.5: in `numbers.rs` "ten million", "three point five", `2k`, "ten thousand people", three displays of millions, `$1,000,000`, NaN and `800` ms; in `normalize.rs` "two hundred and fifty days". `git diff 8a271a9 -- crates/offcut-text/src | grep -cE '^-\s*assert'` gives 7 (four of the rewritten values were continuation lines). No other V2 assertion was touched; `format_quantity(-0.001)` stays `"0"`.
 
 ### 8.7 Inline unit tests
 
@@ -894,7 +894,7 @@ A negative value is never produced by the parser; `format_quantity` of a negativ
 
 ### 9.1 `config.rs` [ONLY thresholds and lexicons] (D-84)
 
-V2's ten fields keep their names and values (V2 §9.1); V3 appends fields and never renames one.
+V2's ten fields keep their names and values (V2 §9.1), except `threshold_number`, raised from 0.80 to 0.85 by the precision gate (section 20.3, Prompt 88; V3 changelog, open item 21); V3 appends fields and never renames one. **Thresholds in use:** FromTo 0.85, ListReveal 0.85, NumberReveal 0.85, KeywordPop 0.80 (TS §17.4).
 
 ```rust
 pub struct DetectorConfig {
@@ -954,7 +954,7 @@ All are (assumption, M1.3), tuned by the sweep of `precision_recall.rs` (section
 | `FILLERS` | actually, ah, also, and, basically, er, like, now, ok, okay, right, so, then, uh, um, well | `list.rs` (marker position, item text) |
 | `VERSION_CONTEXT` | android, angular, build, chapter, chrome, claude, edition, episode, firefox, galaxy, gpt, ios, ipad, iphone, java, level, llama, macos, model, node, page, part, php, pixel, python, react, release, room, rust, season, series, ubuntu, update, v, version, vue, windows | `exclusions.rs` (X2) |
 | `VERSION_AFTER` | max, mini, plus, pro, ultra | `exclusions.rs` (X2) |
-| `CLOCK_WORDS` | a.m., am, o'clock, p.m., pm | `exclusions.rs` (X3) |
+| `CLOCK_WORDS` | a.m, am, o'clock, p.m, pm: the forms `tokenize` gives "a.m." and "p.m.", whose trailing point it splits off as punctuation (as built, Prompt 77; V3 changelog, open item 15) | `exclusions.rs` (X3) |
 
 "always" and "never" are deliberately not emphasis words: Script A says "always" in a plain sentence, and either would put a KeywordPop on nearly every clip.
 
@@ -976,7 +976,7 @@ pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;                
 | 2 | Effective quantities | `number::quantities(&toks, t)`: per sentence, `parse_quantity` over the sentence's tokens; each `Found { words: WordRange, tokens: Range<usize>, quantity: Quantity, sentence: SentenceIdx, suffixed: bool }` (D-104, D-109) |
 | 3 | Candidates | `from_to::find`, then `list::find`, then `number::find`, then `keyword::find`, concatenated in that order |
 | 4 | Exclusions | `exclusions::apply(&mut cands, &toks, t, edits)` (section 9.7) |
-| 5 | Threshold | `cands.retain(\|c\| c.score >= cfg.threshold(c.kind))` |
+| 5 | Threshold | `cands.retain(\|c\| settled(c.score) >= cfg.threshold(c.kind))`. **As built (Prompt 77; V3 changelog, open item 17):** `settled` takes a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth, because sums of the config's two-decimal values carry `f32` noise (0.65 + 0.20 is 0.84999996, so no marker-only list could reach 0.85). A score really between two hundredths (0.795) is not moved; an event's confidence is the settled score (INV-6) |
 | 6 | Resolution | `resolve::resolve(cands, &[], cfg)` (section 9.8) |
 | 7 | Events | Each kept candidate becomes `DetectedEvent { id: event_id(kind, anchors), kind, span, anchors, params, confidence: Confidence::new(score)?, enabled: true }`; output sorted by `span.start`, then kind order |
 
@@ -984,7 +984,7 @@ pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;                
 
 | # | Step |
 |---|---|
-| 1 | `scope` = the word range from the first word of the earliest scope sentence to the last word of the latest, where scope sentences are: `s`; every sentence intersected by the anchors of an event of `prev` that intersects sentence `s`; every sentence whose `start_ms` lies in `(start_ms(s), start_ms(s) + list_window_ms)` |
+| 1 | `scope` = the word range from the first word of the earliest scope sentence to the last word of the latest, where scope sentences are: `s`; every sentence intersected by the anchors of an event of `prev` that intersects sentence `s`; every sentence whose `start_ms` lies in `(start_ms(s), start_ms(s) + list_window_ms)`. **As built (Prompt 78; open item 18):** then the sentences of every event of `prev` that shares a word with the scope, repeated until none crosses its edge, so the scope is always whole sentences and no event of `prev` is half in it |
 | 2 | `outside` = the events of `prev` whose anchors lie wholly outside `scope` |
 | 3 | Steps 1-5 of `detect` over the whole transcript; keep the candidates whose anchors lie wholly inside `scope` |
 | 4 | `resolve::resolve(candidates, &outside, cfg)`: the `outside` events are fixed and kept; a candidate that conflicts with one of them is dropped |
@@ -996,7 +996,8 @@ pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId;                
 
 ```rust
 pub struct Candidate { pub kind: EventKind, pub anchors: WordRange, pub span: Span, pub score: f32,
-                       pub params: EventParams, pub parts: Vec<WordRange> }              // `parts` new (D-106)
+                       pub params: EventParams, pub parts: Vec<WordRange>,               // `parts` new (D-106)
+                       pub sentence: SentenceIdx }                                       // as built (Prompt 77): the sentence of the first word, for resolve's step 4
 pub(crate) struct Found { pub words: WordRange, pub tokens: Range<usize>, pub quantity: Quantity,
                           pub sentence: SentenceIdx, pub suffixed: bool }
 pub(crate) fn quantities(toks: &[Token], t: &Transcript) -> Vec<Found>;
@@ -1038,7 +1039,7 @@ For each sentence, for each ordered pair of quantities `(a, b)` of that sentence
 | Units (D-85) | After inheritance (a `None` takes the other's unit): the same `Unit` variant, or both in one group: time (`Milliseconds`..`Years`), data (`Bytes`..`Gigabytes`); `Count` only with the identical noun; two different currencies are incompatible |
 | From frame | The token right before `a` is "from", and the token right before `b` is "to": + `from_to_frame_bonus` |
 | Change-verb frame | Otherwise: a word of `CHANGE_VERBS` among the 3 tokens before `a`, or between `a` and `b`, and the token right before `b` is "to": + `from_to_change_verb_bonus` |
-| Unit bonus | Both carry the same explicit unit from their own words: + `from_to_same_unit_bonus`; one inherits: + `from_to_inherit_bonus` |
+| Unit bonus | Both carry the same explicit unit from their own words: + `from_to_same_unit_bonus`; one inherits: + `from_to_inherit_bonus`. As built (Prompt 76; open item 16): "the same explicit unit" is the same `Unit` variant from both quantities' own words, `None` and `None` included, which gives "from 2019 to 2024" the 1.00 of the table below (read the other way, a bare pair with a from frame would land on 0.85 and pass or fail on `f32` rounding) |
 | Close | The gap is at most `from_to_close_gap_words`: + `from_to_close_bonus` |
 | Base and clamp | `from_to_base` + bonuses, `min(1.0)`, x the minimum confidence of both quantities' words |
 
@@ -1064,11 +1065,11 @@ pub(crate) struct Marker { pub ordinal: u8, pub words: WordRange, pub ordinal_wo
 
 **Markers** (D-105): the first effective Word token of a sentence, after any `FILLERS`, that is an `ORDINAL_MARKERS` word; or "number" followed by a cardinal or digits 1-7; or a cardinal word or digits 1-7 directly followed by a `Punct` token `,` `.` or `:`.
 
-**Announcer form.** A `Found` quantity with integral value in `list_count_min..=list_count_max` and `Unit::None`, directly followed by a Word of `LIST_NOUNS`. Then the markers with ordinals 1, 2, … `count`, in that order, each in a sentence after the announcer's, each starting before `announcer start + list_window_ms`. If any is missing: no candidate (TS §17.6: a partial list is worse than none). Score `list_base` + `list_all_markers_bonus` (always, since all were found) + `list_ordinal_bonus` when every marker is an ordinal word: 0.90 or 1.00. `header` = `"{count} {NOUN}"` upper-cased noun (D-107).
+**Announcer form.** A `Found` quantity with integral value in `list_count_min..=list_count_max` and `Unit::None`, directly followed by a Word of `LIST_NOUNS`. Then the markers with ordinals 1, 2, … `count`, in that order, each in a sentence after the announcer's, each starting before `announcer start + list_window_ms`. If any is missing: no candidate (TS §17.6: a partial list is worse than none). Score `list_base` + `list_all_markers_bonus` (always, since all were found) + `list_ordinal_bonus` when every marker is an ordinal word: 0.90 or 1.00. `header` = `"{count} {NOUN}"` upper-cased noun (D-107). **As built (Prompt 76; open item 16):** every count followed by a word of `LIST_NOUNS`, in range or not, claims the markers 1, 2, … that follow it (up to its count), so "eight reasons" or "five tips" with four markers gives no partial list; the markers must name 1, 2, 3, … one after the other (a stray marker in between ends the run); the score, like every kind's (TS §17.4), is multiplied by the least confidence of the anchor words.
 
 **Marker-only form.** Three or more consecutive markers that are ordinal words with ordinals 1, 2, 3, …, not already used by an announcer candidate, each in a later sentence than the previous one, all within `list_window_ms` of the first. `count` = the number found, at most `list_count_max`. Score `list_marker_only_base` + `list_marker_only_bonus` when no gap between consecutive markers exceeds `list_marker_gap_ms`: 0.85 or 0.65. `header` = `""`.
 
-**Items** (D-107). For each marker: the effective Word tokens after the marker, leading `FILLERS` dropped, at most `list_item_max_words`, stopping at `.` `?` `!` `;` `:`, at a `,` once two words are taken, or at the sentence end; text joined by one space; `ordinal` = the marker's; `at` = the marker word's start.
+**Items** (D-107). For each marker: the effective Word tokens and numbers in digits after the marker (as built, Prompt 76), leading `FILLERS` dropped, at most `list_item_max_words`, stopping at `.` `?` `!` `;` `:`, at a `,` once two words are taken, or at the sentence end; text joined by one space; `ordinal` = the marker's; `at` = the marker word's start.
 
 `anchors` = from the announcer's first word (or the first marker's) to the last word of the last item; `span` = the same words' times; `parts` = `[announcer count words, each marker's words]`; `params = ListReveal { count, header, items }`.
 
@@ -1079,7 +1080,7 @@ pub(crate) struct Marker { pub ordinal: u8, pub words: WordRange, pub ordinal_wo
 | "First, open the app. Second, drop a clip. Third, read the result." | Marker-only, 0.85, header empty, three items |
 | "It was the first time I tried." | No marker: "first" is not at the sentence start |
 | "I have 3 tips. 1, sleep. 2, eat. 3, ship." | Announcer form, digit markers, 0.90 (markers not ordinal words) |
-| "eight reasons" + eight ordinal markers | None: 8 is over `list_count_max` |
+| "eight reasons" + eight ordinal markers | None: 8 is over `list_count_max`, and the announcer claims the markers after it, so the marker-only form does not show "first" to "seventh" either (no ordinal word names an eighth place) |
 
 ### 9.6 `keyword.rs`
 
@@ -1115,7 +1116,7 @@ Sets `score = 0.0` (TS §17.3: "may zero a score"); the threshold step removes t
 | X6 | List marker: the part's words equal a marker's words (`list::markers`) | NumberReveal | "1, sleep" |
 | X7 | A hidden word: an `edits` entry of `""` for any word inside the candidate's `anchors` (TS §17.6) | Every kind | Hiding one word of a list item |
 
-A ListReveal's announcer count is exempt from X5 by design (its value is 2-7). X7 is the only rule that reads `edits` directly.
+A ListReveal's announcer count is exempt from X5 by design (its value is 2-7). X7 is the only rule that reads `edits` directly; it counts an edit that is empty or only spaces as hidden. **As built (Prompt 77; open item 17):** a part is matched to its quantity by word range, so its unit is the quantity's own, before a FromTo's inheritance; the bounds are named constants of `config.rs`: `YEAR_FIRST` 1,900 and `YEAR_LAST` 2,099 (X1), `VERSION_DOTS` 2 (X2), `PHONE_DIGITS_MIN` 7 (X4), `BARE_NUMBER_MIN` 10 (X5).
 
 ### 9.8 `resolve.rs`
 
@@ -1136,7 +1137,7 @@ TS §17.5, with a fixed set for `redetect_sentence`:
 
 ### 9.9 Inline unit tests (beyond the four test files of section 19)
 
-The six V2 tests of `lib.rs` keep passing unchanged except one: "a number whose word was edited or hidden is not shown" (V2 §9.4) asserts that an edit of `$10,000` to `$20,000` gives no event. In V3 the edit is re-parsed (D-109) and gives an event of `$20k` with the id the old event had: an id hashes the kind and the anchors only (D-47), and an edit of one word keeps the anchors, so the user's toggle in `EditState.event_overrides` carries over to the corrected number (decided 2026-10-18 for the customer: a number the user switched off stays off when its text is corrected; V3 changelog, open item 14). The test is rewritten to assert that; the "hidden" half (edit to `""`) still gives none. It is the only V2 test of the crate whose expectation changes, because it asserted V2's stand-in rule.
+The six V2 tests of `lib.rs` keep passing unchanged except one: "a number whose word was edited or hidden is not shown" (V2 §9.4) asserts that an edit of `$10,000` to `$20,000` gives no event. In V3 the edit is re-parsed (D-109) and gives an event of `$20k` with the id the old event had: an id hashes the kind and the anchors only (D-47), and an edit of one word keeps the anchors, so the user's toggle in `EditState.event_overrides` carries over to the corrected number (decided 2026-10-18 for the customer: a number the user switched off stays off when its text is corrected; V3 changelog, open item 14). The test is rewritten to assert that; the "hidden" half (edit to `""`) still gives none. It is the only V2 test of the crate whose rule changes, because it asserted V2's stand-in rule. **As built:** two more V2 tests of `lib.rs` changed their inputs or a threshold, not their rule. Prompt 73: the input of "about ten thousand people … has no unit and is no event" ends with "of them", because "people" became a count noun (D-101); its assertion is unchanged. Prompt 88, after section 20.3 raised `threshold_number` to 0.85: `forty_percent_is_an_event_at_confidence_1_and_none_at_0_99` keeps its assertions at an explicit `threshold_number: 0.80` and gains one (at the default, "40%" said plainly is no event); `no_returned_event_is_below_the_threshold_of_its_kind` says "70%" at confidence 0.95 instead of 0.9 (0.76 plainly, 0.855 with emphasis). None is deleted, skipped or loosened (V3 changelog, open items 13 and 21).
 
 | Case | Expect |
 |---|---|
@@ -1795,7 +1796,7 @@ Six synthetic signals made in the test (no file), three speech PCM files from `f
 | Case | Expect |
 |---|---|
 | 1 kHz sine, peak -30 dBFS, 20 s | Loudness within ±0.5 LU of -14; peak at most -1.0 dBFS |
-| Pink noise from a fixed-seed LCG, -40 dBFS RMS, 20 s | Same |
+| Pink noise from a fixed-seed LCG, -40 dBFS RMS, 20 s | It reads about -40 LUFS, 26 LU from the target and more than `MAX_GAIN_DB`, so P4's exception applies: the gain is capped and the output reads what the loudness step was given + 24 dB within ±0.5 LU; peak at most -1.0 dBFS (as built, Prompt 67; V3 changelog, open item 11). A signal at -35 dBFS RMS would reach the target itself |
 | Amplitude-modulated noise (4 Hz, speech-like), -20 dBFS RMS, 20 s | Same |
 | A full-scale square wave at 200 Hz, 10 s | Peak at most -1.0 dBFS; loudness within ±1 LU of -14 (PS §20.1): after the one corrective pass of step 6 the limiter may hold it under the target; the reported loudness equals a fresh measurement of the output |
 | 1 kHz sine, peak -50 dBFS, 20 s | Gain capped at +24 dB: loudness = input + 24 within ±0.5 LU (P4's exception) |
@@ -1953,8 +1954,8 @@ The TS §17.6 edge cases and one row per rule of section 9, on written transcrip
 | "I had spent 3000 hours editing by hand." | NumberReveal `3,000 hours`, label `editing by hand` |
 | "We have 3000 users." | NumberReveal `3,000 users`; score 1.00 (count ≥ 100) |
 | "I have 3 tools." | None: "tools" is a list noun, never a count noun (D-101), so `3` is bare and X5 zeroes it; it would score 0.50 anyway. No list: an announcer with no markers |
-| "It costs 40% less." | NumberReveal `40%`, 0.80 |
-| "About 900 people came." | NumberReveal `900 people`, 0.80 |
+| "It costs 40% less." | None: 0.80, under `threshold_number` 0.85 since section 20.3 (Prompt 88; it was NumberReveal `40%` at 0.80). Said with emphasis it scores 0.90 and is shown |
+| "About 900 people came." | None: 0.80, under 0.85 since section 20.3 (Prompt 88; it was NumberReveal `900 people`) |
 | "About 900 came." | None (0.50) |
 | "The rough cut went from 90 minutes to 10 minutes." | FromTo `90 minutes` → `10 minutes`, 1.00; no NumberReveal for either (anchors taken) |
 | "Revenue went from $2k to $20k." | FromTo, 1.00 |
@@ -2006,7 +2007,7 @@ The TS §17.6 edge cases and one row per rule of section 9, on written transcrip
 | Edit word 23 (`3000`) to `4000`; redetect sentence 3 | The NumberReveal of sentence 3 has value 4,000 and keeps its id (same kind and anchors, D-47; section 9.9); every other event unchanged with the same id |
 | Hide word 79 ("First"); redetect sentence 9 | The ListReveal is gone (a partial list, TS §17.6); the other events unchanged |
 | Edit inside sentence 8 (the announcer), the list's markers are in 9-11 | The scope reaches sentences 9-11 (within 45 s, D-86): the list is re-detected |
-| Edit in sentence 1 that creates a currency amount overlapping the window of the existing `3,000 hours` event | The new candidate is dropped (the fixed event wins, section 9.8) |
+| Edit word 60 (`That`, the first word of sentence 6) to `$5,000`: its window opens inside the window of the FromTo of sentence 5, which lies outside the scope and is fixed | The new candidate is dropped (the fixed event wins, section 9.8); the result equals `prev`. As built (Prompt 78; open item 18): the plan's first form, an amount in sentence 1 beside `3,000 hours`, cannot be played, because a sentence that starts within 45 s after `s` is in the scope (so that event is detected again, not fixed), and under synthesized timing no sentence after `3,000 hours` meets its window |
 | `s` out of range | Returns `prev` unchanged |
 | Timing | Printed: microseconds per call over 100 calls on Script A (native, release only); budget 50 ms on R1 (assumption, M1.5), not asserted |
 
@@ -2124,6 +2125,8 @@ Write each outcome into `docs/v3/experiments.md` (question, method, numbers, dat
 
 The decision is taken at S6 and confirmed at S12. A chain that passes on D1 may miss on R1 (D-74): the reading is recorded with that note, and V9's measurements on testers' devices re-check it (BP §11.2).
 
+**Outcome: continue, denoise stays on.** S6 (Prompt 69): 733 ms per 60 s in a dev build, 828 ms in a production build; S12 (Prompt 88): a median of 1,963 ms per 60 s for the portrait clip and 1,111 ms for `v3testclip` (844 ms per 60 s) in the bench, beside the recognizer, on D1 (`docs/v3/experiments.md`, TE-13).
+
 ### 20.3 The precision gate: the decision
 
 | Reading | Continue | Apply the contingency, then continue | Stop |
@@ -2133,6 +2136,8 @@ The decision is taken at S6 and confirmed at S12. A chain that passes on D1 may 
 | Every label | Unchanged since S2 | A label is wrong (a person would not expect it): fix it with a changelog line naming the file, the label and the reason; never because the detector disagrees (D-87) | - |
 
 The gate is read on the default config first and recorded even when it passes, so V4 knows the margin.
+
+**Outcome (S12, Prompt 88): the contingency was applied.** S7 (Prompt 79) read 0.93 on the 30 files with data. With `a02`'s data filled (31 files, 0 skipped) the default config read **0.87**: NumberReveal 0.72, five false positives at exactly 0.80. `threshold_number` 0.80 → 0.85, the lowest value of the sweep at which NumberReveal reaches 0.90: overall **0.98**, recall 0.91; NumberReveal 1.00 / 0.80, ListReveal 1.00 / 1.00, FromTo 1.00 / 0.92, KeywordPop 0.90 / 1.00; every recall at or above 0.30. One true NumberReveal of the set is lost ("16 weeks", `w02`). No label changed. KeywordPop sits at exactly 0.90 (`docs/v3/experiments.md`, "Precision gate").
 
 ### 20.4 The V3 gate
 
@@ -2249,19 +2254,19 @@ V3 is done when every box is ticked (BP §1.2, BP §5.4, TS §28 M1.1-M1.3).
 
 **Code and checks**
 
-- [ ] `pnpm check` is green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
-- [ ] `pnpm fixtures` then `pnpm test` are green, including every inline test of sections 6-10.
-- [ ] `demux_fixtures.rs`, `probe_rejections.rs` pass (BP §5.4).
-- [ ] `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs` pass; `ui.rs` still passes (D-95).
-- [ ] `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs`, `rules_table.rs`, `redetect.rs`, `determinism.rs` (detect) pass.
-- [ ] `precision_recall.rs` at 0.90 or above on at least 30 labeled transcripts; the thresholds used are those of `config.rs` and TS §17.4.
-- [ ] `pnpm build` is green, including `check-hosts.mjs`.
-- [ ] `pnpm e2e` is green.
-- [ ] `pnpm e2e:media` on D1, on a keyed build: every case green, including `rejections.spec.ts` (14 codes), the rewritten cases of D-91, and the D1-only cases of D-99 and D-100.
-- [ ] `ci.yml` runs the six fixture-reading Rust test files (not skipped) and `e2e-media.yml` runs the 15 `@no-gpu` cases of the rejection suite; both green on the pull request.
-- [ ] No source file exceeds 400 lines, tests excluded; in particular `sample_table.rs`, `numbers.rs`, `run-pipeline.ts`.
-- [ ] `git grep` finds no `fetch(` outside the four allowed files, and no word "silence", "pause" or "gap" in `offcut-dsp/src/` except in comments that say what the crate does not do and in `prosody.rs`'s z-score code.
-- [ ] Test counts are at least the baseline's plus V3's new ones; none fell.
+- [x] `pnpm check` is green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`. *Evidence (P89, 2026-10-21): exit 0 after `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10 (two advisories published after P88); V3 changelog, Prompt 89 entry.*
+- [x] `pnpm fixtures` then `pnpm test` are green, including every inline test of sections 6-10. *Evidence (P89, 2026-10-21): "fixtures are up to date"; Rust 461 passed, 0 failed, 3 ignored; Vitest 92; V3 changelog, Prompt 89 entry.*
+- [x] `demux_fixtures.rs`, `probe_rejections.rs` pass (BP §5.4). *Evidence (P89, 2026-10-21): in `cargo test --workspace` on D1 and in CI run 39285869287 (Linux, fixtures generated).*
+- [x] `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs` pass; `ui.rs` still passes (D-95). *Evidence (P89, 2026-10-21): same runs; `bare_ms_rejected.rs` (trybuild) passes.*
+- [x] `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs`, `rules_table.rs`, `redetect.rs`, `determinism.rs` (detect) pass. *Evidence (P89, 2026-10-21): same runs.*
+- [x] `precision_recall.rs` at 0.90 or above on at least 30 labeled transcripts; the thresholds used are those of `config.rs` and TS §17.4. *Evidence (P89, 2026-10-21): 0.98 over 31 files, 0 skipped, at the thresholds of `config.rs` (0.85, 0.85, 0.85, 0.80), equal to TS §17.4 (P88, section 20.3).*
+- [x] `pnpm build` is green, including `check-hosts.mjs`. *Evidence (P89, 2026-10-21): exit 0, `check-hosts` ok; no file of `web/dist` holds the test key.*
+- [x] `pnpm e2e` is green. *Evidence (P89, 2026-10-21): 12 of 12.*
+- [x] `pnpm e2e:media` on D1, on a keyed build: every case green, including `rejections.spec.ts` (14 codes), the rewritten cases of D-91, and the D1-only cases of D-99 and D-100. *Evidence (P89, 2026-10-21): 49 passed (47 media cases and the 2 setup cases), 1 skipped, 0 failed, 11.0 min; the skip is `REJECT_DECODE_UNSUPPORTED`, `test.fixme` by D-78 because Chrome on D1 decodes `rej_h264_444.mp4`; the D-91 cases, "second recording" and "no metadata" passed.*
+- [x] `ci.yml` runs the six fixture-reading Rust test files (not skipped) and `e2e-media.yml` runs the 15 `@no-gpu` cases of the rejection suite; both green on the pull request. *Evidence (P89, 2026-10-21): run 39285869287 on `70cbd8e`: the Linux log shows ffmpeg n9.0.2-28, "generated 25 fixtures" and the six files running; `e2e-media` generated the fixtures and ran the `@no-gpu` cases; both green (P87, P88).*
+- [x] No source file exceeds 400 lines, tests excluded; in particular `sample_table.rs`, `numbers.rs`, `run-pipeline.ts`. *Evidence (P89, 2026-10-21): the length audit over every changed `.rs`/`.ts`/`.tsx` file prints nothing; `check-file-tree` reports the longest at 399 (`video-source.ts`).*
+- [x] `git grep` finds no `fetch(` outside the four allowed files, and no word "silence", "pause" or "gap" in `offcut-dsp/src/` except in comments that say what the crate does not do and in `prosody.rs`'s z-score code. *Evidence (P89, 2026-10-21): the `fetch(` audit prints nothing; the `offcut-dsp` word search finds comments, `ABSOLUTE_SILENCE`/`absolute_silence` and test names about silent input only.*
+- [x] Test counts are at least the baseline's plus V3's new ones; none fell. *Evidence (P89, 2026-10-21): Rust 461 passed, 0 failed, 3 ignored against 262/2, Vitest 92 against 92, `pnpm e2e` 12 against 12, media 48 cases against 30.*
 
 **Deployment**
 
@@ -2273,14 +2278,14 @@ V3 is done when every box is ticked (BP §1.2, BP §5.4, TS §28 M1.1-M1.3).
 
 **Experiments and records**
 
-- [ ] TE-13 (native and browser), the precision gate, TE-12 (or "inconclusive" with the count), the E-3 and E-4 re-reads, and the E-10 smoke reading are in `docs/v3/experiments.md`, each labelled `d1`.
-- [ ] `bench/results/d1-<date>-portrait.json` and `-v3testclip.json` are committed.
-- [ ] `DENOISE_DELAY_SAMPLES` holds a measured value.
-- [ ] The derived clips' and the second recording's sections of `fixtures/speech/README.md` are filled.
+- [x] TE-13 (native and browser), the precision gate, TE-12 (or "inconclusive" with the count), the E-3 and E-4 re-reads, and the E-10 smoke reading are in `docs/v3/experiments.md`, each labelled `d1`. *Evidence (P89, 2026-10-21): `docs/v3/experiments.md`, 14 sections, every reading labelled `d1` (P88).*
+- [x] `bench/results/d1-<date>-portrait.json` and `-v3testclip.json` are committed. *Evidence (P89, 2026-10-21): `d1-2026-10-19-portrait.json`, `d1-2026-10-19-v3testclip.json` (P88).*
+- [x] `DENOISE_DELAY_SAMPLES` holds a measured value. *Evidence (P89, 2026-10-21): 480, measured by `impulses_stay_aligned` (P67); `ChainConfig::default().denoise` is `true` (TE-13).*
+- [x] The derived clips' and the second recording's sections of `fixtures/speech/README.md` are filled. *Evidence (P89, 2026-10-21): filled in P82 and P88.*
 - [ ] The founder has read five labeled files chosen at random and the reading is recorded (D-87); the founder has confirmed D-112 for `a01` and `a02`.
-- [ ] Every (assumption) V3 measured is replaced by its value in TS §39.3, or still listed there.
-- [ ] `docs/v3/v3changelog.md` lists every pinned version, every recipe change, every label change after the freeze, and the ffmpeg build used on each machine.
-- [ ] `docs/v2/experiments.md` has its closing M0 entry (section 1A).
+- [x] Every (assumption) V3 measured is replaced by its value in TS §39.3, or still listed there. *Evidence (P89, 2026-10-21): TS §39.3 items 10, 11, 24, 27 (P88, P89), item 28 lists what V3 leaves open.*
+- [x] `docs/v3/v3changelog.md` lists every pinned version, every recipe change, every label change after the freeze, and the ffmpeg build used on each machine. *Evidence (P89, 2026-10-21): Entry 1 (`nnnoiseless` 0.5.2, `ebur128` 0.1.10, ffmpeg on D1 and both runners), P63 (recipes), P88 (`a02`'s data, labels unchanged: `git diff 9c96667 -- fixtures/labeled` changes no label), P89 (`rustls-webpki`, `webpki-roots`).*
+- [x] `docs/v2/experiments.md` has its closing M0 entry (section 1A). *Evidence (P89, 2026-10-21): "M0 gate decision (recorded 2026-10-16, at V3 S1)" (P61).*
 - [ ] Section 21.3 is fully ticked.
 - [ ] Tagged `v3`.
 
@@ -2318,7 +2323,7 @@ Nothing below was resolved by guessing. Items 1-14 are gaps or contradictions in
 | 24 | `video-source.ts` has 399 lines and V4 adds `prefetch` and seek to it (V2 CL item 36) | V2 as built | V4 must make room first; recorded here so V4's plan starts from it |
 | 25 | **The cleaned audio of a clip that ends early stays in `audio.worker`.** `kept` is cleared by the next `runChain` or by `measureProsody`; after a `REJECT_NO_SPEECH`, a failure of B1 or a later step, or "start over", 17 MB of the clip's audio stays in the worker's memory until the next clip or the page closes. It never reaches storage or the network, but TS §18.4 says the worker keeps audio only until `measureProsody`. `AudioWorkerApi` (frozen) has no release call | D-90, section 14.1, TS §18.4 | Open. V4: `pool.cancel` and the worker restart (section 21.2) end the job; a `release` call needs a protocol change. Until then accepted and named here |
 | 26 | **IndexedDB records outlive their clip.** The D-40 stand-in removes `clips/` from OPFS at the next import, but nothing removes the `clips`, `transcripts` and `edits` records (`remove` is V7's, section 13.5). Every processed clip's transcript and prosody stay on the device until V7; a clip refused with `REJECT_NO_SPEECH` or failed after import keeps its `clips` record. Local only (INV-2 holds), but a person who presses "start over" may expect the words gone | Sections 13.5, 15.1, 15.2 | **Decided 2026-10-18: `clear()`.** Each of the three repos gains `clear(): Promise<void>`, and import step 4 calls the three beside the D-40 sweep, so the device holds the records of one clip at most, as OPFS holds its media. The customer's view: a clip's words and voice measurements should not outlive the clip on the device, and until V7 nothing reads a record of an earlier clip. Applied in Prompt 80 (sections 13.5 and 15.1 updated there) |
-| 27 | **A written emphasis lands exactly on the KeywordPop threshold.** D-87's `energy_z 2.0, pitch_z 1.5` gives 0.50 + 0.20 + 0.10 = 0.80 for an emphasized word outside `EMPHASIS_WORDS` and without an intensifier, equal to `threshold_keyword`; in `f32` the sum can round either side of 0.80 by summation order (V2 CL known issue 22). The labeled set's KeywordPops of that shape pass or fail on rounding | D-87, sections 9.6, 17.5, 19.11 | **Decided 2026-10-16 by the founder: written emphasis gets `pitch_z = 2.0`** (score 0.90), so a labeled KeywordPop does not hang on `f32` summation order. No rounding is added: the detector keeps `score >= threshold` unchanged, which errs toward a missed event rather than a wrong one ("a missed animation is fine but a wrong animation makes the edit bad"). `rules_table.rs` asserts "*Workflow* matters." at 0.90 |
+| 27 | **A written emphasis lands exactly on the KeywordPop threshold.** D-87's `energy_z 2.0, pitch_z 1.5` gives 0.50 + 0.20 + 0.10 = 0.80 for an emphasized word outside `EMPHASIS_WORDS` and without an intensifier, equal to `threshold_keyword`; in `f32` the sum can round either side of 0.80 by summation order (V2 CL known issue 22). The labeled set's KeywordPops of that shape pass or fail on rounding | D-87, sections 9.6, 17.5, 19.11 | **Decided 2026-10-16 by the founder: written emphasis gets `pitch_z = 2.0`** (score 0.90), so a labeled KeywordPop does not hang on `f32` summation order. No rounding is added: the detector keeps `score >= threshold` unchanged, which errs toward a missed event rather than a wrong one ("a missed animation is fine but a wrong animation makes the edit bad"). `rules_table.rs` asserts "*Workflow* matters." at 0.90. **As built (Prompt 77, confirmed by the founder 2026-10-18):** `lib.rs` step 5 reads a score within `SCORE_NOISE` (1e-6) of a whole hundredth as that hundredth before the threshold (section 9.2), because 0.65 + 0.20 is 0.84999996 in `f32`; this is not the rounding the decision rejected, since a score really between two hundredths is not moved |
 | 28 | **The 40-word split's tie-break makes one-word sentences.** "The earliest of equal gaps" splits one word off at a time when gaps are equal (90 words give 50 one-word sentences and one of 40, section 8.7). Recognizer output rarely has equal gaps, but captions and FromTo/list scope follow sentences | TS §17.2, section 8.6 | Open (assumption, M1.3). A tie-break nearest the middle would give 30/30/30; the tests of 8.7 and 19.10 name the rule, so a change is one rule and two rows |
 
 ### 23.1 Cross-check: BP §5 items against sections and tests
@@ -2357,6 +2362,8 @@ Nothing below was resolved by guessing. Items 1-14 are gaps or contradictions in
 **Into `buildplan.md`:** D-74 (§5.3: the experiments are read on D1); D-76 (§5.1 B and §5.2: the speech fixtures are derived, nothing is recorded); D-87 (§5.2: the labeled set is written, frozen before the detector); D-88 (§5.3: E-10 moves to V9); D-93, D-94 (§5.4: where the rejection cases run).
 
 **Into `product.md`:** D-80 (§9.4: the examples state the limit; the measured value is not shown). Nothing else.
+
+**Applied at Prompt 89 (2026-10-21).** Every decision above is in its named section, cited as "v3implementation D-n", and the corrections of items 1-14 with it; items 15-28 are listed in TS §39.3 item 28 with the version that handles each. The build's own departures from this plan (V3 changelog, open items 11-18, 20, 21) are written into the sections they change, each marked "as built", and the `buildplan.md` half of V2 §27 (the schedule moves of v2implementation D-18, D-20, D-21, D-23, D-24, D-33) into BP §4.1, §5.1, §7.1 and §8.1.
 
 ---
 
@@ -2512,7 +2519,7 @@ Every number V3 code uses is a named constant in the file that owns it. "Source"
 | `DENOISE_MIX` | 0.85 | same | TS §18.3 |
 | `DENOISE_FRAME` | 480 | same | RNNoise (derived) |
 | `DENOISE_SCALE` | 32,768.0 | same | RNNoise (derived) |
-| `DENOISE_DELAY_SAMPLES` | 480 | same | (assumption, S4: `impulses_stay_aligned`) |
+| `DENOISE_DELAY_SAMPLES` | 480 | same | Measured at S4 by `impulses_stay_aligned` (Prompt 67): one RNNoise frame, the same for every impulse |
 | `COMP_THRESHOLD_DB`, `COMP_RATIO`, `COMP_ATTACK_MS`, `COMP_RELEASE_MS`, `COMP_KNEE_DB` | -18, 3, 5, 80, 6 | same | TS §18.3 |
 | `LIMITER_LOOKAHEAD` | 240 samples | same | TS §18.3 (5 ms) |
 | `LIMITER_RELEASE_MS` | 50 | same | (assumption, M1.2) |
@@ -2520,11 +2527,18 @@ Every number V3 code uses is a named constant in the file that owns it. "Source"
 | `CLICK_FACTOR`, `CLICK_RMS_WINDOW` | 2.0, 480 | same | TS §18 acceptance (assumption, M1.2) |
 | `PROSODY_DECIMATE`, `PITCH_FRAME`, `PITCH_HOP`, `PITCH_MIN_LAG`, `PITCH_MAX_LAG` | 6, 320, 80, 20, 134 | same | D-108 (assumption, M1.2) |
 | `VOICING_MIN`, `VOICED_FRAME_MIN_DB`, `ENERGY_FLOOR_DB`, `PROSODY_MIN_WORDS` | 0.45, -60, -100, 3 | same | D-96, TS §18.2 |
+| `FIRST_PEAK_SHARE` (`pub(crate)`) | 0.9 | same | Section 7.9 as built (Prompt 68): the first autocorrelation peak within this share of the best is the period |
+| `NO_PEAK_DBFS` (`pub(crate)`) | -200 | same | The reported peak of an all-zero buffer (section 7.6); a reporting value |
 | `MAX_EDITS` | 16 | `offcut-mp4/src/edit_list.rs` | D-60 style bound (assumption, TE-12) |
 | `MAX_CARDINAL_TOKENS` | 24 | `offcut-text/src/cardinals.rs` | Derived from the grammar |
 | `COUNT_UNIT_MIN` | 100 | `offcut-text/src/units_lex.rs` | D-101 (assumption, M1.3) |
 | `SENTENCE_MAX_WORDS` | 40 | `offcut-text/src/sentences.rs` (V2) | TS §17.2 |
 | The V3 fields of `DetectorConfig` | Section 9.1 | `offcut-detect/src/config.rs` | TS §17.4, §17.5, §19.5 (assumption, M1.3) |
+| `threshold_number` (a V2 field) | 0.85 (V2: 0.80) | same | Section 20.3's contingency, Prompt 88 |
+| `NUMBER_MAGNITUDE_MIN`, `NUMBER_EMPHASIS_Z` | 1,000, 1.0 | same | TS §17.4 (NumberReveal magnitude and energy terms) |
+| `FROM_TO_VERB_REACH`, `LIST_MARKER_ONLY_MIN`, `LIST_ITEM_COMMA_WORDS` | 3, 3, 2 | same | Sections 9.4, 9.5, D-105, D-107 (Prompt 76); also the grammar words `FROM`, `TO`, `NUMBER` |
+| `YEAR_FIRST`, `YEAR_LAST`, `VERSION_DOTS`, `PHONE_DIGITS_MIN`, `BARE_NUMBER_MIN` | 1,900, 2,099, 2, 7, 10 | same | Section 9.7, X1-X5 (Prompt 77) |
+| `SCORE_NOISE` | 1e-6 | same | Section 9.2 step 5 (Prompt 77): `f32` noise removed before the threshold |
 | `BYTES_PER_MB` | 1,000,000 | `web/src/copy/messages.ts` | PS §9.4 as `limits.rs` reads it |
 | `FPS_MILLI_PER_FPS` | 1,000 | same | `FpsMilli` (derived) |
 | `HASH_PREFIX_BYTES` | 4,194,304 | `web/src/persistence/clips-repo.ts` | TS §23.1 (4 MiB) |

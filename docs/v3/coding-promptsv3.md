@@ -38,7 +38,7 @@ BASE=8a271a9                                                                # th
 
 1. Implement only this prompt's scope ("Implement"); leave everything under "Do Not Implement Yet" alone even if it looks easy. Create only the files the prompt names. A file not in the TS §5 tree fails `node scripts/check-file-tree.mjs`; a prompt that adds one says so, and TS §5 changes in the same commit.
 2. **Untouched in V3** (§4, last paragraph): every file under `server/`, `crates/offcut-types/`, `crates/offcut-api-types/`, `crates/offcut-scene/`, `crates/offcut-render/`, `crates/offcut-entitlement/`; `offcut-mp4/src/{reader,boxes,demux,sps,validate,mux,mux_boxes}.rs`; `offcut-dsp/src/resample.rs`; `offcut-detect/src/event_id.rs`; `offcut-wasm-core/src/{media_api,hash_api,text_api}.rs`; `offcut-wasm-render/src/{lib,session,profile_api,mux_api}.rs`; `web/vercel.json`; `web/src/gen/**`; `persistence/{schema,db,opfs,entitlement-repo}.ts`; `net/**`; `analytics/client.ts`; `models/**`; `platform/**`; `state/**`; `usecases/{start-app,control-preview,start-export}.ts`; `workers/{rpc,media.worker,asr.worker,render.worker}.ts` and `workers/{media,asr,render}/**`; every UI file §4 does not list; `verify/**`; `render.yaml`; every script §4 does not list. The **reopened contracts** are exactly D-83 (`workers/protocol.ts`, one optional field), D-91 (three `pipeline-preview.spec.ts` cases, `bench/device-bench.ts`) and D-103 (`web/eslint.config.js`, one `MINTING` entry). Say **REOPENED CONTRACT** in the changelog when you touch one.
-3. No source file over 400 lines above its test module. Rust non-test code: no `unwrap`, `expect`, `panic!`, slice indexing, `HashMap` (in `offcut-dsp` and `offcut-detect`), clock, randomness, global state or I/O in a pure crate. TypeScript: no `any`, no `!`, no `@ts-ignore`, no empty `catch`, no `as <Brand>` outside a `MINTING` helper. No disabled lint, no `#[allow]`/`eslint-disable` added to pass a check, no weakened, skipped or deleted test (the two V2 expectations V3 rewrites are named: §8.6, §9.9; the three D-91 cases). No dependency the prompt does not name; pin each new one at its latest stable release and record the version in the changelog (§3.2).
+3. No source file over 400 lines above its test module. Rust non-test code: no `unwrap`, `expect`, `panic!`, slice indexing, `HashMap` (in `offcut-dsp` and `offcut-detect`), clock, randomness, global state or I/O in a pure crate. TypeScript: no `any`, no `!`, no `@ts-ignore`, no empty `catch`, no `as <Brand>` outside a `MINTING` helper. No disabled lint, no `#[allow]`/`eslint-disable` added to pass a check, no weakened, skipped or deleted test (the V2 expectations V3 rewrites are named: §8.6 and §9.9 as corrected at Prompt 89, which list Prompt 73's eleven `offcut-text` assertions and its one detect input and Prompt 88's two `lib.rs` tests that asserted the old NumberReveal threshold; the three D-91 cases). No dependency the prompt does not name; pin each new one at its latest stable release and record the version in the changelog (§3.2).
 4. **Test files V3 may add** (and no others): `crates/offcut-mp4/tests/{demux_fixtures,probe_rejections}.rs`; `crates/offcut-dsp/tests/{loudness_target,chain_no_clicks,duration_preserved,prosody}.rs`; `crates/offcut-text/tests/{numbers_table,numbers_prop,sentences}.rs`; `crates/offcut-detect/tests/{rules_table,precision_recall,redetect,determinism}.rs`; `web/tests-e2e/rejections.spec.ts`; `corpus/run_corpus.ts` (a Playwright file). No new `*.test.ts` (§13.5). Every other Rust test is an inline `#[cfg(test)]` module.
 5. Scripts are POSIX `sh` with LF line endings, invoked with `sh`. A temporary file is named `zz-…` or `zz_…` and is deleted before the gate; nothing temporary is committed. A temporary Playwright check needs `web/tests-e2e/zz-<name>.spec.ts` plus a temporary `web/zz-pw.config.ts` that spreads the real config and sets `projects: [{ name: "zz", testMatch: "zz-*.spec.ts", use: { channel: "chrome" } }]`, run with `pnpm --filter web exec playwright test --config zz-pw.config.ts` (V2 CL items 39, 41).
 6. A TODO carries the version that removes it (`V4:`, `V7:`). The name of a dropped `File` is never read (P-11). `fetch` exists in the four allowed files only. User-facing text exists in `copy/messages.ts` only, limits interpolated from `LIMITS` (INV-15). Nothing in `offcut-dsp` detects silence, classifies a pause, cuts, crossfades or changes a length (TS §36, INV-5, INV-10).
@@ -846,7 +846,7 @@ None.
 
 ### Persistence Requirements
 
-The freeze (D-87): from this commit, every label change has a changelog line. `a02`'s later data fill changes `words`/`prosody`/`sentences` only.
+The freeze (D-87): from this commit, every label change has a changelog line. `a02`'s later data fill changes `words`/`prosody` only (`sentences` stays `null` in an `asr` file).
 
 ### API Requirements
 
@@ -1872,7 +1872,7 @@ G 6.7 row 3: make `normalize.rs` scan the whole transcript → the `$12 / ,000` 
 ### Validation Commands
 
 ```bash
-git diff "$BASE" -- crates/offcut-text/src | grep -cE '^-\s*assert'      # 1 (only the "ten million" expectation removed)
+git diff "$BASE" -- crates/offcut-text/src | grep -cE '^-\s*assert'      # 7 (the eleven V2 assertions of §8.6 as corrected; four are continuation lines)
 cargo test -p offcut-text --lib
 awk '/#\[cfg\(test\)\]/{print NR-1; f=1; exit} END{if(!f) print NR}' crates/offcut-text/src/numbers.rs   # under 400
 pnpm build:wasm
@@ -1880,7 +1880,7 @@ pnpm build:wasm
 
 ### Acceptance Criteria
 
-- [ ] Exactly one V2 assertion removed (the "ten million" one), rewritten to the V3 value.
+- [ ] Only the V2 assertions of §8.6 rewritten to their V3 values ("ten million" and the ten of Prompt 73's table; corrected at Prompt 89, open item 13).
 - [ ] The §8.7 cases pass; `numbers.rs` under 400 lines.
 - [ ] `pnpm build:wasm` succeeds; the SAB gate passes (media D-91 cases may now differ, SAB note 2).
 
@@ -3607,7 +3607,7 @@ Measurements are taken on the finished V3 build (§5 S12); V4 compares against t
 
 - G 12.1 bench (keyed build, D1, detached, ~25 min each): `BENCH_CLIP=portrait pnpm bench:device` and `BENCH_CLIP=v3testclip pnpm bench:device` → `bench/results/d1-<date>-portrait.json`, `…-v3testclip.json`, 10 runs, six stages. Normalise `v3testclip` readings to 60 s (× 60,000 / 78,918). Record under `TE-13 browser` (confirm the S6 decision; §20.2), `E-3 re-read` (asr: target 20 s, line 145 s per 60 s, D-67), `E-4 re-read` (render_encode: 90 s; over 150 s → Canvas2D, a V4 decision), each with `d1` and the D-74 caveat (D1 is not R1).
 - G 12.2: `pnpm e2e:media --grep "second recording\|no metadata"` 2 passed; `Second recording` updated.
-- G 12.3: `CORPUS_MODE=transcripts pnpm corpus -- --grep founder-02` → `a02-v3testclip.json` gains `sentences`, `words`, `prosody`; `git diff fixtures/labeled` changes only that file and no `"expected"` line; precision gate re-run: 31 files read, 0 skipped, ≥ 0.90 (else §20.3). Changelog line: "a02-v3testclip.json: data filled from IndexedDB, labels unchanged (D-87, D-112)". If `a02`'s `say` values do not all match the recognized words, record each (a label stays as the founder's words; a mismatch is a recall miss, not a reason to edit).
+- G 12.3: `CORPUS_MODE=transcripts pnpm corpus --grep founder-02` (no `--`: after it Playwright ignores the grep) → `a02-v3testclip.json` gains `words` and `prosody` (`sentences` stays `null`); `git diff fixtures/labeled` changes only that file and no `"expected"` line; precision gate re-run: 31 files read, 0 skipped, ≥ 0.90 (else §20.3). Changelog line: "a02-v3testclip.json: data filled from IndexedDB, labels unchanged (D-87, D-112)". If `a02`'s `say` values do not all match the recognized words, record each (a label stays as the founder's words; a mismatch is a recall miss, not a reason to edit).
 - G 12.4 TE-12: `CORPUS_MODE=demux pnpm corpus`; fewer than 10 clips → "TE-12: inconclusive (n clips)", re-check in V9 (D-88); ≥ 10 under 90% → each failing clip's code recorded, the JS-demuxer decision before V4's preview work (§20.4). Copy counts and rates only (no lent ids) into `experiments.md`.
 - G 12.5 E-10 smoke: `corpus/.clips/founder-01.txt` from Script A's text, `founder-02.txt` from `~/v3testclip-words.txt` (local, never committed); `CORPUS_MODE=wer pnpm corpus`; record both WERs as "smoke, not E-10 (carried to V9, D-88)".
 - G 12.6 **Human**: pick five `w*.json` at random (`ls fixtures/labeled/w*.json | shuf -n 5`); the founder answers per file; record names and answers. A "no" → fix per D-87 with a changelog line, re-run the gate.

@@ -964,7 +964,7 @@ Do not start Phase 6 until this passes.
 
 ## Phase 6 - Number grammar and sentences (S5)
 
-Goal: `offcut-text` parses and formats every row of §19.8, splits long sentences, and keeps every quantity inside one sentence, with V2's tests unchanged except the one §8.6 names.
+Goal: `offcut-text` parses and formats every row of §19.8, splits long sentences, and keeps every quantity inside one sentence, with V2's tests unchanged except those §8.6 names (corrected at Prompt 89, V3 changelog open item 13: eleven V2 assertions of the crate asserted V2's stand-ins and were set to V3 values, Prompt 73's table).
 
 ### Step 6.1 - Word lists
 
@@ -995,10 +995,10 @@ cargo test -p offcut-text --lib units_lex                    # expect: all passe
 
 | Order | File | Section | Tests to write with it / Watch for |
 |---|---|---|---|
-| 1 | `crates/offcut-text/src/numbers.rs` | §8.3, §8.5 | The inline cases of §8.7 that concern it (`format_quantity` of -5 and NaN). **Rewrite exactly one V2 inline test**: "ten million" now parses as 10,000,000 using 2 tokens (§8.6). `numbers.rs` remains the only formatter |
+| 1 | `crates/offcut-text/src/numbers.rs` | §8.3, §8.5 | The inline cases of §8.7 that concern it (`format_quantity` of -5 and NaN). **Rewrite the V2 inline assertions that asserted V2's stand-ins** (§8.6): "ten million" now parses as 10,000,000 using 2 tokens, and the ten others of Prompt 73's table take their V3 values (corrected at Prompt 89, V3 changelog open item 13: eleven V2 assertions of the crate asserted V2's stand-ins and were set to V3 values, Prompt 73's table). `numbers.rs` remains the only formatter |
 
 ```bash
-git diff 8a271a9 -- crates/offcut-text/src | grep -cE '^-\s*assert'   # expect: 1 (only the "ten million" expectation removed)
+git diff 8a271a9 -- crates/offcut-text/src | grep -cE '^-\s*assert'   # expect: 7 (the eleven rewritten V2 assertions of §8.6; four are continuation lines)
 ```
 
 ### Step 6.5 - Sentences and per-sentence numbers
@@ -1042,7 +1042,7 @@ pnpm check                                                  # expect: exit 0
 # frozen check (Step 1.7)                                   # expect: no output
 ```
 
-Pass: all 72 rows of `numbers_table.rs`, the 5 properties and the 8 sentence cases pass, exactly one V2 assertion changed, and `numbers.rs` stays under 400 lines.
+Pass: all 72 rows of `numbers_table.rs`, the 5 properties and the 8 sentence cases pass, only the V2 assertions §8.6 lists changed, and `numbers.rs` stays under 400 lines.
 
 Commit: `"V3 S5: complete number grammar, units and the sentence split"`
 
@@ -1592,7 +1592,7 @@ Write each median and decision into `experiments.md`, labelled `d1`.
 ### Step 12.3 - Fill `a02`'s data and re-run the gate
 
 ```bash
-CORPUS_MODE=transcripts pnpm corpus -- --grep founder-02     # expect: fixtures/labeled/a02-v3testclip.json gains words and prosody
+CORPUS_MODE=transcripts pnpm corpus --grep founder-02        # expect: fixtures/labeled/a02-v3testclip.json gains words and prosody (no `--`: after it Playwright ignores the grep)
 git diff --stat fixtures/labeled                            # expect: only a02-v3testclip.json changed
 git diff fixtures/labeled | grep -E '^[-+].*"expected"'      # expect: no output (labels unchanged)
 cargo test -p offcut-detect --test precision_recall -- --nocapture 2>&1 | grep -iE "overall|files read"

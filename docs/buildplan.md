@@ -282,6 +282,14 @@ No product code. Everything here is free.
 | `bench/device-bench.ts`, `bench/results/` | Median and p90 of 10 runs per stage |
 | `web/tests-e2e/pipeline-preview.spec.ts`, `export-creator.spec.ts` | Reference-clip cases only for now |
 
+**Moved into V2 as built** (each a **(schedule)** decision of `docs/v2/v2implementation.md`; the implementation document is the more precise one on which version creates a file):
+- `state/machines/clip-machine.ts` and `export-machine.ts`, with the complete transition tables of TS §12.2 (planned for V3 and V5). Their test files stay in V4 and V5 (v2implementation D-18).
+- `state/blockers.ts` with all eight `BLOCKER_CODES`, `forImport()` complete and `forExport()` holding its two state-only conditions (planned for V5; v2implementation D-20).
+- `crates/offcut-mp4/src/validate.rs` with all 11 rules of TS §15.2 (planned for V3). V3 adds `probe_rejections.rs`, the fixtures, the 14 messages, `RejectionPanel` and `clip_rejected` (v2implementation D-21).
+- `persistence/entitlement-repo.ts` with `get()` and `put()`: the export reads its token from the IndexedDB `entitlement` store, which tests write (planned for V6; v2implementation D-23).
+- `config/entitlement-public-key.ts`: the production key, plus the test key only in a build with `VITE_ENTITLEMENT_TEST_PUBLIC_KEY`; CI refuses a deployment whose bundle holds the test key (planned for V6; v2implementation D-24).
+- The muxer's audio edit list for AAC priming (`elst.media_time`), planned for V5; V5 keeps `ctts` and the overflow test (v2implementation D-33).
+
 ### 4.2 Experiments run in V2
 
 | ID | Question | Pass | If it fails |
@@ -319,7 +327,7 @@ This is the one point where the right answer may be to stop. Decide from three r
 
 ---
 
-## 5. V3 - Real ingest, clean voice, real detector (M1.1, M1.2, M1.3; week 4, first half: 2-4 Nov)
+## 5. V3 - Real ingest, clean voice, real detector (M1.1, M1.2, M1.3; week 4, first half: 2-4 Nov; built in eight working days)
 
 **Goal.** Replace the three stand-ins from V2 with the real thing: any file a user drops is either accepted or rejected with a specific message; the voice is cleaned to the loudness target without changing its length; all four event kinds are detected by rules at 0.90 precision or better.
 
@@ -327,20 +335,22 @@ This is the one point where the right answer may be to stop. Decide from three r
 
 **Depends on.** V2 and a passed M0 gate.
 
+**Eight working days, not three** (v3implementation §5). V3 is built in eight working days on the branch `v3-build` (S1 to S15): S1 contracts and docs; S2 fixtures and the frozen labeled set; S4 the voice chain natively and S6 in the browser, risk first; S3 the demuxer; S5 the number grammar; S7 the detector rules, re-detection and the precision gate (two and a half days); S8 records and the full pipeline; S9 the rejection panel and copy; S10-S11 the E2E suites, corpus tooling and CI; S12 the measurements; S13-S15 copy-back, merge, deploy and tag. The calendar of section 0 moves by the difference; the rule of section 0's "tight spot" applies.
+
 ### 5.1 Build
 
 **A. Ingest and rejections (M1.1)**
 
 | Create or complete | Purpose |
 |---|---|
-| `crates/offcut-mp4/src/validate.rs` | `validate_probe`: the 11 rules in order, first failure wins (TS §15.2) |
-| `probe.rs` complete | Rotation, VFR flag, track counts, codec strings |
-| `fixtures/gen_fixtures.sh`, `fixtures/manifest.json` | Generates every `ok_*` and `rej_*` fixture of TS §26 with the ffmpeg CLI; not committed |
+| `crates/offcut-mp4/src/validate.rs` | `validate_probe`: the 11 rules in order, first failure wins (TS §15.2). Created whole in V2 (v2implementation D-21); V3 tests it |
+| `probe.rs` complete; `edit_list.rs` | Rotation, VFR flag, track counts, codec strings; edit-list shapes E0-E4 (v3implementation D-92) |
+| `fixtures/gen_fixtures.sh`, `fixtures/manifest.json` | Generates every `ok_*` and `rej_*` fixture of TS §26 with the ffmpeg CLI from `lavfi` sources, and derives the five speech fixtures from the reference clip; nothing is committed (v3implementation D-76, D-77) |
 | `messages.ts`: one entry per `REJECT_*` | 14 rejection messages with interpolated limits (TS §15.3) |
-| `web/src/ui/components/RejectionPanel.tsx`; `state/machines/clip-machine.ts` | Rejection is a value, not an error (TS §11.3) |
+| `web/src/ui/components/RejectionPanel.tsx` (`state/machines/clip-machine.ts` exists since V2, v2implementation D-18) | Rejection is a value, not an error (TS §11.3) |
 | `web/src/persistence/db.ts`, `schema.ts`, `clips-repo.ts`, `transcript-repo.ts`, `edits-repo.ts` | Stage F of C-4 writes the clip, transcript and edits. The `clips` store has no file-name field |
 | `crates/offcut-mp4/tests/demux_fixtures.rs`, `probe_rejections.rs`; `web/tests-e2e/rejections.spec.ts` | Every fixture gives its expected outcome |
-| `corpus/manifest.json`, `fetch_corpus.sh`, `run_corpus.ts` | Corpus runner; clips stay outside git |
+| `corpus/manifest.json`, `fetch_corpus.sh`, `run_corpus.ts` | Corpus runner; clips stay outside git, in the local directory `OFFCUT_CORPUS_DIR`, never uploaded (v3implementation D-88) |
 
 **B. Audio enhancement and prosody (M1.2)**
 
@@ -349,7 +359,7 @@ This is the one point where the right answer may be to stop. Decide from three r
 | `crates/offcut-dsp/src/` `config.rs`, `highpass.rs`, `denoise.rs`, `compressor.rs`, `limiter.rs`, `loudness.rs`, `chain.rs`, `prosody.rs` | `run_chain` exactly as the worked exemplar in TS §34.3; `measure_prosody` |
 | `crates/offcut-wasm-core/src/audio_api.rs`; `web/src/workers/audio.worker.ts` | `runChain`, `measureProsody` |
 | `crates/offcut-dsp/tests/` `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs` | Postconditions P1-P8 of TS §34.3 |
-| Fixtures `speech_20s_long_pause.mp4`, `speech_30s_sparse.mp4` (you record them) | The pause must survive: 20 s in, 20 s out, never 15 s |
+| Fixtures `speech_20s_long_pause.mp4`, `speech_30s_sparse.mp4`, derived by `gen_fixtures.sh` from the reference clip with generated room tone; nothing is recorded (v3implementation D-76) | The pause must survive: 20 s in, 20 s out, never 15 s |
 
 **C. Normalization and the detector (M1.3)**
 
@@ -357,7 +367,7 @@ This is the one point where the right answer may be to stop. Decide from three r
 |---|---|
 | `crates/offcut-text/src/` `numbers.rs` (complete), `units_lex.rs`, `sentences.rs` (complete), `normalize.rs` (complete) | Spelled cardinals to trillions, decimals, k/m/b, currencies, percent, multipliers, units (TS §17.2) |
 | `crates/offcut-detect/src/` `from_to.rs`, `list.rs`, `keyword.rs`, `exclusions.rs`, `resolve.rs`; `config.rs` (complete) | Scoring table and thresholds of TS §17.4; resolution order of TS §17.5 |
-| `fixtures/labeled/*.json` (30 or more), `fixtures/labeled/SCHEMA.md` | Hand-labeled transcripts covering all four kinds |
+| `fixtures/labeled/*.json` (30 or more), `fixtures/labeled/SCHEMA.md` | Labeled transcripts covering all four kinds, written as text and frozen before the detector's rules (v3implementation D-87) |
 | `crates/offcut-text/tests/` `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs` | Number parse and format |
 | `crates/offcut-detect/tests/` `rules_table.rs`, `precision_recall.rs`, `redetect.rs`, `determinism.rs` | Edge cases of TS §17.6; precision at least 0.90 |
 | `run-pipeline.ts` complete | The C-4 order: audio extraction, then ASR and the voice chain in parallel, `asr.unload()` before `render.openSession()` |
@@ -365,25 +375,28 @@ This is the one point where the right answer may be to stop. Decide from three r
 
 ### 5.2 Non-code work
 
-- Hand-label at least 30 transcripts. This is slow, cannot be delegated to the detector being tested, and gates the version.
-- Record the remaining speech fixtures: `speech_60s_landscape.mp4`, `speech_20s_noevents.mp4`.
-- Collect the 20-clip ASR accuracy set (10 US, 10 Indian or other English accents) with reference text, and start collecting the 40+ real-clip corpus (VFR, rotated, noisy, accented). V9 needs the full corpus; asking people for clips takes calendar time, so start now.
+- **Label at least 30 transcripts, as text, before the detector exists** (v3implementation D-87). The labeled set is written text, not recordings: 29 written transcripts, the reference clip's transcript in the written form, and the second recording as recognized. The labels are frozen in one commit before any detector rule is written; after that a label changes only with a changelog line naming the file, the label and the reason, never to match the detector. The labeling cannot be delegated to the detector being tested; the founder reads five files chosen at random and says whether each label is what a person would expect (an exit box).
+- **No speech fixture is recorded** (v3implementation D-76). `speech_60s_landscape.mp4`, `speech_20s_noevents.mp4` and the other speech fixtures are derived from the reference clip by `gen_fixtures.sh` and stay out of git (D-39). A real recording made later is stored in `testclips/` under the same name and is preferred, with no code change.
+- Start collecting the 40+ real-clip corpus (VFR, rotated, noisy, accented). V9 needs the full corpus; asking people for clips takes calendar time, so start now. The 20-clip ASR accuracy set moves to V9 with E-10 (below).
 
 ### 5.3 Experiments
 
+Read on D1, the development machine, and recorded under the label `d1` until R1 exists; thresholds do not change, and a clip of another length is read against the budget times its length over 60 s (v3implementation D-74, as v2implementation D-69).
+
 | ID | Pass | If it fails |
 |---|---|---|
-| TE-12 (first run) | `offcut-mp4` demuxes at least 90% of the corpus clips collected so far | JS demuxer behind the same `SampleMeta` shape |
+| TE-12 (first run) | `offcut-mp4` demuxes at least 90% of the corpus clips collected so far; "inconclusive" with fewer than 10 clips, re-checked in V9 (v3implementation D-88) | JS demuxer behind the same `SampleMeta` shape |
 | TE-13 | Voice chain at most 4 s for the reference clip on R1 | `ChainConfig.denoise = false`: high-pass, loudness and limiter only |
-| E-10 | WER at most 12% on the 20-clip set (the caption-edit half is read in V7-V9 from real use) | Larger model, stronger edit UX or narrower claims |
+| E-10 | **Carried to V9** (v3implementation D-88): no 20-clip accent set exists. V3 builds `run_corpus.ts --wer` and reads it on the founder's clips as a smoke reading that is not E-10. In V9: WER at most 12% on the 20-clip set (the caption-edit half is read in V7-V9 from real use) | Larger model, stronger edit UX or narrower claims |
 
 ### 5.4 Exit checklist
 
 - [ ] `demux_fixtures.rs`, `probe_rejections.rs`, `rejections.spec.ts` pass.
+  - **Where the rejection cases run** (v3implementation D-93, D-94). CI's Linux job installs a pinned ffmpeg build and runs `pnpm fixtures` before `cargo test`, so the six fixture-reading Rust test files run on every pull request. The 15 cases of `rejections.spec.ts` tagged `@no-gpu` (the 13 refusals before the pipeline, "start over" and the `ok_vfr.mp4` accept case) run on CI's Windows media runner after `pnpm fixtures`. `REJECT_NO_SPEECH` needs a whole ASR pass and runs on the development machine with the other GPU cases, in `pnpm e2e:media` on a keyed build before the merge.
 - [ ] `loudness_target.rs`, `chain_no_clicks.rs`, `duration_preserved.rs`, `prosody.rs` pass.
 - [ ] `numbers_table.rs`, `numbers_prop.rs`, `sentences.rs`, `rules_table.rs`, `redetect.rs`, `determinism.rs` (detect) pass.
 - [ ] `precision_recall.rs` at 0.90 or above on at least 30 labeled transcripts. If below: raise the per-kind threshold to the lowest value in the printed sweep that reaches 0.90 (TS §17 contingency).
-- [ ] TE-12, TE-13, E-10 outcomes recorded.
+- [ ] TE-12, TE-13 outcomes recorded; E-10's smoke reading recorded and E-10 carried to V9.
 - [ ] Tagged `v3`.
 
 **Not in V3.** Anything visual beyond what V2 drew. The three new event kinds are detected but only NumberReveal is drawn until V4.
@@ -467,10 +480,10 @@ This is the one point where the right answer may be to stop. Decide from three r
 | Create or complete | Purpose |
 |---|---|
 | `render/export-loop.ts` complete | Every output frame rendered and encoded exactly once; encoder-queue backpressure; restart from frame 0 on the next ladder entry if the encoder fails; cancel per frame; every `VideoFrame` closed in `finally` (TS §21.4) |
-| `offcut-mp4/src/mux.rs` complete | `moov` reserve of 256 KiB, `ctts` for reordered frames, `elst` for AAC priming, exact 30 fps timescale (TS §21.2, §21.3) |
+| `offcut-mp4/src/mux.rs` complete | `moov` reserve of 256 KiB, `ctts` for reordered frames, exact 30 fps timescale (TS §21.2, §21.3); the `elst` for AAC priming is written since V2 (v2implementation D-33) |
 | `offcut-entitlement/src/profile.rs` in use | `None` gives Preview; valid Creator gives 1080x1920 without watermark; anything else gives Free, 720x1280 with watermark |
-| `web/src/state/blockers.ts`, `blockers.test.ts` | The eight blockers of TS §12.5, evaluated in one place |
-| `state/machines/export-machine.ts`, `export-machine.test.ts` | `idle, gating, rendering, muxing, saving, done` |
+| `web/src/state/blockers.ts` (complete), `blockers.test.ts` | The eight blockers of TS §12.5, evaluated in one place; the file exists since V2 (v2implementation D-20) |
+| `state/machines/export-machine.ts` (since V2, v2implementation D-18), `export-machine.test.ts` | `idle, gating, rendering, muxing, saving, done` |
 | `usecases/start-export.ts` complete, `start-export.test.ts` | C-7 gate, C-9 render, C-10 deliver; download name `offcut-<yyyymmdd-hhmm>.mp4`, never the source name |
 | `persistence/render-cache-repo.ts` | Cache key = SHA-256 over source hash prefix, transcript, events, edits, profile kind, renderer version |
 | `ui/components/ChangeSummary.tsx`, `PostExportQuestion.tsx`; `usecases/answer-post-export.ts` | J11: only changes that were made; the "Would you post this?" question |
@@ -539,9 +552,9 @@ Replace the placeholder mail and billing variables in Render with real values. K
 |---|---|
 | `web/src/state/auth-store.ts`, `entitlement-store.ts`, `machines/auth-machine.ts` | Auth state machine (TS §12.2) |
 | `web/src/entitlement/entitlement.ts` | `effective()` = token remaining minus outbox length, floored at 0; the only place the two are combined |
-| `web/src/persistence/entitlement-repo.ts`, `receipt-outbox.ts` | Token cache; receipts survive reload and retry at 5 s, 30 s, 5 min, then each app start |
+| `web/src/persistence/entitlement-repo.ts` (since V2, v2implementation D-23), `receipt-outbox.ts` | Token cache; receipts survive reload and retry at 5 s, 30 s, 5 min, then each app start |
 | `web/src/platform/broadcast.ts` | The sign-in tab tells the original tab over `BroadcastChannel` |
-| `web/src/config/entitlement-public-key.ts`, `pricing.ts` | Public key as an array (rotation); display prices |
+| `web/src/config/entitlement-public-key.ts` (since V2, v2implementation D-24), `pricing.ts` | Public key as an array (rotation); display prices |
 | `net/http.ts` complete | 10 s per attempt, backoff within the 70 s cold-start budget, "Connecting to the account service" after 3 s (C-15) |
 | `web/src/usecases/` `request-magic-link.ts`, `complete-sign-in.ts`, `sign-out.ts`, `start-checkout.ts`, `confirm-checkout.ts`, `open-billing-portal.ts`, `delete-account.ts`, `export-account-data.ts`; `start-app.ts` complete (session restore) | C-8, C-11, C-18 |
 | `web/src/ui/components/SignInDialog.tsx`, `UpgradePrompt.tsx`; `ui/pages/AuthCallbackPage.tsx`, `AccountPage.tsx` | Limits shown before the email field; the callback strips the token from the URL; the prompt has two placements only, `after_export` and `limit_reached` |
@@ -698,8 +711,8 @@ PS §17 requires a lawyer's review before any public compliance claim or any abs
 | Finish the corpus | 40 or more real clips tagged `vfr`, `rotated`, `noisy`, `accent`; `corpus/manifest.json` records id, SHA-256 and tags; clips stay outside git |
 | Run `pnpm corpus` | Each clip goes through import, pipeline and export, then `verify_mp4.py` |
 | Fix by frequency | Group failures by error code; fix the most common first; add a small fixture for each bug found so it cannot return |
-| Re-check TE-12 | Demux coverage at least 90% |
-| Re-run E-10 | WER on the accent set after any model change |
+| Re-check TE-12 | Demux coverage at least 90% (V3 read it on 2 clips: inconclusive) |
+| Run E-10 | WER on the 20-clip accent set (10 US, 10 Indian or other English accents, with reference text): its first full run, carried from V3 (v3implementation D-88), and again after any model change |
 
 **The week-8 rule (PS §20.4).** If the pass rate is under 90% on Sun 6 Dec, do not slip the launch. Remove the least valuable accepted input by tightening `limits.rs` (first candidate: input above 30 fps), update the rejection copy, and re-run.
 
@@ -873,11 +886,11 @@ Then set `FOUNDING_OFFER_ENABLED=true` and offer the founding-member plan at 99 
 |---|---|---|---|
 | 1 | 12-18 Oct | E-1 starts; E-8 beacon live | TE-5, TE-6, TE-7, TE-11; TE-9 onboarding starts |
 | 2-3 | 19 Oct - 1 Nov | E-3, E-4; **M0 gate reads E-1, E-3, E-4** | TE-1, TE-2, TE-3, TE-4, TE-10, TE-14 |
-| 4 | 2-8 Nov | E-10 (WER) | TE-12 first run, TE-13 |
+| 4 | 2-8 Nov | E-10 smoke reading only (E-10 carried to V9, v3implementation D-88) | TE-12 first run (inconclusive under 10 clips), TE-13 |
 | 5 | 9-15 Nov | E-4 re-measured | TE-8, TE-9 completed |
 | 6 | 16-22 Nov | E-2 starts | none |
 | 7 | 23-29 Nov | E-2, E-8 continue | none |
-| 8 | 30 Nov - 6 Dec | E-2; E-5 starts | TE-12 re-checked (corpus checkpoint 6 Dec) |
+| 8 | 30 Nov - 6 Dec | E-2; E-5 starts; E-10 (WER, first full run) | TE-12 re-checked (corpus checkpoint 6 Dec) |
 | 9 | 7-13 Dec | E-2 ends; E-5; E-3, E-4 final | TE-11, TE-14 re-checked |
 | 10 | 14-20 Dec | E-5 ends; E-7 instrumentation live | all free-tier facts re-verified |
 | After launch | from 21 Dec | E-6, E-7, E-8, E-9 read at M3 | none |
