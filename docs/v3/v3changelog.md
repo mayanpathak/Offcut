@@ -14,7 +14,6 @@
 | # | Item | Owner | Version |
 |---|---|---|---|
 | 7 | **The Linux ffmpeg URL is short-lived.** BtbN deletes its dated autobuild releases after about six weeks (on 2026-10-16 the oldest one listed was of 2026-08-31), so the URL of Entry 1 stops working around the end of November 2026. On 2026-10-19 it still downloads (Prompt 87); it is in `ci.yml` and in `check-external-facts.mjs` with its date. Choose before about 2026-11-27: a newer dated build (new URL and SHA-256 in both files) or a copy on the asset host (an upload with the R2 keys). CI fails at the checksum step the day it is gone | Founder (choice), Agent (the edit) | Before 2026-11-27 |
-| 22 | **§21.3's check of the `V4:` markers names places that are written another way.** `git grep -n "V4: " -- web/src crates` lists nine lines, in `offcut-render`, `offcut-scene` and `video-source.ts`, but none of the four §21.3 names: the render worker's `redetectSentence` handler is `notYet` with "V2 has no word edits (V4)" (`render.worker.ts`, frozen in V3), and `run-pipeline.ts`'s cancel and retry say "the cancel arrives in V4" and "before V4". The places exist and are marked; the box's search does not find them. Prompt 90 ticks it with `git grep -nE "V4" -- web/src/usecases web/src/workers` as its evidence, or the plan's wording is corrected there | Agent | Prompt 90 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -1251,3 +1250,64 @@ CI on Prompt 88's `70cbd8e` (run 39285869287): `ci` success, with `e2e-media` in
 2. Run G 13.5's SQL in the Neon SQL editor.
 3. Confirm D-112 for `a01` and `a02`.
 4. Push the tag `v3`.
+
+---
+
+## 2026-10-21 - Prompt 90 (V3 30/30): V3 closed: merge `7f091fb`, deployed and verified
+
+**V3 closed: 2026-10-21, merge `7f091fb912c8f09a573ba52d999eec8568581931`** (pull request #5, merged by the founder at 2026-10-20 22:35:40 UTC).
+
+**Final counts:**
+
+| Count | V3 | Baseline (Entry 1) |
+|---|---|---|
+| Rust | 461 passed, 0 failed, 3 ignored | 262, 2 ignored |
+| Vitest | 92 | 92 |
+| `pnpm e2e` | 12 | 12 |
+| Media cases | 48 (49 passed with the 2 setup cases, 1 `test.fixme` by D-78) | 30 |
+| Labeled files | 31 | — |
+| Precision gate | 0.98 | — |
+
+**The merge.** The merged tree equals `v3-build`'s at `8e872ec`, line for line (`git merge-tree` with `origin/main`, checked before the merge). `main`'s one commit outside the branch, the `rustls` hotfix of PR #4, was already in it.
+
+**Deployed, run 39509258056 on `7f091fb`:**
+
+| Job | Result | Time (UTC) |
+|---|---|---|
+| `ci` | success | 22:35-22:44 |
+| `e2e-media` | success | 22:44-22:53 |
+| `deploy-api` | success | 22:53-22:55 |
+| `deploy-web` | success | 22:55-22:57 |
+
+The server went first, then the web build. Every step of `deploy-web` succeeded: "Wait until the API runs this commit", "Refuse a build that holds the test key", the rewrite check, "Headers of the deployment", and the `@smoke` case.
+
+**Verified from D1** (G 13.4, G 13.5), against `https://offcut-one.vercel.app`:
+- `/api/v1/healthz`: 200, `{"ok":true,"version":"7f091fb…"}`.
+- `node scripts/check-headers.mjs https://offcut-one.vercel.app`: the 7 headers of `web/vercel.json`, value for value.
+- `E2E_BASE_URL=… playwright test --project=non-media --grep @smoke`: 1 passed.
+- The deployed page and every script it loads (7 files) hold the test key 0 times.
+- `git diff --name-only 8a271a9 7f091fb -- server` is empty: the API image is V2's code.
+- **A temporary spec** (`web/tests-e2e/zz-deployed.spec.ts` with `web/zz-pw.config.ts`, deleted after; nothing temporary is committed), on a fresh profile with the real asset host and the real API:
+  - `crossOriginIsolated` was `true` in every case.
+  - `rej_4k.mp4`: `data-reject="REJECT_RESOLUTION"`, "This video is larger than Offcut handles", the body with 1920.
+  - `rej_hevc.mov`: `REJECT_HEVC`, the HEVC message with "Most Compatible".
+  - "Try with a sample clip": the feed read "Cleaning voice", "Transcribing…", "Found: 3,000 hours", "Found: 90 minutes to 10 minutes", "Found: 3-item list", "Found: $12k". Play showed Pause, and the preview played for 5 s.
+  - The sample case failed once on the spec's own reading: it read the feed after the page had replaced it with the preview. It passed once the feed was recorded while it ran, as `pipeline-preview.spec.ts` does (2.7 min, the model downloaded from the asset host).
+- **The founder's SQL** (Neon SQL editor, 2026-10-21):
+  - `clip_rejected` gave `{"reject_reason": "REJECT_HEVC"}` (23:02:25 UTC) and `{"reject_reason": "REJECT_RESOLUTION"}` (23:02:05), no other key.
+  - `stage_timing` held five `"stage": "audio_chain"` rows (706, 1,058, 1,197, 1,309, 5,609 ms), beside `probe_audio`, `asr` (`webgpu`, 61,679-96,887 ms) and `detect_scene`.
+- **D-112.** The founder confirmed `a01` and `a02` on 2026-10-21: "i am absolutely comfortable of the scripts being public".
+
+**Exit checklist.**
+- §1A items 2-10 are ticked with their evidence from Entry 1 and Prompt 61, which recorded them and did not tick them.
+- §21.3 is ticked but for the tag. Open item 22 is closed there: the places V4 fills are marked "(V4)" and "arrives in V4", which `git grep -nE "\bV4\b"` lists.
+- §22 is ticked but for "Section 21.3 is fully ticked" and "Tagged `v3`".
+- The tag is the founder's: `v3` on `7f091fb`, the commit deployed and verified above. Its boxes are ticked in this pull request once `git ls-remote --tags origin v3` shows it.
+
+**Differs from the prompt, the guide or the plan.**
+- **The tag points at the merge, not at this changelog commit** (G 13.6 tags `main`'s head after it). Prompt 90 asks for the tag on "the deployed commit", and `7f091fb` is the one every check above read; this pull request changes documents only.
+- **The SQL was run twice.** The query of G 13.5 orders by time with `limit 20`, and the sample-clip runs' 20 `stage_timing` rows pushed the two `clip_rejected` rows out of it. A second query for `clip_rejected` alone found them.
+
+**Found, not fixed.**
+- **One `audio_chain` of 5,609 ms** (23:19:49 UTC) on the deployed app, against 706-1,309 ms for the other four, all on D1. The budget for the 74.7 s reference clip is 4 s x 74.7 / 60 = 4.98 s (D-74), and the bench's median is 1,963 ms per 60 s. One reading, likely taken while the page was still downloading the speech model on a fresh profile. TE-13's decision stands; V9's measurements on testers' devices re-read it (§20.2).
+- Open item 7 (the Linux ffmpeg URL, before about 2026-11-27) stays open: the founder's choice.
