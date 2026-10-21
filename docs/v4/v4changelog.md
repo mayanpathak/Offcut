@@ -16,8 +16,7 @@
 | 3 | **Starting plan quotas** (anonymous 3/day, Free 30/month, Creator 300/month soft) and the default "AI edit plan: on" are (assumption) values chosen in this revision, not founder numbers; TE-15 replaces them (PS §11, TS §40.7) | Founder | V6.1 |
 | 4 | **Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10) | Founder | V6.7 |
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
-| 6 | **Merge `v4-spec` into `main`** (spec v1.2 and `v4implementation.md`; docs only, a push to `main` deploys). V4's 1A item 2: nothing is built before it | Founder | Before V4 S1 |
-| 7 | **Confirm the push rule for V4** (D-115: the agent pushes each prompt's commit to `v4-build`, as in V3), or change it | Founder | Before V4 S1 |
+| 6 | **Open a draft pull request `v4-build` → `main`** (optional, so CI runs on every push, as in V3) | Founder | Any time |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -82,4 +81,25 @@ TS §5 lists the new file.
 **How it was checked.** `node scripts/check-file-tree.mjs` passes. Decision numbers run D-113 to D-166 with no gap and no duplicate. No code changed.
 
 **Open.** Items 6 and 7 above (the founder's, before S1).
+
+---
+
+## Entry 0.2 - 2026-10-22 - One branch for V4: `v4-build` (outside a prompt)
+
+**Decision.** The founder chose one branch for all of V4: "exactly like V3 we will have another branch for V4 and we will commit to that branch only" (option B).
+
+**What was done.**
+- The local branch `v4-spec` was renamed `v4-build`.
+- `origin/main` (`550ff8f`, "Landing hero") was merged into it (`81474bf`). That brings in `docs/v3/v3changelog.md` and one line of `web/src/copy/messages.ts`; there were no conflicts.
+- `v4-build` was pushed to `origin`.
+- Spec v1.2 reaches `main` with V4's merge, not before.
+
+**Changed in `v4implementation.md`.**
+- 1A items 2 and 3 are ticked and rewritten: spec v1.2 is on `v4-build`, and the code baseline is `550ff8f`.
+- D-115 is rewritten: one branch, the agent pushes every commit to `v4-build`, and `main`, the merge and the tag are the founder's.
+- Section 3.3 is updated.
+
+**Open items.** Item 6 (merge `v4-spec`) and item 7 (the push rule) are closed by this decision. A new item 6 asks for an optional draft pull request.
+
+**How it was checked.** `node scripts/check-file-tree.mjs`; `git merge-base v4-build origin/main` gives `550ff8f`.
 
