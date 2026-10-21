@@ -752,6 +752,7 @@ offcut/
     ├── v3/testvideo_scripts/script1.md   founder's recording script: phone, portrait, all four event kinds
     ├── v3/testvideo_scripts/script2.md   founder's recording script: laptop webcam, the exclusion traps
     ├── v3/testvideo_scripts/script3.md   founder's recording script: noisy room and a long pause (voice chain)
+    ├── v4/v4implementation.md         file-by-file implementation plan for V4 (M1.4, M1.5 and the seams S-1 to S-7 of §40.9)
     ├── v4/v4changelog.md              record of every change made while building V4 (opened by the v1.2 spec revision)
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```

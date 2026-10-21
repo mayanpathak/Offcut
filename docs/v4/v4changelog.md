@@ -16,6 +16,8 @@
 | 3 | **Starting plan quotas** (anonymous 3/day, Free 30/month, Creator 300/month soft) and the default "AI edit plan: on" are (assumption) values chosen in this revision, not founder numbers; TE-15 replaces them (PS §11, TS §40.7) | Founder | V6.1 |
 | 4 | **Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10) | Founder | V6.7 |
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
+| 6 | **Merge `v4-spec` into `main`** (spec v1.2 and `v4implementation.md`; docs only, a push to `main` deploys). V4's 1A item 2: nothing is built before it | Founder | Before V4 S1 |
+| 7 | **Confirm the push rule for V4** (D-115: the agent pushes each prompt's commit to `v4-build`, as in V3), or change it | Founder | Before V4 S1 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -45,3 +47,39 @@
 **How it was checked.** `node scripts/check-file-tree.mjs` (the new changelog is listed in TS §5). No code changed, so no test count changed.
 
 **Open.** Items 1-5 above; known issues 1-2.
+
+---
+
+## Entry 0.1 - 2026-10-21 - `v4implementation.md` written (outside a prompt)
+
+**What.** `docs/v4/v4implementation.md`, the file-by-file plan for V4, written against spec v1.2 and V3 as built, in the structure of `v3implementation.md`. It covers:
+- BP §6 (M1.4, M1.5) together with the seams S-1 to S-7 of TS §40.9
+- 54 decisions, D-113 to D-166
+- a 17-step build order over ten working days: contracts first, then the identity proof (D-116, D-117), then the look, the workers, review, robustness, tests, CI, measurement and deploy
+- the file-by-file hand-over to V5, V6 and V6.1-V6.7 (section 22.2)
+
+TS §5 lists the new file.
+
+**Decisions that refine the spec** (copied back at V4 S16, section 24):
+- D-119: the plan's wire format is fixed at `PLAN_FORMAT = 1` in V4.
+- D-120, D-121: rule-produced items carry the detector's own values (`ItemParams::Detected`), and number resolution happens in `validate`, not in `build_scene`.
+- D-122: `offcut-plan` depends on `offcut-text`, and the scene depends on `offcut-plan`.
+- D-130: `Video.dst` is an axis-aligned rectangle.
+- D-136: `Theme` gains `mono_font`.
+- Section 8.7: `ValidItem.marks` carries FromTo's second time.
+
+**Decisions that reopen V1-V3 contracts:**
+- D-125: `FrameIdx::to_time_ms` becomes `to_out_ms`.
+- D-126: `ClockSync`, `previewSeek` and the `MINTING` entry move to `OutMs`.
+- D-127, D-128: `AudioWorkerApi` gains `assemble` and `release`.
+- D-130: `DrawCmd` gains `Video` and `Image`.
+- D-132: `FontId` becomes `FontKey`.
+- D-133: the `Renderer::render` signature changes.
+- D-136: style colours become theme roles.
+
+**Found while reading the code for the plan.** Four files have no room for V4's additions: `render.worker.ts` (372 lines), `rpc.ts` (377), `video-source.ts` (399) and `session.rs` (381). D-150 splits each before anything is added. V3 §23 items 24 and 25 are closed by D-150 and D-128.
+
+**How it was checked.** `node scripts/check-file-tree.mjs` passes. Decision numbers run D-113 to D-166 with no gap and no duplicate. No code changed.
+
+**Open.** Items 6 and 7 above (the founder's, before S1).
+
