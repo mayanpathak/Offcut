@@ -138,7 +138,7 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 | `crates/offcut-entitlement` | Token format, verification; signing behind feature `sign` | `ed25519-dalek`, `offcut-types` | network, storage |
 | `crates/offcut-api-types` | Every client-server DTO and the analytics allowlist | `serde`, `ts-rs`, `offcut-types` | server or client code |
 | `server` (`offcut-api`) | Routes, DB access, signing, provider adapters | Postgres, email API, merchant API, AI provider API (v1.2) | any media handling; storing or logging a transcript; client crates other than `offcut-types`, `offcut-api-types`, `offcut-entitlement` and `offcut-plan` (v1.2: catalog, prompt, schema; §40.7) |
-| `crates/offcut-plan` (v1.2, V4) | Plan types' logic: catalog, prompt and schema generation, validation, rules producer, time-map construction | `offcut-types`, `serde_json` | `web-sys`, `wasm-bindgen`, `wgpu`, network, clocks, randomness, `offcut-scene`, `offcut-render` |
+| `crates/offcut-plan` (v1.2, V4) | Plan types' logic: catalog, prompt and schema generation, validation, rules producer, time-map construction | `offcut-types`, `offcut-text` (tokenize, `parse_quantity`, `format_quantity`), `serde`, `thiserror`; `serde_json` behind the default feature `prompt` (v4implementation D-122) | `web-sys`, `wasm-bindgen`, `wgpu`, network, clocks, randomness, `offcut-scene`, `offcut-render` |
 | Vercel config | Headers, rewrite | Render origin | functions, middleware, edge config |
 
 Enforcement of every row: §7.
@@ -279,11 +279,13 @@ offcut/
 │   │   ├── src/
 │   │   │   ├── lib.rs
 │   │   │   ├── units.rs               [ONLY] unit newtypes and conversions
+│   │   │   ├── timemap.rs             [ONLY] recording ↔ program time; identity only in V4 (v4implementation D-125)
 │   │   │   ├── ids.rs                 [ONLY] id newtypes
 │   │   │   ├── limits.rs              [ONLY] every PS limit as a typed constant
 │   │   │   ├── media.rs               ProbeInfo, ClipInfo, RejectReason, Orientation, Rotation
 │   │   │   ├── transcript.rs          Word, Sentence, Transcript, NormalizedSpan, Quantity, Unit
 │   │   │   ├── events.rs              EventKind, EventParams, DetectedEvent
+│   │   │   ├── plan.rs                EditPlan, the plan's wire format, PLAN_FORMAT = 1 (v4implementation D-119, D-120)
 │   │   │   ├── prosody.rs             WordProsody, Prosody
 │   │   │   ├── edit.rs                EditState, StyleId, CropOffset
 │   │   │   ├── profile.rs             Plan, ExportProfile
@@ -354,12 +356,34 @@ offcut/
 │   │   │   ├── limiter.rs
 │   │   │   ├── loudness.rs
 │   │   │   ├── chain.rs               run_chain() (length-preserving)
-│   │   │   └── prosody.rs             measure_prosody()
+│   │   │   ├── prosody.rs             measure_prosody()
+│   │   │   ├── program.rs             [ONLY place that changes duration] assemble(); identity in V4 (v4implementation D-127)
+│   │   │   └── silence.rs             silence_profile() (first reader V6.2)
 │   │   └── tests/
 │   │       ├── loudness_target.rs
 │   │       ├── chain_no_clicks.rs
 │   │       ├── duration_preserved.rs
-│   │       └── prosody.rs
+│   │       ├── prosody.rs
+│   │       └── program_identity.rs    the program audio equals the cleaned voice (S-6)
+│   ├── offcut-plan/                   (V4) the edit plan: catalog, prompt, validation, rules producer (v4implementation D-122)
+│   │   ├── Cargo.toml                 default feature "prompt" (serde_json, the schema generator); the binding turns it off
+│   │   ├── src/
+│   │   │   ├── lib.rs                 module list; re-exports; PlanError
+│   │   │   ├── catalog.rs             [ONLY] CATALOG_VERSION, ItemSpec, ParamSpec, the four kinds (D-123)
+│   │   │   ├── prompt.rs              system_prompt, output_schema, user_message (feature "prompt"; first caller V6.1)
+│   │   │   ├── config.rs              [ONLY] PlanConfig and its defaults (D-165)
+│   │   │   ├── resolve.rs             QuantityRef -> Quantity over the effective tokens (D-121)
+│   │   │   ├── validate.rs            [ONLY constructor of ValidPlan] the rules V-1 to V-8 (D-121, D-122)
+│   │   │   ├── validate_params.rs     validate.rs's per-kind parameter checks, if it nears 400 lines (v4implementation C.1)
+│   │   │   └── from_rules.rs          DetectedEvent[] -> EditPlan, the rules producer
+│   │   └── tests/
+│   │       ├── catalog_snapshot.rs    the prompt and the schema, version-named snapshots
+│   │       ├── validate.rs            one case per rule
+│   │       ├── plan_from_rules.rs
+│   │       ├── validate_rules_plans.rs  no rules plan of fixtures/labeled/ loses an item (D-165)
+│   │       ├── ui.rs                  trybuild driver
+│   │       ├── ui/valid_plan_private.rs  ValidPlan has no public constructor (INV-21); its .stderr beside it
+│   │       └── snapshots/             insta snapshot files
 │   ├── offcut-scene/
 │   │   ├── Cargo.toml
 │   │   ├── assets/
@@ -370,9 +394,15 @@ offcut/
 │   │   ├── src/
 │   │   │   ├── lib.rs                 build_scene(), Scene::frame_at()
 │   │   │   ├── styles.rs              [ONLY] StyleSpec for Clean, Bold, Tech
+│   │   │   ├── theme.rs               [ONLY colour values] Theme, Role, FontRole, default_for (v4implementation D-136)
+│   │   │   ├── motion.rs              CaptionMotion, MotionUnit, MotionPreset, ActiveTreatment (D-137)
 │   │   │   ├── safe_area.rs           [ONLY] logical canvas and safe-area constants
 │   │   │   ├── fonts.rs               font registry (embedded bytes)
 │   │   │   ├── captions.rs            caption chunking and line layout
+│   │   │   ├── readability.rs         [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168)
+│   │   │   ├── placement.rs           [ONLY] caption block and event zone from CaptionPlacement (D-171)
+│   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops
+│   │   │   ├── hit.rs                 Scene::hit (D-174)
 │   │   │   ├── layout.rs              text shaping through parley
 │   │   │   ├── easing.rs
 │   │   │   ├── anim.rs                keyframe tracks evaluated at TimeMs
@@ -383,6 +413,7 @@ offcut/
 │   │   │   ├── events/keyword_pop.rs
 │   │   │   ├── watermark.rs
 │   │   │   ├── framing.rs             [ONLY] crop rectangle from ClipInfo + CropOffset
+│   │   │   ├── video.rs               the per-frame Video command: crop, placement (v4implementation D-130)
 │   │   │   ├── display_list.rs        DisplayList, DrawCmd (backend-neutral)
 │   │   │   └── summary.rs             change_summary()
 │   │   └── tests/
@@ -390,7 +421,22 @@ offcut/
 │   │       ├── layout_safe_area.rs
 │   │       ├── framing.rs
 │   │       ├── determinism.rs
-│   │       └── snapshots/             insta snapshot files
+│   │       ├── styles_use_theme.rs    no colour literal outside theme.rs (D-136)
+│   │       ├── timemap_identity.rs    the scene on the identity map (S-1)
+│   │       ├── catalog_complete.rs    catalog kinds and drawn kinds are one set (INV-23)
+│   │       ├── line_breaks.rs         the line-break table, written before the algorithm (D-167)
+│   │       ├── parity.rs              preview equals export (D-172)
+│   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
+│   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
+│   │       ├── hit.rs                 Scene::hit (D-174)
+│   │       ├── v3_reference.rs        temporary, V4 S2 to S7: the identity reference (D-117)
+│   │       ├── snapshots/             insta snapshot files
+│   │       ├── snapshots/v3_reference/busy_1080.json       temporary, V4 S2 to S7 (D-117)
+│   │       ├── snapshots/v3_reference/busy_540.json        temporary, V4 S2 to S7 (D-117)
+│   │       ├── snapshots/v3_reference/reference_1080.json  temporary, V4 S2 to S7 (D-117)
+│   │       ├── snapshots/v3_reference/a01_1080.json        temporary, V4 S2 to S7 (D-117)
+│   │       ├── snapshots/v3_reference/w01_1080.json        temporary, V4 S2 to S7 (D-117)
+│   │       └── snapshots/v3_reference/w07_1080.json        temporary, V4 S2 to S7 (D-117)
 │   ├── offcut-render/
 │   │   ├── Cargo.toml
 │   │   ├── src/
@@ -401,7 +447,8 @@ offcut/
 │   │   │   ├── composite.rs           video + overlay -> target
 │   │   │   └── shaders/video.wgsl
 │   │   └── tests/
-│   │       └── golden_frames.rs       native wgpu, software adapter; reads fixtures/golden/
+│   │       ├── golden_frames.rs       native wgpu, software adapter; reads fixtures/golden/
+│   │       └── common/ssim.rs         the similarity measure of the goldens (v4implementation D-135)
 │   ├── offcut-entitlement/
 │   │   ├── Cargo.toml                 feature "sign" (server only)
 │   │   ├── src/
@@ -437,6 +484,7 @@ offcut/
 │       └── src/
 │           ├── lib.rs                 panic hook, init
 │           ├── session.rs             RenderSession (owns Renderer, Scene, Demuxer)
+│           ├── scene_api.rs           set_scene (validate + build), source_at, summary; rules_plan (v4implementation D-150)
 │           ├── detect_api.rs          detect, redetect_sentence
 │           ├── profile_api.rs         export_profile_from_token, preview_profile (v2implementation D-53)
 │           └── mux_api.rs             Mp4MuxerHandle
@@ -519,6 +567,7 @@ offcut/
 │   ├── tsconfig.json
 │   ├── eslint.config.js               boundaries + restricted globals (§7)
 │   ├── vercel.json                    [ONLY] response headers and /api rewrite
+│   ├── LICENSES.md                    licences of shipped assets: Inter (OFL-1.1), Lucide icons (ISC) (v4implementation D-180)
 │   ├── public/
 │   │   ├── robots.txt
 │   │   └── ort/                       ONNX Runtime .wasm files copied at build by vite.config.ts
@@ -556,6 +605,9 @@ offcut/
 │   │   │   ├── export-store.ts
 │   │   │   ├── auth-store.ts
 │   │   │   ├── entitlement-store.ts
+│   │   │   ├── ui-store.ts            selected tab, follow switch, editing word, toasts, save state (v4implementation §17)
+│   │   │   ├── history.ts             undo and redo of EditState, 50 steps (D-184)
+│   │   │   ├── history.test.ts
 │   │   │   ├── blockers.ts            [ONLY] blocker codes and conditions
 │   │   │   ├── blockers.test.ts
 │   │   │   └── machines/
@@ -577,6 +629,13 @@ offcut/
 │   │   │   ├── toggle-event.ts
 │   │   │   ├── set-style.ts
 │   │   │   ├── set-crop-offset.ts
+│   │   │   ├── set-caption-position.ts  (V4) the caption block's position (v4implementation D-171)
+│   │   │   ├── set-highlight-numbers.ts (V4) numbers in the accent colour on or off (D-169)
+│   │   │   ├── replace-all.ts         (V4) "Change all N" for a repeated mis-hearing (D-175)
+│   │   │   ├── undo-redo.ts           (V4) D-184
+│   │   │   ├── review-update.ts       (V4) the shared update rule of an edit: pause, queue, setScene, restore, undo (D-147)
+│   │   │   ├── preview-interact.ts    (V4) hover and click hit tests, drag commits (D-183)
+│   │   │   ├── style-thumbnails.ts    (V4) the style cards rendered from the clip (D-186)
 │   │   │   ├── control-preview.ts
 │   │   │   ├── start-export.ts
 │   │   │   ├── start-export.test.ts
@@ -621,7 +680,8 @@ offcut/
 │   │   │   └── load-render.ts         [ONLY] instantiate offcut_render.wasm
 │   │   ├── workers/
 │   │   │   ├── protocol.ts            [ONLY] message types for all four workers
-│   │   │   ├── rpc.ts                 request/response/progress/cancel plumbing
+│   │   │   ├── rpc.ts                 request/response/progress/cancel plumbing (the page side)
+│   │   │   ├── rpc-worker.ts          serveWorker, the worker side of rpc.ts (v4implementation D-150, D-151)
 │   │   │   ├── rpc.test.ts
 │   │   │   ├── pool.ts                worker lifecycle; typed clients
 │   │   │   ├── media.worker.ts
@@ -634,6 +694,9 @@ offcut/
 │   │   │   ├── audio.worker.ts
 │   │   │   ├── render.worker.ts
 │   │   │   ├── render/video-source.ts       demux + VideoDecoder + frame queue
+│   │   │   ├── render/frame-decoder.ts      the VideoDecoder's management, out of video-source.ts (v4implementation D-150)
+│   │   │   ├── render/preview-job.ts        play, pause, seek, clock, the resize rule (D-148, D-149, D-150)
+│   │   │   ├── render/export-job.ts         the export handlers, out of render.worker.ts (D-150)
 │   │   │   ├── render/preview-loop.ts
 │   │   │   ├── render/export-loop.ts
 │   │   │   ├── render/encoders.ts           [ONLY] WebCodecs encoder configs and ladder
@@ -647,17 +710,45 @@ offcut/
 │   │       │   ├── AccountPage.tsx
 │   │       │   ├── SettingsPage.tsx
 │   │       │   └── LegalPage.tsx
+│   │       ├── assets/
+│   │       │   └── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
+│   │       ├── icons.tsx              inline SVG icons (D-181)
+│   │       ├── hooks/
+│   │       │   └── use-shortcuts.ts   the keyboard shortcuts (D-185)
+│   │       ├── layout/
+│   │       │   ├── EditorLayout.tsx   top bar, stage, side panel, live region (D-178)
+│   │       │   ├── TopBar.tsx         save state, undo, redo, Export or the export pill
+│   │       │   ├── Stage.tsx          the state's card or the player
+│   │       │   └── SidePanel.tsx      the four tabs (in place of a ReviewPanel)
+│   │       ├── primitives/            (D-181)
+│   │       │   ├── Button.tsx
+│   │       │   ├── IconButton.tsx
+│   │       │   ├── Tooltip.tsx
+│   │       │   ├── Tabs.tsx
+│   │       │   ├── Switch.tsx
+│   │       │   ├── SegmentedControl.tsx
+│   │       │   ├── Slider.tsx
+│   │       │   ├── Toast.tsx
+│   │       │   ├── Spinner.tsx
+│   │       │   ├── Skeleton.tsx
+│   │       │   ├── PanelSection.tsx
+│   │       │   └── Kbd.tsx
 │   │       ├── components/
 │   │       │   ├── CapabilityGate.tsx
 │   │       │   ├── DropZone.tsx
 │   │       │   ├── ModelDownloadPanel.tsx
 │   │       │   ├── ProcessingFeed.tsx
+│   │       │   ├── ProcessingCard.tsx     the processing state's card (v4implementation D-188)
 │   │       │   ├── PreviewPlayer.tsx
-│   │       │   ├── ReviewPanel.tsx
 │   │       │   ├── CaptionEditor.tsx
-│   │       │   ├── EventToggleList.tsx
+│   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item
+│   │       │   ├── StylePanel.tsx         the style cards and Highlight numbers
 │   │       │   ├── StylePicker.tsx
+│   │       │   ├── FramingPanel.tsx       caption position and crop
 │   │       │   ├── CropOffsetControl.tsx
+│   │       │   ├── CutsSection.tsx        renders nothing in V4 (V6.2)
+│   │       │   ├── ShortcutsSheet.tsx     (D-185)
+│   │       │   ├── ToastHost.tsx
 │   │       │   ├── ExportButton.tsx
 │   │       │   ├── ExportProgress.tsx
 │   │       │   ├── SignInDialog.tsx
@@ -672,7 +763,11 @@ offcut/
 │   │       └── styles/
 │   │           ├── tokens.css
 │   │           ├── pages.module.css
-│   │           └── components.module.css
+│   │           ├── components.module.css
+│   │           ├── editor.module.css      the editor layout (v4implementation §17.6)
+│   │           ├── panel.module.css       the side panel and its tabs
+│   │           ├── primitives.module.css  the primitives (D-181)
+│   │           └── preview.module.css     the player, its transport and the direct-manipulation chrome
 │   └── tests-e2e/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
@@ -693,6 +788,7 @@ offcut/
 │       ├── timeline-preserved.spec.ts
 │       ├── checkout.spec.ts
 │       ├── cancel.spec.ts
+│       ├── screens.spec.ts            D1-only screen capture for the design reviews; never in CI (v4implementation D-191)
 │       ├── restore.spec.ts
 │       ├── failure-recovery.spec.ts
 │       ├── api-cold-start.spec.ts
@@ -710,7 +806,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh
@@ -756,6 +852,7 @@ offcut/
     ├── v4/v4buildguide.md             step-by-step build order for V4, with a milestone per phase and three human gates
     ├── v4/coding-promptsv4.md         the 38 V4 coding prompts (91 to 128), run in order
     ├── v4/v4changelog.md              record of every change made while building V4 (opened by the v1.2 spec revision)
+    ├── v4/experiments.md              outcome of every reading V4 takes (v4implementation §21) and BP §6.2's two decisions
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
@@ -801,11 +898,14 @@ offcut-wasm-core ──► offcut-mp4, offcut-text, offcut-dsp ─────�
 offcut-wasm-render ─► offcut-render ─► offcut-scene ─┐                 │
         │            offcut-detect ─► offcut-text ───┤                 ▼
         ├──────────► offcut-mp4 ─────────────────────┼──────────► offcut-types
-        └──────────► offcut-entitlement ─────────────┘                 ▲
+        ├──────────► offcut-plan ─► offcut-text ─────┤                 ▲
+        └──────────► offcut-entitlement ─────────────┘                 │
 offcut-api (server) ─► offcut-api-types, offcut-entitlement[sign] ─────┘
 ```
 
 `offcut-scene` also depends on `offcut-text`, for `format_quantity` only (count-up values, §19.5). `check-file-tree.mjs` allows that pair, and the `offcut-text` ban in `deny.toml` lists `offcut-scene` as a wrapper (v2implementation D-28). It creates no cycle.
+
+`offcut-plan` (V4, v4implementation D-122) depends on `offcut-text` and `offcut-types`. `offcut-scene` depends on `offcut-plan` (it reads a `ValidPlan`), and `offcut-wasm-render` depends on it with `default-features = false` (no schema code in the render bundle). Two edges are dev-only, for the labeled-set tests (v4implementation §3.2): `offcut-scene → offcut-detect` and `offcut-plan → offcut-detect`. `check-file-tree.mjs` counts dev-dependencies, so its table allows all of them; the `offcut-text` ban in `deny.toml` lists `offcut-plan` as a wrapper. None creates a cycle: `offcut-detect` and `offcut-text` depend on no crate above them.
 
 **Web (arrows point to what may be imported)**
 
@@ -823,7 +923,7 @@ everything ─► gen (types only)
 
 | Rule | Enforced by |
 |---|---|
-| Pure crates (`offcut-types`, `-mp4`, `-text`, `-detect`, `-dsp`, `-scene`) depend on `web-sys`, `js-sys`, `wasm-bindgen` or `wgpu` | `cargo-deny` `[bans]` per-crate wrappers in `deny.toml`; CI step `cargo deny check` |
+| Pure crates (`offcut-types`, `-mp4`, `-text`, `-detect`, `-dsp`, `-scene`, `-plan`) depend on `web-sys`, `js-sys`, `wasm-bindgen` or `wgpu` | `cargo-deny` `[bans]` per-crate wrappers in `deny.toml`; CI step `cargo deny check` |
 | Pure crates read a clock or randomness (`std::time`, `rand`, `getrandom`) | `clippy.toml` `disallowed_methods` / `disallowed_types`; CI `cargo clippy -D warnings` |
 | `server` depends on `offcut-mp4`, `-text`, `-detect`, `-dsp`, `-scene`, `-render` | `cargo-deny` ban on those crates for package `offcut-api`; `server/tests/no_media_routes.rs` |
 | A crate imports a crate above it in the diagram | Cargo rejects cycles; `scripts/check-file-tree.mjs` checks declared dependencies against this section |

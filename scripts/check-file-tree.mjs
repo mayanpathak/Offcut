@@ -51,13 +51,18 @@ const ALLOWED_CRATE_DEPS = {
   "offcut-mp4": ["offcut-types"],
   "offcut-text": ["offcut-types"],
   "offcut-dsp": ["offcut-types"],
-  // offcut-text for format_quantity only (v2implementation D-28).
-  "offcut-scene": ["offcut-text", "offcut-types"],
+  // offcut-text for tokenize, parse_quantity and format_quantity (v4implementation D-122).
+  // offcut-detect: dev-dependency only: the labeled-set tests (v4implementation §3.2).
+  "offcut-plan": ["offcut-text", "offcut-types", "offcut-detect"],
+  // offcut-text for format_quantity only (v2implementation D-28); offcut-plan for ValidPlan (D-122).
+  // offcut-detect: dev-dependency only: the labeled-set tests (v4implementation §3.2).
+  "offcut-scene": ["offcut-text", "offcut-types", "offcut-plan", "offcut-detect"],
   "offcut-entitlement": ["offcut-types"],
   "offcut-detect": ["offcut-text", "offcut-types"],
   "offcut-render": ["offcut-scene", "offcut-types"],
   "offcut-wasm-core": ["offcut-mp4", "offcut-text", "offcut-dsp", "offcut-types"],
-  "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types"],
+  // offcut-plan without default features: no schema code in the bundle (D-122).
+  "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types", "offcut-plan"],
   "offcut-api": ["offcut-api-types", "offcut-entitlement", "offcut-types"],
 };
 
@@ -75,6 +80,7 @@ const PURE_CRATES = [
   "offcut-detect",
   "offcut-scene",
   "offcut-entitlement",
+  "offcut-plan",
 ];
 const NOT_IN_PURE_CRATES = ["rand", "getrandom", "wasm-bindgen", "js-sys", "web-sys", "wgpu"];
 
