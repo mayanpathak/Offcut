@@ -1311,3 +1311,18 @@ The server went first, then the web build. Every step of `deploy-web` succeeded:
 **Found, not fixed.**
 - **One `audio_chain` of 5,609 ms** (23:19:49 UTC) on the deployed app, against 706-1,309 ms for the other four, all on D1. The budget for the 74.7 s reference clip is 4 s x 74.7 / 60 = 4.98 s (D-74), and the bench's median is 1,963 ms per 60 s. One reading, likely taken while the page was still downloading the speech model on a fresh profile. TE-13's decision stands; V9's measurements on testers' devices re-read it (§20.2).
 - Open item 7 (the Linux ffmpeg URL, before about 2026-11-27) stays open: the founder's choice.
+
+## 2026-10-21 - After V3: a one-line landing change to check the deploy with the repository private
+
+The founder made `github.com/mayanpathak/Offcut` private on 2026-10-21 and asked for a small change they can see on the site, pushed to `main`, to confirm that CI still passes and the deploy still runs.
+
+**Changed.**
+- `web/src/copy/messages.ts`: `landing.hero` reads "Turn what you say into a finished vertical short." (was "... a finished short."). The subhead already promises a vertical short.
+
+**Why the deploy does not depend on the repository's visibility.** The Vercel project has no Git connection: the `deploy` job of `ci.yml` runs `vercel pull`, `vercel build` and `vercel deploy --prebuilt --prod` with `VERCEL_TOKEN`. The dashboard's "Connect Git Repository" is expected, and the Hobby plan's check on private repositories does not apply to a deploy made with a token.
+
+**Differs from the plan.** PS §10 J1 and `docs/v1/v1implementation.md` quote the old hero; they are not edited here. The entry is in this changelog because `docs/v4/` is not on `main` yet.
+
+**Checked.** `eslint`, `tsc --noEmit` and `vitest run` in `web/`, and `node scripts/check-copy-codes.mjs`, before the push; CI on the push and the deployed page after it.
+
+**Found, not fixed.** On 2026-10-21 the asset host `pub-f3fc62bf02b24aa59053b79f34d13f56.r2.dev` served the speech model at about 0.13 MB/s (one 8.4 MB range in 66 s; the same connection read 4.3 MB/s from Cloudflare's speed test), slowing with each range. Cloudflare limits `r2.dev` and says it is not for production; a custom domain on the bucket is the fix, with `VITE_ASSET_BASE_URL` and the CSP of `web/vercel.json` changed to match.
