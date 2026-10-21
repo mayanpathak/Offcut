@@ -4,7 +4,28 @@
 
 **Reader.** Whoever writes the V4 code, file by file. Everything needed to write a V4 file is in this document or in the TS section it names. V3 as built is the truth this plan builds on: where `v3implementation.md` and its changelog disagree, the changelog's "As built" wins. Where the specs and the earlier plans are silent or contradict each other, this document decides in section 2; each decision is marked **(V4 decision)**. A decision that changes something V1, V2 or V3 froze (V2 §25.1, V3 §21.1) is marked **REOPENED CONTRACT**, with the cost on both sides.
 
-**The one-sentence goal.** At the end of V4, a dropped clip plays back in a synced preview with its captions in Clean, Bold or Tech, all four event visuals, 9:16 framing with a draggable crop for landscape clips and a working scrub bar, and the user can fix a mis-heard word, switch any visual off, change the style and move the crop, with every change on screen within a moment and nothing ever waiting on the network; deployed and measured on D1 (BP §6).
+**The one-sentence goal.** At the end of V4, a dropped clip plays back in a synced preview with phrase-aware captions in a premium default style (or Bold, or Mono), all four visuals, 9:16 framing and a working scrub bar, in a clean dark editor where a creator fixes a word by clicking it, drags the captions or the framing on the video, switches visuals off, picks a style by looking at their own clip, undoes anything, and sees every change within 150 ms, with nothing ever waiting on the network; deployed and measured on D1 (BP §6).
+
+**The quality bar (the founder's brief of 2026-10-22).** V4 decides how every short looks and how it feels to make one, so V4 is held to a higher bar than "the features of BP §6 work": **better captions, a better final video and a better experience than Submagic, for content creators in general**, not only technical creators. Two lists set that bar; sections 2.9 and 2.10 answer each line.
+
+| Part A: caption intelligence (the output) | Where |
+|---|---|
+| Accurate transcription of names, slang and jargon | V2-V3 (the recognizer); V4 makes fixing fast: click a word (D-182), fix it everywhere (D-175) |
+| Precise word-level timing | V2-V3; V4 keeps every time (INV-5) and adds a reading-time floor that uses silence only (D-168) |
+| Smart line breaks, easy to read on a phone | D-167 |
+| Highlights and animations on the right words | D-169, D-170 |
+| Consistent placement that does not cover faces or content; draggable | D-171, D-183 |
+| The export looks exactly like the preview | D-172 |
+
+| Part B: editor experience (the process) | Where |
+|---|---|
+| A great default style, no settings needed | D-170, D-176 |
+| A fast, smooth, synchronized preview | TS §20, D-148, D-149, D-193 |
+| Click a word to correct it, see it at once | D-173, D-182, D-183 |
+| Simple controls for style, highlights, framing, effects | D-183, D-186, D-187 |
+| Smart suggestions instead of editing every detail | D-175, D-176 |
+| Reliable exports, clear progress, easy recovery | D-152, D-184, D-189, D-190 |
+| A clean, premium, user-friendly interface | D-177 to D-181, D-191, D-192, section 17 |
 
 **The second goal, which decides how every file is written.** V4 is the last version that may change the shape of the scene, the renderer, the timeline or the audio. From V5 to V6.7 every later version must be additive: it fills function bodies, adds files, adds enum variants, catalog rows and table rows. In particular, **V6.1 (the AI edit plan), V6.2 (cuts) and V6.3 (music) must meet no contract that V4 has to reopen.** So V4 builds, under the features of BP §6, the seven seams of TS §40.9: the scene reads a validated **edit plan** (the rule detector is its first producer), time runs through an identity **time map** from recording time to program time, the **video is a draw command**, fonts come from a **registry** and colours from a **theme**, caption motion is **data**, and the preview plays **assembled program audio**. Section 22 lists, file by file, what V5 to V6.7 add, and shows that each row is additive.
 
@@ -14,22 +35,22 @@
 
 1. Scope: what V4 is and is not
 1A. Preconditions: what V4 starts from
-2. Decisions this document makes (D-113 to D-166)
+2. Decisions this document makes (D-113 to D-193)
 3. Tools, dependencies, environment variables
 4. V4 file tree
 5. Build order (17 steps, each with its own check)
 6. `offcut-types`: two timelines, the plan's wire format
 7. `offcut-plan` (new): catalog, prompt, validation, the rules producer
-8. `offcut-scene`: the plan-driven scene, the look
+8. `offcut-scene`: the plan-driven scene, caption intelligence, the look
 9. `offcut-render`: video as a command, native rendering, golden frames
 10. `offcut-dsp`: program audio (identity)
 11. WASM binding crates
 12. Code generation
-13. Server: no changes
+13. Server: one enum widened
 14. Web infrastructure: protocol, RPC, pool, loaders
 15. Workers: `render.worker`, `audio.worker`, the preview loop, the video source
 16. State and use-cases: edits, cancel, retry, seek
-17. UI, copy, styles
+17. Interface and interaction design
 18. Fixtures, snapshots, golden frames
 19. Root configuration, scripts, CI, hosting
 20. Tests, case by case
@@ -52,19 +73,23 @@ Appendix D. Named constants V4 introduces
 |---|---|
 | Edit plan (seam S-2) | `crates/offcut-plan` exists: the plan's wire format (`EditPlan`, `PLAN_FORMAT = 1`), the capability catalog of the four V3 kinds (`CATALOG_VERSION = 1`), the generated LLM system prompt and output schema (snapshot-tested, sent nowhere), the rules producer `from_rules`, and `validate`, the only constructor of a `ValidPlan`. The scene reads a `ValidPlan` and nothing else describes the edit (D-118 to D-124) |
 | Timelines (S-1) | `OutMs` (program time) beside `TimeMs` (recording time), and `TimeMap::identity`. The scene, the preview clock, the scrub bar and the frame index run on program time; source frames are read at `scene.source_at(t)`. Every map is the identity in V4, so program time equals recording time and INV-5's v1.1 behaviour holds exactly (D-125, D-126) |
-| Captions | Clean, Bold and Tech from TS §19.4, written as theme roles plus `CaptionMotion` data: Clean's highlighted active word, Bold's upper-case word-by-word pop, Tech's dark panel, green active word and block cursor. KeywordPop's in-caption scale (D-136 to D-139) |
+| Captions | **Phrase-aware line breaks** that never strand an article or split a phrase, balanced lines, a 700 ms reading floor taken from silence (D-167, D-168); the **premium default** (Clean: Inter 800, a soft shadow, the spoken word on a sliding highlight pill), Bold, and Mono (V3's Tech), written as theme roles plus `CaptionMotion` data (D-136, D-137, D-170); numbers highlighted, stressed words popping (D-169) |
 | Event visuals | All four kinds drawn (TS §19.5): NumberReveal (V2, now on program time), ListReveal (header, items appearing at their own times, numbered, auto-shrink past five), FromTo (two values, arrow, proportional bars, the "to" value emphasized), KeywordPop (D-140, D-141) |
+| Caption placement | Drag the captions up or down on the preview (snaps at Top, Middle, Bottom) or pick a position in the Framing tab; the visuals move to the free side; the watermark never meets a caption (D-171, D-183) |
+| Preview = export | One scene and one renderer at every size; display lists equal after scaling, and a 1080-vs-540 golden at SSIM ≥ 0.99 (D-172) |
 | Framing | Portrait passes through; landscape and square get the 9:16 crop with the user's offset. The crop is part of the per-frame `Video` command (S-4), so a later zoom or reframe changes data only (D-131, D-142) |
 | Watermark | Drawn by the scene when `profile.watermark` is set (INV-9), at the bottom-left of the safe area, never over a caption (D-143) |
 | Renderer (S-4, S-5) | Draws the display list in order with the video as one `Video` command (any crop of the source, any axis-aligned placement); `Image` and video masks are typed but answer `Unsupported` until their first user. Fonts come from a `FontSet` registry (`FontKey` replaces `FontId`). Natively, `render_to_image` draws to memory on a software adapter for the golden frames (D-130 to D-135) |
 | Program audio (S-6) | `offcut-dsp::program::assemble` exists and runs in `audio.worker` (`AudioWorkerApi.assemble`); with the identity map and no music it returns the cleaned voice sample for sample. The preview plays `prog48` (D-127, D-128) |
 | Preview | Audio clock master; clock sync every 250 ms; a queue of six decoded frames; scrubbing (`seeking` state, keyframe restart, `previewSeek`); the 360x640 fallback when a frame costs over 28 ms on average; drift at most 80 ms over 60 s (TS §20) |
-| Review UI (S-7) | `ReviewPanel` with `CaptionEditor` (edit or hide a word), `PlanItemList` (one toggle per plan item), `StylePicker`, `CropOffsetControl` (landscape only), and a cuts section that shows nothing while a plan has no cuts. Every change is optimistic and local: `editsRepo.put`, a new plan where words changed, `setScene`, the preview paused and restored (C-6) |
+| Editor (S-7) | A dark, premium editor (D-177 to D-181): top bar with save state, undo, redo and Export; the preview as the hero with its transport; a side panel with **Captions** (the transcript: click a word to fix it, "Change all N", hide, restore, follow playback; D-182, D-175), **Style** (three cards rendered from the clip itself, Highlight numbers; D-186), **Visuals** (suggested visuals, a switch each; D-187) and **Framing** (caption position, crop; D-187). On the preview: click a caption word to edit it, drag the captions, drag the video sideways (D-183). Undo and redo (D-184), keyboard shortcuts (D-185). Every change is optimistic and local and on screen within 150 ms (D-173). A cuts section shows nothing while a plan has no cuts |
 | Zero events | `NO_EVENTS_FOUND`: "No numbers or lists found in this clip. Captions and cleanup applied." (PS §10 J7) |
+| Processing and export | A four-step checklist in plain words with live found-moment chips (D-188); an export pill with stage, percent, time left and Cancel (D-189); errors as inline cards in plain words with one action (D-190) |
+| Design quality | Tokens, primitives, icons, Inter as the interface font, WCAG AA, an axe check, two design reviews by the founder on captured screens (D-179 to D-181, D-191, D-192) |
 | Robustness | `rpc.ts` progress throttle (10/s, feed lines never dropped), cancel with `CANCEL_TIMEOUT = 2 s`, worker crash handling; `pool.cancel`, `pool.restartWorker`; `cancel-job.ts` for import, pipeline, model download and export; `ErrorPanel` with the copy of every code a person can meet in V4 and a retry; `client_error` and `job_cancelled` are sent (C-12, C-14) |
 | Tests | Display-list snapshots (exact), safe-area check over the 31 labeled transcripts in three styles, framing, scene determinism, 16 golden frames, the plan crate's tests, the identity proofs; `rpc.test.ts`, the machine tests, `run-pipeline.test.ts`; `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts`, `pipeline-preview.spec.ts` complete |
-| Analytics | `review_action`, `job_cancelled`, `client_error` start (BP Appendix C). `pipeline_done` unchanged |
-| Measurements | Preview drift and late frames, first preview frame, seek time, `frame_at` cost, scene build time, golden similarity across adapters; all on D1 (D-114) |
+| Analytics | `review_action`, `job_cancelled`, `client_error` start (BP Appendix C); `review_action`'s `action` gains `caption_position`, `highlight_numbers`, `replace_all`, `undo`, `redo` (section 13). `pipeline_done` unchanged |
+| Measurements | Edit-to-preview time (at most 150 ms), preview drift and late frames, first preview frame, seek time, `frame_at` cost, scene build time, golden similarity across adapters; all on D1 (D-114) |
 
 ### 1.2 Not in V4
 
@@ -82,6 +107,10 @@ Appendix D. Named constants V4 introduces
 | The empty-output retry of the recognizer on WASM (TS §16.6, listed for V4 by V2 §25.2) | Not built; `E_ASR_RUNTIME` shows its copy and a retry | V7 (failure recovery), recorded in section 24 |
 | The network-privacy test | V3's guards; V4 adds no request | V8 |
 | The Canvas2D backend | Built only if section 21's decision asks for it | Contingency |
+| Captions that move around a detected face on their own | The drag and the three snap points (D-171) | P1 (face tracking, PS §9.5) |
+| "Maybe mis-heard" flags on words | None: the recognizer gives no per-word confidence (TE-2, D-176) | V6.1 (the model may mark doubtful words), V9 (E-10) |
+| Custom caption fonts and colours | Three styles and Highlight numbers | V6.5 (presets), V6.7 (brand kit) |
+| Undo across a reload | Undo within the session; edits are autosaved | V7 |
 
 Nothing from TS §36 is built. Two rows matter most in V4. The time map exists (TS §40.1, TDR-7 as revised), but its only constructor in V4 is `identity`: there is no silence detection, no gap analysis, no cut, no cross-fade. And no user-inserted item: the user toggles what the plan proposed (PS §12.4).
 
@@ -162,14 +191,14 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 |---|---|---|
 | D-130 | **REOPENED V2 CONTRACT (`display_list.rs`, frozen by V2 §25.1).** `DrawCmd` gains `Video { slot: VideoSlot, src: CropRect, dst: Rect, opacity: f32, mask: Option<Vec<PathEl>> }` and `Image { image: ImageKey, rect: Rect, opacity: f32 }`; `VideoSlot` has one member, `Main`. `CropRect` moves from `offcut-scene/src/lib.rs` to `display_list.rs`. **`dst` is an axis-aligned `Rect`, not an `Affine`**: this refines TS §40.5, because every V6.x use (zoom, picture in picture, a shape frame's bounds) is axis-aligned and the mask carries any other shape. The scene emits exactly one `Video { Main, src: crop, dst: full canvas, opacity: 1.0, mask: None }` as the first command of every frame | Seam S-4. A rectangle is what the video pass can place with four vertices; a rotation would need a second sampler path no feature asks for |
 | D-131 | **`Scene::crop()` is removed; the crop is per frame.** `framing::crop_rect` is still the only place the crop is worked out (`[ONLY]`), now with the user's offset (V2's stand-in removed); `frame_at` puts it in the `Video` command. A per-frame crop is how V6.1's punch-in and V6.2's jump-cut zoom will be expressed (a smaller `src` around the same centre), and how face tracking (P1) will move it | TS §19 seam "`crop()` becomes `crop_at(t)`" taken now, in the form of the command |
-| D-132 | **REOPENED V2 CONTRACT (D-29, `FontId`).** `FontId` is replaced by `FontKey(u16)` and a `FontSet` registry. `FontSet::embedded()` registers the three files at four instances, with keys 0 = Inter 700, 1 = Inter 900, 2 = JetBrains Mono 700, 3 = Noto Emoji, the order of V2's enum. A `FontSet` holds, per key, the font file, its family name, its weight and its normalized coordinates; `fonts.rs` builds the parley collection from it. `Renderer::render` takes `&FontSet` beside the list (D-133). `FontSet::with_user(files)` is V6.7's | Seam S-5. No snapshot of `FontId` exists, so the cost on the V2 side is code only; the order is kept so the identity reference (D-117) maps one to the other |
+| D-132 | **REOPENED V2 CONTRACT (D-29, `FontId`).** `FontId` is replaced by `FontKey(u16)` and a `FontSet` registry. `FontSet::embedded()` registers the three files at five instances, with keys 0 = Inter 700, 1 = Inter 900, 2 = JetBrains Mono 700, 3 = Noto Emoji (the order of V2's enum) and 4 = Inter 800 (D-170, appended). A `FontSet` holds, per key, the font file, its family name, its weight and its normalized coordinates; `fonts.rs` builds the parley collection from it. `Renderer::render` takes `&FontSet` beside the list (D-133). `FontSet::with_user(files)` is V6.7's | Seam S-5. No snapshot of `FontId` exists, so the cost on the V2 side is code only; the order is kept so the identity reference (D-117) maps one to the other |
 | D-133 | **REOPENED V2 CONTRACT (`Renderer::render`).** `render(&mut self, sources: &VideoSources, list: &DisplayList, fonts: &FontSet) -> Result<(), RenderError>`, where `VideoSources` maps `VideoSlot::Main` to the decoded frame and the clip's rotation. The compositor draws commands in list order. **V4 supports:** one `Video` command per list, first in the list; any `src` inside the source's display frame; any `dst` inside the canvas; opacity 1.0; no mask. A list outside that, an `Image` command or a mask returns the new `RenderError::Unsupported`, mapped to `E_INTERNAL` with detail `Unsupported`. Pixels of the canvas outside `dst` are black | The general compositor (several video commands, Vello layers under and over the video, masks) is V6.5's work and changes only the compositor's body |
 | D-134 | **Native rendering for tests.** `offcut-render` gains, behind `#[cfg(not(target_arch = "wasm32"))]`, `Renderer::new_headless(width, height)` and `render_to_image(&mut self, source: &RgbaImage, rotation, list, fonts) -> Result<RgbaImage, RenderError>`, reading the frame from memory and the target into memory. The dev-dependency `wgpu` turns on the native backends `vulkan` and `dx12`, and the test asks for a software adapter (`force_fallback_adapter: true`; WARP on Windows, `lavapipe` on Linux). **Fallback if 1A item 7 fails on one machine:** the golden test runs on the machine where it works (the Linux runner first) and is skipped elsewhere with the reason printed; it is never weakened | TS §19 acceptance asks for goldens on a software adapter; V2 §25.2 listed `render_to_image` for V4. A software adapter makes the goldens the same on every machine that has it |
 | D-135 | **Golden frames.** `fixtures/golden/*.png` holds 16 images at 540x960 (the preview size, half the cost of 1080x1920): the 12 of TS §26 (3 styles x 4 kinds), watermark on and off (Clean, NumberReveal), one landscape crop at offset 0.5, one punch-in (a hand-written list whose `Video.src` is the centre 1/1.1 of the frame). The source frame is a synthetic pattern drawn by the test (gradient, grid, a disc), never a recording. Similarity is SSIM over 8x8 luma windows, implemented in the test file (no crate), at least 0.98 (assumption, M1.4: V3 §23 item 14). `OFFCUT_GOLDEN_UPDATE=1` writes the images; CI never sets it | TS §26 names 14; the crop and the punch-in prove S-4. A synthetic source keeps recordings out of git (D-76) |
 | D-136 | **REOPENED V2 CONTRACT (`styles.rs`): colours are theme roles.** `offcut-scene/src/theme.rs` [ONLY colour values] defines `Theme { text, stroke, accent, accent_alt, panel, backdrop: Rgba, display_font, body_font, mono_font: FontKey }` and `Theme::default_for(StyleId)`. `StyleSpec` names roles (`fill: Role::Text`, `active: Role::Accent`, …) and a `FontRole` (`Display`, `Body`, `Mono`), never an `Rgba` or a `FontKey`. **Refines TS §40.5**: a third font role, `mono_font`, because Tech's captions are monospaced and a brand kit replaces display and body fonts, not the code font. `styles_use_theme.rs` asserts that no `Rgba {` literal appears in `offcut-scene/src` outside `theme.rs` and `display_list.rs` | Seam S-5. A brand kit (V6.7) then becomes one `Theme` value |
 | D-137 | **Caption motion is data.** `StyleSpec.motion: CaptionMotion { unit: MotionUnit, enter: MotionPreset, active: ActiveTreatment, easing: Easing, duration_ms: u32 }`. V4's values: Clean `Word`, `Fade`, `Highlight`, ease-out cubic, 120 ms; Bold `Word`, `Pop`, `Highlight`, back-out, 140 ms; Tech `Word`, `None`, `Cursor`, linear, 80 ms (TS §19.4, all (assumption, E-2)). `MotionUnit::Glyph` exists; no V4 style uses it. `MotionPreset` and `ActiveTreatment` get their V6.5 members by appending | Seam S-5. Kinetic presets (V6.5) are rows of this data plus new arms |
 | D-138 | **Zones are a table.** `safe_area.rs` replaces `EVENT_ZONE` and `CAPTION_ZONE` with `pub fn zone(id: ZoneId) -> Rect` over `ZoneId { Event, Caption, Full }` (Event y 860-1180, Caption y 1220-1500, Full the safe area). Later releases append rows (`Top`, `LowerThird`, …) | Seam S-5; V6.x items claim zones through the catalog (V-6) |
-| D-139 | **Style values** (TS §19.4, all (assumption, E-2)): Clean Inter 700 64 lp, as spoken, 18 chars x 2 lines, 5 words, white fill, 6 lp dark stroke, active word in accent `#FFD60A`; Bold Inter 900 84 lp, upper case, 12 x 2, 3 words, 10 lp stroke, the active word pops 1.0 → 1.12 → 1.0 over 140 ms back-out; Tech JetBrains Mono 700 56 lp, as spoken, 22 x 2, 5 words, no stroke, a rounded panel (radius 24 lp, 32 lp padding) at 85% opacity behind the chunk, active word green `#3DDC84`, a block cursor (0.6 em wide, the line's height) after the active word. KeywordPop in every style: 1.0 → 1.25 → 1.10 over 180 ms from the word's start, colour `accent_alt` | TS §19.4 gives the table; the pop amplitude for Bold, the panel's radius and padding, and the cursor size are not given |
+| D-139 | **Style values** (TS §19.4, all (assumption, E-2); **Clean and Bold are superseded by D-170**; Tech is kept as written here and named "Mono" in the interface): Clean Inter 700 64 lp, as spoken, 18 chars x 2 lines, 5 words, white fill, 6 lp dark stroke, active word in accent `#FFD60A`; Bold Inter 900 84 lp, upper case, 12 x 2, 3 words, 10 lp stroke, the active word pops 1.0 → 1.12 → 1.0 over 140 ms back-out; Tech JetBrains Mono 700 56 lp, as spoken, 22 x 2, 5 words, no stroke, a rounded panel (radius 24 lp, 32 lp padding) at 85% opacity behind the chunk, active word green `#3DDC84`, a block cursor (0.6 em wide, the line's height) after the active word. KeywordPop in every style: 1.0 → 1.25 → 1.10 over 180 ms from the word's start, colour `accent_alt` | TS §19.4 gives the table; the pop amplitude for Bold, the panel's radius and padding, and the cursor size are not given |
 
 ### 2.5 Event visuals, watermark, summary
 
@@ -177,8 +206,8 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 |---|---|---|
 | D-140 | **ListReveal layout.** In the Event zone: the header (when not empty) at 56 lp in the display font, then up to five items at 48 lp, each `"{ordinal}. {text}"`, stacked with 16 lp between lines, left-aligned at the zone's left plus 40 lp. From six items on, every text shrinks by the same factor so that all lines fit (minimum 32 lp; below that the extra items are not drawn and the event counts as drawn). Each item fades in and rises 24 lp over 200 ms ease-out from its own `at` (in program time); the whole list holds until the last item's end + 1,500 ms and fades over 200 ms (TS §19.5) | TS §19.5 gives the timing, not the sizes |
 | D-141 | **FromTo layout.** Two columns in the Event zone. Each shows its value at 96 lp (auto-fit to the column, minimum 56 lp; below it the event is not drawn, as TS §19.7 does for a number) above a bar whose height is `value / max(from, to)` of 180 lp, minimum 8%. The "from" column appears at the first anchor, the arrow (a filled path) and the "to" column at the second anchor's first word; the "to" value in `accent`, scaled 1.15. No label row in V4 (`FromTo.label` is `None`, D-85). A negative or zero value draws a bar of 8%. Hold to `span.end + 1,500 ms`, fade 200 ms | Same; the second anchor's time is read from `ValidItem.anchors` and the transcript, not stored in `EventParams` |
-| D-142 | **The crop offset.** `CropOffsetControl` (landscape and square clips only) is a range input from -1.0 to 1.0, step 0.01; the value is committed on release (`change`), not on every move, so one drag is one `setScene` and one `review_action`. Dragging previews through the next `setScene`, not through a per-move redraw | PS §8 principle 3 allows one crop offset; a scene rebuild per pointer move would cost a scene build per event |
-| D-143 | **Watermark.** `watermark.rs`: the text `WATERMARK_TEXT = "Made with Offcut"` (the working name A-11; one constant), Inter 700 at 36 lp, white at 60% opacity with a 3 lp dark stroke, its baseline 6 lp above the bottom of the safe area and its left at the safe area's left (TS §19.1 anchor). `layout_safe_area.rs` asserts that its box overlaps no caption box in any style on any labeled transcript. (assumption, alpha: PS §19 minor) | The bottom of the caption zone is the bottom of the safe area: an overlap is possible with Bold's two lines and must be shown not to happen, not assumed |
+| D-142 | **The crop offset.** Dragging the video on the preview is the main way (D-183); `CropOffsetControl` (landscape and square clips only) is a range input from -1.0 to 1.0, step 0.01; the value is committed on release (`change`), not on every move, so one drag is one `setScene` and one `review_action`. Dragging previews through the next `setScene`, not through a per-move redraw | PS §8 principle 3 allows one crop offset; a scene rebuild per pointer move would cost a scene build per event |
+| D-143 | **Watermark.** `watermark.rs`: the text `WATERMARK_TEXT = "Made with Offcut"` (the working name A-11; one constant), Inter 700 at 36 lp, white at 60% opacity with a 3 lp dark stroke, its baseline 6 lp above the bottom of the safe area and its left at the safe area's left (TS §19.1 anchor). `layout_safe_area.rs` asserts that its box overlaps no caption box in any style on any labeled transcript, at the three snap points of D-171. (assumption, alpha: PS §19 minor) | The bottom of the caption zone is the bottom of the safe area: an overlap is possible with Bold's two lines and must be shown not to happen, not assumed |
 | D-144 | **`summary.rs`** (`change_summary`): `voice_cleaned: true` (the chain always runs since V3), `captions_emphasized`: the drawn KeywordPop items, `visual_moments`: the drawn items of the other kinds. A disabled or undrawable item is not counted | TS §10.6. V2's stand-in returned `false` and counted NumberReveal only |
 | D-145 | **Item visibility in the scene.** An item is drawn when `event_overrides.get(id)` is `true`, or is absent and the item is enabled by default (every V4 item is). Overrides of ids that no longer exist after a word edit are kept in `EditState` and ignored | TS §10.8: toggles survive by `EventId`; an override must not be lost because a sentence was re-detected and the event came back with the same id |
 
@@ -186,7 +215,7 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 
 | # | Decision | Why |
 |---|---|---|
-| D-146 | **A word edit, end to end.** `CaptionEditor` shows the effective words of the clip, one button per word; clicking one opens an inline input with the word's current text; Enter or blur commits, Escape cancels; an empty commit hides the word. `edit-word.ts`: clip `ready → updating`; `edit.word_edits` updated; `editsRepo.put`; `pool.render.redetectSentence({ sentence, wordEdits })` → events; `pool.render.rulesPlan({ transcript, events })` → plan; `pool.render.setScene(...)`; clip `updating → ready`; `review_action { action: "word_edit" }`. The worker keeps the transcript, the prosody and the last events from `detect` to serve `redetectSentence` (the frozen method takes no transcript) | C-6, with the plan step of D-124. One word at a time is the smallest control that fixes a mis-heard word; PS forbids a timeline |
+| D-146 | **A word edit, end to end.** The interface is the transcript editor of D-182 and the click on the preview of D-183; this row is the flow behind them. `edit-word.ts`: clip `ready → updating`; `edit.word_edits` updated; `editsRepo.put`; `pool.render.redetectSentence({ sentence, wordEdits })` → events; `pool.render.rulesPlan({ transcript, events })` → plan; `pool.render.setScene(...)`; clip `updating → ready`; `review_action { action: "word_edit" }`. The worker keeps the transcript, the prosody and the last events from `detect` to serve `redetectSentence` (the frozen method takes no transcript) | C-6, with the plan step of D-124. One word at a time is the smallest control that fixes a mis-heard word; PS forbids a timeline |
 | D-147 | **The review panel's update rule.** Every review use-case: if the preview is `playing`, `controlPreview.pause()` first and `play()` after `setScene` resolves (TS §12.4); a second change while one is in flight waits for it (one queue in `clip-store`'s `updating` state, the machine refuses `edit_start` from `updating`); an `IllegalTransitionError` is a bug. The edit is optimistic: the store holds the new `EditState` before the worker answers, and a worker failure there is shown by `ErrorPanel` with "Undo this change", which restores the previous `EditState` and calls `setScene` again | TS §13.4 "edits are optimistic and local"; C-6 "preview paused during the update, then restored" |
 | D-148 | **Seek.** `PreviewPlayer` gains a scrub bar (`input type="range"`, 0 to the clip's program duration, step one frame). Pointer-down → `previewStore.seek()` (`playing|paused → seeking`); each input event → `controlPreview.seek(at)` (throttled to one in flight); pointer-up → `seek_done_playing` or `seek_done_paused` and, when it was playing, the audio restarts at `at`. `RenderWorkerApi.previewSeek({ at })` draws the frame of `at` with `frameAtBlocking` and resolves; `video-source` restarts at the keyframe at or before the source time when `at` is outside its queue (TS §20.2). Target: first frame at most 300 ms after the seek for GOPs of 2 s or less (assumption, M1.5); a spinner after 300 ms. The scrub bar is a player control, not an edit slider (PS principle 3 is about edits) | TS §20, C-5's `<Seek>` |
 | D-149 | **The preview's 360x640 fallback.** `runPreview` measures `render_frame`'s cost; when the mean over the last 60 frames exceeds 28 ms, it calls `session.resize(360, 640)` once and the scene is set again at the preview profile scaled by 2/3. The page's canvas element keeps 540x960 CSS pixels. It is recorded in `PreviewStats.downscaled` and never undone for that clip (assumption, M1.5) | TS §20.3 |
@@ -194,8 +223,8 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 | D-151 | **Progress throttle.** `rpc-worker.ts` sends at most 10 `progress` messages per second per job: a progress without a feed line inside 100 ms of the last one sent is held and replaced by the next; a held one is flushed before the job's `res`. A progress carrying a feed line is always sent at once (TS §14.3: feed lines are never dropped) | TS §14.3 |
 | D-152 | **Cancel.** `pool.cancel(kind)` posts `{ type: "cancel", jobId }` for that worker's pending job and resolves when the job answers or after `CANCEL_TIMEOUT = 2,000 ms` (assumption, M1.5); on timeout `pool.restartWorker(kind)` terminates the worker, rejects its pending calls with `E_WORKER_CRASH` and makes a fresh one on the next call. `usecases/cancel-job.ts::cancelJob(scope)` with `scope: "import" \| "pipeline" \| "model" \| "export"`: import → media; pipeline → whichever of media, asr, audio, render holds the pipeline's current job, then `pool.audio.release()` and `pool.render.closeSession()`, clip `processing → accepted`; model → `modelManager` aborts its download (the bytes stay for resume); export → render, partial file deleted, export `rendering|muxing → cancelled → idle`. Each sends `job_cancelled { stage }` | C-12, TS §14.3 |
 | D-153 | **Crash and retry.** A worker's `error` or `messageerror` event rejects its pending calls with `E_WORKER_CRASH` (stage of the pool row) and marks the client dead; the next call creates a new worker (`restartWorker`). In V4 there is no restart budget (V7): a second crash in the same clip is shown as the first was. `ErrorPanel` shows the code's copy (section 17) and one retry: for a clip in `failed`, `runPipeline` from step A (`failed → processing` by `retry`); for a failure while `ready` (the preview or an edit, `E_GPU_LOST`, `E_GPU_INIT`, `E_WORKER_CRASH` of the render worker), "Reload preview" reopens the session, sets the scene and attaches a new canvas without re-processing. Every shown failure sends `client_error { error_code, stage }` once | C-14; resume from the last completed stage needs the records V7 reads |
-| D-154 | **`NO_EVENTS_FOUND`** is shown in `ReviewPanel` above `PlanItemList` when the valid plan has no item, in place of the empty list; the copy is PS §10 J7's sentence. `pipeline-preview.spec.ts` asserts it on `speech_20s_noevents.mp4` | PS §10 J7, V3 §21.2 |
-| D-155 | **Preview statistics reach the tests through the page.** `previewPlay` resolves with `PreviewStats { frames, late, maxDriftMs, downscaled }`; `control-preview.ts` stores the last one in `preview-store` (`lastStats`); `PreviewPlayer` writes it as `data-frames`, `data-late`, `data-max-drift-ms` and `data-downscaled` on its root element. Nothing is sent anywhere | `preview-sync.spec.ts` must read the drift (TS §20 acceptance) without a test hook in a worker |
+| D-154 | **`NO_EVENTS_FOUND`** is shown in the Visuals tab (`PlanItemList`, D-187) when the valid plan has no item, in place of the empty list; the copy is PS §10 J7's sentence. `pipeline-preview.spec.ts` asserts it on `speech_20s_noevents.mp4` | PS §10 J7, V3 §21.2 |
+| D-155 | **Preview statistics reach the tests through the page** (and, in development and test builds only, `data-caption-text`, `data-caption-colors` and `data-caption-position` mirror the visible chunk for the editor's tests; stripped from production like the dev hooks of section 20.4). `previewPlay` resolves with `PreviewStats { frames, late, maxDriftMs, downscaled }`; `control-preview.ts` stores the last one in `preview-store` (`lastStats`); `PreviewPlayer` writes it as `data-frames`, `data-late`, `data-max-drift-ms` and `data-downscaled` on its root element. Nothing is sent anywhere | `preview-sync.spec.ts` must read the drift (TS §20 acceptance) without a test hook in a worker |
 | D-156 | **The long-task check.** `pipeline-preview.spec.ts` records `PerformanceObserver("longtask")` entries on the page from the drop to `ready`, and asserts that none exceeds 100 ms, excluding the first `WebAssembly.instantiate` of each bundle on the main thread if any (TS §13.5, assumption M2.4). A failure is fixed by moving the work behind a worker method (TS §13.5 contingency), not by raising the limit | V3 §21.2 assigned it to V4 |
 
 ### 2.7 Tests, dependencies, copy
@@ -204,10 +233,10 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 |---|---|---|
 | D-157 | **`insta`** (dev) in `offcut-scene` and `offcut-plan`, with the `json` feature; snapshots under each crate's `tests/snapshots/`, committed; CI runs with `INSTA_UPDATE=no` and `CI=true` so an unreviewed snapshot fails. **`png`** (dev) in `offcut-render` for the goldens | V2 §25.2 named `insta` for V4; `png` is the smallest crate that reads and writes the golden files |
 | D-158 | **`layout_safe_area.rs` builds its scenes from the labeled set.** It reads the 31 files of `fixtures/labeled/`, synthesizes word times as `precision_recall.rs` does (V3 §19.12), detects with `offcut-detect` (a dev-dependency of `offcut-scene`), builds the rules plan, validates it and builds the scene in each of the three styles at 1080 wide, then checks every frame (step 33 ms) for the safe area and the watermark rule of D-143 | TS §26 names the labeled files as its input; V3 §21.3 promised them |
-| D-159 | **Copy.** `messages.review` (panel title, the editor's hints, "hide this word", toggle labels per kind, style names, crop label, "Undo this change"), `messages.preview` (seek label, "Loading frame"), `messages.cancel` (the four scopes' buttons and "Cancelled. Process again / Start over"), `messages.noEventsFound`. **Error copy** (`title`, `body`, `action`) for every code a person can meet in V4 leaves `COPY_PENDING`: `E_STORAGE_QUOTA`, `E_STORAGE_IO`, `E_DECODE_AUDIO`, `E_DECODE_VIDEO`, `E_ASR_RUNTIME`, `E_ASR_OOM`, `E_DSP`, `E_GPU_INIT`, `E_GPU_LOST`, `E_ENCODE_VIDEO`, `E_ENCODE_AUDIO`, `E_MUX`, `E_WORKER_CRASH`, `E_INTERNAL`. The `.persistent` variants stay V7's; the auth, billing and network codes stay pending until V6 | `ErrorPanel` must say something specific for every failure it can show (PS §9.4 rule, TS §13.4); `check-copy-codes.mjs` enforces it |
+| D-159 | **Copy.** The keys of section 17.5, written in the tone of D-177 and D-190. **Error copy** (`title`, `body`, `action`) for every code a person can meet in V4 leaves `COPY_PENDING`: `E_STORAGE_QUOTA`, `E_STORAGE_IO`, `E_DECODE_AUDIO`, `E_DECODE_VIDEO`, `E_ASR_RUNTIME`, `E_ASR_OOM`, `E_DSP`, `E_GPU_INIT`, `E_GPU_LOST`, `E_ENCODE_VIDEO`, `E_ENCODE_AUDIO`, `E_MUX`, `E_WORKER_CRASH`, `E_INTERNAL`. The `.persistent` variants stay V7's; the auth, billing and network codes stay pending until V6 | `ErrorPanel` must say something specific for every failure it can show (PS §9.4 rule, TS §13.4); `check-copy-codes.mjs` enforces it |
 | D-160 | **The V2 and V3 cases V4 rewrites**, by name. `pipeline-preview.spec.ts`: "Preview plays" (the canvas now also carries the `data-*` statistics; the assertion of D-155 is added), "Events" (`setScene` takes a plan: the `pipeline_done` counts are unchanged). `export-creator.spec.ts`: none. `offcut-scene`'s inline tests in `lib.rs`, `captions.rs`, `framing.rs` and `number_reveal.rs` change their calls to the V4 contract (plan, map, theme, fonts, `OutMs`); their expected values do not change, except `framing.rs`'s "any offset" case, which now asserts the offset (V2's stand-in is gone). No other V2 or V3 expectation changes | V3's rule: a changed expectation is named, never silent |
 | D-161 | **Stage timing.** The plan and the assembly are measured inside `stage_timing detect_scene` (from `openSession` to the first `setScene` resolving, `rulesPlan` and `assemble` included). No `PipelineStage` is added in V4: `Plan` arrives with V6.1 (TS §10.6) | `PipelineStage` is an analytics enum; adding a member is V6.1's, when the stage exists |
-| D-162 | **Bench.** `bench/device-bench.ts` is unchanged in its stages and file name (V3 §21.1). S15 runs it once on the portrait clip so that `detect_scene` (now with the plan and the assembly) and `render_encode` (now with the V4 look) are compared with V3's file | The bench shape is frozen; the reading is what V4 owes |
+| D-162 | **Bench.** `bench/device-bench.ts` is unchanged in its stages and file name (V3 §21.1). S17 runs it once on the portrait clip so that `detect_scene` (now with the plan and the assembly) and `render_encode` (now with the V4 look) are compared with V3's file | The bench shape is frozen; the reading is what V4 owes |
 
 ### 2.8 What V4 builds for V6.x without a user (the complete list)
 
@@ -217,6 +246,43 @@ Numbering continues from V3's D-112. Each is the smallest choice that keeps V5 t
 | D-164 | **No V6.x behaviour leaks into V4.** No network call is added. No catalog kind beyond the four. No cut is applied, no music mixed, no image drawn. `validate` in V4 drops every non-item field (D-121), so a hand-made plan with a cut cannot shorten an export | The seams must not change what V4 does; they only remove what V6.x would otherwise have to rewrite |
 | D-165 | **The plan crate's `validate` takes `PlanConfig`**, holding the per-kind limits of V-4 and V-6 (`max_per_clip`, `min_gap`, label lengths), with `PlanConfig::default()` read from the catalog. V4's limits for the four kinds: NumberReveal 8 per clip, min gap 1,500 ms; ListReveal 3, 10,000 ms; FromTo 4, 3,000 ms; KeywordPop 12, 800 ms; labels 32 characters, list headers 24 (all (assumption, V6.1, E-11)). **The rules plan passes V-6 untouched in practice**: the detector's `resolve` already removes overlaps (TS §17.5), and `validate_rules_plans.rs` asserts that no rules plan of the labeled set loses an item to V-6 | One validator for both producers (TS §40.4); a limit that cut detector output would change the V3 event counts silently |
 | D-166 | **Scene build budget.** `build_scene` at most 1 s and `frame_at` on average at most 2 ms for the 60 s portrait clip (TS §19 acceptance), now including validation and the time map; measured natively in release (`scene_timing`, an `#[ignore]` test) and in the browser through `stage_timing detect_scene`. Over budget: profile before S12; the usual cause is shaping per frame, which the layout-once rule of V2 forbids | TS §19, §30 |
+
+### 2.9 Caption intelligence: the output quality (founder's brief of 2026-10-22, part A)
+
+| # | Decision | Why |
+|---|---|---|
+| D-167 | **Smart line breaks.** `captions::chunk` keeps its hard breaks (a sentence end; a pause of `CHUNK_GAP_MS` or more; `max_words`; the line and character limits) and, between two hard breaks, chooses the chunk and line boundaries with the least total cost, by dynamic programming over the words (at most 40 words between hard breaks: TS §17.2's split, so the table is small). Costs, all in `readability.rs` [ONLY] (assumption, E-2): a break after `,` `;` `:` `—` costs 0; a break before a clause word (`CLAUSE_STARTERS`: and, but, so, because, which, that, when, if, or, then, while, until, …) costs 1; a plain break costs 3; a break **after a binder** (`BINDERS`: articles, possessives, prepositions, "to", auxiliaries and modals, "not", number words that modify the next word) costs 12, so "the / product" or "to / build" almost never happens; a chunk of one word costs 8 unless a pause of at least 250 ms stands on both sides of it (a deliberate one-word beat stays alone); within a chunk, two lines whose lengths differ by more than a third cost their difference in characters (balanced lines, no orphan word on line two). A number is one caption word already (TS §17.2) and is never split. The result is deterministic (INV-7) | "Smart line breaks that are easy to read on a phone." Character-count chunking breaks phrases in half; a phrase-aware cost is what professional subtitling does, and it needs no model |
+| D-168 | **Reading time.** A chunk is shown at least `MIN_CHUNK_MS = 700 ms`: when its words are spoken faster, its show end is extended into the silence after it, up to the next chunk's lead (never overlapping it, TS §19.4) and never past the next word by more than `CHUNK_TAIL_MS`. When there is no silence to extend into, the chunk is shorter than 700 ms and nothing else changes: no word is moved (INV-5) | A caption that flashes is unreadable; the floor uses silence the speaker already left, so timing stays truthful |
+| D-169 | **Emphasis in captions, three layers**, drawn in this precedence: (1) the **spoken word**, through the style's active treatment; (2) a **stressed word** (a KeywordPop item: prosody and lexicon, V3) pops in `accent_alt`; (3) a **number** (a caption word that shows a quantity's display) is drawn in `accent` when `highlight_numbers` is on (default on, a switch in the Style tab, D-186). No other word is coloured: emphasis that is everywhere is nowhere | "Highlights and animations that emphasize the right words." The three signals V4 has are real (timing, prosody, parsed numbers); the AI plan of V6.1 adds its own picks as items, through the same layers |
+| D-170 | **The default style is the premium one.** `Clean` (the default, `StyleId::Clean`) is redesigned for content creators in general: Inter 800 (a fifth font instance, `FontKey(4)`, appended to `FontSet::embedded()`, D-132's rule), 72 lp, as spoken, 16 characters x 2 lines, 4 words, white with a 5 lp dark stroke and a hard drop shadow (the run drawn again under itself, offset 0 x 4 lp, black at 45%); the **active word sits on a rounded pill** (radius 14 lp, padding 12 x 4 lp) in `accent` (`#FFD60A`) with the word in `#111114`; the pill **slides** from word to word over 90 ms ease-out and grows from 0.9 to 1.0 as it arrives. `Bold`: Inter 900, upper case, 84 lp, 3 words, the active word in `accent`, 10 lp stroke, each word pops 1.0 → 1.12 → 1.0 over 140 ms back-out. `Tech` keeps its ID and its look (JetBrains Mono, dark panel, green active word, block cursor) and is named **"Mono"** in the interface. `ActiveTreatment` gains `Pill`; `StyleSpec` gains `shadow: Option<ShadowSpec { offset: (f32, f32), role: Role, opacity: f32 }>`. Supersedes D-139 for Clean; all values (assumption, E-2) | "A great default style immediately." The pill is the look creators recognise from the best caption tools; a creator who never opens the Style tab must still get it |
+| D-171 | **Caption placement the user can drag.** `EditState` gains `caption_position: CaptionPlacement` (a checked `f32` in `0.0..=1.0`, like `CropOffset`; default `1.0`), the vertical place of the caption block's centre between `CAPTION_TOP = SAFE.top + 140` (0.0) and `CAPTION_BOTTOM = SAFE.bottom - 140` (1.0) lp, so the default reproduces V3's zone (centre 1360). Three snap points: Top 0.15, Middle 0.55, Bottom 1.0. **The event zone follows the captions**: when the caption centre is at or below the canvas middle (960 lp), the event zone ends 40 lp above the caption block (the default gives V3's 860-1180); above the middle, it starts 40 lp below it. The watermark's band is below the lowest caption position at every placement (D-143's test runs at the three snap points). Automatic placement around a face is P1 (face tracking): the drag and the snaps are how a creator keeps captions off a face or a product in V4. **REOPENED V1 CONTRACT (`EditState`)**: two fields, `caption_position` and `highlight_numbers` (D-169), both with serde defaults so the `edits` records of V3 still read | "Consistent positioning … without covering faces or important content (user should be able to drag)." One number per clip is the smallest control that does it |
+| D-172 | **The preview is the export, by construction and by test.** One scene, one renderer, layout in logical pixels scaled to the output, no font hinting (Vello draws unhinted outlines), so the 540 x 960 preview and the 720 and 1080 exports differ only by scale. `tests/parity.rs`: for six scenes, the display lists at 540, 720 and 1080 are equal after scaling, every coordinate within 0.01 lp; `golden_frames.rs`'s parity case renders the three styles at 1080 and at 540 and compares the 1080 image box-filtered to 540 with the 540 image at SSIM ≥ 0.99. The one deliberate difference, the Free watermark (INV-9), is announced by the page, not hidden: the preview shows a "Free exports include a small watermark" badge next to the player (page chrome, not drawn into frames) when the user is not on Creator. V5 adds an exported frame against a preview frame (section 22.2) | "Final exports that look exactly like the preview." Saying it is not enough; the two tests make it a property of the code |
+| D-173 | **Edit to preview within 150 ms** (TS §13.5, assumption M1.5), measured from the commit of a word edit to the first frame drawn with it, on the 60 s portrait clip on D1. Two mechanisms: (1) `layout.rs` keeps, per thread, a cache of shaped runs (2,048 entries, least recently used) keyed by text, `FontKey` and size bits; `scene_cache.rs` asserts output identical with the cache cold, warm and disabled (INV-7 holds); (2) after `setScene` the worker **redraws the frame at the current position** when the preview is paused, so a correction is on screen without pressing play | "Click a word to correct it; see the correction reflected immediately." A full scene build re-shapes every word; with the cache only the edited chunk is shaped |
+| D-174 | **Hit testing.** `Scene::hit(t: OutMs, x: f32, y: f32) -> Option<Hit>` in logical pixels, `Hit::Word(WordIdx)` for a caption word drawn at `t` (its glyph box plus 8 lp), `Hit::Captions` for the caption block's box, `Hit::Video` otherwise. Pure, from the chunk layout already built. Exposed as `RenderWorkerApi.hitTest({ at, x, y })` with `x`, `y` as fractions of the canvas | Click a caption word on the preview to edit it, drag the caption block, drag the video: three gestures, one function |
+| D-175 | **"Fix it everywhere."** When a word is edited from text `a` to `b`, and other words whose **original** text equals `a` (case-folded, whole word) are not edited yet, a toast offers "Change all N"; accepting adds every one of them to `word_edits` in one change (one undo step, D-184), and the events are recomputed with `detect` over the whole transcript with the new edits (the render bundle's `detect` takes edits since V3) | Names, brands and jargon are what the recognizer gets wrong, and they repeat; fixing "Jhon" once should fix it in all six places |
+| D-176 | **Suggestions, honestly scoped.** In V4 the product suggests: the visuals (rules plan items, shown as "Suggested visuals" with a switch each), "Change all N" (D-175), the premium default style, highlighted numbers. It does **not** flag words as "maybe mis-heard": the recognizer returns no per-word confidence (TE-2, `Confidence(1.0)` everywhere), and a flag without a signal would be noise. Recorded for V9 (E-10) and V6.1 (the model may mark doubtful words; a catalog row) | "Smart suggestions instead of making users edit every detail", without inventing a signal V4 does not have |
+
+### 2.10 Editor experience and design (founder's brief of 2026-10-22, part B)
+
+| # | Decision | Why |
+|---|---|---|
+| D-177 | **Audience: content creators in general**, not only technical creators (the founder's decision of 2026-10-22; copied back to PS §3, §4, §6 at S16, technical creators remaining the first distribution channel). Consequences for V4: no jargon anywhere a person reads. The interface says "Visuals" (not events or plan items), "Captions", "Style", "Framing", "Export"; visual kinds are "Big number", "List", "Before → after", "Emphasis"; styles "Clean", "Bold", "Mono". Never "LUFS", "detector", "scene", "plan", "WebGPU" outside the settings page's technical note | A creator who is not technical must understand every word on screen without help |
+| D-178 | **The editor's layout** (desktop, from 1024 px wide; the capability check already refuses phones). **Top bar** (56 px): product mark; clip length; save state ("Saved on this device", D-184); undo and redo; **Export** as the one primary button. **Stage** (centre): the preview in a 9:16 frame with rounded corners at the largest size that fits (at most 960 px tall), on a dark backdrop, with the transport under it: play/pause, current time / length, scrub bar. **Side panel** (right, 360 px; 320 px below 1280 px wide): four tabs, **Captions · Style · Visuals · Framing**, the selected one remembered per session. Processing shows the same frame with the steps inside it (D-188), so the page does not jump when the preview arrives. Nothing scrolls horizontally; the side panel scrolls on its own | Creators judge an editor in seconds; the industry-standard layout (big preview, one panel of controls, one primary action) needs no learning |
+| D-179 | **Visual design system** in `ui/styles/tokens.css` (`[ONLY]` design values): the editor is **dark** (`--bg #0E0E11`, `--surface-1 #16161B`, `--surface-2 #1D1D23`, `--border #2A2A32`, `--text #F4F4F6`, `--text-2 #A3A3AD`, `--brand #8B5CF6`, `--brand-hover #7C4DEE`, `--ok #34D399`, `--warn #FBBF24`, `--danger #F87171`); the landing page keeps following the system's light or dark (unchanged). Type scale 12/13/14/16/20/24/32 px, weights 400/500/600/700; spacing on a 4 px grid (4, 8, 12, 16, 24, 32, 48); radii 6 (controls), 10 (cards), 16 (panels, the preview frame); two elevations (a 1 px border and a soft shadow); motion `--fast 120ms`, `--base 200ms`, `ease-out`, all non-essential motion off under `prefers-reduced-motion`; focus ring 2 px `--brand` with 2 px offset on every interactive element; hit targets at least 32 x 32 px; text and controls at WCAG AA contrast or better. All (assumption, design review D-191) | "Clean, premium and user friendly." A system of tokens is what makes 30 components look like one product; a dark editor makes the video the brightest thing on screen |
+| D-180 | **The interface font is Inter**, self-hosted as one variable WOFF2 (Latin subset) at `/fonts/inter-latin.woff2`, `font-display: swap`, preloaded on `/app`; `system-ui` is the fallback. CSP `font-src 'self'` allows it; TS §36 forbids fonts from a CDN, not from our origin. Its licence (OFL) joins `LICENSES.md`; the app-shell budget (400 kB gzip, TS §13.5) is measured with it at S17, and if the font breaks the budget the shell returns to system fonts. `tokens.css`'s first comment ("system fonts only") is corrected. The captions' fonts are unchanged (embedded in the scene) | The same typeface in the interface and in the captions makes the product feel designed, and Inter is already licensed and in the repository |
+| D-181 | **Interface primitives**, in `ui/primitives/`, CSS Modules on the tokens, no component library (TS §36): `Button` (primary, secondary, ghost, danger; sm, md), `IconButton` (always with a tooltip and an accessible name), `Tabs` (roving tab index, arrow keys), `Switch`, `SegmentedControl`, `Slider` (a native range, styled, value shown), `Tooltip` (after 400 ms, on focus too), `Toast` (bottom centre, one action, 5 s, paused on hover), `Spinner`, `Skeleton`, `PanelSection` (title, optional hint, body), `Kbd`. Each is keyboard-operable and labelled from `messages.ts`. **Icons**: `ui/icons.tsx`, about 20 inline SVG paths taken from Lucide (ISC licence, listed in `LICENSES.md`), 20 px, 1.75 stroke, `currentColor` | A small owned set keeps the bundle small and every control consistent |
+| D-182 | **The transcript editor** (the Captions tab; this is `CaptionEditor.tsx`, replacing D-146's word buttons): the transcript as flowing text, in blocks that are the caption chunks (each with its start time, clickable to seek). While playing, the spoken word is highlighted and kept in view (a "Follow" switch, on by default, off as soon as the user scrolls). **Click a word**: the preview seeks to it and pauses, and the word becomes an inline field with its text selected; Enter or Tab commits (Tab moves to the next word), Escape cancels, an empty commit hides the word. Edited words carry a dotted underline; hidden words are struck through and keep a "Show" button; a word's menu (⋯ on hover, or the context-menu key) offers "Hide", "Restore original". After a commit, D-175's toast may offer "Change all N" | "Click a word to correct it", the way creators already fix transcripts in the best tools, with the video following the text |
+| D-183 | **Direct manipulation on the preview** (only while paused or stopped; the cursor says what a press will do, from `hitTest`, at most once per animation frame): **click a caption word** → the Captions tab opens with that word in its field; **drag the caption block** up or down → its position, snapping within 16 px of Top, Middle and Bottom, a thin guide line showing the snap, committed on release as one change (D-171); **drag the video sideways** on a landscape or square clip → the crop offset, with the 9:16 frame outline drawn as interface chrome during the drag, committed on release (D-142's slider stays in the Framing tab as the accessible way). Interface chrome drawn over the canvas is never part of a frame | Direct manipulation is faster than any panel, and each gesture maps to one value the scene already reads |
+| D-184 | **Undo and redo, and autosave.** `state/history.ts` keeps up to 50 `EditState` snapshots of the current clip: every review change pushes one (a replace-all is one); **Ctrl/⌘+Z** and **Shift+Ctrl/⌘+Z** (and Ctrl+Y), and the two top-bar buttons, apply a snapshot through `review-update.ts` (mode `plan` when the word edits differ, else `scene`). The history is cleared with the clip and is not kept across a reload (V7). Every change is already written by `editsRepo.put`; the top bar shows "Saved on this device" (and "Saving…" while a write is pending) | Fear of breaking something is what stops people editing; undo removes it. Autosave already exists and should be visible |
+| D-185 | **Keyboard**: Space plays and pauses (unless focus is in a text field); ← and → step one frame when paused, Shift+← and Shift+→ one second; Ctrl/⌘+Z, Shift+Ctrl/⌘+Z undo and redo; Escape closes a field or a menu; `?` opens a shortcuts sheet. One hook, `ui/hooks/use-shortcuts.ts`, owns the map; every shortcut is also a visible control | Fast for the people who edit every day, invisible to the people who do not |
+| D-186 | **The Style tab.** Three **style cards**, each showing the clip's current frame drawn in that style by the real renderer: `RenderWorkerApi.styleThumbnails({ at })` renders three 216 x 384 frames with the current edits and returns three `ImageBitmap`s (transferred); they refresh, debounced 300 ms, when the position, the words or the placement change, only while the tab is shown. Each card: the image, the name, one line ("Clean: soft and premium, the spoken word on a highlight"). Below: the **Highlight numbers** switch (D-169). What the card shows is what the export will show (D-172) | Choosing by looking at your own video is faster and more trustworthy than reading style names |
+| D-187 | **The Visuals tab**: the suggested visuals in time order, each a row with its kind's icon, its friendly label, its figure ("90 min → 10 min"), its time (click to seek) and a switch; a header "4 of 5 visuals on". With none: the `NO_EVENTS_FOUND` sentence and one line on what Offcut looks for ("numbers, lists and before-and-after comparisons you say out loud"). The **Framing tab**: caption position (segmented Top · Middle · Bottom, plus "drag the captions on the preview" hint) and, for landscape and square clips, the crop slider with "or drag the video" | Each tab has one job and tells the user what to do |
+| D-188 | **Processing screen**: inside the preview frame, a checklist of four steps in plain words (Preparing audio · Cleaning your voice · Writing captions · Finding visual moments), the current one animated, done ones ticked; found moments appear as chips under it as they arrive (the feed of V3); the line "Everything runs on your computer. This usually takes a couple of minutes."; Cancel. The model's first-run download uses the same frame and tone (the size, a progress bar, "only the first time") | Waiting is part of the experience; showing real progress in plain words keeps people from leaving |
+| D-189 | **Export progress** (V4's part; V5 adds the summary): the Export button turns into a progress pill in the top bar (percent and the stage in words: "Rendering video", "Finishing file"), a determinate bar, time left once 3 s of frames give a rate, and Cancel; done shows a success state with "Download again". Errors through `ErrorPanel` (D-190) | "Reliable exports, clear progress" |
+| D-190 | **Errors and recovery, in words people use**: `ErrorPanel` is an inline card where the failure happened (the stage area, the panel, or the export pill), never a modal: a short title, what happened in one sentence, what to do, one primary action (Try again, Reload preview, Undo this change) and "Start over" as secondary. Codes and details never show to users (development builds may expand a "Details" section). Copy written for the 14 codes of D-159 in this tone | "Easy recovery from errors" |
+| D-191 | **Design review gates.** (1) **Mid-version review** (step S10A): with the shell, the primitives and the editor layout showing real states, `tests-e2e/screens.spec.ts` (D1 only, not in CI) captures eight screens (empty, model download, processing, ready, editing a word, style tab, error, exporting) at 1280 x 800 and 1920 x 1080 into `web/test-results/screens/` (git-ignored); the founder reviews them and the requested changes are made before the review flows are wired. (2) **Exit review**: the same capture on the finished build, a visual QA list (4 px grid, alignment, hover, focus and pressed states on every control, empty, loading and error states present, reduced motion, no clipped text in the three styles at both widths) and the five goldens | "Good UI/UX design is a must": a design is accepted by looking at it, on the reference widths, before and after the code that depends on it |
+| D-192 | **Accessibility**: every control reachable and operable by keyboard with a visible focus ring; names and hints from `messages.ts`; the preview canvas has an accessible name, and the transcript editor is its text alternative; processing steps and toasts announce through one `aria-live="polite"` region; `@axe-core/playwright` (dev dependency, MPL-2.0) runs in `review-edit.spec.ts` on the ready and editing states with zero serious or critical violations | Premium includes everyone; the check keeps it true as V6.x adds controls |
+| D-193 | **Interface performance**: no main-thread task over 50 ms during editing interactions (the long-task check of D-156 is extended to a word edit, a style switch and a caption drag); thumbnails, hit tests and scene builds run in the render worker; the transcript of a 90 s clip (about 300 words) renders without virtualisation; every interaction gives feedback within 100 ms (pressed state, spinner after 300 ms) | A premium feel is mostly speed |
 
 ---
 
@@ -246,14 +312,16 @@ Pin each at its latest stable release on the day S1 adds it, and record the vers
 | `offcut-text` (path) | `offcut-plan` | normal | - | `tokenize`, `parse_quantity`, `format_quantity` (D-122) |
 | `offcut-detect` (path) | `offcut-scene`, `offcut-plan` | dev | - | `layout_safe_area.rs` (D-158), `validate_rules_plans.rs`, `plan_from_rules.rs` |
 | `trybuild` (workspace) | `offcut-plan` | dev | - | `ValidPlan` has no public constructor (INV-21) |
+| `@axe-core/playwright` | `web` | dev | - | The accessibility check (D-192). MPL-2.0 |
+| Inter variable WOFF2, Latin subset | `web/public/fonts/` | asset | - | The interface font (D-180). OFL-1.1, the same Inter release as the scene's TTF |
 
-No web dependency is added.
+No runtime web dependency is added.
 
 **Purity check.** `offcut-plan` is a pure crate: `scripts/check-file-tree.mjs`'s `PURE_CRATES` list gains it (V2 §22.4: no `web-sys`, `js-sys`, `wasm-bindgen`, `getrandom`, `rand`, `wgpu`). The native `wgpu` features are dev-only and `cargo tree -p offcut-render -e normal --target wasm32-unknown-unknown` must show neither `vulkan` nor `dx12` crates; S1 records the tree.
 
 ### 3.3 Accounts
 
-Nothing new. The founder opens a draft pull request `v4-build` → `main` (optional, for CI on every push, as in V3); at the exit, reads five golden frames and says whether each looks as intended (section 23), then merges and tags.
+Nothing new. The founder reviews the captured screens at S10A and at the exit (D-191). The founder opens a draft pull request `v4-build` → `main` (optional, for CI on every push, as in V3); at the exit, reads five golden frames and says whether each looks as intended (section 23), then merges and tags.
 
 ### 3.4 Environment variables
 
@@ -285,7 +353,10 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   │   ├── src/timemap.rs              NEW P    [ONLY] TimeMap, Segment, SrcPos; identity only (V6.2: from_segments)
 │   │   ├── src/plan.rs                 NEW F    the wire format, PLAN_FORMAT = 1 (D-119, D-120)
 │   │   ├── src/events.rs               CHANGED  doc comment: EventKind is the plan item kind (D-118); no variant added
+│   │   ├── src/edit.rs                 CHANGED  REOPENED: caption_position (CaptionPlacement), highlight_numbers, serde defaults (D-169, D-171)
 │   │   └── src/summary.rs              unchanged  (fields unchanged; V6.2 adds two)
+│   ├── offcut-api-types/
+│   │   └── src/analytics.rs            CHANGED  ReviewActionKind + caption_position, highlight_numbers, replace_all, undo, redo (section 13)
 │   ├── offcut-plan/                    NEW
 │   │   ├── Cargo.toml                  NEW F
 │   │   ├── src/lib.rs                  NEW P    module list; re-exports; PlanError
@@ -311,7 +382,10 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   │   ├── src/styles.rs               CHANGED  [ONLY] Clean, Bold, Tech as roles + CaptionMotion (D-136, D-137, D-139); P (V6.5 presets)
 │   │   ├── src/motion.rs               NEW P    CaptionMotion, MotionUnit, MotionPreset, ActiveTreatment (V6.5: arms)
 │   │   ├── src/safe_area.rs            CHANGED  [ONLY] ZoneId, zone(); WATERMARK_ANCHOR (D-138); P (rows)
-│   │   ├── src/captions.rs             CHANGED  OutMs; theme roles; words, chunks and lines only
+│   │   ├── src/captions.rs             CHANGED  OutMs; theme roles; words, chunks and lines; the break search of D-167
+│   │   ├── src/readability.rs          NEW P    [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168); V6.x: other languages
+│   │   ├── src/placement.rs            NEW F    [ONLY] caption block and event zone from CaptionPlacement (D-171)
+│   │   ├── src/hit.rs                  NEW F    Scene::hit (D-174)
 │   │   ├── src/captions_draw.rs        NEW P    drawing a chunk: motion, Tech panel and cursor, pops (V6.5: presets)
 │   │   ├── src/anim.rs                 CHANGED  keys in OutMs
 │   │   ├── src/easing.rs               unchanged
@@ -331,6 +405,11 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   │   ├── tests/styles_use_theme.rs   NEW F    D-136
 │   │   ├── tests/timemap_identity.rs   NEW F    S-1 (lives here: it exercises the scene on the identity map)
 │   │   ├── tests/catalog_complete.rs   NEW P    INV-23: catalog kinds and drawn kinds are the same set (V6.x kinds join)
+│   │   ├── tests/line_breaks.rs        NEW F    the table of D-167, written before the algorithm
+│   │   ├── tests/parity.rs             NEW F    D-172
+│   │   ├── tests/placement.rs          NEW F    D-171 at the snap points and the extremes
+│   │   ├── tests/scene_cache.rs        NEW F    D-173: identical output, cache cold, warm, off
+│   │   ├── tests/hit.rs                NEW F    D-174
 │   │   ├── tests/v3_reference.rs       TEMPORARY  S2 to S6 only (D-117), deleted at S7 with its JSON files
 │   │   └── tests/snapshots/            NEW      insta files
 │   ├── offcut-render/
@@ -359,7 +438,7 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   ├── playwright.config.ts            CHANGED  MEDIA_SUITES + preview-sync, review-edit, cancel
 │   ├── src/gen/domain.ts               generated  OutMs, OutSpan, TimeMap, EditPlan and its types (section 12)
 │   ├── src/copy/messages.ts            CHANGED  review, preview seek, cancel, noEventsFound, 14 error entries (D-159)
-│   ├── src/workers/protocol.ts         CHANGED  REOPENED (D-124, D-126, D-127, D-128): rulesPlan, setScene(plan) → SceneReport, previewSeek(OutMs), ClockSync(OutMs), assemble, release, PreviewStats
+│   ├── src/workers/protocol.ts         CHANGED  REOPENED (D-124, D-126, D-127, D-128, D-174, D-186): rulesPlan, setScene(plan) → SceneReport, previewSeek(OutMs), ClockSync(OutMs), hitTest, styleThumbnails, assemble, release, PreviewStats
 │   ├── src/workers/rpc.ts              SPLIT    page side only; + throttle-aware progress; F
 │   ├── src/workers/rpc-worker.ts       NEW F    serveWorker side (D-150, D-151)
 │   ├── src/workers/rpc.test.ts         NEW F
@@ -375,6 +454,9 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   ├── src/wasm/load-core.ts           CHANGED  CoreApi gains assemble
 │   ├── src/wasm/load-render.ts         CHANGED  RenderApi: rulesPlan; RenderSession: set_scene(plan) → report, source_at, resize
 │   ├── src/state/clip-store.ts         CHANGED  plan, prog48 (in place of out48), events setter, edit actions, editing queue
+│   ├── src/state/history.ts            NEW F    undo and redo of EditState, 50 steps (D-184)
+│   ├── src/state/history.test.ts       NEW F
+│   ├── src/state/ui-store.ts           NEW P    selected tab, follow switch, editing word, toasts, save state (V6.x: new tabs)
 │   ├── src/state/preview-store.ts      CHANGED  position, lastStats; seek actions fire
 │   ├── src/state/machines/clip-machine.test.ts  NEW F
 │   ├── src/state/machines/model-machine.test.ts NEW F
@@ -389,23 +471,48 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   ├── src/usecases/set-crop-offset.ts NEW F
 │   ├── src/usecases/review-update.ts   NEW F    the shared update rule of D-147 (pause, queue, setScene, restore, undo)
 │   ├── src/usecases/cancel-job.ts      NEW F    D-152
-│   ├── src/ui/pages/EditorPage.tsx     CHANGED  ReviewPanel, ErrorPanel, the cancelled state
-│   ├── src/ui/components/ReviewPanel.tsx      NEW P   (V6.x: cuts, music, presets, brand kit, post text sections)
-│   ├── src/ui/components/CaptionEditor.tsx    NEW F
-│   ├── src/ui/components/PlanItemList.tsx     NEW P   (V6.x kinds: one label each)
-│   ├── src/ui/components/StylePicker.tsx      NEW P   (V6.5: presets)
+│   ├── src/usecases/set-caption-position.ts NEW F D-171
+│   ├── src/usecases/set-highlight-numbers.ts NEW F D-169
+│   ├── src/usecases/replace-all.ts     NEW F    D-175
+│   ├── src/usecases/undo-redo.ts       NEW F    D-184
+│   ├── src/usecases/preview-interact.ts NEW F   hover and click hit tests, drag commits (D-183)
+│   ├── src/usecases/style-thumbnails.ts NEW F   D-186
+│   ├── public/fonts/inter-latin.woff2  NEW      the interface font (D-180)
+│   ├── LICENSES.md                     NEW      Inter (OFL-1.1), Lucide icons (ISC)
+│   ├── src/ui/pages/EditorPage.tsx     CHANGED  EditorLayout by clip state (section 17.2); preloads the font
+│   ├── src/ui/layout/EditorLayout.tsx  NEW P    top bar, stage, side panel, live region (V6.x: nothing)
+│   ├── src/ui/layout/TopBar.tsx        NEW P    save state, undo, redo, Export / export pill (V6: account menu)
+│   ├── src/ui/layout/Stage.tsx         NEW F    the state's card or the player
+│   ├── src/ui/layout/SidePanel.tsx     NEW P    the four tabs (V6.x: Cuts, Music, Brand tabs or sections)
+│   ├── src/ui/components/PreviewPlayer.tsx    CHANGED  9:16 frame, transport, scrub bar, direct manipulation, watermark badge, data-* statistics
+│   ├── src/ui/components/ProcessingCard.tsx   NEW F   D-188
+│   ├── src/ui/components/CaptionEditor.tsx    NEW F   the transcript editor (D-182)
+│   ├── src/ui/components/StylePanel.tsx       NEW P   cards and Highlight numbers (V6.5: presets)
+│   ├── src/ui/components/StylePicker.tsx      NEW P   the three cards (V6.5: preset cards)
+│   ├── src/ui/components/PlanItemList.tsx     NEW P   the Visuals tab (V6.x kinds: one label and icon each)
+│   ├── src/ui/components/FramingPanel.tsx     NEW F   caption position and crop
 │   ├── src/ui/components/CropOffsetControl.tsx NEW F
 │   ├── src/ui/components/CutsSection.tsx      NEW P   renders nothing in V4 (V6.2)
-│   ├── src/ui/components/ErrorPanel.tsx       NEW P   (V7: persistent copy, "report this")
-│   ├── src/ui/components/PreviewPlayer.tsx    CHANGED  scrub bar, spinner, data-* statistics
-│   ├── src/ui/components/ProcessingFeed.tsx   CHANGED  cancel button
-│   ├── src/ui/components/ModelDownloadPanel.tsx CHANGED cancel button
-│   ├── src/ui/components/ExportProgress.tsx   CHANGED  cancel button
-│   ├── src/ui/styles/components.module.css    CHANGED  classes of the new components
+│   ├── src/ui/components/ErrorPanel.tsx       NEW P   D-190 (V7: persistent copy, "report this")
+│   ├── src/ui/components/ShortcutsSheet.tsx   NEW F   D-185
+│   ├── src/ui/components/ToastHost.tsx        NEW F
+│   ├── src/ui/components/ReviewPanel.tsx      not created: SidePanel takes its place (TS §5 updated at S1)
+│   ├── src/ui/components/ProcessingFeed.tsx   CHANGED  the found-moment chips inside ProcessingCard; its cancel moves to the card
+│   ├── src/ui/components/ModelDownloadPanel.tsx CHANGED restyled; cancel button
+│   ├── src/ui/components/ExportProgress.tsx   CHANGED  the export pill (D-189)
+│   ├── src/ui/components/RejectionPanel.tsx   CHANGED  restyled as a stage card; copy unchanged
+│   ├── src/ui/components/DropZone.tsx         CHANGED  restyled as the empty stage
+│   ├── src/ui/primitives/*.tsx                NEW F   Button, IconButton, Tabs, Switch, SegmentedControl, Slider, Tooltip, Toast, Spinner, Skeleton, PanelSection, Kbd (D-181)
+│   ├── src/ui/icons.tsx                NEW P    about 20 inline SVG icons (V6.x: more)
+│   ├── src/ui/hooks/use-shortcuts.ts   NEW F    D-185
+│   ├── src/ui/styles/tokens.css        CHANGED  [ONLY design values] D-179; @font-face (D-180)
+│   ├── src/ui/styles/editor.module.css, panel.module.css, primitives.module.css, preview.module.css  NEW
+│   ├── src/ui/styles/components.module.css    CHANGED  the classes the restyled V2/V3 components keep
 │   ├── tests-e2e/helpers/fixtures.ts   CHANGED  previewStats(), seekTo(), editWord(), toggleItem(), setStyle(), dragCrop()
 │   ├── tests-e2e/pipeline-preview.spec.ts     CHANGED  zero-event case, long-task case, statistics (D-154, D-156, D-160); F
 │   ├── tests-e2e/preview-sync.spec.ts  NEW F
-│   ├── tests-e2e/review-edit.spec.ts   NEW P    (V6.x: one case per new control)
+│   ├── tests-e2e/review-edit.spec.ts   NEW P    (V6.x: one case per new control); axe check (D-192)
+│   ├── tests-e2e/screens.spec.ts       NEW F    D1-only screen capture for the design reviews (D-191)
 │   └── tests-e2e/cancel.spec.ts        NEW F
 ├── fixtures/
 │   └── golden/*.png                    NEW      16 images (D-135)
@@ -422,7 +529,7 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
         └── experiments.md              NEW      section 21's records
 ```
 
-**Untouched in V4:** every file under `server/`, `crates/offcut-api-types/`, `crates/offcut-entitlement/`, `crates/offcut-mp4/`, `crates/offcut-text/`, `crates/offcut-detect/` (the plan reads them, no file changes); `offcut-dsp`'s chain, its stages and its four test files; `offcut-wasm-core/src/{media_api,hash_api,text_api}.rs`; `offcut-wasm-render/src/{lib,profile_api,mux_api,detect_api}.rs`; `web/vercel.json`; `persistence/*` (the repos are called, not changed; `edits-repo.put` already takes the whole `EditState`); `net/*`; `analytics/client.ts`; `models/*` except through `cancel-job.ts`'s abort, which uses the existing signal; `platform/*`; `state/{capability-store,model-store,export-store,blockers}.ts`; `state/machines/{transition,clip-machine,model-machine,export-machine}.ts` (tables unchanged: V4 fires the events V2 already declared); `workers/{media.worker,asr.worker}.ts` and `workers/{media,asr}/*`; `workers/render/{encoders,opfs-sink}.ts`; `verify/*`; `bench/*`; `corpus/*`; `fixtures/gen_fixtures.sh`, `manifest.json`, `labeled/*`, `speech/*`.
+**Untouched in V4:** every file under `server/` (the server only rebuilds with the wider analytics enum, section 13), every file of `crates/offcut-api-types/` but `analytics.rs`, `crates/offcut-entitlement/`, `crates/offcut-mp4/`, `crates/offcut-text/`, `crates/offcut-detect/` (the plan reads them, no file changes); `offcut-dsp`'s chain, its stages and its four test files; `offcut-wasm-core/src/{media_api,hash_api,text_api}.rs`; `offcut-wasm-render/src/{lib,profile_api,mux_api,detect_api}.rs`; `web/vercel.json`; `persistence/*` (the repos are called, not changed; `edits-repo.put` already takes the whole `EditState`); `net/*`; `analytics/client.ts`; `models/*` except through `cancel-job.ts`'s abort, which uses the existing signal; `platform/*`; `state/{capability-store,model-store,export-store,blockers}.ts`; `state/machines/{transition,clip-machine,model-machine,export-machine}.ts` (tables unchanged: V4 fires the events V2 already declared); `workers/{media.worker,asr.worker}.ts` and `workers/{media,asr}/*`; `workers/render/{encoders,opfs-sink}.ts`; `verify/*`; `bench/*`; `corpus/*`; `fixtures/gen_fixtures.sh`, `manifest.json`, `labeled/*`, `speech/*`.
 
 Three untouched files are worth naming. `state/machines/clip-machine.ts` already has `edit_start`, `edit_done`, `cancel` and `retry`; V4 fires them and writes their tests. `persistence/schema.ts` stays at `DB_VERSION = 1`: V4 stores no plan (D-124). `offcut-detect` gains no line: `redetect_sentence` has been ready since V3.
 
@@ -430,31 +537,34 @@ Three untouched files are worth naming. `state/machines/clip-machine.ts` already
 
 ## 5. Build order
 
-Seventeen steps. BP §0 gives V4 4 days (5 to 8 Nov 2026); the build is ahead of that calendar (V3 closed on 2026-10-21) and V4 carries the seven seams besides, so the plan takes **ten working days**. Do not start a step while the previous step's check fails. Order: contracts, the identity proof, splits, the look, the workers, the review flow, robustness, tests, CI, measure, deploy.
+Nineteen steps and one review. BP §0 gives V4 4 days (5 to 8 Nov 2026); the build is ahead of that calendar (V3 closed on 2026-10-21), and V4 carries the seven seams, the caption intelligence and the editor's design besides, so the plan takes **thirteen working days**. Do not start a step while the previous step's check fails. Order: contracts, the identity proof, splits, caption intelligence, the look, the design system and a review of it, direct manipulation, editing, robustness, tests, CI, measure, a second review, deploy.
 
 | # | Day | Step | Produces | Check |
 |---|---|---|---|---|
-| S1 | 1 | Setup and contracts on paper | Branch (D-115); `docs/v4/` files (D-113); TS §5 tree with every NEW file of section 4, TS §7's graph with `offcut-plan`, TS §2's row (D-122); `Cargo.toml` member and workspace dependencies; `deny.toml`; Entry 1 of the changelog with the baseline counts and SHA; `cargo tree` records (section 3.2); the frozen-file list for this version | `pnpm check` green; counts equal to 1A item 4 |
-| S2 | 1 | The identity reference | `tests/v3_reference.rs` and its six JSON files written by the **V3** scene code (D-117) | `cargo test -p offcut-scene --test v3_reference` writes them; a second run compares equal |
-| S3 | 2 | The four splits | `rpc-worker.ts`, `frame-decoder.ts`, `render/export-job.ts`, `render/preview-job.ts`, `scene_api.rs` (D-150); no behaviour change | `pnpm check`, `pnpm test`, `pnpm e2e` unchanged; `pnpm e2e:media` on D1 unchanged (48 cases); every split file under 400 lines |
-| S4 | 2-3 | Types and the plan crate | `units.rs` (`OutMs`, `to_out_ms`), `timemap.rs`, `plan.rs`; `offcut-plan` whole (sections 6, 7) with its five test files; `pnpm gen` | `cargo test -p offcut-types -p offcut-plan`; `check-gen-clean`; the prompt and schema snapshots reviewed and committed |
-| S5 | 3-4 | Scene and renderer on the new contract, V3's look | `SceneInput` v1.2, `OutMs`, `FontSet`, `Theme::default_for(Clean)` reproducing V3's colours exactly (Bold and Tech still Clean's, as in V3), zones, `Video` command, `video.rs`, `Renderer::render(sources, list, fonts)`, composite in list order; the binding (`scene_api.rs`), `protocol.ts` and `load-render.ts` reopened; `render.worker` sends the plan; `run-pipeline.ts` calls `rulesPlan`; `timemap_identity.rs` | `cargo test --workspace` with the V3 inline tests adapted (D-160); in `pnpm dev` the reference clip previews as in V3 |
-| S6 | 4 | **The identity proof** | `v3_reference.rs` compares the V4 path with the S2 files (D-117); program audio: `program.rs`, `silence.rs`, `program_identity.rs`, `assemble` in the binding and the worker, the page plays `prog48` (D-127) | Both identity tests pass; `pnpm e2e:media` on D1: the 48 V3 cases green. **If the reference differs anywhere but the normalisation, stop: the switch changed a pixel** |
-| S7 | 5 | Native rendering and the first goldens | Delete `v3_reference.rs`; `new_headless`, `render_to_image`, the image source of `video_pass.rs`, `ssim.rs`; `golden_frames.rs` with the Clean x NumberReveal, watermark-off image, the crop and the punch-in (D-135) | `cargo test -p offcut-render` on D1 (WARP) and in CI (lavapipe); the similarity of the D1 images read on lavapipe is printed and recorded |
-| S8 | 5-6 | The look | `theme.rs` three palettes; `styles.rs` Bold and Tech; `motion.rs`; captions' panel, cursor, word pop, KeywordPop scale; `list_reveal.rs`, `from_to.rs`, `keyword_pop.rs`; framing offset; `watermark.rs`; `summary.rs`; the remaining 12 goldens | `cargo test -p offcut-scene -p offcut-render`; `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs`, `styles_use_theme.rs`, `catalog_complete.rs` pass; the 16 goldens committed |
-| S9 | 6 | Preview: seek and resize | `preview-job.ts` seek handler, `video-source.ts` restart at keyframe and `prefetch`, `preview-loop.ts` cost measure and resize (D-148, D-149); `control-preview.ts` seek; `preview-store.ts` position and statistics; `PreviewPlayer` scrub bar and `data-*` attributes (D-155) | In `pnpm dev`: scrubbing a 60 s clip shows the frame of the bar within 300 ms on D1; the attributes update after a play |
-| S10 | 7 | Review flow | `review-update.ts`, `edit-word.ts`, `toggle-event.ts`, `set-style.ts`, `set-crop-offset.ts`; the use-case edges in `eslint.config.js`; `redetectSentence` and `rulesPlan` handlers; `ReviewPanel`, `CaptionEditor`, `PlanItemList`, `StylePicker`, `CropOffsetControl`, `CutsSection`; `NO_EVENTS_FOUND`; copy | In `pnpm dev`: on the reference clip, the word that says "90" edited to "9" makes the from-to show "9 minutes"; switching off the list removes it; Bold shows upper case; the landscape crop moves |
-| S11 | 7-8 | Robustness | `rpc.ts`/`rpc-worker.ts` throttle, cancel timeout, crash; `pool.cancel`, `restartWorker`, `release`; `cancel-job.ts`; cancel buttons; `ErrorPanel`; `client_error`, `job_cancelled`; the 14 error entries (D-159) | `vitest run` with `rpc.test.ts`; `pnpm check` (copy codes) green; in `pnpm dev`: cancel during transcription returns to "Process again"; killing the render worker from DevTools shows `E_WORKER_CRASH` and "Reload preview" works |
-| S12 | 8 | Unit and machine tests | `rpc.test.ts` complete, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` | `vitest run`: all pass; Vitest count above 92 |
-| S13 | 8-9 | E2E | `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts`; `pipeline-preview.spec.ts` complete (zero events, long tasks, statistics); helpers | `pnpm e2e:media` on D1, keyed build: all green, count at least 48 + the new cases (section 20.1) |
-| S14 | 9 | CI | `ci.yml` (lavapipe, `INSTA_UPDATE=no`, the golden test), `e2e-media.yml`, `playwright.config.ts`, `check-file-tree.mjs`, `check-copy-codes.mjs` | The pull request's `ci` and `e2e-media` jobs green; the Linux log shows `golden_frames` running, not skipped |
-| S15 | 9 | Measure | Section 21's readings on D1: drift, late frames, first frame, seek, `frame_at`, scene build, the bench on the portrait clip; the golden similarity across adapters; BP §6.2's decisions | `docs/v4/experiments.md` written; the bench file committed |
-| S16 | 10 | Spec copy-back | Section 24's corrections in TS, BP, PS | `check-file-tree` green; every row of section 24's copy-back table done or listed open |
-| S17 | 10 | Merge, deploy, tag | Pull request ready; `pnpm e2e:media` on D1 all green (D-72); the founder merges; the deployed page checked (section 23); tag `v4` | `ci.yml` green on `main`; section 23 ticked |
+| S1 | 1 | Setup and contracts on paper | Branch (D-115); `docs/v4/` files (D-113); TS §5 tree with every NEW file of section 4, TS §7's graph with `offcut-plan`, TS §2's row (D-122); `Cargo.toml` member and workspace dependencies; `deny.toml`; Entry 1 of the changelog with the baseline counts and SHA; `cargo tree` records (section 3.2); the frozen-file list | `pnpm check` green; counts equal to 1A item 4 |
+| S2 | 1 | The identity reference | `tests/v3_reference.rs` and its six JSON files written by the **V3** scene code (D-117) | A second run compares equal |
+| S3 | 2 | The four splits | `rpc-worker.ts`, `frame-decoder.ts`, `render/export-job.ts`, `render/preview-job.ts`, `scene_api.rs` (D-150); no behaviour change | `pnpm check`, `pnpm test`, `pnpm e2e`, `pnpm e2e:media` (48) unchanged; every file under 400 lines |
+| S4 | 2-3 | Types and the plan crate | `units.rs`, `timemap.rs`, `plan.rs`, `edit.rs` (two fields, D-171); `offcut-plan` whole with its five test files; `pnpm gen` | `cargo test -p offcut-types -p offcut-plan`; `check-gen-clean`; prompt and schema snapshots committed |
+| S5 | 3-4 | Scene and renderer on the new contract, V3's look | `SceneInput` v1.2, `OutMs`, `FontSet`, `Theme::default_for(Clean)` reproducing V3's colours exactly, zones, `Video` command, `video.rs`, `Renderer::render(sources, list, fonts)`; the binding, `protocol.ts`, `load-render.ts` reopened; `rulesPlan` in the pipeline; `timemap_identity.rs` | `cargo test --workspace` with the V3 inline tests adapted (D-160); in `pnpm dev` the reference clip previews as in V3 |
+| S6 | 4 | **The identity proof**; program audio | `v3_reference.rs` against the S2 files (D-117); `program.rs`, `silence.rs`, `program_identity.rs`, `assemble` in the binding and the worker, the page plays `prog48` (D-127) | Both identity tests pass; the 48 V3 media cases green. **If the reference differs beyond the normalisation, stop** |
+| S7 | 5 | Native rendering, first goldens | Delete `v3_reference.rs`; `new_headless`, `render_to_image`, `ssim.rs`; four goldens (Clean number, watermark off, crop, punch-in) | `cargo test -p offcut-render` on D1 (WARP) and in CI (lavapipe); cross-adapter similarity recorded |
+| S8 | 5-6 | **Caption intelligence** | `tests/line_breaks.rs`'s table written and committed **first** (30 sentences, the expected chunks and lines decided by reading, the founder reads ten), then `readability.rs` and the break search (D-167), the reading floor (D-168), the emphasis layers (D-169), `placement.rs` (D-171), `hit.rs` (D-174), the shaping cache (D-173), `parity.rs` (D-172) | `line_breaks.rs`, `placement.rs`, `hit.rs`, `scene_cache.rs`, `parity.rs` pass; no expected break changed after the table's commit without a changelog line |
+| S9 | 6-7 | The look | `theme.rs`; Clean (the pill, the shadow), Bold, Mono (D-170); `motion.rs`; `captions_draw.rs`; `list_reveal.rs`, `from_to.rs`, `keyword_pop.rs`; framing offset; `watermark.rs`; `summary.rs`; the remaining goldens and the parity golden | All scene and render tests of section 20.2 pass; the 16 goldens committed, the parity case passing |
+| S10 | 7-8 | **Design system and editor shell** | `tokens.css` (D-179), the font (D-180), `ui/primitives/`, `icons.tsx` (D-181), `EditorLayout`, `TopBar`, `Stage`, `SidePanel` with real states and static tab content, `ProcessingCard` (D-188), restyled `DropZone`, `RejectionPanel`, `ModelDownloadPanel`; `screens.spec.ts` | `pnpm check`; every state of section 17.2 reachable in `pnpm dev` |
+| S10A | 8 | **Design review 1** (D-191) | The eight screens at two widths captured and reviewed by the founder; requested changes made | The founder's go, recorded in the changelog with the list of changes |
+| S11 | 8-9 | Preview and direct manipulation | Seek, `prefetch`, resize rule (D-148, D-149); the transport; the statistics (D-155); `hitTest`, hover cursors, click to edit, caption drag with snaps, video drag (D-183); the watermark badge (D-172); the redraw after `setScene` while paused (D-173) | In `pnpm dev`: scrub shows the frame within 300 ms; dragging the captions to Top moves the visuals below them; a click on a caption word opens it in the Captions tab |
+| S12 | 9-10 | Editing | `review-update.ts` and the edit use-cases; `CaptionEditor` (D-182), `replace-all.ts` (D-175), `history.ts` and `undo-redo.ts` (D-184), `use-shortcuts.ts` and `ShortcutsSheet` (D-185), `StylePanel` with live cards (D-186), `PlanItemList`, `FramingPanel` (D-187), `CutsSection`, `ToastHost`; the copy of section 17.5 | In `pnpm dev`: editing "90" to "9" shows "9 minutes" within 150 ms; "Change all" fixes every copy; Ctrl+Z restores each step; the cards show the clip in three styles |
+| S13 | 10-11 | Robustness and its interface | Throttle, cancel timeout, crash (D-151 to D-153); `cancel-job.ts`; cancel buttons; `ErrorPanel` (D-190); the export pill (D-189); `client_error`, `job_cancelled`; the 14 error entries; the analytics enum (section 13) | `vitest run` with `rpc.test.ts`; copy check green; cancel and a killed worker behave as D-152, D-153 say |
+| S14 | 11 | Unit and machine tests | `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` | `vitest run` all pass |
+| S15 | 11-12 | E2E | `preview-sync.spec.ts`, `review-edit.spec.ts` (with axe, D-192), `cancel.spec.ts`; `pipeline-preview.spec.ts` complete | `pnpm e2e:media` on D1, keyed build, all green (section 20.1) |
+| S16 | 12 | CI | `ci.yml` (lavapipe, `INSTA_UPDATE=no`), `e2e-media.yml`, `playwright.config.ts`, the check scripts | The pull request's jobs green; `golden_frames` runs in the Linux log |
+| S17 | 12 | Measure | Section 21's readings, edit-to-preview first; the bench; the shell budget with the font (D-180); BP §6.2's decisions | `docs/v4/experiments.md` written; the bench file committed |
+| S18 | 13 | Spec copy-back | Section 24's corrections in TS, BP, PS (the audience of D-177 included) | `check-file-tree` green |
+| S19 | 13 | **Design review 2**, merge, deploy, tag | The exit capture and visual QA list (D-191), the five goldens; `pnpm e2e:media` all green (D-72); the founder merges; the deployed page checked; tag `v4` | Section 23 ticked |
 
-**What can run in parallel.** S4's crate is pure and can start while S3's splits are reviewed. S7's native renderer needs S5's renderer contract only. S9 (preview) and S10 (review) touch different files and can be interleaved once S8's look exists. S11 is independent of S9 and S10 except for `EditorPage.tsx`. If client work is blocked, V6's server work still depends only on V1 (BP §0).
+**What can run in parallel.** S4's crate is pure and can start while S3's splits are reviewed. S7's native renderer needs S5's renderer contract only. S10 (the design system) needs no Rust and can run beside S8 and S9. S11 (direct manipulation) and S12 (editing) touch different files once S10A's review is in. S13 is independent of S11 and S12 except for `EditorPage.tsx`. If client work is blocked, V6's server work still depends only on V1 (BP §0).
 
-**What each step must not do.** No step changes a pixel before S7 (D-116). No step adds a `TODO` without a version tag. No step touches a file of section 4's untouched list; the frozen-file diff against the baseline lists only section 4's files. No step adds a network request (D-164).
+**What each step must not do.** No step changes a pixel before S7 (D-116). No interface code past the shell is written before S10A's review. No step adds a `TODO` without a version tag. No step touches a file of section 4's untouched list; the frozen-file diff against the baseline lists only section 4's files. No step adds a network request (D-164).
 
 ---
 
@@ -539,7 +649,23 @@ pub struct MusicCue { pub fits: bool, pub energy: MusicEnergy }
 - **Tests** (inline): a round trip of a plan holding every arm; refusal of an unknown field at every level; the exact JSON of a one-item rules plan (a contract with V6.1's server, so it is pinned here as V3 pinned `EventParams`); `ItemParams::Detected` round trips without a tag clash.
 - **Generated TypeScript.** Every type above goes to `web/src/gen/domain.ts` (section 12).
 
-### 6.4 `events.rs`
+### 6.4 `edit.rs` (D-169, D-171; REOPENED V1 CONTRACT)
+
+```rust
+pub struct CaptionPlacement(f32);            // 0.0 (top of the allowed band) ..= 1.0 (bottom); new() checks; Deserialize checks
+pub struct EditState {
+    pub word_edits: BTreeMap<WordIdx, String>,
+    pub event_overrides: BTreeMap<EventId, bool>,
+    pub style: StyleId,
+    pub crop_offset: CropOffset,
+    #[serde(default = "CaptionPlacement::bottom")] pub caption_position: CaptionPlacement,   // 1.0
+    #[serde(default = "yes")] pub highlight_numbers: bool,                                   // true
+}
+```
+
+The two defaults make the `edits` records V3 wrote read as the V4 default (bottom, numbers highlighted). Tests: an EditState JSON without the two fields reads with them; `CaptionPlacement::new` refuses NaN, infinities and values outside 0..=1.
+
+### 6.5 `events.rs`
 
 No variant is added in V4 (D-118). The doc comment of `EventKind` says it is the kind of a plan item, that codes 0-3 are fixed by the event-id layout (D-47), and that a release that draws a new kind appends a variant with the next code.
 
@@ -716,7 +842,8 @@ crop       = framing::crop_rect(clip, edit.crop_offset)                        /
 style      = styles::spec(edit.style)                                           // roles + motion
 words      = captions::words(transcript, &edit.word_edits)                      // unchanged rule (TS §17.2)
 words_out  = each word's [start, end] through time_map.out_span; a word with no program time is not shown
-chunks     = captions::chunk(words_out, sentences, style, theme, fonts)         // OutMs
+block      = placement::caption_block(edit.caption_position, style)              // D-171; the event zone follows it
+chunks     = captions::chunk(words_out, sentences, style, theme, fonts, block)  // OutMs; the break search of D-167, the floor of D-168
 for item in plan.items() where visible(item, edit) (D-145):
     span_out = time_map.out_span(item.span)?       → SceneError::TimeMap if None
     track    = events::layout(item, span_out, transcript, time_map, style, theme, fonts)?   // None = not drawn
@@ -784,9 +911,11 @@ impl Theme { pub fn default_for(style: StyleId) -> Theme; pub fn color(&self, r:
 | `accent` (active word) | `#FFD60A` | `#FFD60A` | `#3DDC84` |
 | `accent_alt` (KeywordPop, "to" value) | `#FFD60A` | `#FF5E3A` | `#3DDC84` |
 | `panel` | `#101014` at 85% | `#101014` at 85% | `#0B0F0C` at 85% |
-| `display_font` / `body_font` / `mono_font` | Inter 700 / Inter 700 / JetBrains Mono 700 | Inter 900 / Inter 700 / JetBrains Mono 700 | JetBrains Mono 700 / Inter 700 / JetBrains Mono 700 |
+| `display_font` / `body_font` / `mono_font` | Inter 800 / Inter 700 / JetBrains Mono 700 | Inter 900 / Inter 700 / JetBrains Mono 700 | JetBrains Mono 700 / Inter 700 / JetBrains Mono 700 |
+| Pill (active word, D-170) | `accent` behind, word in `#111114` | none | none |
+| Shadow | 0 x 4 lp, black 45% | 0 x 4 lp, black 45% | none |
 
-All (assumption, E-2). `StyleSpec` (one row per style):
+All (assumption, E-2; D-170 for Clean and Bold). At S5, before the redesign, `Theme::default_for(Clean)` reproduces V3's values exactly for the identity proof (D-117); S9 sets the values of this table. `StyleSpec` (one row per style):
 
 ```rust
 pub struct StyleSpec { pub font: FontRole, pub size: f32, pub case: Case, pub max_chars_per_line: u32,
@@ -841,7 +970,41 @@ V2's chunking and line rules unchanged (TS §19.4), with:
 - `summary.rs`: D-144.
 - `safe_area.rs`: D-138. `SAFE_AREA`, `CANVAS_WIDTH`, `CANVAS_HEIGHT`, `WATERMARK_ANCHOR` keep their values.
 
-### 8.9 Tests
+### 8.9 Caption intelligence (D-167 to D-174)
+
+**`readability.rs` [ONLY]** holds the English lists and costs of D-167 and `MIN_CHUNK_MS` (D-168), each a sorted `const` slice or a named constant, all (assumption, E-2). `CLAUSE_STARTERS` (about 40 words), `BINDERS` (about 70: articles, possessives, prepositions, "to", the auxiliaries and modals, "not", "very", "really", the cardinals that are not the last word of a number). Matching is on the lower-cased effective text of a caption word, punctuation stripped.
+
+**The break search** (`captions::chunk`):
+
+```text
+segments = split the caption words at hard breaks (sentence end, gap >= CHUNK_GAP_MS)
+for each segment (at most 40 words, TS §17.2):
+    best[i] = least cost of chunking words[0..i]
+    best[i] = min over j < i where words[j..i] fits the style (max_words, lines x chars):
+                 best[j] + cost_of_break_before(i) + cost_of_chunk(j..i)
+    cost_of_break_before(i): 0 after , ; : —   | 1 before a CLAUSE_STARTER | 12 after a BINDER | 3 otherwise
+    cost_of_chunk(j..i):     8 if one word and not isolated by pauses >= 250 ms both sides | 0 otherwise
+                             + the best line split of the chunk: min over k of
+                               (binder rule for the line break) + imbalance(len(line1), len(line2))
+    imbalance(a, b) = 0 if |a - b| <= max(a, b) / 3, else |a - b| in characters
+ties: the earlier break wins (deterministic)
+```
+
+A segment of one word is one chunk. The search costs O(n x max_words) per segment: microseconds.
+
+**The reading floor** (D-168) is applied after chunking: a chunk's `show.end` becomes `max(show.end, show.start + MIN_CHUNK_MS)` capped at the next chunk's `show.start` and at its own last word's end plus `CHUNK_TAIL_MS` plus the silence after it. Lead and tail rules of TS §19.4 are otherwise unchanged.
+
+**Emphasis** (D-169): `captions_draw.rs` chooses each word's fill in the order active → KeywordPop → number (when `edit.highlight_numbers`) → `fill`. A caption word is a number when it was made from a `NormalizedSpan` (TS §17.2) or when its effective text parses as a quantity in the same way the captions show it (`captions::words` already knows which words carry a number's display).
+
+**Placement** (`placement.rs` [ONLY], D-171): `caption_block(p: CaptionPlacement, style) -> Rect` (the zone of height 280 lp whose centre is `CAPTION_TOP + p x (CAPTION_BOTTOM - CAPTION_TOP)`); `event_zone(caption_block) -> Rect` (D-171's rule); `zone(ZoneId)` in `safe_area.rs` reads them for the clip's placement. The three snap points are `SNAP_TOP = 0.15`, `SNAP_MIDDLE = 0.55`, `SNAP_BOTTOM = 1.0`.
+
+**The pill** (D-170): drawn by `captions_draw.rs` as a `FillRect` (radius 14 lp) behind the active word, before the word's run; between two words it moves: its rectangle at `t` is the eased interpolation, over `PILL_SLIDE_MS = 90`, from the previous word's box to the active word's box, starting at the active word's start; its scale grows 0.9 → 1.0 over the same time. The pill exists only while a word is active (between words, during a pause, none is drawn). The shadow: the run again, before the stroke, offset by `ShadowSpec.offset`, in black at `opacity`.
+
+**Hit testing** (`hit.rs`, D-174): the chunk visible at `t`, its lines and words as laid out (boxes in logical px, padded 8 lp); the caption block of `placement.rs`; else `Hit::Video`. No shaping happens in `hit`.
+
+**The shaping cache** (D-173): `layout.rs`'s `thread_local!` gains an `LruCache`-like structure written in the file (a `BTreeMap` keyed by `(String, FontKey, u32 size bits)` plus a use counter; 2,048 entries, the least recently used evicted), deterministic because shaping a key always gives the same runs. `scene_cache.rs` builds six scenes three ways (cold, warm, cache disabled through a test-only switch) and compares every frame's display list.
+
+### 8.10 Tests
 
 | File | Cases |
 |---|---|
@@ -850,6 +1013,11 @@ V2's chunking and line rules unchanged (TS §19.4), with:
 | `tests/framing.rs` | `ok_portrait_3x4` (1080x1440 → top and bottom go), 1920x1080 at offsets -1, -0.5, 0, 0.5, 1 (x = 0, 328.125, 656.25, 984.375, 1312.5), 1080x1920 whole frame at any offset, rotated 90 display sizes (720x1280) |
 | `tests/determinism.rs` | Each of six scenes built twice: byte-equal `Scene` and display lists for every frame (INV-7); `frame_at` asked out of order equal |
 | `tests/styles_use_theme.rs` | D-136's text search over `src/` |
+| `tests/line_breaks.rs` | The 30-sentence table of D-167 (written and committed at S8 before the search, the founder reads ten): for each, the expected chunks and lines in Clean and Bold; plus property checks over the 31 labeled transcripts: no line ends with a word of `BINDERS` unless the chunk's words allow no other split, no chunk exceeds its style's limits, every word appears exactly once and in order |
+| `tests/placement.rs` | At 0.0, 0.15, 0.55, 1.0: the caption block inside the safe area, the event zone inside it and disjoint from the caption block, the watermark box disjoint from both; at 1.0 the event zone is V3's 860-1180 |
+| `tests/parity.rs` | D-172 |
+| `tests/scene_cache.rs` | D-173 |
+| `tests/hit.rs` | A word's centre hits that word; a point in the block between lines hits `Captions`; a point outside hits `Video`; nothing hits while no chunk is visible |
 | `tests/timemap_identity.rs` | For the reference clip's plan: a scene on `TimeMap::identity(d)` has `duration == d`, `frame_count` of TS §19.2, `source_at(t) == At(t)` for every frame time, and each chunk's and item's program span equal to its recording span |
 | `tests/catalog_complete.rs` | INV-23 (section 7.8) |
 | inline (`lib.rs`, `captions.rs`, `framing.rs`, `number_reveal.rs`) | V2's cases on the V4 contract (D-160) |
@@ -904,7 +1072,7 @@ V6.5 replaces the rule with layers (commands before a `Video` go into an under-l
 ### 9.4 Tests: `golden_frames.rs` (D-134, D-135)
 
 - Source frame: `pattern(w, h)`: a diagonal gradient, an 8x8 grid of 2-pixel lines, a filled disc at a third of the width: drawn by the test into an `RgbaImage` 1920x1080 (landscape cases) or 1080x1920 (portrait cases).
-- Scenes: built with `build_scene` from small fixed transcripts and rules plans (the snapshot inputs of section 8.9), the preview profile (540x960); each golden is the frame at a fixed instant inside the visual.
+- Scenes: built with `build_scene` from small fixed transcripts and rules plans (the snapshot inputs of section 8.10), the preview profile (540x960); each golden is the frame at a fixed instant inside the visual.
 - The 16 images, each named `<style>_<kind>.png`, `clean_number_watermark.png`, `clean_number_nowatermark.png`, `crop_landscape_050.png`, `punch_in_110.png` (a hand-written list), compared with SSIM ≥ 0.98 (`tests/common/ssim.rs`: luma, 8x8 windows, the standard constants).
 - A missing golden fails with "run with OFFCUT_GOLDEN_UPDATE=1 and review the image"; an adapter that is not a software one fails with its name (D-134).
 
@@ -942,6 +1110,7 @@ pub fn silence_profile(out48: &[f32]) -> SilenceProfile;     // RMS dB per 10 ms
 #[wasm_bindgen] impl RenderSession {
     pub fn set_scene(&mut self, input: JsValue) -> Result<JsValue, JsValue>;   // → SceneReport { dropped: Dropped[] }
     pub fn source_at(&self, t_out_ms: u32) -> JsValue;                         // { at: number } | { held: number }
+    pub fn hit(&self, t_out_ms: u32, x: f32, y: f32) -> JsValue;               // Hit (D-174); x, y fractions of the canvas
     pub fn summary(&self) -> JsValue;
 }
 ```
@@ -960,9 +1129,9 @@ pub fn silence_profile(out48: &[f32]) -> SilenceProfile;     // RMS dB per 10 ms
 
 ---
 
-## 13. Server: no changes
+## 13. Server: one enum widened
 
-V4 adds no route, no table, no variable. V6's seam S-10 (account deletion and export iterate one list of per-user tables) is V6's work (BP §8.1). The server image is unchanged; `git diff --name-only <baseline> -- server` is empty at the exit.
+V4 adds no route, no table, no variable. One shared type changes: `ReviewActionKind` in `offcut-api-types/src/analytics.rs` (the allowlist, TS §22.6) gains `caption_position`, `highlight_numbers`, `replace_all`, `undo` and `redo`, so the server accepts the new `review_action` values; `analytics_allowlist.rs` gains one case per member, and `ANALYTICS_EVENT_DOCS` (the settings page's list) is regenerated. The image is rebuilt and deployed server-first as always. V6's seam S-10 is V6's work (BP §8.1). `git diff --name-only <baseline> -- server` lists only the regenerated analytics test fixtures, if any.
 
 ---
 
@@ -991,6 +1160,10 @@ export interface RenderWorkerApi {
   previewClock(p: { clock: ClockSync }): void;
   previewPause(): Promise<void>;
   previewSeek(p: { at: OutMs }): Promise<void>;
+  /** x, y as fractions of the canvas (D-174). Only while the preview is not playing. */
+  hitTest(p: { at: OutMs; x: number; y: number }): Promise<Hit>;
+  /** Three frames of `at` in Clean, Bold, Mono with the current edits; transferred (D-186). */
+  styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
   exportClip(p: { exportId: ExportId; entitlementToken: string; out48: Float32Array }):
     Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
@@ -998,6 +1171,7 @@ export interface RenderWorkerApi {
 export type ClockSync = { audioMs: OutMs; epochMs: number };
 export type SceneReport = { dropped: Dropped[] };
 export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs; downscaled: boolean };
+export type Hit = { kind: "word"; word: WordIdx } | { kind: "captions" } | { kind: "video" };
 ```
 
 Costs on the V1 side: `setScene`'s `events` becomes `plan` plus `timeMap`, and it answers a report; `previewPlay` answers statistics; `ClockSync` and `previewSeek` change type, not shape. The `serveWorker` options of the render worker gain nothing (`previewSeek` was already allowed during a preview); the audio worker's `oneWay` gains `release`.
@@ -1037,6 +1211,9 @@ The worker file keeps the session state (`open`, the scene input, the preview ca
 | `setScene({ transcript, plan, edit, timeMap, profile })` | `session.set_scene`; keeps the input for the export's switch and back (as V2 kept it) |
 | `previewSeek({ at })` | `preview-job.ts`: stops a running loop, `source.frameAtBlocking(srcOf(at))`, `render_frame`, resolves |
 | `previewPlay` | `preview-job.ts`: as V2, with `OutMs`, `source_at` and the statistics returned |
+| `setScene` (after the first) | When a preview canvas is attached and not playing, redraws the frame at the last position (D-173) |
+| `hitTest({ at, x, y })` | `scene_api::hit` (D-174) |
+| `styleThumbnails({ at, width, height })` | One `OffscreenCanvas` of that size; the scene rebuilt three times at a thumbnail profile with the current edits and each style; `transferToImageBitmap` after each render; the preview's scene and canvas restored after (as the export switch does) |
 
 `render/export-job.ts` holds V2's `writeExport`, `afterExport` and `exportClip` unchanged in behaviour; the profile switch and back now pass the plan and the map.
 
@@ -1068,6 +1245,8 @@ The split keeps `frameAt` and `frameAtBlocking`'s contracts (TS §20.1). `prefet
 ### 16.1 Stores
 
 - **`clip-store.ts`**: `plan?: EditPlan`, `timeMap?: TimeMap`, `prog48: Float32Array | null` (replaces `out48`, D-127; the export still reads `out48.f32` from OPFS, D-129), `cancelled: boolean` (the clip is `accepted` after a cancel, D-152). New actions: `setPlan(plan)`, `setEvents(events)`, `editStarted(edit)` (`ready → updating`, the optimistic `EditState`), `editDone()` (`updating → ready`), `editFailed(previous, failure)` (`updating → ready` with the old state and a failure), `cancelledRun()` (`processing → accepted`), `retried()` (`failed → processing`). The machine's table is unchanged (V2 declared every event).
+- **`history.ts`** (D-184): `push(edit)`, `undo() -> EditState | undefined`, `redo() -> EditState | undefined`, `canUndo`, `canRedo`, `clear()`; a store of its own so the top bar can read it.
+- **`ui-store.ts`**: the selected tab, the follow switch, the word being edited, the toast queue, the save state (`saved`, `saving`); written by use-cases and by the components' local actions (tab selection), never by a worker.
 - **`preview-store.ts`**: `position: OutMs` (updated at each clock sync and seek), `lastStats?: PreviewStats`; actions `seekStart()`, `seekDone(playing: boolean)`; the three seek events now fire.
 
 ### 16.2 Use-cases
@@ -1081,36 +1260,100 @@ The split keeps `frameAt` and `frameAtBlocking`'s contracts (TS §20.1). `prefet
 | `toggle-event.ts` | `toggleEvent(id: EventId, on: boolean)` → `event_overrides[id] = on`, mode `scene`; `review_action { action: "event_toggle", event_kind, enabled }` |
 | `set-style.ts` | `setStyle(style)`, mode `scene`; `review_action { action: "style" }` |
 | `set-crop-offset.ts` | `setCropOffset(offset)` (landscape and square only), mode `scene`; `review_action { action: "crop_offset" }` |
+| `set-caption-position.ts` | `setCaptionPosition(p)`, mode `scene`; `review_action { action: "caption_position" }` |
+| `set-highlight-numbers.ts` | `setHighlightNumbers(on)`, mode `scene`; `review_action { action: "highlight_numbers" }` |
+| `replace-all.ts` | `replaceAll(from, to)` (D-175): one change with every matching index; events by `detect` with the new edits; `review_action { action: "replace_all" }` |
+| `undo-redo.ts` | `undo()`, `redo()` (D-184) through `review-update.ts`; `review_action { action: "undo" \| "redo" }` |
+| `preview-interact.ts` | `hoverAt(x, y)` (throttled to one per animation frame; hit test only when paused), `clickAt(x, y)` (a word: pause, open it in the Captions tab), `dragCaptions(y)` and `dragVideo(x)` (live guide only; the commit on release goes to `setCaptionPosition` or `setCropOffset`) |
+| `style-thumbnails.ts` | `refreshThumbnails()` (D-186): debounced 300 ms, only while the Style tab is shown, the latest call wins |
 | `cancel-job.ts` | D-152. It owns the abort controllers: `signalFor(scope)` is imported by `run-pipeline.ts`, `import-clip.ts` and `start-export.ts` (a use-case may import `cancel-job.ts`, TS §7), and `cancelJob(scope)` aborts it, calls `pool.cancel` and applies the scope's store change |
 | `control-preview.ts` | `attach(canvas, prog48)`; `seek(at: OutMs)` (D-148: one in flight, the latest wins; sound restarts at `at` when it was playing); `lastStats` stored after each play; `reloadPreview()` (D-153: open the session, set the scene, attach a new canvas) |
 | `import-clip.ts`, `start-export.ts` | Honour the cancel signal (`cancelJob("import")`, `cancelJob("export")`); the export machine's `cancel` and `cancel_done` fire |
 
 ---
 
-## 17. UI, copy, styles
+## 17. Interface and interaction design
 
-### 17.1 Components
+This section is the design specification of the editor (D-177 to D-193). It is written for content creators in general: someone who has never opened a video editor must get a postable short without reading anything, and someone who edits every day must never wait for the interface.
 
-| Component | Shows | Calls |
+### 17.1 Principles
+
+1. **The video is the hero.** The preview is the largest and brightest thing on the screen; the interface is dark, quiet and neutral around it (D-178, D-179).
+2. **Good by default.** The default style, the highlighted numbers, the suggested visuals and the bottom caption position make a postable short with no click (D-170, D-176).
+3. **Direct before indirect.** Fix a word where you see it; move captions and the crop by dragging them; every panel control is the accessible second way to do the same thing (D-182, D-183).
+4. **Instant and reversible.** Every change shows within 150 ms (D-173), autosaves, and can be undone (D-184).
+5. **Plain words.** No jargon, no codes, one primary action per screen (D-177, D-190).
+6. **One system.** Every colour, size, space, radius and motion comes from the tokens (D-179); every control from the primitives (D-181).
+
+### 17.2 Screens and states
+
+| State (clip status) | What the screen shows | Primary action |
 |---|---|---|
-| `ReviewPanel` | `NO_EVENTS_FOUND` or `PlanItemList`; `CaptionEditor`; `StylePicker`; `CropOffsetControl` (landscape and square only); `CutsSection` (nothing in V4). Disabled while the export is `rendering`/`muxing` (TS §12.4) | - |
-| `CaptionEditor` | The effective words, one button each, the sentence's words wrapped; the inline input of D-146 with "Hide this word" | `editWord` |
-| `PlanItemList` | One row per valid item: the kind's label ("Number", "List", "From–to", "Emphasis") and its figure (the feed's `display`), a toggle | `toggleEvent` |
-| `StylePicker` | Three buttons, the current one pressed (`aria-pressed`) | `setStyle` |
-| `CropOffsetControl` | A range input, committed on `change` (D-142) | `setCropOffset` |
-| `CutsSection` | Nothing while the plan has no cuts (V6.2 fills it) | - |
-| `ErrorPanel` | The failure's `title`, `body`, `action`; one retry button ("Try again" for `failed`, "Reload preview" for a failure while `ready`, "Undo this change" for a failed edit); "Start over" | `runPipeline` (retry), `reloadPreview`, the undo of D-147 |
-| `PreviewPlayer` | The scrub bar, a spinner after 300 ms of seeking, the `data-*` statistics (D-155) | `controlPreview.seek` |
-| `ProcessingFeed`, `ModelDownloadPanel`, `ExportProgress` | A cancel button each | `cancelJob(scope)` |
-| `EditorPage` | `ready`/`updating`: player, review panel, export; `accepted` after a cancel: "Cancelled." with "Process again" and "Start over"; `failed`: `ErrorPanel` | `runPipeline`, `dismissClip` |
+| Empty (`idle`) | The editor shell with the stage holding the drop zone: "Drop a video (up to 90 seconds)", "or try a sample", the supported-browser line; the side panel collapsed | Choose a video |
+| Model download (first run) | The stage frame with the download card (size, progress, "only the first time"), Cancel | - |
+| Processing (`importing`, `accepted`, `processing`) | The stage frame with the four-step checklist and the found-moment chips (D-188); side panel tabs disabled with a skeleton | Cancel |
+| Cancelled (`accepted` after a cancel) | "Cancelled." in the stage, "Process again" and "Start over" | Process again |
+| Ready (`ready`) | Preview with transport; side panel on the Captions tab; top bar with Export enabled | Export |
+| Updating (`updating`) | As ready; the changed control shows its pressed state; a spinner on the preview only if the update takes over 300 ms | - |
+| Rejected (`rejected`) | The V3 `RejectionPanel` content in the stage card, restyled | Choose another video |
+| Failed (`failed`) | `ErrorPanel` in the stage card (D-190) | Try again |
+| Exporting (export `rendering`, `muxing`, `saving`) | The export pill in the top bar (D-189); review controls disabled with a tooltip "Available when the export finishes" (TS §12.4) | Cancel |
+| Preview failure while ready | `ErrorPanel` over the stage, the panel still usable | Reload preview |
 
-### 17.2 `copy/messages.ts` (D-159)
+### 17.3 Components
 
-New keys, every number interpolated (INV-15): `review.title`, `review.editHint`, `review.hideWord`, `review.kind.{number_reveal, list_reveal, from_to, keyword_pop}`, `review.toggleOn`, `review.toggleOff`, `review.style.{clean, bold, tech}`, `review.crop`, `review.undo`, `noEventsFound` (PS §10 J7's sentence), `preview.seek`, `preview.loadingFrame`, `cancel.{import, pipeline, model, export}`, `cancel.cancelled`, `cancel.processAgain`; `errors.<code>` (`title`, `body`, `action`) for the 14 codes of D-159. `check-copy-codes.mjs`'s `COPY_PENDING` loses those 14.
+| Component | Contents and behaviour | Calls |
+|---|---|---|
+| `EditorLayout` (new) | Top bar, stage, side panel (D-178); the `aria-live` region (D-192) | - |
+| `TopBar` (new) | Mark, clip length, save state, undo, redo, Export / export pill | `undo`, `redo`, `startExport`, `cancelJob("export")` |
+| `Stage` (new) | Holds `DropZone`, the processing card, `PreviewPlayer`, `RejectionPanel` or `ErrorPanel` by state | - |
+| `PreviewPlayer` | The canvas in its 9:16 frame; pointer handling of D-183 (hover cursor, click, drags, snap guides); the transport (play/pause, time, scrub bar, D-148); the Free watermark badge (D-172); the `data-*` statistics (D-155) | `controlPreview.*`, `hitTest`, `setCaptionPosition`, `setCropOffset` |
+| `ProcessingCard` (new) | The steps, the chips, the line, Cancel (D-188) | `cancelJob("pipeline")` |
+| `ModelDownloadPanel` | Restyled; Cancel | `cancelJob("model")` |
+| `SidePanel` (new) | `Tabs`: Captions, Style, Visuals, Framing | - |
+| `CaptionEditor` (Captions tab) | The transcript editor (D-182), follow switch, word menu, replace-all toast | `editWord`, `replaceAll`, `controlPreview.seek` |
+| `StylePanel` (new; contains `StylePicker`) | Three style cards with live thumbnails, Highlight numbers switch (D-186) | `setStyle`, `setHighlightNumbers` |
+| `PlanItemList` (Visuals tab) | The rows of D-187, or the empty state | `toggleEvent`, `controlPreview.seek` |
+| `FramingPanel` (new; contains `CropOffsetControl`) | Caption position segmented control and hint; crop slider and hint (D-187) | `setCaptionPosition`, `setCropOffset` |
+| `CutsSection` | Renders nothing in V4 (V6.2) | - |
+| `ErrorPanel` | D-190 | retry, `reloadPreview`, undo |
+| `ExportProgress` | The pill of D-189 | `cancelJob("export")` |
+| `ShortcutsSheet` (new) | The list of D-185, opened with `?` | - |
+| `Toast` host (new) | One stack; replace-all, hide and undo toasts | - |
 
-### 17.3 Styles
+### 17.4 Interaction details
 
-`components.module.css` gains the classes of the new components, written with the tokens of `tokens.css`; no inline style (CSP `style-src 'self'`). The scrub bar and the crop control use native `input type="range"`, styled.
+- **Feedback timing.** A press shows its pressed state at once; anything that takes longer than 300 ms shows a spinner in place; nothing shows a spinner for less than 300 ms (no flicker).
+- **Motion.** Panels and toasts fade and rise 8 px over `--base`; tabs switch without motion; the pill in the captions is the content's motion, not the interface's. Under `prefers-reduced-motion` only opacity changes.
+- **Hover on the canvas** (paused): over a caption word the cursor is a text cursor and the word gets a 2 px outline drawn as chrome; over the caption block (not a word) a vertical-move cursor; over the video of a landscape clip a horizontal-move cursor.
+- **Seek.** Clicking a transcript block or a visual's time seeks without playing; the scrub bar plays from the new place if it was playing.
+- **Edits while playing.** A change pauses the preview and resumes it after (D-147); the transcript editor pauses on click.
+- **Empty and long content.** A 90 s transcript fits the Captions tab with its own scroll; a word longer than the field's width scrolls inside its field; a style card's thumbnail keeps 9:16.
+- **Widths.** Reference widths 1280 x 800 and 1920 x 1080 (D-191); below 1024 px the capability check has already refused the device.
+
+### 17.5 Copy (`copy/messages.ts`, D-159, D-177)
+
+Every string below is a key; every number in it is interpolated (INV-15). Tone: second person, short sentences, verbs first on buttons, no exclamation marks, no jargon.
+
+| Area | Keys (examples of the text) |
+|---|---|
+| Top bar | `editor.saved` "Saved on this device", `editor.saving` "Saving…", `editor.undo` "Undo", `editor.redo` "Redo", `editor.export` "Export" |
+| Tabs | `panel.captions` "Captions", `panel.style` "Style", `panel.visuals` "Visuals", `panel.framing` "Framing" |
+| Captions tab | `captions.hint` "Click any word to fix it.", `captions.follow` "Follow playback", `captions.hide` "Hide word", `captions.restore` "Restore original", `captions.show` "Show", `captions.replaceAll(n, from, to)` "Change all {n} “{from}” to “{to}”?" |
+| Style tab | `style.clean` "Clean", `style.cleanLine` "Soft and premium: the spoken word on a highlight.", `style.bold`, `style.boldLine`, `style.mono` "Mono", `style.monoLine`, `style.highlightNumbers` "Highlight numbers" |
+| Visuals tab | `visuals.count(on, total)` "{on} of {total} visuals on", `visuals.kind.{number_reveal, list_reveal, from_to, keyword_pop}` "Big number", "List", "Before → after", "Emphasis", `noEventsFound` (PS §10 J7), `visuals.whatWeLookFor` |
+| Framing tab | `framing.captionPosition` "Caption position", `framing.top`, `framing.middle`, `framing.bottom`, `framing.dragCaptions` "Or drag the captions on the video.", `framing.crop` "Framing", `framing.dragVideo` "Or drag the video sideways." |
+| Preview | `preview.play`, `preview.pause`, `preview.seek` "Position", `preview.loadingFrame`, `preview.watermarkBadge` "Free exports include a small watermark" |
+| Processing | `processing.steps.{audio, voice, captions, visuals}`, `processing.reassure` "Everything runs on your computer. This usually takes a couple of minutes.", `cancel.*` |
+| Shortcuts | `shortcuts.title`, one key per shortcut |
+| Errors | `errors.<code>.{title, body, action}` for the 14 codes of D-159, e.g. `E_GPU_LOST`: "The preview stopped" / "Your graphics card was reset, which can happen when another app uses it." / "Reload preview" |
+
+### 17.6 Styles and assets
+
+- `ui/styles/tokens.css` [ONLY design values]: D-179's tokens; the editor sets `data-theme="dark"` on its root; the landing page is unchanged.
+- `ui/styles/*.module.css`: one module per component group (`editor`, `panel`, `primitives`, `preview`); no inline style (CSP `style-src 'self'`); every colour, size and duration a token.
+- `web/public/fonts/inter-latin.woff2` (D-180), its `@font-face` in `tokens.css`, preloaded by `EditorPage`.
+- `ui/icons.tsx` (D-181).
 
 ---
 
@@ -1140,7 +1383,7 @@ New keys, every number interpolated (INV-15): `review.title`, `review.editHint`,
 
 ### 19.3 `ci.yml`
 
-Linux `ci` job, before step 4 (`cargo test`): `sudo apt-get install -y mesa-vulkan-drivers` (pinned by the runner image; the version is printed and recorded in the changelog at S14), `INSTA_UPDATE=no` and `CI=true` in the step's `env`. `golden_frames.rs` runs in that step; its output line names the adapter (`llvmpipe`/`lavapipe`). Nothing else changes; the deploy order is unchanged.
+Linux `ci` job, before step 4 (`cargo test`): `sudo apt-get install -y mesa-vulkan-drivers` (pinned by the runner image; the version is printed and recorded in the changelog at S16), `INSTA_UPDATE=no` and `CI=true` in the step's `env`. `golden_frames.rs` runs in that step; its output line names the adapter (`llvmpipe`/`lavapipe`). Nothing else changes; the deploy order is unchanged.
 
 ### 19.4 `e2e-media.yml` and `playwright.config.ts`
 
@@ -1159,9 +1402,9 @@ Unchanged. The web build grows by the plan crate in `offcut_render.wasm` (S5 rec
 | Suite | Where | Count after V4 (at least) |
 |---|---|---|
 | `cargo test --workspace` | D1, Linux CI (with fixtures and lavapipe) | 461 + V4's (section 20.2): about 560 passed, 3 ignored (+ `scene_timing`, ignored) |
-| Vitest | D1, CI | 92 + `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts`: about 150 |
+| Vitest | D1, CI | 92 + `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts`, `history.test.ts` (D-184): about 160 |
 | `pnpm e2e` | D1, CI | 12 (unchanged) |
-| `pnpm e2e:media` | D1 (all), Windows CI (`@no-gpu`) | 48 + `preview-sync` 3 + `review-edit` 8 + `cancel` 5 + `pipeline-preview` 3 new = 67 cases |
+| `pnpm e2e:media` | D1 (all), Windows CI (`@no-gpu`) | 48 + `preview-sync` 4 + `review-edit` 16 + `cancel` 5 + `pipeline-preview` 3 new = 76 cases (`screens.spec.ts` is a D1 tool, not counted) |
 
 The exact counts are recorded at the exit; none may fall below the baseline (1A item 4).
 
@@ -1184,6 +1427,7 @@ The exact counts are recorded at the exit; none may fall below the baseline (1A 
 | `offcut-scene/tests/catalog_complete.rs` | INV-23 |
 | `offcut-render/tests/golden_frames.rs` | 16 images; SSIM ≥ 0.98; adapter is software |
 | `offcut-dsp/tests/program_identity.rs` | Section 10 |
+| `offcut-scene/tests/line_breaks.rs`, `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` | Section 8.10 |
 | `scene_timing` (ignored, release) | `build_scene` ≤ 1 s, mean `frame_at` ≤ 2 ms on the portrait clip's plan (D-166) |
 
 ### 20.3 TypeScript (Vitest)
@@ -1194,6 +1438,7 @@ The exact counts are recorded at the exit; none may fall below the baseline (1A 
 | `state/machines/clip-machine.test.ts` | Every legal transition of TS §12.2's clip table; the illegal ones of TS §12.3 (`rejected → processing`, `importing → processing`, `processing → importing`, `ready → importing`) throw `IllegalTransitionError` in tests; `updating` refuses `edit_start` (D-147) |
 | `state/machines/model-machine.test.ts` | TS §12.2's model table; `verifying → downloading` without `failed` refused |
 | `usecases/run-pipeline.test.ts` | Section 16.2 |
+| `state/history.test.ts` | Push, undo, redo, the 50-step limit, a new change after undo drops the redo branch, clear on a new clip |
 
 ### 20.4 End to end (Playwright, D1 unless tagged)
 
@@ -1202,6 +1447,8 @@ The exact counts are recorded at the exit; none may fall below the baseline (1A 
 | `pipeline-preview.spec.ts` (complete) | V3's cases as rewritten by D-160; **zero events**: `speech_20s_noevents.mp4` reaches `ready`, the review panel shows `noEventsFound`, no item row; **long tasks** (D-156); **statistics**: after a 5 s play, `data-frames` > 100 and `data-max-drift-ms` present |
 | `preview-sync.spec.ts` | **Drift**: the portrait clip plays 60 s; `data-max-drift-ms` ≤ 80 and `late / frames` ≤ 0.05 (TS §20 acceptance); **first frame**: the canvas shows a non-black frame within 500 ms of `ready` (pixel read of the page's canvas through a screenshot); **seek**: seeking to 30 s while paused shows the frame of 30 s (the white-frame marker at 55 s is used: seek to 55.0 s, the canvas's mean brightness rises above 200) within 300 ms on D1 |
 | `review-edit.spec.ts` | **Edit a number**: on the reference clip, the word that was recognized as "90" (the from-to's first value, "Found: 90 minutes to 10 minutes") edited to "9" → the from-to's row in `PlanItemList` reads "9 minutes", and `review_action { action: "word_edit" }` is sent; **hide a word**: an empty commit removes it from the caption (`CaptionEditor` shows it struck through); **toggle**: switching the list off removes its row's "on" state and the next frame at the list's time has no list (the item row's state and `data-` of the panel); the toggle survives a word edit elsewhere (D-145); **style**: Bold → the caption's text in upper case on the canvas's accessible label mirror (`data-caption-text`, written by `PreviewPlayer` from the scene's visible chunk, test-only attribute in dev and test builds); **crop**: on `speech_60s_landscape.mp4` the control exists and a drag to 1.0 sends one `review_action { action: "crop_offset" }`; on the portrait clip it does not exist; **pause and restore**: an edit while playing pauses and the preview plays again after; **undo**: a forced `setScene` failure (the session closed from the test through a dev-only hook in `render.worker`, compiled out of production) shows "Undo this change", and pressing it restores the previous state |
+| `review-edit.spec.ts` (the editor, D-182 to D-187) | **Click a word in the transcript**: the preview seeks to it and pauses, the field opens with the text selected; **Tab** commits and opens the next word; **Escape** cancels; **click a caption word on the preview**: the Captions tab opens on that word; **replace all**: the founder clip's transcript with a word repeated three times edited once → the toast offers "Change all 2" → all three change, one undo restores all three; **undo and redo** with Ctrl+Z and Shift+Ctrl+Z across a word edit, a style change and a toggle; **drag the captions** to the top: snaps at Top, the visuals' zone is below them (`data-caption-position` on the player), one `review_action { action: "caption_position" }`; **drag the video** on the landscape clip; **style cards**: three images appear within 400 ms, choosing Bold applies it; **Highlight numbers** off: the number in the caption is no longer in the accent colour (the display list mirror `data-caption-colors`, dev/test only); **shortcuts**: Space plays and pauses outside a field and types a space inside one; **accessibility**: axe on ready and editing states, zero serious or critical violations; every control reachable by Tab with a visible focus ring (D-192) |
+| `preview-sync.spec.ts` (addition) | **Edit to preview** ≤ 150 ms (section 21.1) |
 | `cancel.spec.ts` | `@no-gpu` **import cancel**: a large `ok_*` file's import cancelled → `idle`, no OPFS clip directory, one `job_cancelled { stage: "import" }`; `@no-gpu` **model cancel**: with the model absent, the download cancelled → partial bytes kept, the next run resumes; **pipeline cancel during ASR** → `accepted`, "Process again" works; **export cancel** → `idle`, no temporary file in OPFS, no render-cache entry; **cancel timeout**: a worker made unresponsive by a dev-only hook → restarted after 2 s, the clip is `accepted` |
 
 The dev-only hooks named above are behind `import.meta.env.DEV || import.meta.env.MODE === "test"` and stripped from the production bundle; `check-hosts.mjs`'s bundle scan asserts their marker string is absent from `web/dist` (as the test key is, V2).
@@ -1216,13 +1463,17 @@ Write each outcome into `docs/v4/experiments.md` (question, method, numbers, dat
 
 | Reading | Step | Procedure | Target | If it misses | Recorded in |
 |---|---|---|---|---|---|
-| Preview drift and late frames | S13, S15 | `preview-sync.spec.ts`'s drift case, five runs, the worst | ≤ 80 ms; late ≤ 5% (TS §20, PS §20.1) | BP §6.2 row 1 (section 21.2) | `experiments.md` |
-| First preview frame | S13 | `preview-sync.spec.ts` | ≤ 500 ms after `ready` (assumption, M1.5) | Profile `attachPreview`; record | Same |
-| Seek to first frame | S13 | `preview-sync.spec.ts`, GOP of the portrait clip (30 frames) | ≤ 300 ms (assumption, M1.5) | Record; the spinner covers it; V9 re-reads | Same |
-| Downscale rule | S15 | `data-downscaled` after a 60 s play on D1 | `false` on D1 | Recorded; R1 may differ (D-114) | Same |
-| `build_scene`, `frame_at` | S15 | `scene_timing` natively, release | ≤ 1 s; mean ≤ 2 ms | D-166 | Same |
-| `detect_scene` and `render_encode` in the browser | S15 | `pnpm bench:device`, `BENCH_CLIP=portrait`, 10 runs | Within 10% of V3's file for `detect_scene` plus the assembly (about 30 ms); `render_encode` ≤ 90 s per 60 s (E-4) | `render_encode` over 150 s: BP §6.2 row 2 | `bench/results/d1-<date>-portrait.json` |
-| Golden similarity across adapters | S7, S14 | The D1-written goldens read on lavapipe in CI | ≥ 0.98 each | Per-adapter folders `fixtures/golden/{warp,lavapipe}/` and the reason recorded; the threshold is not lowered | `experiments.md`; TS §39.3 item 14 |
+| **Edit to preview** | S12, S17 | A Playwright case of `preview-sync.spec.ts`: on the paused 60 s portrait clip, commit a word edit and time until the canvas changes (`requestVideoFrameCallback`-free: the worker's `setScene` answer plus the redraw's `data-frames` tick), 20 runs, the 90th percentile | ≤ 150 ms (TS §13.5, D-173) | Profile the build; cache misses first (D-173); a scene build split per chunk is the next step, recorded as a V4 decision | `experiments.md` |
+| Style thumbnails | S12, S17 | Time from the Style tab opening to three images, 10 runs | ≤ 400 ms (assumption, D-186) | Lower the thumbnail size; render one card at a time | Same |
+| Hit test and hover | S11 | `hitTest` round trip while paused | ≤ 16 ms (one frame) | Hover hit tests every second frame | Same |
+| App shell with the font | S17 | `check-hosts.mjs`'s bundle sizes | ≤ 400 kB gzip (TS §13.5) | D-180: system fonts | `v4changelog.md` |
+| Preview drift and late frames | S15, S17 | `preview-sync.spec.ts`'s drift case, five runs, the worst | ≤ 80 ms; late ≤ 5% (TS §20, PS §20.1) | BP §6.2 row 1 (section 21.2) | `experiments.md` |
+| First preview frame | S15 | `preview-sync.spec.ts` | ≤ 500 ms after `ready` (assumption, M1.5) | Profile `attachPreview`; record | Same |
+| Seek to first frame | S15 | `preview-sync.spec.ts`, GOP of the portrait clip (30 frames) | ≤ 300 ms (assumption, M1.5) | Record; the spinner covers it; V9 re-reads | Same |
+| Downscale rule | S17 | `data-downscaled` after a 60 s play on D1 | `false` on D1 | Recorded; R1 may differ (D-114) | Same |
+| `build_scene`, `frame_at` | S17 | `scene_timing` natively, release | ≤ 1 s; mean ≤ 2 ms | D-166 | Same |
+| `detect_scene` and `render_encode` in the browser | S17 | `pnpm bench:device`, `BENCH_CLIP=portrait`, 10 runs | Within 10% of V3's file for `detect_scene` plus the assembly (about 30 ms); `render_encode` ≤ 90 s per 60 s (E-4) | `render_encode` over 150 s: BP §6.2 row 2 | `bench/results/d1-<date>-portrait.json` |
+| Golden similarity across adapters | S7, S16 | The D1-written goldens read on lavapipe in CI | ≥ 0.98 each | Per-adapter folders `fixtures/golden/{warp,lavapipe}/` and the reason recorded; the threshold is not lowered | `experiments.md`; TS §39.3 item 14 |
 | `offcut_render.wasm` size | S5 | Before and after the plan crate | Recorded | Over 300 kB growth: find the crate responsible (`cargo bloat`-style size listing of the release build) and record it; `serde_json` is already out of the bundle (feature `prompt` off, D-122) | `v4changelog.md` |
 
 ### 21.2 BP §6.2's decisions
@@ -1257,6 +1508,11 @@ Contracts from the end of V4. Changing one later means touching both sides of a 
 | The review use-cases' update rule | `usecases/review-update.ts` |
 | The `data-*` statistics names | `PreviewPlayer.tsx` (D-155) |
 | The golden image names and the SSIM rule | `golden_frames.rs` |
+| `EditState`'s fields, including `caption_position` and `highlight_numbers` (V6.x appends with serde defaults) | `offcut-types/src/edit.rs` |
+| The break-cost model (costs may be tuned as values; the search and its hard breaks are fixed) | `readability.rs`, `captions.rs` |
+| `Scene::hit` and `Hit` | `hit.rs`, `protocol.ts` |
+| The design tokens' names (values may be tuned), the primitives' props, the editor's four tabs | `tokens.css`, `ui/primitives/`, `SidePanel.tsx` |
+| The `review_action` action names | `offcut-api-types/src/analytics.rs` |
 
 V2's and V3's freezes stand, except the rows D-125, D-126, D-127, D-130, D-132, D-133 and D-136 reopened, each named in section 2.
 
@@ -1291,13 +1547,18 @@ Every cell is additive: a body, a file, an arm, a row. Where a later release tou
 | `usecases/run-pipeline.ts` | `prog48.f32` written | - | `request-plan.ts` replaces the `rulesPlan` call (fallback to it) | map from the plan | music | - | - | - | - |
 | `usecases/review-update.ts` and the four edit files | - | - | - | `restore-cut.ts`, `set-filler-cuts.ts` beside them | `set-music.ts` | - | `set-caption-preset.ts` | - | `set-brand-kit.ts` |
 | `usecases/start-export.ts` | `prog48`, cache key (S-9), verifier | gate, sign-in | - | - | - | - | - | - | - |
-| `ui/components/ReviewPanel.tsx` | - | - | post-text section | `CutsSection` filled | music section | - | preset picker | - | brand kit section |
+| `ui/layout/SidePanel.tsx` and its tabs | - | - | a "Post" section (hook, caption, hashtags with copy buttons) | `CutsSection` filled (Captions or a Cuts tab) | a Music section | - | preset cards in Style | furniture rows in Visuals | a Brand section in Style |
 | `ui/components/PlanItemList.tsx` | - | - | labels of 4 kinds | - | - | 8 labels | 2 | 5 | - |
 | `ui/components/ErrorPanel.tsx` | export copy | auth copy | plan fallback notice | - | - | - | - | - | - |
 | `state/clip-store.ts` | - | - | plan source, dropped counts | cut restores | music | - | preset | - | kit |
 | `copy/messages.ts` | export | auth, plan | plan, settings switch | cuts | music | kinds | presets | furniture | kit |
 | `tests-e2e/review-edit.spec.ts` | - | - | regenerate plan | restore a cut | music on/off | - | presets | - | kit |
 | `golden_frames.rs` | - | - | +4 | jump zoom | - | +8 | +2 | +5 | kit matrix |
+| `offcut-scene/readability.rs` | - | - | the model's own emphasis picks join the layers of D-169 as items | - | - | - | per-preset break limits | - | - |
+| `offcut-scene/placement.rs` | - | - | - | - | - | - | - | zones for hook title and lower third | logo corner |
+| `ui/primitives/`, `tokens.css` | - | - | - | - | - | - | - | - | brand colours shown in the Style tab only, never in the interface |
+| `state/history.ts` | - | - | regenerate plan is one step | restore a cut is one step | music changes are steps | - | - | - | kit changes are steps |
+| `usecases/preview-interact.ts` | - | - | - | - | - | - | drag a shape frame | drag a lower third | drag the logo |
 
 ### 22.3 What must be true on V5's first morning
 
@@ -1318,6 +1579,7 @@ Every cell is additive: a body, a file, an arm, a row. Where a later release tou
 - A per-frame video command: punch-ins (V6.1), jump-cut zooms (V6.2), shapes and transitions (V6.5) are data in `video.rs` and the compositor's body.
 - A font registry and a theme: the brand kit (V6.7) is a `Theme` and three font files.
 - A review panel built from plan items and a generic update rule: every V6.x control is one use-case and one section.
+- A design system, primitives, an undo history and direct manipulation: a V6.x control is designed once in the tokens and gets undo, autosave and keyboard access for free.
 
 ---
 
@@ -1334,12 +1596,15 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 - [ ] BP §6.3: `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` pass.
 - [ ] BP §6.3 (v1.2): `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs` pass; the scene takes no `events` argument; no `TimeMs` reaches `frame_at`; the renderer has no crop parameter.
 - [ ] The identity proof of D-117 passed at S6 (its record in the changelog), and the temporary test is gone.
+- [ ] Caption intelligence: `line_breaks.rs` (the table unchanged since its commit, or each change logged), `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` pass.
+- [ ] The editor: every state of section 17.2 is reachable and matches the reviewed screens; the axe check passes; every control works by keyboard.
 - [ ] No source file over 400 lines, tests excluded; the four splits of D-150 are in place.
 - [ ] `git grep` finds no `fetch(` outside the four files, no network call added (D-164), and no cut, mix or non-identity map constructed outside tests.
 - [ ] Test counts at least the baseline's plus V4's (section 20.1); none fell except the cases D-160 names.
 
 **Measurements**
 
+- [ ] Edit to preview ≤ 150 ms (90th percentile) on D1; style thumbnails ≤ 400 ms; the app shell within 400 kB gzip with the font.
 - [ ] Preview drift ≤ 80 ms over 60 s and late frames ≤ 5% on D1; first frame ≤ 500 ms; seek ≤ 300 ms (or recorded with the spinner).
 - [ ] `build_scene` ≤ 1 s and mean `frame_at` ≤ 2 ms natively.
 - [ ] The bench file of S15 committed; `render_encode` within E-4's line.
@@ -1349,13 +1614,14 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 **Deployment**
 
 - [ ] `ci.yml` green on `main`; API (unchanged image) then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
-- [ ] On the deployed page on D1: the reference clip previews; Bold and Tech switch; a word edit changes a number; a list switched off disappears; the landscape clip's crop moves; scrubbing works; cancel during transcription returns to "Process again".
+- [ ] On the deployed page on D1: the reference clip previews in the premium default; Bold and Mono switch from their cards; clicking a word on the preview and editing it changes the number at once; "Change all" and undo work; dragging the captions to the top moves the visuals below them; a list switched off disappears; the landscape clip's crop moves by dragging; scrubbing works; cancel during transcription returns to "Process again".
 - [ ] `review_action`, `job_cancelled` and `client_error` rows appear in `analytics_events` with enum props only (the founder's SQL).
 
 **Records**
 
 - [ ] `docs/v4/experiments.md` written; every reading labelled `d1`.
-- [ ] The founder has looked at five golden frames chosen at random and said whether each looks as intended.
+- [ ] Design review 1 (S10A) and design review 2 (S19) done by the founder on the captured screens at 1280 x 800 and 1920 x 1080, with the visual QA list of D-191 ticked; the founder has looked at five golden frames chosen at random and said whether each looks as intended.
+- [ ] The founder has read ten rows of `line_breaks.rs`'s table and said whether each break reads naturally.
 - [ ] Every (assumption) V4 measured is replaced in TS §39.3, or still listed.
 - [ ] `v4changelog.md` lists every pinned version (`insta`, `png`, the lavapipe package), every snapshot or golden change after its first commit, and the identity proof.
 - [ ] Section 22.3 fully ticked.
@@ -1382,6 +1648,13 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 | 13 | `review-edit.spec.ts` needs the visible caption text; reading pixels for words is not reliable | TS §27 | Section 20.4: a dev/test-only `data-caption-text` attribute; not in production |
 | 14 | V3 §23 item 25 (audio kept in the worker after an early end) | V3 §23 | Closed by D-128 |
 | 15 | V3 §23 item 24 (`video-source.ts` has no room) | V3 §23 | Closed by D-150 |
+| 16 | The audience is content creators in general, not only technical creators | PS §3, §4, §6 (ICP, persona, value proposition) | D-177; the founder's decision of 2026-10-22. Copy back at S18: the primary ICP becomes short-form creators who film talking-head clips; technical creators stay the first channel; the persona gains a non-technical creator |
+| 17 | TS §19.4's style table is V1's; V4 redesigns Clean and Bold and renames Tech's label | TS §19.4 | D-170. Copy back |
+| 18 | `EditState` (a V1 type, TS §10.6) gains `caption_position` and `highlight_numbers` | TS §10.6 | D-169, D-171. Copy back; V3's stored records read with defaults |
+| 19 | TS §5 lists `ReviewPanel.tsx` and `EventToggleList.tsx`; the editor of section 17 has `SidePanel` and its tabs | TS §5, §13.3 | Section 4. TS §5 and §13.3's component table updated at S1 |
+| 20 | `tokens.css` says "system fonts only"; TS §36 bans CDN fonts, not self-hosted ones | `tokens.css`, TS §36 | D-180. TS §36's row clarified at S18 |
+| 21 | No per-word confidence to flag doubtful words (TE-2) | TS §16.4, §39.3 item 7 | D-176: no flag in V4; a V6.1 catalog row or V9 |
+| 22 | Automatic face-aware caption placement | PS §9.5 (face tracking, P1) | D-171: drag and snaps in V4; the face model when face tracking ships |
 
 ### 24.1 Cross-check: BP §6 items against sections and tests
 
@@ -1398,9 +1671,9 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 | D rpc, pool, cancel, ErrorPanel, machine tests, E2E | 14.2, 14.3, 16.2, 17.1, 20 | `rpc.test.ts`, `cancel.spec.ts`, machine tests | Code and checks |
 | 6.2 decisions | 21.2 | - | Measurements |
 
-### 24.2 Decisions to copy back (S16)
+### 24.2 Decisions to copy back (S18)
 
-D-119 (wire format fixed), D-121 (resolution in `validate`), D-122 (graph), D-125 (`to_out_ms`), D-127 (`assemble`, `release` in TS §14.2), D-130 (`dst` rectangle), D-133 (renderer contract and its V4 support rule), D-136 (`mono_font`), section 8.7 (`marks`), D-150 (the split files in TS §5), D-152 (`CANCEL_TIMEOUT` measured or kept), D-165 (plan limits in TS §40.4), every (assumption) measured in section 21.
+D-167 to D-171 (captions, placement, `EditState` fields, the style table), D-177 (audience, to PS), D-180 (fonts, TS §36), D-181 to D-187 (TS §13.3's component table), D-119 (wire format fixed), D-121 (resolution in `validate`), D-122 (graph), D-125 (`to_out_ms`), D-127 (`assemble`, `release` in TS §14.2), D-130 (`dst` rectangle), D-133 (renderer contract and its V4 support rule), D-136 (`mono_font`), section 8.7 (`marks`), D-150 (the split files in TS §5), D-152 (`CANCEL_TIMEOUT` measured or kept), D-165 (plan limits in TS §40.4), every (assumption) measured in section 21.
 
 ---
 
@@ -1431,7 +1704,14 @@ Each file below gets a per-file spec from `docs/file-specs/TEMPLATE.md` before i
 | `web/src/workers/render/frame-decoder.ts` | The `VideoDecoder` | samples | frames | close a frame it handed out |
 | `web/src/usecases/review-update.ts` | The edit update rule | change | stores, scene | await the network |
 | `web/src/usecases/cancel-job.ts` | C-12 | scope | stores, pool | leave a temporary file |
-| `web/src/ui/components/CaptionEditor.tsx` | Word edits | clip store | `editWord` | show a timeline |
+| `web/src/ui/components/CaptionEditor.tsx` | The transcript editor (D-182) | clip, preview and ui stores | `editWord`, `replaceAll`, `seek` | show a timeline; commit on blur without Enter or Tab |
+| `offcut-scene/src/readability.rs` | Break costs and lists | words | costs | hold anything but English lists and constants |
+| `offcut-scene/src/placement.rs` | Caption block and event zone | placement, style | rectangles | read the watermark flag (preview and export must agree) |
+| `offcut-scene/src/hit.rs` | What a point on the canvas is | scene, time, point | `Hit` | shape text |
+| `web/src/ui/styles/tokens.css` | Every design value | - | custom properties | be bypassed by a literal colour or size in a module |
+| `web/src/ui/primitives/*` | The controls | props | elements | hold product logic; render text not from `messages.ts` |
+| `web/src/usecases/preview-interact.ts` | Gestures on the preview | pointer positions | hit tests, commits | commit before release |
+| `web/src/state/history.ts` | Undo and redo | snapshots | snapshots | hold more than 50 |
 | `web/src/ui/components/ErrorPanel.tsx` | Failures | stores | retry calls, `client_error` | show a code or a file name |
 
 ---
@@ -1452,6 +1732,7 @@ Each file below gets a per-file spec from `docs/file-specs/TEMPLATE.md` before i
 | INV-21 | Only `validate` builds a `ValidPlan` | `tests/ui.rs` (trybuild) |
 | INV-22 | Every drawn number is parsed from the effective transcript | `validate.rs` V-5 cases; the word-edit snapshot; `review-edit.spec.ts` "edit a number" |
 | INV-23 | Catalog kinds and drawn kinds are the same set | `catalog_complete.rs`; `catalog_snapshot.rs` |
+| INV-15 (editor) | All copy from `messages.ts`, including tooltips, aria labels and toasts | `react/jsx-no-literals`; `check-copy-codes.mjs` |
 | INV-24 | A plan failure never blocks a clip | V4: the rules plan is the only producer and `validate` never rejects it (`validate_rules_plans.rs`); V6.1 adds the fallback tests |
 
 ---
@@ -1501,4 +1782,15 @@ Each file below gets a per-file spec from `docs/file-specs/TEMPLATE.md` before i
 | `PROGRESS_MIN_INTERVAL_MS` | 100 | `workers/rpc-worker.ts` | TS §14.3 |
 | `DOWNSCALE_MEAN_MS`, `DOWNSCALE_WINDOW` | 28, 60 frames | `render/preview-job.ts` | (assumption, M1.5) |
 | `SEEK_SPINNER_MS` | 300 | `PreviewPlayer.tsx` | (assumption, M1.5) |
-| `LONG_TASK_MAX_MS` | 100 | `pipeline-preview.spec.ts` | (assumption, M2.4) |
+| `LONG_TASK_MAX_MS` | 100 (processing), 50 (editing, D-193) | `pipeline-preview.spec.ts`, `review-edit.spec.ts` | (assumption, M2.4) |
+| Break costs 0 / 1 / 3 / 12, one-word chunk 8, imbalance threshold 1/3 | D-167 | `readability.rs` | (assumption, E-2) |
+| `MIN_CHUNK_MS` | 700 | `readability.rs` | (assumption, E-2) |
+| `ISOLATED_WORD_PAUSE_MS` | 250 | `readability.rs` | (assumption, E-2) |
+| `CAPTION_TOP`, `CAPTION_BOTTOM`, snaps 0.15 / 0.55 / 1.0, event-zone gap 40 lp | D-171 | `placement.rs` | (assumption, E-2) |
+| Clean: Inter 800, 72 lp, 16 x 2, 4 words, stroke 5, shadow 0 x 4 at 45%, pill radius 14, padding 12 x 4, `PILL_SLIDE_MS` 90 | D-170 | `styles.rs`, `theme.rs`, `captions_draw.rs` | (assumption, E-2) |
+| `SHAPE_CACHE_ENTRIES` | 2,048 | `layout.rs` | (assumption, D-173) |
+| `EDIT_TO_PREVIEW_MAX_MS` | 150 | `preview-sync.spec.ts` | TS §13.5 (assumption, M1.5) |
+| `HISTORY_MAX` | 50 | `state/history.ts` | (assumption) |
+| `THUMB_DEBOUNCE_MS`, thumbnail size | 300, 216 x 384 | `style-thumbnails.ts` | (assumption, D-186) |
+| `SNAP_DISTANCE_PX` | 16 | `preview-interact.ts` | (assumption, design review) |
+| Design tokens | D-179 | `tokens.css` | (assumption, design review D-191) |

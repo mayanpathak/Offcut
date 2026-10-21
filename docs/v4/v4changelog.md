@@ -103,3 +103,54 @@ TS §5 lists the new file.
 
 **How it was checked.** `node scripts/check-file-tree.mjs`; `git merge-base v4-build origin/main` gives `550ff8f`.
 
+
+---
+
+## Entry 0.3 - 2026-10-22 - `v4implementation.md` revised for caption quality and the editor's design (outside a prompt)
+
+**Why.** The founder's brief of 2026-10-22 sets V4's bar higher: better captions, a better final video and a better user experience than Submagic, for content creators in general (not only technical creators), with a clean, premium and user-friendly interface.
+
+**What changed in the plan.**
+- **Header.** A quality-bar section maps every line of the founder's two lists (A: caption intelligence; B: editor experience) to the decision that answers it.
+- **Two new decision groups.**
+  - Section 2.9, caption intelligence (D-167 to D-176):
+    - phrase-aware line breaks by a least-cost search (no article or preposition stranded, balanced lines)
+    - a 700 ms reading floor taken from silence only
+    - three emphasis layers (spoken word, stressed word, numbers)
+    - a redesigned premium default (Clean: Inter 800, soft shadow, the spoken word on a sliding highlight pill)
+    - draggable caption placement with snap points, the visuals following
+    - preview-export parity tests
+    - edit to preview within 150 ms (shaping cache, redraw while paused)
+    - hit testing
+    - "Change all N" for repeated mis-hearings
+    - honest scope for suggestions
+  - Section 2.10, editor experience and design (D-177 to D-193):
+    - the audience and plain-word copy
+    - the editor layout: top bar, preview, four tabs
+    - a dark design system in tokens, Inter as the interface font, primitives and icons
+    - the transcript editor; direct manipulation on the preview
+    - undo, redo and visible autosave; keyboard shortcuts
+    - style cards rendered from the clip itself; the Visuals and Framing tabs
+    - processing, export and error experiences
+    - two founder design reviews on captured screens; accessibility (axe); interface performance
+- **Section 17** is replaced by a full interface and interaction specification: principles, screens and states, components, interaction details, copy, styles.
+- **Updated to match:**
+  - scope (1.1, 1.2); the file tree (new scene files, the editor's layout, primitives and use-cases, the font, `history.ts`)
+  - the build order: 19 steps over 13 days, with S8 caption intelligence, S10 design system and shell, S10A design review 1, S19 design review 2
+  - the protocol (`hitTest`, `styleThumbnails`); the use-cases and stores
+  - tests (`line_breaks.rs` written before the algorithm, `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs`, `history.test.ts`, the editor cases and axe in `review-edit.spec.ts`)
+  - the measurements (edit to preview, thumbnails, hit test, shell budget with the font)
+  - the hand-over table, the exit checklist (both design reviews, the line-break reading), the spec issues (16-22) and the constants
+- **D-139, D-142, D-146, D-154 and D-159** point to their successors. Decisions now run D-113 to D-193.
+
+**New reopened contracts.**
+- `EditState` gains `caption_position` and `highlight_numbers`, with serde defaults so V3's records still read (D-169, D-171).
+- `ReviewActionKind` in the analytics allowlist gains five members, so the server is rebuilt (section 13).
+- `FontSet` gains key 4 (Inter 800), appended (D-170).
+
+**For the founder.**
+- At S8, read ten rows of the line-break table.
+- At S10A and S19, review the captured screens.
+- Copy-back item 16: the product spec's target customer becomes content creators in general (applied at S18).
+
+**How it was checked.** `node scripts/check-file-tree.mjs` passes. Decision numbers run D-113 to D-193 with no gap. No code changed.
