@@ -47,7 +47,7 @@ function waitText(seconds: number): string {
 
 export const messages = {
   landing: {
-    hero: "Turn what you say into a finished short.",
+    hero: "Turn what you say into a finished vertical short.",
     subhead:
       "Drop in a raw talking-head clip. Get back a vertical short with a cleaned voice, animated captions, and visuals for the numbers and lists you spoke.",
     supportedBrowsers: "Works in Chrome or Edge on Windows and Mac.",
