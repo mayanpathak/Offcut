@@ -1,8 +1,10 @@
-# buildplan.md - Offcut Build Plan (V1 to V10)
+# buildplan.md - Offcut Build Plan (V1 to V10, with V6.1 to V6.7)
 
-**Status:** v1. Built from `product.md` (PS, Product Spec v1.1) and `technicalspec.md` (TS, Technical Spec v1.1).
+**Status:** v1.2. Built from `product.md` (PS, Product Spec v1.2) and `technicalspec.md` (TS, Technical Spec v1.2).
 
-**What this document is.** The order in which Offcut gets built, as ten versions. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the product, and V6 is feature-complete. V7 to V10 add no features: they are testing, hardening and the launch gate.
+**What this document is.** The order in which Offcut gets built, as ten versions plus seven point releases. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the MVP product and, from v1.2, **the seams the AI edit plan needs** (TS §40.9), so that nothing written in V4-V6 has to be rewritten later. V6.1 to V6.7 add the AI-planned editor (TS §40.10, §8A below), and V6.7 is feature-complete. V7 to V10 add no features: they are testing, hardening and the launch gate.
+
+**v1.2 in one paragraph (founder decision of 2026-10-21).** V4, V5 and V6 are written for the edit-plan design from the start: the scene reads an `EditPlan` (the rule detector is its first producer), time runs through an identity `TimeMap`, the video is a draw command, fonts and colours come from a registry and a theme, and the audio the preview plays is assembled program audio. V6.1 then adds the cloud LLM producer, and each later point release adds drawing code and data, not new contracts.
 
 **What this document is not.** It defines no feature, no number and no file that the two specs do not already define. Where this plan and a spec disagree, the spec wins and this plan gets fixed. "PS §n" is a product-spec section, "TS §n" a tech-spec section. Step ids such as `M1.3` and experiment ids such as `E-3` and `TE-5` are the specs' own (TS §28, TS §37).
 
@@ -17,13 +19,22 @@
 | **V3** | Real ingest, clean voice, real detector | M1.1, M1.2, M1.3 | Week 4, first half: 2-4 Nov | Four event kinds at 0.90 precision |
 | **V4** | The look and the editor | M1.4, M1.5 | Week 4, second half: 5-8 Nov | Preview + review UI working |
 | **V5** | Export that an independent tool accepts | M1.6 | Week 5, first half: 9-11 Nov | All 11 verifier checks pass |
-| **V6** | Accounts, limits, payments: feature-complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all P0 features work |
+| **V6** | Accounts, limits, payments: the MVP features complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all v1.1 P0 features work |
+| **V6.1** | AI edit plan (backbone) + emphasis, emoji, text extras | M1.9 | After V6; dated when V6 closes | AI plans validate and render; fallback works; privacy test revised |
+| **V6.2** | Intelligent pause and silence trimming | M1.10 | | Cut exports pass the verifier at the map's duration |
+| **V6.3** | Background music with ducking | M1.11 | | Ducking and mix loudness measured |
+| **V6.4** | List builder, number moments, cards | M1.12 | | Goldens per kind |
+| **V6.5** | Kinetic caption presets, video inside shapes, shape transitions | M1.13 | | Goldens; frame budget |
+| **V6.6** | Furniture and topic-shift transitions | M1.14 | | Goldens; end-card duration |
+| **V6.7** | Brand kit: feature-complete | M1.15 | | **M1.x gate**: every PS §9.5 V6.x row works |
 | **V7** | Survive real life: restore and failure recovery | M2.1 | Week 6: 16-22 Nov | Reload, crash and quota cases recover |
 | **V8** | Prove the privacy claim; security hardening | M2.2 | Week 7: 23-29 Nov | Network-privacy test blocks releases |
 | **V9** | Real clips and real speed | M2.3, M2.4 | Weeks 8-9: 30 Nov - 13 Dec | Corpus checkpoint (Sun 6 Dec); budgets met |
 | **V10** | Launch gate | M2.5 | Week 10: 14-20 Dec | **M2 gate** (Sun 20 Dec); public launch Mon 21 Dec |
 
 Build work ends at V10. M3 (Sun 21 Mar 2027) and M4 (Sat 19 Jun 2027) are decisions, not builds (PS §20.5).
+
+**Dates after v1.2.** V1-V3 finished about two weeks early (V3 closed 2026-10-21 against 4 Nov). V4-V6 keep their scope plus the seams; V6.1-V6.7 come next and are dated when V6 closes. V7-V10 keep five weeks after V6.7. The calendar dates of V7-V10 above hold only if V6.x fits in the slack; otherwise each shifts by the overrun and the founder re-sets the launch date when V6.7 closes (PS A-2). If V6.x must be shortened, cut from the tail (V6.7 first) or move the date: the founder chooses; a release is never shipped half-done.
 
 **The tight spot.** V3 to V6 are four versions in two weeks. That is the specs' own schedule (five weeks of implementation, PS §9.9), not a choice of this plan. If it slips, the rule is PS §18: cut the P0 feature with the lowest contribution to H1 before moving a date, and keep the five stabilization weeks (V7-V10) intact. One relief valve exists: the V6 server work (M1.7) depends only on V1, so it can be started early whenever client work is blocked.
 
@@ -47,7 +58,7 @@ A version is done only when all of these hold:
 3. It is deployed: server first, then web (TS §33 deploy order), and the header check passes against the deployed URL (TS §24.3).
 4. Every experiment listed for the version has a recorded outcome in `docs/`, or its "if it fails" action has been taken before the next version starts (TS §28).
 5. Every (assumption) the version measured is replaced by its value in TS §39.3, or stays listed there.
-6. The commit is tagged `v1` ... `v10`.
+6. The commit is tagged `v1` ... `v10`, and `v6.1` ... `v6.7` for the point releases (v1.2).
 
 ### 1.3 How each file gets written (TS §34)
 
@@ -60,9 +71,11 @@ A version is done only when all of these hold:
 
 | Rule | Where it comes from |
 |---|---|
-| The recording's timeline is never changed: no silence, pause, breath, filler or mistake is removed, shortened or moved | INV-5, INV-10, PS §8 principle 7 |
-| No media, transcript, caption text, event parameter or file name leaves the browser | INV-2, PS §15 |
-| `fetch` exists in four files only; the browser contacts two hosts only | TS §7, TS §24.1 |
+| Nothing is cut without a validated plan; a cut is a shortened pause, lead/trail silence or an opt-in filler/false start, never inside a word, never a reorder or a speed change; every cut can be restored. Until V6.2 nothing is cut at all | INV-5, INV-10, PS v1.2 §8 principle 7, §9.2.1 |
+| No media, caption text as edited, event or plan parameter or file name leaves the browser; transcript text leaves only in the body of `POST /plan` while the AI plan is on, and the server never stores or logs it | INV-2, P-1, P-14, PS v1.2 §15 |
+| `fetch` exists in four files only; the browser contacts two hosts only; only the server calls the AI provider | TS §7, TS §24.1, TS §40.7 |
+| Nothing reads a plan that `validate` did not return; no number on screen that was not parsed from the transcript; a plan failure never blocks a clip | INV-21, INV-22, INV-24 |
+| Time converts between recording and program time only through `TimeMap` | TS §40.1 |
 | The main thread never decodes, infers, filters, renders or encodes | INV-17 |
 | The ASR session and the render session never coexist | INV-12 |
 | All user-facing text and every number in it come from `copy/messages.ts` and generated limits | INV-15 |
@@ -424,6 +437,20 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 | `crates/offcut-scene/tests/` `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs`, `snapshots/` | Exact display-list snapshots; nothing leaves the safe area; byte-identical frames |
 | `crates/offcut-render/tests/golden_frames.rs`, `fixtures/golden/*.png` (14) | 3 styles x 4 event kinds, watermark on and off; similarity at least 0.98 on a software adapter |
 
+**A2. Edit-plan seams (v1.2; TS §40.9 S-1 to S-7). Build these with A, not after it: they are the shape A is written in.**
+
+| Create or change | Purpose |
+|---|---|
+| `offcut-types/src/units.rs` (`OutMs`, `FrameIdx::to_out_ms`), `timemap.rs` (`TimeMap::identity`, `to_out`, `to_src`, `joins`) | Two timelines from the start; identity until V6.2 (S-1) |
+| `offcut-types/src/plan.rs`; new crate `crates/offcut-plan/` with `catalog.rs`, `prompt.rs`, `validate.rs`, `from_rules.rs`, `timemap.rs` (identity path only) | The scene reads a `ValidPlan`; the rules are its first producer; the prompt and schema are generated and snapshot-tested even though nothing sends them yet (S-2) |
+| `QuantityRef` resolution in `build_scene` | Numbers on screen come from the (edited) transcript words (S-3, INV-22) |
+| `DrawCmd::Video` and `DrawCmd::Image` in `display_list.rs`; `offcut-render` draws the list in order with the video as a command; `Scene::crop()` removed | Zoom, shapes and transitions later change one command, not the renderer (S-4, TDR-21) |
+| `FontKey` + `FontSet` (replacing `FontId`), `Theme` roles, `StyleSpec.motion`, zone table in `safe_area.rs` | Brand kit and kinetic presets are data later (S-5) |
+| `offcut-dsp/src/program.rs` (`assemble`, identity), `silence.rs` (`silence_profile`); `AudioWorkerApi.assemble`; preview plays `prog48` | Program audio exists before cuts and music need it (S-6) |
+| `PlanItemList.tsx` instead of `EventToggleList.tsx`; a cuts section that renders nothing when there are no cuts | Review UI generic over plan items (S-7) |
+| Tests: `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs`; a punch-in golden (scale 1.1) | The identity case is proven equal to v1.1 behaviour; goldens unchanged |
+| TS §5 file tree | Gains every new file above in the same change (§1.3) |
+
 **B. Preview player (M1.5)**
 
 | Complete | Purpose |
@@ -435,7 +462,7 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 
 | Create | Purpose |
 |---|---|
-| `web/src/ui/components/ReviewPanel.tsx`, `CaptionEditor.tsx`, `EventToggleList.tsx`, `StylePicker.tsx`, `CropOffsetControl.tsx` | J8. No sliders except the crop offset. No control that removes or shortens anything |
+| `web/src/ui/components/ReviewPanel.tsx`, `CaptionEditor.tsx`, `PlanItemList.tsx` (v1.2, was `EventToggleList.tsx`), `StylePicker.tsx`, `CropOffsetControl.tsx` | J8. No sliders except the crop offset. Until V6.2 no control removes or shortens anything |
 | `web/src/usecases/edit-word.ts`, `toggle-event.ts`, `set-style.ts`, `set-crop-offset.ts` | C-6: a word edit re-runs detection for its sentence; toggles survive by `EventId` |
 | `messages.ts`: `NO_EVENTS_FOUND` | The honest zero-event message (PS §10 J7) |
 
@@ -461,6 +488,7 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 - [ ] `pipeline-preview.spec.ts` (all cases), `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts` pass.
 - [ ] `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` pass.
 - [ ] Preview drift at most 80 ms over 60 s; first preview frame within 500 ms of `ready`.
+- [ ] v1.2 seams S-1 to S-7: `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs` pass; the scene takes no `events` argument; no `TimeMs` reaches `frame_at`; the renderer has no crop parameter.
 - [ ] Tagged `v4`.
 
 **Not in V4.** Export beyond the V2 spike, the watermark in a real export, accounts.
@@ -489,6 +517,7 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 | `ui/components/ChangeSummary.tsx`, `PostExportQuestion.tsx`; `usecases/answer-post-export.ts` | J11: only changes that were made; the "Would you post this?" question |
 | `verify/verify_mp4.py` checks 7-11, `verify/watermark_mask_720.png` | Loudness, A/V sync and timeline against the source, watermark, bitrate, metadata |
 | `web/tests-e2e/export-creator.spec.ts` complete, `timeline-preserved.spec.ts` | All 11 checks; INV-5 and INV-10 on both pause fixtures (600 and 900 frames) |
+| v1.2 seams S-8, S-9 (TS §40.9) | The export loop runs over `OutMs`, reads source frames at `scene.source_at(t)`, encodes `prog48`, takes `frame_count` from `out_duration`; the test writes the expected duration beside each export and `verify_mp4.py` checks 5 and 8 compare against it; the render-cache key adds plan, time-map, theme and music hashes |
 
 ### 7.2 Things to know about V5
 
@@ -510,7 +539,7 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 
 ## 8. V6 - Accounts, limits, payments: feature-complete (M1.7, M1.8; week 5, second half: 12-15 Nov)
 
-**Goal.** The last missing features: magic-link sign-in, the signed entitlement token, the free plan's three exports a month with watermark, usage receipts, account deletion and export, and checkout for the Creator plan through the merchant of record. After V6 nothing new is added to the product.
+**Goal.** The last missing MVP features: magic-link sign-in, the signed entitlement token, the free plan's three exports a month with watermark, usage receipts, account deletion and export, and checkout for the Creator plan through the merchant of record. After V6 the only new features are V6.1-V6.7 (§8A). v1.2 seam S-10: account deletion and export iterate one list of per-user tables, so V6.1's `plan_usage` is one more entry.
 
 **What you can demo.** The whole journey J1 to J12 with a real email address: drop, preview, click Export, see the limits before signing in, sign in from the emailed link, export a 720p watermarked file, see "2 of 3 left", upgrade in the merchant's test mode, export 1080p without watermark.
 
@@ -598,21 +627,41 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 - [ ] A test-mode purchase at the merchant updates the `subscriptions` row and the next token says Creator.
 - [ ] TE-8 and TE-9 outcomes recorded.
 - [ ] M1 gate list above fully checked.
-- [ ] Tagged `v6`. **Feature freeze starts here.**
+- [ ] Tagged `v6`. (v1.2: the feature freeze moves to `v6.7`.)
 
-**Not in V6, and not ever in the MVP.** Passwords, OAuth, a Pro plan, coupons, credit metering, server-side enforcement of limits (TS §36).
+**Not in V6, and not ever in the MVP.** Passwords, OAuth, a Pro plan, coupons, credit metering, server-side enforcement of export limits (TS §36). (The plan-request quota of V6.1 is server-enforced because it is a real cost, TS §40.7.)
+
+---
+
+## 8A. V6.1 to V6.7 - The AI-planned editor (v1.2)
+
+**Goal.** Turn the V6 product into the Submagic-class editor of PS v1.2: one AI edit plan per clip drives cuts, music, kinetic captions, structure visuals, furniture, transitions and the brand kit. Each release is tagged (`v6.1` ... `v6.7`), deployed and demoable, under the §1.2 rules. The order is fixed by dependency and by the founder's priorities (cuts and music first after the backbone); TS §40.10 lists each release's contents and done-when test, TS §28 M1.9-M1.15 its tests.
+
+**Why this order.** V6.1 builds the only new contract (the plan request) and proves it on cheap consumers. V6.2 and V6.3 change the audio and the timeline, the deepest changes, while the visual layer is still small. V6.4-V6.6 are drawing code over existing contracts and can be reordered among themselves, except that V6.6's topic-shift transitions use V6.5's shape transitions. V6.7 applies to every template, so it comes last.
+
+| Release | Build (TS §40.10) | Demo | Exit (besides §1.2) |
+|---|---|---|---|
+| **V6.1 Edit plan** | `server/src/plan/` (route, `PlanProvider` trait, the TE-15 adapter, quotas), `migrations/0002_plan_usage.sql`; `usecases/request-plan.ts`, `persistence/plans-repo.ts` (IndexedDB v2, `events` store removed); settings switch and provider text; catalog kinds `Emphasis`, `IconPop`, `PunchIn`, `Emoji` with drawing; text-extras panel with copy buttons; `plan_result` analytics; `GET /healthz` warm-up at `clip_accepted` | Drop the reference clip: the feed says "Planning your edit…", words light up and punch in where the model chose, the hook title and hashtags wait in review; pull the network cable and drop again: the rules plan, with a notice | TE-15 recorded; `privacy-network.spec.ts` plan-on and plan-off cases; `log_redaction.rs` plan flow; INV-21 to INV-24 tests; E-11 events arriving |
+| **V6.2 Cuts** | `Cut` arms in validation; `timemap::build` with silence snapping; `assemble` splices with cross-fades; jump-cut punch-in alternation; cuts list with restore; filler switch; `ChangeSummary` cut fields | The 20 s long-pause fixture under a test plan exports shorter, with no click and in sync; restore one cut and re-export: longer by exactly that cut | `cuts_applied.spec.ts`, `timemap_build.rs`, `program_splice.rs`; verifier 11/11 with expected durations |
+| **V6.3 Music** | Music import to OPFS (`clips/<id>/music.f32` decoded), music picker, ducking and mix in `assemble`, plan `MusicCue` as the default on/off; bundled tracks only if TE-16 passes | A clip with music that dips under every sentence and fades out at the end | `mix_ducking.rs`; verifier check 7 on a music export; TE-16 recorded |
+| **V6.4 Structure visuals** | `ListBuilder`, `NumberMoment` (count, bar), `QuoteCard`, `DefinitionCard`, `Versus`, `StepTracker`, `Timeline`, `Checklist` in catalog and scene | "Three reasons" builds a numbered list item by item; "from 800 ms to 120 ms" becomes two bars | Goldens per kind x preset; V-5 cases for every number-bearing kind |
+| **V6.5 Motion** | Kinetic caption presets as `CaptionMotion` data, per-glyph animation, `Video.mask` (video inside shapes), shape transitions | Switch presets live in review; the speaker framed in a circle; a shape wipe between two topics | Goldens; `frame_at` average within budget at the heaviest preset on D1 |
+| **V6.6 Furniture** | Progress bar, chapter markers, hook title card, lower third, end card with CTA (a `Hold` segment), topic-shift transitions | A short with a hook card, chapter ticks on a progress bar and an end card asking to follow | Goldens; end-card export duration equals the map's |
+| **V6.7 Brand kit** | `BrandKit` store (logo, colours, fonts) in this browser; logo through `DrawCmd::Image`; theme and `FontSet` from the kit; applied to exports only for Creator (INV-9) | Set a logo, two colours and a font once: every preset, card and furniture item wears them | Golden matrix under a test kit; `profile.rs` brand-kit cases; **M1.x gate**: walk every PS §9.5 V6.x row on D1 |
+
+**Tagged `v6.7`. Feature freeze starts here.**
 
 ---
 
 ## 9. V7 - Survive real life: restore and failure recovery (M2.1; week 6: 16-22 Nov)
 
-**From here on, no features.** V7 to V10 make the V6 product reliable, provably private, fast enough and launchable. A change that adds a capability is out of scope until after the M2 gate (TS §28: no P1 item starts before M2 passes).
+**From here on, no features.** V7 to V10 make the V6.7 product reliable, provably private, fast enough and launchable. A change that adds a capability is out of scope until after the M2 gate (TS §28: no P1 item starts before M2 passes).
 
 **Goal.** The product behaves well when things go wrong: the tab is reloaded, the browser crashes, the disk fills up, a worker dies, the GPU device is lost, a decoder chokes on a bad sample.
 
 **What you can demo.** Reload the tab mid-review: you are back at the preview with your edits, with no second transcription. Kill a worker from the browser's task manager: a specific message, a retry that works.
 
-**Depends on.** V6.
+**Depends on.** V6.7.
 
 ### 9.1 Build
 
@@ -634,7 +683,7 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 - Give the alpha build to 15 technical creators and have each run their own clip (PS §19 E-2).
 - Ask each one: would you post this result with at most 2 minutes of changes? Target: at least 8 of 15.
-- Write down what each person changed, what broke, and any request for music. These feed the E-10 edit count, the top-3-errors-per-week rule (PS §14) and the music promotion trigger (PS §9.5).
+- Write down what each person changed, what broke, which plan items they switched off and which cuts they restored. These feed the E-10 edit count, the top-3-errors-per-week rule (PS §14) and E-11 (PS §19, v1.2).
 - Tune the items the specs hand to E-2: safe-area insets, style values, event timings, watermark size and placement (TS §37 non-blocking decisions).
 
 ### 9.3 Exit checklist
@@ -650,11 +699,11 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 ## 10. V8 - Prove the privacy claim; security hardening (M2.2; week 7: 23-29 Nov)
 
-**Goal.** "Your video is not uploaded" stops being a statement and becomes a test that blocks every release. Every one of the twelve privacy promises in TS §25.1 has its structural guard, its automatic test and its place in the product.
+**Goal.** "Your video is not uploaded" stops being a statement and becomes a test that blocks every release. Every privacy promise in TS §25.1 (P-1 to P-14 from v1.2) has its structural guard, its automatic test and its place in the product.
 
-**What you can demo.** Run `privacy-network.spec.ts`: it drives the whole journey while recording every request from the page and all workers, then proves no request went to an unlisted host and none contained a transcript word, the file name or any byte window of the media.
+**What you can demo.** Run `privacy-network.spec.ts`: it drives the whole journey while recording every request from the page and all workers, then proves no request went to an unlisted host, none contained the file name or any byte window of the media, and transcript words appeared only in the one plan request (none at all with the AI plan off; v1.2).
 
-**Depends on.** V6 (all flows must exist to be captured). Can overlap with V7.
+**Depends on.** V6.7 (all flows must exist to be captured). Can overlap with V7.
 
 ### 10.1 Build
 
@@ -792,12 +841,13 @@ Then set `FOUNDING_OFFER_ENABLED=true` and offer the founding-member plan at 99 
 - [ ] Detector precision at least 90% on at least 30 hand-labeled transcripts; no event below threshold exists.
 - [ ] Caption edits re-run detection for the affected sentence.
 - [ ] Voice chain output within ±1 LU of -14 LUFS.
-- [ ] The export has the same duration as the source within one video frame; the 0-5 s speech, 5-10 s silence, 10-20 s speech fixture exports as 20 seconds, in sync on both sides of the pause.
+- [ ] With no cuts, the export has the same duration as the source within one video frame; the 0-5 s speech, 5-10 s silence, 10-20 s speech fixture exports as 20 seconds, in sync on both sides of the pause.
+- [ ] With cuts (v1.2), the same fixture under a fixed test plan exports at the time map's duration within one video frame, no cut inside a word, no audible click, in sync on both sides of every join (PS §20.1).
 - [ ] Preview drift at most 80 ms over 60 s.
 - [ ] Creator export is 1080x1920 H.264/AAC; Free export is 720x1280 with watermark; both play in the default gallery app on one Android and one iOS phone and upload to two target platforms (manual).
 - [ ] Free account: 3 exports per month enforced by the token; counter visible before each export.
 - [ ] Checkout works end to end in test mode and live mode; replayed webhooks change nothing.
-- [ ] The network-privacy test passes: no media bytes, no transcript or caption text, only allowlisted hosts and events.
+- [ ] The network-privacy test passes: no media bytes; transcript text only in the one plan request, and none with the AI plan off; only allowlisted hosts and events (v1.2).
 - [ ] The "What leaves your device" page matches the allowlist exactly.
 - [ ] "Clear local data" removes clips, transcripts and the render cache.
 - [ ] The 40+ clip corpus exports at 90% or better; the rest are rejected specifically; none crash.
