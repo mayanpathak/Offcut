@@ -154,3 +154,31 @@ TS §5 lists the new file.
 - Copy-back item 16: the product spec's target customer becomes content creators in general (applied at S18).
 
 **How it was checked.** `node scripts/check-file-tree.mjs` passes. Decision numbers run D-113 to D-193 with no gap. No code changed.
+
+---
+
+## Entry 0.4 - 2026-10-22 - `v4buildguide.md` written (outside a prompt)
+
+**What.** `docs/v4/v4buildguide.md`, the step-by-step guide for V4, in the structure of `v3buildguide.md`:
+- what it is, how to read the references, how it is organised, a phase overview, and "Read this first" (ten traps)
+- **20 phases (0-19) over 13 days.** Each phase has a goal, numbered steps with Order / File / Section / Watch-for tables, commands with their expected output, a "Prove the guards" step where a guard is new, and a milestone ending in `Pass:`, a commit on `v4-build`, a push and a CI read on PR #7.
+- **Three human gates:**
+  - Step 8.2: the founder reads ten rows of the line-break table, before the algorithm exists.
+  - Phase 11: design review 1, on sixteen captured screens.
+  - Step 19.5: design review 2 on the deployed editor, plus five goldens.
+- a quick reference, and the assumptions and gaps found
+
+TS §5 already lists the file.
+
+**Found while writing it, and applied to `v4implementation.md` in the same commit.**
+- **The interface font.** `vercel.json` rewrites every path outside `/api/`, `/assets/` and `/ort/` to `index.html`, so the font moves from `web/public/fonts/` to `web/src/ui/assets/` (a hashed `/assets/` file; D-180, §3.2, §4, §17.6).
+- **The screen capture** gets its own Playwright project, `screens`, and a root script `pnpm screens`. CI never runs it (§4, §19.2).
+- **Goldens.** S7 writes only the two video-only goldens; the other fourteen are written at S9, because the look changes Clean (§5).
+
+**Other placements.** The guide's "Assumptions (c)" lists them:
+- `v3_reference.rs` is rewritten in Phase 5 and passes in Phase 6.
+- A minimal `review-update.ts` is written in Phase 12 and completed in Phase 13.
+- The new copy keys are written in Phase 10, so the design review reads real words.
+
+**How it was checked.** `node scripts/check-file-tree.mjs` passes. Every phase maps to an S-step of §5. The counts used (461/0/3, 92, 12, 48 media cases) are V3's close. No code changed.
+
