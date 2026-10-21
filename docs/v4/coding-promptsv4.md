@@ -99,7 +99,7 @@ The agent writes files, runs commands (including on D1, which is the machine it 
 
 | When | Human step | Plan / guide |
 | --- | --- | --- |
-| Before Prompt 91 | **Decide**: may the agent push one throwaway branch, `scratch/v4-adapter`, to `origin` for the runner's adapter probe and delete it after? Yes: Prompt 91 reads lavapipe before S1. No: Prompt 91 reads D1 only and the runner reading moves to Prompt 101 (the golden job is the probe) | §1A item 7; G 0.5; "Gaps settled" item 1 |
+| Before Prompt 91 | **Decided 2026-10-22: yes.** The agent may push one throwaway branch, `scratch/v4-adapter`, to `origin` for the runner's adapter probe and must delete it after (locally and on `origin`). Prompt 91 reads lavapipe before S1. This is the only branch besides `v4-build` the agent may push | §1A item 7; G 0.5; "Gaps settled" item 1 |
 | By Prompt 125 | **Decide V3 CL item 7** (V4 CL open item 5): move the Linux ffmpeg URL in Prompt 125, or leave it (it dies about 2026-11-27) | G 0.8, 17.1 |
 | After Prompt 102 | **Read ten rows** of the line-break table the agent shows you, each as it would sit on a phone, and answer per row "I would break it this way: yes / no, because …". Prompt 103 records your answers before any algorithm exists | D-167; G 8.2 |
 | Prompt 111 | **Design review 1** (about 30 minutes): sixteen screenshots, four questions per screen, the brand colour (keep the violet of D-179 or name another), and whether "Mono" keeps its name. Then look at the changed screens and say "go" | D-191; G Phase 11 |
@@ -274,6 +274,7 @@ Prove D1 has every tool V4 needs, record the V3 baseline counts and sizes on `v4
 ### Project State Before This Prompt
 
 - `v4-build` at `6d897fa` or later, pushed, upstream `origin/v4-build`; it holds spec v1.2 (`ef1c42d`), the plan (`16b3a4c`, revised `1b9db25`), `origin/main` at `550ff8f` merged in (`81474bf`), the guide (`6d897fa`) and this file. Draft pull request #7 `v4-build` → `main` is open; its last run is green.
+- The founder allowed the scratch push for the runner probe on 2026-10-22 ("Who does what"; V4 changelog Entry 0.6).
 - `docs/v4/v4changelog.md` holds Entries 0 to 0.5. No V4 code exists.
 - `bench/results/d1-2026-10-19-portrait.json` and `-v3testclip.json` exist (§1A item 9).
 
