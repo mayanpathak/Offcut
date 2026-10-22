@@ -11,8 +11,9 @@ use crate::units::{Confidence, Span, TimeMs};
 /// (`PlanItem.kind`, v4implementation D-118): there is no second kind enum.
 /// The four variants have the codes 0-3 of the event-id hash (D-47), fixed
 /// forever. A release that draws a new kind appends a variant with the next
-/// code; none is moved or removed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+/// code; none is moved or removed. The order is the code order (a key of the
+/// plan crate's per-kind limits).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum EventKind {
     NumberReveal,

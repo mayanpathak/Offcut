@@ -278,13 +278,27 @@ mod typescript {
             let _ = writeln!(out, "  {name}: {value},");
         }
         out.push_str("} as const;\n");
-        // The plan's wire format (v4implementation §12).
+        // The plan's wire format and catalog (v4implementation §12).
         let _ = writeln!(out, "\nexport const PLAN_FORMAT = {PLAN_FORMAT};");
+        let _ = writeln!(out, "export const CATALOG_VERSION = {};", catalog_version());
 
         code_array::<ErrorCode>(&mut out, &cfg, "ERROR_CODES");
         code_array::<RejectReason>(&mut out, &cfg, "REJECT_REASONS");
         code_array::<UnsupportedReason>(&mut out, &cfg, "UNSUPPORTED_REASONS");
         without_trailing_spaces(&out)
+    }
+
+    /// `CATALOG_VERSION` of `offcut-plan`, read from its one home,
+    /// `catalog.rs`. This crate may not depend on the plan crate (TS §7), so
+    /// the generator reads the constant's line; a test fails if it moves.
+    fn catalog_version() -> u32 {
+        include_str!("../../offcut-plan/src/catalog.rs")
+            .lines()
+            .find_map(|line| {
+                let value = line.strip_prefix("pub const CATALOG_VERSION: u32 = ")?;
+                value.strip_suffix(';')?.parse().ok()
+            })
+            .expect("offcut-plan/src/catalog.rs declares `pub const CATALOG_VERSION: u32 = <n>;`")
     }
 
     /// `ts-rs` leaves a space at the end of some lines of a documented type.
@@ -358,6 +372,7 @@ mod typescript {
         }
         assert_eq!(ts.matches("readonly __unit: ").count(), 25);
         assert!(ts.contains("\nexport const PLAN_FORMAT = 1;\n"));
+        assert!(ts.contains("\nexport const CATALOG_VERSION = 1;\n"));
 
         let limit_names: Vec<&str> = include_str!("limits.rs")
             .split("\npub const ")

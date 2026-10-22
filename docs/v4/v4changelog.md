@@ -38,6 +38,8 @@
 | 15 | **REOPENED CONTRACT** `offcut-api-types/src/analytics.rs` `ReviewActionKind`: five members (§13); the server rebuilds | `offcut-api-types`, `web/src/gen` | P120 |
 | 16 | TS §9 (the review call chain: "ReviewPanel shows …", `<EventToggleList …>`) and the TS §13 component table still name `ReviewPanel` and `EventToggleList`, which TS §5 now replaces with `SidePanel` and `PlanItemList` (Entry 2) | TS §9, §13 | P127 (copy-back) |
 | 17 | ~~Record "identity reference frozen at <SHA of Prompt 93's commit>" (the SHA is not known inside its own commit, Entry 3); from then on `git diff --stat <SHA> -- crates/offcut-scene/tests/snapshots/v3_reference` must print nothing until Prompt 101 deletes the files~~ Closed in Entry 4: frozen at `09b1085` | `docs/v4/v4changelog.md` | P94 |
+| 18 | §12 lists `DropReason` and `Dropped` among the generated TypeScript types; they live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4. Not generated (Entry 6); generate them when a page or analytics consumer exists, or correct §12 in the copy-back | `web/src/gen`, plan §12 | P127 (copy-back) or V6.1 |
+| 19 | **D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6) | `offcut-plan/src/catalog.rs` | P97 |
 
 ---
 
@@ -466,3 +468,54 @@ The event counts are the expected ones: the reference clip's four of README "Exp
 - The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (the first run failed only at `check-gen-clean.sh`, which diffs `web/src/gen` against git: it passes once `domain.ts` is staged, as the prompt says); **Rust 478 passed, 0 failed, 3 ignored** (Entry 4: 462; +16, the new tests above); Vitest 92; `pnpm build` exit 0 (app shell 307.5 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and nothing else; no private path tracked.
 
 **Open.** Known issues 6 and 7 closed. Nothing new.
+
+---
+
+## Entry 6 - 2026-10-22 - P96 (S4): offcut-plan catalog, config, resolve, validate, from_rules
+
+**What.** Prompt 96 (G 4.4 rows 1-5 and 7, §7.1-§7.7, C.1, D-118 to D-124, D-165): the edit plan's logic in `offcut-plan`, each file tested inline as it landed (`cargo test -p offcut-plan` after each). Nothing outside the crate calls it yet (Prompt 98).
+
+**Files.**
+
+| File | Lines (above its tests) | What |
+|---|---|---|
+| `src/catalog.rs` [ONLY] | 238 (180) | `CATALOG_VERSION = 1`; `Producers`, `AnchorRule`, `ParamTy`, `ParamSpec`, `ItemSpec` (`zone: &'static str`); the four rows of §7.2's table exactly, in code order, each `Producers::Both`; `catalog()`, `spec(kind)`; `EVENT_ZONE = "event"`, `CAPTION_ZONE = "caption"` |
+| `src/config.rs` [ONLY] | 110 (69) | `PlanConfig { per_kind, min_keep_gap: 150 ms, max_cut_share_permille: 400, max_chapters: 6 }`, `KindLimits { max_per_clip, min_gap, label_chars, header_chars }`; `Default` reads the catalog (NumberReveal 8 / 1,500 ms / 32; ListReveal 3 / 10,000 ms / 32 / header 24; FromTo 4 / 3,000 ms / 32; KeywordPop 12 / 800 ms) |
+| `src/resolve.rs` | 182 (85) | `effective_tokens` (`offcut_text::tokenize` with the edits), `quantity_at` (every word of the range has a token, the quantity starts at the first and takes every token but trailing punctuation), `inherit` (D-85; display re-written by `format_quantity`), `label_digits_ok` |
+| `src/validate.rs` [ONLY constructor] | 239 above its tests | `ValidPlan` (private fields; `source`, `items`, `is_empty`), `ValidItem` (with `marks`), `Dropped`, `DropReason` (twelve, snake_case), `RejectReason`, `PlanRejected` (thiserror); `validate`: V-1, the non-item drops, tokens once, the per-item checks, V-6, the sort |
+| `src/validate_params.rs` (C.1's allowed split, used) | 307 | `check_item`: V-2, V-3, V-4, V-5, the span, the marks |
+| `src/from_rules.rs` | 89 (28) | one `Detected` item per event, `confidence: Some`, `enabled` not copied; `t` unused (D-163) |
+| `src/lib.rs` | 18 | §7.1's modules and re-exports (`RejectReason` too); `prompt` arrives in Prompt 97 |
+
+**How `validate` reads §7.6, where the text leaves a choice:**
+- **V-2.** `spec(kind)` and a `PlanConfig` entry, else `UnknownKind`. A `Detected` arm from a `Model` plan, a word-pointing arm from the `Rules`, or a producer the row does not allow → `WrongProducer`. The arm's kind differs from `PlanItem.kind` → `ParamsMismatch`. "Every required param is present": the typed arms make `value`, `from`, `to` and `word` always present, so the check that remains is a list with no point (both arms) or, for a word-pointing list, more points than the row's `ListPoints { max: 7 }` → `ParamsMismatch`. A detector list keeps its own count.
+- **V-3.** Anchors empty or past the last word → `AnchorsOutOfRange`; the anchor rule's word count → `AnchorRule`. "Every `at` and `word` inside the anchors" is applied to `ListPoint.at`, `KeywordPop.word` (also a `Detected` one) and **each `QuantityRef` range** (non-empty and inside the anchors), each → `AnchorsOutOfRange`. A `Detected` arm's own times: its list items' `at` lie between the first word's start and the last word's end.
+- **V-4.** Word-pointing labels only (the detector's texts are not checked): `label` and each list point's label against `label_chars`, the header against `header_chars`, by `chars().count()` → `LabelTooLong`; then `label_digits_ok` against every effective token → `LabelDigits`.
+- **V-5.** `quantity_at` for each `QuantityRef`; FromTo through `inherit`; `ListReveal` becomes `ListItem { ordinal: i + 1, text: label, at: word start }`, `count` = points, header = label or `""`.
+- **Marks** (§8.7). A word-pointing FromTo: the start of its `to` range's first word. A `Detected` FromTo: `parse_quantity` run from each effective token inside the anchors in turn, a found quantity's tokens skipped, and the start of the second one taken; none → `NumberUnresolved`.
+- **Span** from the first anchor word's start to the last one's end, for every arm (the detector's span is the same rule, `from_to.rs` and `number.rs`).
+- **V-6** in anchor order, ties by kind code: `OverLimit` when the kind has `max_per_clip` already; `TooClose` when the start is less than `min_gap` after the previous kept item of the kind ends; `ZoneTaken` when an earlier kept item of the same zone holds it, each item taking its zone over `[start, end + hold)` with the holds 1,200 ms (NumberReveal) and 1,500 ms (the other event-zone kinds), private constants of `validate.rs`; the caption zone is never taken.
+- **Order**: by `(span.start, kind code, anchors.start)`. The dropped list holds the non-item drops first, then the item drops in plan order, then V-6's.
+- **No panic, no `unwrap`, no indexing** in the crate's non-test code; every time sum saturates; a missing word time is `AnchorsOutOfRange`.
+
+**Changes outside the crate.**
+- `crates/offcut-types/src/events.rs`: `EventKind` gains `PartialOrd, Ord` (§7.4's `BTreeMap<EventKind, KindLimits>` needs a key order; V3's enum had none). Declaration order is the code order; the generated TypeScript changes by its doc comment only.
+- `crates/offcut-types/src/lib.rs`: the generator writes `export const CATALOG_VERSION = 1;` after `PLAN_FORMAT` (§12). `CATALOG_VERSION` lives in `offcut-plan/src/catalog.rs` and `offcut-types` may not depend on the plan crate (TS §7), so the generator reads the constant's line from that file with `include_str!`; the generator's test asserts the constant is there, and fails if the line moves.
+- `crates/offcut-plan/Cargo.toml`: `[dev-dependencies] serde_json` (the inline tests read JSON also without the feature `prompt`). The workspace does not deny unused dependencies (Entry 2), so no normal dependency waited.
+- `web/src/gen/domain.ts` regenerated.
+
+**Found, not fixed.**
+- §12 lists `DropReason` and `Dropped` among the generated TypeScript types. They live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4 (they become an analytics enum in V6.1). Not generated; known issue 18.
+- **D-165 at risk for two kinds (Prompt 97 decides).** The detector keeps two overlays apart by its windows only (150 ms lead, holds 1,400/1,700 ms: at least about 1,850 ms between a FromTo's end and the next one's start), while V-6's `min_gap` is 3,000 ms for FromTo and 10,000 ms for ListReveal. A rules plan with two FromTos 1.85-3 s apart would lose one to `TooClose`. `validate_rules_plans.rs` (Prompt 97) runs every labeled file; if one loses an item, the limit is the (assumption) to revisit, not the detector. Known issue 19.
+
+**Tests.** Inline, 20: `catalog.rs` 2 (code order and unique names; §7.2's numbers), `config.rs` 1, `resolve.rs` 5 (§7.5's four: "ten thousand" → 10,000; "nine" for "ninety" → 9 minutes after inheritance from "to ten minutes"; a hidden word → `None`; "3x faster" without a "3" → false; plus inheritance leaving two units or none alone), `validate.rs` 11 (V-1 `Format` and `Catalog`; a model plan of the four kinds valid whole and sorted, with resolved values, list items and the FromTo mark; an edited number drawn as edited and an edited-away one dropped; the eight non-item fields `NotInThisBuild`; V-2 `WrongProducer` both ways and `ParamsMismatch` three ways; V-3 `AnchorsOutOfRange` and `AnchorRule`; V-4 `LabelTooLong` by characters and `LabelDigits`; V-5 `NumberUnresolved`; a `Detected` FromTo's mark and one without a second quantity; V-6 `OverLimit`, `TooClose`, `ZoneTaken` and a KeywordPop beside a visual; snake_case names), `from_rules.rs` 1. Every one of the twelve drop reasons is returned by some path (`UnknownKind` only for a kind missing from the catalog or the config, which no V4 kind is).
+
+**How it was checked.**
+- `cargo test -p offcut-plan` (default features and `--no-default-features`): 20 passed.
+- `cargo clippy -p offcut-plan --all-targets -- -D warnings`, with and without default features: clean.
+- `cargo build -p offcut-plan --target wasm32-unknown-unknown --no-default-features --release`: Finished.
+- Line counts above: every file under 400 above its tests.
+- `pnpm gen:types && sh scripts/check-gen-clean.sh`: clean with `domain.ts` staged.
+- The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (`check-file-tree`: 298 files, 13 crates; `check-gen-clean` clean with `domain.ts` staged); **Rust 498 passed, 0 failed, 3 ignored** (Entry 5: 478; +20, the inline tests above); Vitest 92; `pnpm build` exit 0 (app shell 307.5 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and nothing else; no private path tracked.
+
+**Open.** Known issues 18 and 19 (new).

@@ -155,7 +155,8 @@ export type Transcript = { words: Array<Word>, sentences: Array<Sentence>, numbe
  * (`PlanItem.kind`, v4implementation D-118): there is no second kind enum.
  * The four variants have the codes 0-3 of the event-id hash (D-47), fixed
  * forever. A release that draws a new kind appends a variant with the next
- * code; none is moved or removed.
+ * code; none is moved or removed. The order is the code order (a key of the
+ * plan crate's per-kind limits).
  */
 export type EventKind = "number_reveal" | "list_reveal" | "from_to" | "keyword_pop";
 
@@ -368,6 +369,7 @@ export const LIMITS = {
 } as const;
 
 export const PLAN_FORMAT = 1;
+export const CATALOG_VERSION = 1;
 
 export const ERROR_CODES = [
   "E_MODEL_DOWNLOAD",

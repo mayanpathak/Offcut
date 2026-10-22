@@ -22,3 +22,7 @@ offcut-text = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The inline tests read and write JSON also when the feature `prompt` is off.
+serde_json = { workspace = true }
