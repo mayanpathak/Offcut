@@ -1,22 +1,24 @@
-//! The scene of a session (TS §19.6): built from the transcript, the events
-//! and the user's choices, and summed up for the page. A second
-//! `#[wasm_bindgen] impl RenderSession` block; JavaScript sees one class.
-//! Moved from `session.rs` (v4implementation D-150).
+//! The scene of a session (TS §19.6, §40.8): the rules plan of the detected
+//! events, and the scene built from the transcript, a plan the binding
+//! validates, the user's choices and the time map, summed up for the page. A
+//! second `#[wasm_bindgen] impl RenderSession` block; JavaScript sees one
+//! class. Moved from `session.rs` (v4implementation D-150, §11.1).
 
 use std::collections::BTreeMap;
 
+use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
-use offcut_render::scene::{Scene, SceneInput, build_scene};
+use offcut_render::scene::{FontSet, Scene, SceneInput, Theme, build_scene};
 use offcut_types::{
-    CaptionPlacement, CropOffset, DetectedEvent, EditState, ErrorCode, EventId, ExportProfile,
-    StyleId, Transcript,
+    CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
+    ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::session::{RenderSession, scene_error_name};
-use crate::{failure, from_js, to_plain, word_edits};
+use crate::{failure, from_js, to_js, to_plain, word_edits};
 
 /// The user's choices as JavaScript holds them: the keys of `word_edits` are
 /// strings there. A record V3 stored has no `caption_position` and no
@@ -38,42 +40,120 @@ fn highlighted() -> bool {
     EditState::default().highlight_numbers
 }
 
-/// A `SceneInput` by value: everything but the clip, which the session has.
+/// What `set_scene` takes: everything but the clip, which the session has.
 #[derive(Deserialize)]
 struct SceneInputValue {
     transcript: Transcript,
-    events: Vec<DetectedEvent>,
+    plan: EditPlan,
     edit: EditInput,
     profile: ExportProfile,
+    #[serde(rename = "timeMap")]
+    time_map: TimeMap,
+}
+
+/// What `set_scene` answers: the plan's items and fields it left out, and why.
+#[derive(Serialize)]
+struct SceneReport {
+    dropped: Vec<Dropped>,
+}
+
+/// Where the main video's source is, as JavaScript reads it:
+/// `{ at: number }` or `{ held: number }`.
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum SourcePos {
+    At(u32),
+    Held(u32),
+}
+
+/// The plan of the detector's events: the plan the page holds and hands back
+/// to `set_scene` (D-124). `transcript` is a `Transcript`, `events` the
+/// `DetectedEvent[]` of `detect` or `redetect_sentence`.
+#[wasm_bindgen]
+pub fn rules_plan(transcript: JsValue, events: JsValue) -> Result<JsValue, JsValue> {
+    let transcript: Transcript = from_js(transcript, "Transcript")?;
+    let events: Vec<DetectedEvent> = from_js(events, "DetectedEvent")?;
+    to_js(&from_rules(&events, &transcript))
+}
+
+/// The variant's name: the `detail` of a refused plan.
+fn reject_name(reason: RejectReason) -> &'static str {
+    match reason {
+        RejectReason::Format => "PlanFormat",
+        RejectReason::Catalog => "PlanCatalog",
+    }
+}
+
+/// The scene of `input` on `clip`, and what its plan left out. Every failure
+/// is `E_INTERNAL`, with the detail returned here: the page built every part
+/// of the input.
+fn scene_of(
+    input: SceneInputValue,
+    clip: &ClipInfo,
+) -> Result<(Scene, Vec<Dropped>), &'static str> {
+    let word_edits = word_edits(input.edit.word_edits).ok_or("SceneInput")?;
+    // V4 cuts nothing and holds nothing (D-164).
+    if !input.time_map.is_identity() {
+        return Err("TimeMapNotIdentity");
+    }
+    let edit = EditState {
+        word_edits,
+        event_overrides: input.edit.event_overrides,
+        style: input.edit.style,
+        crop_offset: input.edit.crop_offset,
+        caption_position: input.edit.caption_position,
+        highlight_numbers: input.edit.highlight_numbers,
+    };
+    let (plan, dropped) = validate(
+        input.plan,
+        &input.transcript,
+        &edit.word_edits,
+        &PlanConfig::default(),
+    )
+    .map_err(|rejected| reject_name(rejected.reason))?;
+    let theme = Theme::default_for(edit.style);
+    let fonts = FontSet::embedded();
+    let scene = build_scene(SceneInput {
+        transcript: &input.transcript,
+        plan: &plan,
+        edit: &edit,
+        clip,
+        profile: &input.profile,
+        time_map: &input.time_map,
+        theme: &theme,
+        fonts: &fonts,
+    })
+    .map_err(scene_error_name)?;
+    Ok((scene, dropped))
 }
 
 #[wasm_bindgen]
 impl RenderSession {
-    /// `input` is `{ transcript, events, edit, profile }`; the clip is the
-    /// one the session was opened with. Builds the scene and keeps it in
-    /// place of the one before. The renderer is not touched.
-    pub fn set_scene(&mut self, input: JsValue) -> Result<(), JsValue> {
+    /// `input` is `{ transcript, plan, edit, profile, timeMap }`; the clip is
+    /// the one the session was opened with. Validates the plan against the
+    /// transcript as edited, builds the scene and keeps it in place of the
+    /// one before, and answers `{ dropped }`. The renderer is not touched.
+    pub fn set_scene(&mut self, input: JsValue) -> Result<JsValue, JsValue> {
         let input: SceneInputValue = from_js(input, "SceneInput")?;
-        let word_edits = word_edits(input.edit.word_edits)
-            .ok_or_else(|| failure(ErrorCode::Internal, "SceneInput"))?;
-        let edit = EditState {
-            word_edits,
-            event_overrides: input.edit.event_overrides,
-            style: input.edit.style,
-            crop_offset: input.edit.crop_offset,
-            caption_position: input.edit.caption_position,
-            highlight_numbers: input.edit.highlight_numbers,
-        };
-        let scene = build_scene(SceneInput {
-            transcript: &input.transcript,
-            events: &input.events,
-            edit: &edit,
-            clip: &self.clip,
-            profile: &input.profile,
-        })
-        .map_err(|error| failure(ErrorCode::Internal, scene_error_name(error)))?;
+        let (scene, dropped) =
+            scene_of(input, &self.clip).map_err(|detail| failure(ErrorCode::Internal, detail))?;
         self.scene = Some(scene);
-        Ok(())
+        to_js(&SceneReport { dropped })
+    }
+
+    /// Where the main video's source is at the program time `t_out_ms`;
+    /// `null` before a scene is set.
+    pub fn source_at(&self, t_out_ms: u32) -> JsValue {
+        let at = self
+            .scene
+            .as_ref()
+            .map(|scene| match scene.source_at(OutMs::new(t_out_ms)) {
+                SrcPos::At(t) => SourcePos::At(t.get()),
+                SrcPos::Held(t) => SourcePos::Held(t.get()),
+            });
+        // One number in one field always serializes.
+        at.and_then(|at| to_plain(&at).ok())
+            .unwrap_or(JsValue::NULL)
     }
 
     /// The `ChangeSummary` of the scene; `null` before a scene is set.
@@ -83,5 +163,111 @@ impl RenderSession {
         summary
             .and_then(|summary| to_plain(&summary).ok())
             .unwrap_or(JsValue::NULL)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use offcut_types::{BitsPerSec, DurMs, Hz, Orientation, ProfileKind, Px, Rotation};
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    fn clip() -> ClipInfo {
+        ClipInfo {
+            duration: DurMs::new(10_000),
+            display_width: Px::new(1080),
+            display_height: Px::new(1920),
+            rotation: Rotation::R0,
+            orientation: Orientation::Portrait,
+            is_vfr: false,
+            video_codec_string: "avc1.640028".to_owned(),
+            audio_codec_string: "mp4a.40.2".to_owned(),
+            audio_sample_rate: Hz::new(48_000),
+            audio_channels: 2,
+        }
+    }
+
+    /// The input the page sends, as JSON, with `change` made to it.
+    fn input(change: impl FnOnce(&mut Value)) -> SceneInputValue {
+        let profile = ExportProfile {
+            kind: ProfileKind::Preview,
+            width: Px::new(540),
+            height: Px::new(960),
+            watermark: false,
+            video_bitrate: BitsPerSec::new(4_000_000),
+            audio_bitrate: BitsPerSec::new(128_000),
+        };
+        let transcript = Transcript {
+            words: Vec::new(),
+            sentences: Vec::new(),
+            numbers: Vec::new(),
+            model_version: "test".to_owned(),
+        };
+        let plan = from_rules(&[], &transcript);
+        let mut value = json!({
+            "transcript": transcript,
+            "plan": plan,
+            "edit": { "word_edits": {}, "event_overrides": {}, "style": "clean", "crop_offset": 0.0 },
+            "profile": profile,
+            "timeMap": TimeMap::identity(DurMs::new(10_000)),
+        });
+        change(&mut value);
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn refused(input: SceneInputValue) -> &'static str {
+        match scene_of(input, &clip()) {
+            Ok(_) => panic!("the input was not refused"),
+            Err(detail) => detail,
+        }
+    }
+
+    #[test]
+    fn the_rules_plan_on_the_identity_map_builds_a_scene() {
+        let (scene, dropped) = scene_of(input(|_| {}), &clip()).unwrap();
+        assert_eq!(dropped, []);
+        assert_eq!(scene.duration(), DurMs::new(10_000));
+        assert_eq!(
+            scene.source_at(OutMs::new(33)),
+            SrcPos::At(offcut_types::TimeMs::new(33))
+        );
+        let report = serde_json::to_value(SceneReport { dropped }).unwrap();
+        assert_eq!(report, json!({ "dropped": [] }));
+        let at = serde_json::to_value(SourcePos::At(33)).unwrap();
+        assert_eq!(at, json!({ "at": 33 }));
+    }
+
+    #[test]
+    fn a_map_that_is_not_the_identity_and_a_plan_of_another_build_are_refused() {
+        // A cut between 1 s and 2 s: V4 constructs none outside tests (D-164).
+        let cut = json!({ "segments": [
+            { "kind": "source", "src": { "start": 0, "end": 1_000 } },
+            { "kind": "source", "src": { "start": 2_000, "end": 10_000 } },
+        ] });
+        assert_eq!(refused(input(|v| v["timeMap"] = cut)), "TimeMapNotIdentity");
+        assert_eq!(
+            refused(input(|v| v["plan"]["format"] = json!(2))),
+            "PlanFormat"
+        );
+        assert_eq!(
+            refused(input(|v| v["plan"]["catalog"] = json!(2))),
+            "PlanCatalog"
+        );
+        assert_eq!(
+            refused(input(|v| v["edit"]["word_edits"] = json!({ "01": "x" }))),
+            "SceneInput"
+        );
+    }
+
+    #[test]
+    fn a_field_v4_does_not_apply_is_dropped_and_reported() {
+        let hook = input(|v| v["plan"]["extras"]["hook"] = json!("Watch this"));
+        let (_, dropped) = scene_of(hook, &clip()).unwrap();
+        let report = serde_json::to_value(SceneReport { dropped }).unwrap();
+        assert_eq!(
+            report,
+            json!({ "dropped": [{ "kind": null, "reason": "not_in_this_build" }] })
+        );
     }
 }

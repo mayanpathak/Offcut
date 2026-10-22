@@ -1,20 +1,21 @@
 //! A value that changes over time, given as keys. The value at `t` is
 //! computed from `t` alone: nothing is carried from one frame to the next.
+//! Keys are program times (D-126).
 
-use offcut_types::TimeMs;
+use offcut_types::OutMs;
 
 use crate::easing::{Easing, ease};
 
 /// `keys` are in time order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Track {
-    pub keys: Vec<(TimeMs, f32)>,
+    pub keys: Vec<(OutMs, f32)>,
     pub easing: Easing,
 }
 
 /// Before the first key its value, after the last key its value, between two
 /// keys the eased value. A track without keys is 0.0.
-pub fn eval(track: &Track, t: TimeMs) -> f32 {
+pub fn eval(track: &Track, t: OutMs) -> f32 {
     let Some(&(first_at, first)) = track.keys.first() else {
         return 0.0;
     };

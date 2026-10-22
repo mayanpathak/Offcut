@@ -11,11 +11,16 @@ workspace = true
 offcut-types = { workspace = true }
 # For `format_quantity` only (D-28).
 offcut-text = { workspace = true }
+# The scene draws a valid plan, which only `offcut-plan` can make (D-122).
+# Without `prompt`: the scene needs no schema code.
+offcut-plan = { workspace = true, default-features = false }
 parley = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+# The display-list snapshots (v4implementation D-157, §8.10).
+insta = { workspace = true }
 # The identity reference, tests/v3_reference.rs (v4implementation D-117):
 # the detector's events of the reference clip and of three labeled files, and
 # the display lists written as JSON. Temporary until V4 Prompt 101; the

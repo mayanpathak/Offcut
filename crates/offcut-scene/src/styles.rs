@@ -1,10 +1,13 @@
-//! The caption styles (TS §19.4). This is the only file that holds their
-//! values; all of them are (assumption), reviewed in E-2.
+//! [ONLY] The caption styles (TS §19.4, D-136, D-137). This is the only file
+//! that holds their values; all of them are (assumption), reviewed in E-2. A
+//! style names theme roles and a font role, never a colour or a font: the
+//! theme gives them their values.
 
 use offcut_types::StyleId;
 
-use crate::display_list::{FontId, Rgba};
 use crate::easing::Easing;
+use crate::motion::{ActiveTreatment, CaptionMotion, MotionPreset, MotionUnit};
+use crate::theme::{FontRole, Role};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Case {
@@ -12,62 +15,60 @@ pub enum Case {
     Upper,
 }
 
+/// A rounded box behind a chunk's lines (Tech, V4 Prompt 105).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PanelSpec {
+    pub role: Role,
+    /// In logical pixels.
+    pub radius: f32,
+    pub padding: f32,
+}
+
 /// One row of the table of TS §19.4.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleSpec {
-    pub font: FontId,
+    pub font: FontRole,
     /// In logical pixels.
     pub size: f32,
     pub case: Case,
     pub max_chars_per_line: u32,
     pub max_lines: u32,
     pub max_words: u32,
-    pub fill: Rgba,
+    pub fill: Role,
     /// In logical pixels.
     pub stroke_width: f32,
-    pub stroke_color: Rgba,
+    pub stroke: Role,
     /// The word that is being spoken.
-    pub active_color: Rgba,
-    /// A KeywordPop word (V4).
-    pub pop_color: Rgba,
-    pub easing: Easing,
-    pub motion_ms: u32,
+    pub active: Role,
+    /// A KeywordPop word.
+    pub pop: Role,
+    pub panel: Option<PanelSpec>,
+    pub motion: CaptionMotion,
 }
-
-const WHITE: Rgba = Rgba {
-    r: 255,
-    g: 255,
-    b: 255,
-    a: 255,
-};
-const DARK: Rgba = Rgba {
-    r: 16,
-    g: 16,
-    b: 20,
-    a: 255,
-};
-const ACCENT: Rgba = Rgba {
-    r: 255,
-    g: 214,
-    b: 10,
-    a: 255,
-};
 
 fn clean() -> StyleSpec {
     StyleSpec {
-        font: FontId::Inter700,
+        font: FontRole::Display,
         size: 64.0,
         case: Case::AsSpoken,
         max_chars_per_line: 18,
         max_lines: 2,
         max_words: 5,
-        fill: WHITE,
+        fill: Role::Text,
         stroke_width: 6.0,
-        stroke_color: DARK,
-        active_color: ACCENT,
-        pop_color: ACCENT,
-        easing: Easing::EaseOutCubic,
-        motion_ms: 120,
+        stroke: Role::Stroke,
+        active: Role::Accent,
+        pop: Role::Accent,
+        panel: None,
+        // V3's one motion: captions shown at once, the spoken word in the
+        // active colour, a number moving ease-out cubic.
+        motion: CaptionMotion {
+            unit: MotionUnit::Word,
+            enter: MotionPreset::None,
+            active: ActiveTreatment::Highlight,
+            easing: Easing::EaseOutCubic,
+            duration_ms: 120,
+        },
     }
 }
 
@@ -78,5 +79,18 @@ pub fn spec(id: StyleId) -> StyleSpec {
         StyleId::Bold => clean(),
         // V4: the Tech row of TS §19.4.
         StyleId::Tech => clean(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_style_moves_glyph_by_glyph() {
+        // Per-glyph timing is not drawn in V4 (v4implementation §8.5).
+        for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
+            assert_eq!(spec(style).motion.unit, MotionUnit::Word, "{style:?}");
+        }
     }
 }

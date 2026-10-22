@@ -9,8 +9,8 @@ use offcut_mp4::reader::RandomAccess;
 use offcut_mp4::{ContainerError, IoError};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::{Scene, SceneError};
-use offcut_render::{RenderError, Renderer};
-use offcut_types::{Bytes, ClipInfo, ErrorCode, Px, TimeMs};
+use offcut_render::{RenderError, Renderer, VideoSources};
+use offcut_types::{Bytes, ClipInfo, ErrorCode, OutMs, Px, TimeMs};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::{
@@ -127,6 +127,7 @@ fn render_failure(error: RenderError) -> (ErrorCode, &'static str) {
         RenderError::DeviceLost => (ErrorCode::GpuLost, "DeviceLost"),
         RenderError::FrameImport => (ErrorCode::Internal, "FrameImport"),
         RenderError::Overlay => (ErrorCode::Internal, "Overlay"),
+        RenderError::Unsupported => (ErrorCode::Internal, "Unsupported"),
     }
 }
 
@@ -134,6 +135,7 @@ pub(crate) fn scene_error_name(error: SceneError) -> &'static str {
     match error {
         SceneError::Font => "Font",
         SceneError::Layout => "Layout",
+        SceneError::TimeMap => "TimeMap",
     }
 }
 
@@ -219,18 +221,22 @@ impl RenderSession {
         }
     }
 
-    /// Draws `frame` with what the scene shows at `t_ms` over it. The frame
-    /// stays the caller's.
-    pub fn render_frame(&mut self, frame: &VideoFrame, t_ms: u32) -> Result<(), JsValue> {
+    /// Draws what the scene shows at the program time `t_out_ms`, with
+    /// `frame` as its main video: the frame of the source time `source_at`
+    /// gives. The frame stays the caller's.
+    pub fn render_frame(&mut self, frame: &VideoFrame, t_out_ms: u32) -> Result<(), JsValue> {
         let Some(scene) = self.scene.as_ref() else {
             return Err(failure(ErrorCode::Internal, "NoScene"));
         };
         let Some(renderer) = self.renderer.as_mut() else {
             return Err(failure(ErrorCode::Internal, "NoCanvas"));
         };
-        let list = scene.frame_at(TimeMs::new(t_ms));
+        let list = scene.frame_at(OutMs::new(t_out_ms));
+        let sources = VideoSources {
+            main: (frame, self.clip.rotation),
+        };
         renderer
-            .render(frame, scene.crop(), self.clip.rotation, &list)
+            .render(&sources, &list, scene.fonts())
             .map_err(render_error)
     }
 
@@ -307,6 +313,7 @@ mod tests {
             (RenderError::DeviceLost, ErrorCode::GpuLost, "DeviceLost"),
             (RenderError::FrameImport, ErrorCode::Internal, "FrameImport"),
             (RenderError::Overlay, ErrorCode::Internal, "Overlay"),
+            (RenderError::Unsupported, ErrorCode::Internal, "Unsupported"),
         ];
         for (error, code, name) in cases {
             assert_eq!(render_failure(error), (code, name));
@@ -319,5 +326,6 @@ mod tests {
         assert_eq!(container_name(ContainerError::Io(IoError::Read)), "Read");
         assert_eq!(scene_error_name(SceneError::Font), "Font");
         assert_eq!(scene_error_name(SceneError::Layout), "Layout");
+        assert_eq!(scene_error_name(SceneError::TimeMap), "TimeMap");
     }
 }

@@ -1,7 +1,7 @@
-//! The compositor: a source frame, turned and cropped, with a display list
-//! drawn over it, on a canvas (TS §19). It draws what it is given. It does
-//! not know what a scene means, it detects nothing, and it closes no
-//! `VideoFrame`: the caller does (TS §19.6).
+//! The compositor: a display list drawn in its order on a canvas, its video
+//! command with the frame of its slot, turned and cropped (TS §19, D-133). It
+//! draws what it is given. It does not know what a scene means, it detects
+//! nothing, and it closes no `VideoFrame`: the caller does (TS §19.6).
 
 mod composite;
 mod gpu;
@@ -12,7 +12,7 @@ mod video_pass;
 /// renderer its display lists, and depends on this crate only (D-61).
 pub use offcut_scene as scene;
 
-use offcut_scene::{CropRect, DisplayList};
+use offcut_scene::{DisplayList, FontSet};
 use offcut_types::{Px, Rotation};
 use thiserror::Error;
 
@@ -35,6 +35,16 @@ pub enum RenderError {
     FrameImport,
     #[error("the overlay could not be drawn")]
     Overlay,
+    /// A list this version cannot draw (D-133): an image, a mask, a video
+    /// that is not the first command or not opaque, or more than one.
+    #[error("the display list asks for what this renderer does not draw")]
+    Unsupported,
+}
+
+/// The frames a list's `Video` commands draw, by slot, each with the
+/// rotation of its clip (D-133).
+pub struct VideoSources<'a> {
+    pub main: (&'a web_sys::VideoFrame, Rotation),
 }
 
 /// One device, and the textures of one output size. Textures are made when
@@ -99,26 +109,38 @@ impl Renderer {
         Ok(())
     }
 
-    /// Draws `frame`, cropped to `crop` and turned by `rotation`, with `list`
-    /// over it. The result is on the canvas. `crop` is in display pixels of
-    /// the source (TS §19.7).
+    /// Draws `list` in its order: its video, the part `src` of the frame of
+    /// its slot turned by the clip's rotation, in `dst`, black around it;
+    /// then every command after it, with glyphs set in `fonts`. The result is
+    /// on the canvas. `src` is in display pixels of the source (TS §19.7). A
+    /// list V4 does not draw is `Unsupported` (D-133).
     pub fn render(
         &mut self,
-        frame: &web_sys::VideoFrame,
-        crop: CropRect,
-        rotation: Rotation,
+        sources: &VideoSources<'_>,
         list: &DisplayList,
+        fonts: &FontSet,
     ) -> Result<(), RenderError> {
         if self.gpu.is_lost() {
             return Err(RenderError::DeviceLost);
         }
-        self.video
-            .load(&self.gpu.device, &self.gpu.queue, frame, crop, rotation)?;
-        // A frame with nothing over it costs no overlay pass.
-        let with_overlay = !list.cmds.is_empty();
+        let size = self.gpu.size();
+        let (src, dst) = composite::video_of(list, size)?;
+        let (frame, rotation) = sources.main;
+        self.video.load(
+            &self.gpu.device,
+            &self.gpu.queue,
+            frame,
+            src,
+            rotation,
+            (dst, size),
+        )?;
+        // The video is the first command; a frame with nothing over it costs
+        // no overlay pass.
+        let over = list.cmds.get(1..).unwrap_or_default();
+        let with_overlay = !over.is_empty();
         if with_overlay {
             self.overlay
-                .render(&self.gpu.device, &self.gpu.queue, list)?;
+                .render(&self.gpu.device, &self.gpu.queue, over, fonts)?;
         }
         self.compositor
             .present(&self.gpu, &self.video, with_overlay)

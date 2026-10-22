@@ -1,12 +1,15 @@
 //! The identity reference (v4implementation D-116, D-117). Temporary: written
-//! in V4 Prompt 93 by V3's scene code, compared through the V4 contract in
-//! Prompt 100, deleted with its six JSON files in Prompt 101.
+//! in V4 Prompt 93 by V3's scene code (the files under
+//! `tests/snapshots/v3_reference/`, frozen at `09b1085`), compared here
+//! through the V4 contract, deleted with its six JSON files in Prompt 101.
 //!
-//! Six scenes are built with `build_scene`, and every 7th frame's display
-//! list is kept: a prime step samples every chunk and every event phase. With
-//! `OFFCUT_V3_REFERENCE_WRITE=1` the lists are written to
-//! `tests/snapshots/v3_reference/<name>.json`; otherwise they are read and
-//! compared value for value. Nothing else is written.
+//! The comparison form (G 6.1, V4 Prompt 98): the same six inputs, built as
+//! rules plan → `validate` → `build_scene` on `TimeMap::identity`,
+//! `Theme::default_for(Clean)` and `FontSet::embedded()`. Every 7th frame's
+//! display list is serialized, normalized (the leading `Video` command
+//! removed, every `FontKey(n)` read as the name of V3's font of index `n`) and
+//! compared value for value, `f32` by equality, with the file. Nothing is
+//! written. Ignored until Prompt 100 makes it pass (S6).
 
 #![allow(
     clippy::unwrap_used,
@@ -16,20 +19,24 @@
 )]
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use offcut_detect::{DetectorConfig, detect};
-use offcut_scene::{Scene, SceneInput, build_scene};
+use offcut_plan::{PlanConfig, from_rules, validate};
+use offcut_scene::{FontSet, Scene, SceneInput, Theme, build_scene};
 use offcut_text::{RawWord, normalize_transcript};
 use offcut_types::{
     BitsPerSec, ClipInfo, Confidence, DetectedEvent, DurMs, EditState, EventId, EventKind,
     EventParams, ExportProfile, FrameIdx, Hz, Orientation, ProfileKind, Prosody, Px, Quantity,
-    Rotation, Span, TimeMs, Transcript, Unit, WordIdx, WordProsody, WordRange,
+    Rotation, Span, StyleId, TimeMap, TimeMs, Transcript, Unit, WordIdx, WordProsody, WordRange,
 };
 use serde_json::Value;
 
 /// Every 7th frame: 0, 7, 14, … ("Gaps settled" item 3 of the V4 prompts).
 const STEP: u32 = 7;
+
+/// The names of V3's four fonts, by index: what `FontKey(n)` reads as (D-132).
+const FONT_IDS: [&str; 4] = ["Inter700", "Inter900", "JetBrainsMono700", "NotoEmoji"];
 
 struct Input {
     name: &'static str,
@@ -40,7 +47,7 @@ struct Input {
 }
 
 // --- The helpers of `offcut-scene`'s `lib.rs` tests, copied (a test file
-// cannot reach `#[cfg(test)]` code). ---------------------------------------
+// cannot reach `#[cfg(test)]` code), on the V4 contract. --------------------
 
 fn word(text: &str, start_ms: u32, end_ms: u32) -> RawWord {
     RawWord {
@@ -85,14 +92,17 @@ fn profile(width: u32) -> ExportProfile {
     }
 }
 
-fn number_event(value: Quantity, start: u32, end: u32) -> DetectedEvent {
+/// A NumberReveal on the word `word`. `validate` takes its span from that
+/// word's times (D-121); `start` and `end` are the span V3's `busy()` gave it,
+/// which no word of `busy()`'s transcript has for the first two (V4 Prompt 98).
+fn number_event(value: Quantity, word: u32, start: u32, end: u32) -> DetectedEvent {
     DetectedEvent {
         id: EventId::new(u64::from(start)),
         kind: EventKind::NumberReveal,
         span: Span::new(TimeMs::new(start), TimeMs::new(end)).unwrap(),
         anchors: WordRange {
-            start: WordIdx::new(0),
-            end: WordIdx::new(1),
+            start: WordIdx::new(word),
+            end: WordIdx::new(word + 1),
         },
         params: EventParams::NumberReveal { value, label: None },
         confidence: Confidence::new(1.0).unwrap(),
@@ -130,10 +140,12 @@ fn busy() -> (Transcript, Vec<DetectedEvent>) {
         unit,
         display: display.to_owned(),
     };
+    // The words `lib.rs`'s `busy()` puts them on (V4 Prompt 98): "three"
+    // 1,100-1,350, "wanted." 3,500-3,750, "$250,000" 6,550-7,000.
     let events = vec![
-        number_event(quantity(40.0, Unit::Percent, "40%"), 1_000, 1_400),
-        number_event(quantity(3.0, Unit::None, "3"), 3_500, 3_800),
-        number_event(quantity(250_000.0, Unit::Usd, "$250k"), 6_550, 7_000),
+        number_event(quantity(40.0, Unit::Percent, "40%"), 2, 1_000, 1_400),
+        number_event(quantity(3.0, Unit::None, "3"), 10, 3_500, 3_800),
+        number_event(quantity(250_000.0, Unit::Usd, "$250k"), 13, 6_550, 7_000),
     ];
     (transcript(&words), events)
 }
@@ -430,16 +442,35 @@ fn inputs() -> Vec<Input> {
     inputs
 }
 
-/// Every 7th frame's display list, as `serde_json` writes it and reads it back.
+/// A list as V3 wrote it: without the leading `Video` command, and with
+/// each glyph run's `FontKey(n)` as the name of V3's font of index `n` (D-117).
+fn normalize(mut list: Value) -> Value {
+    let Some(cmds) = list.get_mut("cmds").and_then(Value::as_array_mut) else {
+        return list;
+    };
+    if cmds.first().is_some_and(|cmd| cmd.get("Video").is_some()) {
+        cmds.remove(0);
+    }
+    for cmd in cmds.iter_mut() {
+        let Some(font) = cmd.get_mut("GlyphRun").and_then(|run| run.get_mut("font")) else {
+            continue;
+        };
+        if let Some(name) = font.as_u64().and_then(|n| FONT_IDS.get(n as usize)) {
+            *font = Value::from(*name);
+        }
+    }
+    list
+}
+
+/// Every 7th frame's display list, as `serde_json` writes it and reads it
+/// back, normalized.
 fn frames(scene: &Scene) -> Vec<Value> {
     (0..scene.frame_count())
         .step_by(STEP as usize)
         .map(|n| {
-            // A frame index is a program time from V4 on (D-125); V3's scene
-            // takes a recording time. The map is the identity: the same number.
-            let list = scene.frame_at(TimeMs::new(FrameIdx::new(n).to_out_ms().get()));
+            let list = scene.frame_at(FrameIdx::new(n).to_out_ms());
             let text = serde_json::to_string(&list).expect("a display list serializes");
-            serde_json::from_str(&text).expect("and reads back")
+            normalize(serde_json::from_str(&text).expect("and reads back"))
         })
         .collect()
 }
@@ -452,16 +483,6 @@ fn reference_path(name: &str) -> PathBuf {
     manifest_dir()
         .join("tests/snapshots/v3_reference")
         .join(format!("{name}.json"))
-}
-
-/// One frame per line, each in `serde_json`'s compact form.
-fn write(path: &Path, frames: &[Value]) {
-    let lines: Vec<String> = frames
-        .iter()
-        .map(|frame| serde_json::to_string(frame).expect("a frame serializes"))
-        .collect();
-    std::fs::create_dir_all(path.parent().expect("a parent")).expect("the snapshot directory");
-    std::fs::write(path, format!("[\n{}\n]\n", lines.join(",\n"))).expect("the file is written");
 }
 
 /// The path of the first value that differs, if any.
@@ -491,54 +512,74 @@ fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
 }
 
 #[test]
+#[ignore = "identity proof, S6"]
 fn v3_reference() {
-    let writing = std::env::var("OFFCUT_V3_REFERENCE_WRITE").is_ok_and(|v| v == "1");
-    for input in inputs() {
+    let theme = Theme::default_for(StyleId::Clean);
+    let fonts = FontSet::embedded();
+    let edit = EditState::default();
+    let (mut compared, mut differing) = (0usize, Vec::new());
+    let inputs = inputs();
+    for input in &inputs {
+        let rules = from_rules(&input.events, &input.transcript);
+        let (plan, dropped) = validate(
+            rules,
+            &input.transcript,
+            &edit.word_edits,
+            &PlanConfig::default(),
+        )
+        .expect("a rules plan is never refused");
         let scene = build_scene(SceneInput {
             transcript: &input.transcript,
-            events: &input.events,
-            edit: &EditState::default(),
+            plan: &plan,
+            edit: &edit,
             clip: &input.clip,
             profile: &profile(input.width),
+            time_map: &TimeMap::identity(input.clip.duration),
+            theme: &theme,
+            fonts: &fonts,
         })
         .expect("the scene builds");
         let got = frames(&scene);
         let path = reference_path(input.name);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|_| panic!("{}: no {}", input.name, path.display()));
+        let want: Vec<Value> = serde_json::from_str(&text).expect("a reference file parses");
+        let differ: Vec<(usize, String)> = if got.len() == want.len() {
+            got.iter()
+                .zip(&want)
+                .enumerate()
+                .filter_map(|(i, (g, w))| first_difference(w, g, "").map(|at| (i, at)))
+                .collect()
+        } else {
+            vec![(
+                0,
+                format!("{} frames now, {} in the reference", got.len(), want.len()),
+            )]
+        };
+        compared += got.len();
         println!(
-            "{}: {} frames of {}, {} events",
+            "{}: {} frames of {}, {} items, {} dropped, {} differ",
             input.name,
             got.len(),
             scene.frame_count(),
-            input.events.len()
+            plan.items().len(),
+            dropped.len(),
+            differ.len()
         );
-        if writing {
-            write(&path, &got);
-            continue;
-        }
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            panic!(
-                "{}: no {}: run with OFFCUT_V3_REFERENCE_WRITE=1 once, at P93 only",
-                input.name,
-                path.display()
+        for (i, at) in &differ {
+            println!(
+                "  frame {} (index {i}) at {at} (reference vs now)",
+                *i as u32 * STEP
             );
-        };
-        let want: Vec<Value> = serde_json::from_str(&text).expect("a reference file parses");
-        assert_eq!(
-            got.len(),
-            want.len(),
-            "{}: {} frames now, {} in the reference",
-            input.name,
-            got.len(),
-            want.len()
-        );
-        for (i, (g, w)) in got.iter().zip(&want).enumerate() {
-            if let Some(at) = first_difference(w, g, "") {
-                panic!(
-                    "{}: frame {} (index {i}) differs at {at} (reference vs now)",
-                    input.name,
-                    i as u32 * STEP
-                );
-            }
+        }
+        if !differ.is_empty() {
+            differing.push(input.name);
         }
     }
+    assert!(
+        differing.is_empty(),
+        "{} inputs, {compared} frames; differ: {differing:?}",
+        inputs.len()
+    );
+    println!("{} inputs, {compared} frames, identical", inputs.len());
 }

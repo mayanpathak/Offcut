@@ -1,7 +1,9 @@
-//! The source frame: copied into a texture, then drawn to the target turned
-//! and cropped. A `VideoFrame` is read here and never closed (TS §19.6).
+//! The source frame: copied into a texture, then drawn to the target turned,
+//! cropped and placed in its rectangle. A `VideoFrame` is read here and never
+//! closed (TS §19.6). The crop and the rectangle come with each frame: they
+//! are the `Video` command's `src` and `dst` (D-133).
 
-use offcut_scene::CropRect;
+use offcut_scene::{CropRect, Rect};
 use offcut_types::Rotation;
 use web_sys::VideoFrame;
 
@@ -25,8 +27,8 @@ pub(crate) struct VideoPass {
 }
 
 const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
-/// Two `vec4<f32>`: the `Placement` of `shaders/video.wgsl`.
-const PLACEMENT_BYTES: usize = 32;
+/// Three `vec4<f32>`: the `Placement` of `shaders/video.wgsl`.
+const PLACEMENT_BYTES: usize = 48;
 
 /// The shader of both passes. Each pipeline uses the entry points it names.
 pub(crate) fn shader(device: &wgpu::Device) -> wgpu::ShaderModule {
@@ -134,6 +136,19 @@ pub(crate) fn placement(crop: CropRect, rotation: Rotation, frame: (u32, u32)) -
         Rotation::R180 => [-w, 0.0, 0.0, -h, 1.0 - x, 1.0 - y],
         Rotation::R270 => [0.0, w, -h, 0.0, 1.0 - y, x],
     }
+}
+
+/// Where `dst` lies on a target of `target` pixels, as the shader reads it:
+/// its top-left corner as shares of the target, and one over its width and
+/// its height as shares. On the whole target: `[0, 0, 1, 1]`, exactly.
+pub(crate) fn rectangle(dst: Rect, target: (u32, u32)) -> [f32; 4] {
+    let (target_w, target_h) = (target.0.max(1) as f32, target.1.max(1) as f32);
+    [
+        dst.x / target_w,
+        dst.y / target_h,
+        target_w / dst.w,
+        target_h / dst.h,
+    ]
 }
 
 /// Copies the frame into `texture`, which is `size` large. The copy exists
@@ -267,14 +282,17 @@ impl VideoPass {
         }
     }
 
-    /// Takes `frame` in and sets where it is drawn. The frame stays the caller's.
+    /// Takes `frame` in and sets where it is drawn: the part `src` of it,
+    /// turned by `rotation`, into `dst` on a target of `target` pixels. The
+    /// frame stays the caller's.
     pub fn load(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         frame: &VideoFrame,
-        crop: CropRect,
+        src: CropRect,
         rotation: Rotation,
+        (dst, target): (Rect, (u32, u32)),
     ) -> Result<(), RenderError> {
         // A frame that was closed has no size.
         let (width, height) = (frame.display_width(), frame.display_height());
@@ -293,9 +311,10 @@ impl VideoPass {
         };
         import(queue, frame, &held.texture, (held.width, held.height))?;
 
-        let [a, b, c, d, e, f] = placement(crop, rotation, (width, height));
+        let [a, b, c, d, e, f] = placement(src, rotation, (width, height));
+        let [x, y, inverse_w, inverse_h] = rectangle(dst, target);
         let mut bytes = [0u8; PLACEMENT_BYTES];
-        let values = [a, b, c, d, e, f, 0.0, 0.0];
+        let values = [a, b, c, d, e, f, 0.0, 0.0, x, y, inverse_w, inverse_h];
         for (slot, value) in bytes.as_chunks_mut::<4>().0.iter_mut().zip(values) {
             *slot = value.to_le_bytes();
         }
@@ -303,7 +322,7 @@ impl VideoPass {
         Ok(())
     }
 
-    /// Draws the frame that was loaded over the whole target.
+    /// Draws the frame that was loaded in its rectangle, black around it.
     pub fn draw(&self, pass: &mut wgpu::RenderPass<'_>) {
         let Some(held) = self.frame.as_ref() else {
             return;
@@ -423,5 +442,24 @@ mod tests {
             corners(placement(top, Rotation::R90, stored));
         assert_eq!((top_left, top_right), ((0.0, 1.0), (0.0, 0.0)));
         assert_eq!((bottom_left, bottom_right), ((0.5, 1.0), (0.5, 0.0)));
+    }
+
+    #[test]
+    fn the_whole_target_is_the_rectangle_one_and_a_part_is_measured_in_shares() {
+        let whole = Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 540.0,
+            h: 960.0,
+        };
+        // Multiplying by exactly 1 leaves the target's point as it is: V3's.
+        assert_eq!(rectangle(whole, (540, 960)), [0.0, 0.0, 1.0, 1.0]);
+        let right_half = Rect {
+            x: 270.0,
+            y: 0.0,
+            w: 270.0,
+            h: 960.0,
+        };
+        assert_eq!(rectangle(right_half, (540, 960)), [0.5, 0.0, 2.0, 1.0]);
     }
 }

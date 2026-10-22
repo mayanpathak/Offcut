@@ -1,15 +1,19 @@
 //! Captions: which words are shown together, when, and where (TS §19.4).
-//! Every time here is a transcript time, used as it is (INV-5).
+//! Every time here is a program time: a word's recording times go through
+//! the time map once, in `words`, and are used as they come out (D-126).
 
 use std::collections::BTreeMap;
 
-use offcut_types::{Sentence, Span, TimeMs, Transcript, WordIdx};
+use offcut_types::{OutMs, OutSpan, Sentence, Span, TimeMap, TimeMs, Transcript, WordIdx};
 
 use crate::SceneError;
-use crate::display_list::{Affine, DrawCmd, Stroke};
+use crate::display_list::{Affine, DrawCmd, FontKey, Stroke};
+use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
-use crate::safe_area::CAPTION_ZONE;
+use crate::motion::{ActiveTreatment, enter_at};
+use crate::safe_area::{ZoneId, zone};
 use crate::styles::{Case, StyleSpec};
+use crate::theme::Theme;
 
 /// A pause this long between two words starts a new chunk.
 pub const CHUNK_GAP_MS: u32 = 350;
@@ -23,8 +27,8 @@ pub const CHUNK_TAIL_MS: u32 = 120;
 #[derive(Clone, Debug, PartialEq)]
 pub struct CaptionWord {
     pub text: String,
-    pub start: TimeMs,
-    pub end: TimeMs,
+    pub start: OutMs,
+    pub end: OutMs,
     pub word: WordIdx,
 }
 
@@ -52,12 +56,12 @@ pub struct Line {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Chunk {
     pub words: Vec<CaptionWord>,
-    pub show: Span,
+    pub show: OutSpan,
     pub lines: Vec<Line>,
 }
 
 impl Chunk {
-    pub fn visible_at(&self, t: TimeMs) -> bool {
+    pub fn visible_at(&self, t: OutMs) -> bool {
         self.show.start <= t && t < self.show.end
     }
 }
@@ -65,8 +69,13 @@ impl Chunk {
 /// The words captions show (TS §17.2): an edit in place of what was
 /// transcribed, no word that was edited to nothing, and one word carrying
 /// the display of a number in place of the words it was spoken in. A number
-/// with an edited word in it is shown as its words.
-pub fn words(transcript: &Transcript, edits: &BTreeMap<WordIdx, String>) -> Vec<CaptionWord> {
+/// with an edited word in it is shown as its words. A word with no program
+/// time is not shown.
+pub fn words(
+    transcript: &Transcript,
+    edits: &BTreeMap<WordIdx, String>,
+    map: &TimeMap,
+) -> Vec<CaptionWord> {
     let count = u32::try_from(transcript.words.len()).unwrap_or(u32::MAX);
     let mut out = Vec::new();
     let mut index = 0u32;
@@ -87,28 +96,41 @@ pub fn words(transcript: &Transcript, edits: &BTreeMap<WordIdx, String>) -> Vec<
                 .get(end.saturating_sub(1) as usize)
                 .unwrap_or(first);
             let display = &number.quantity.display;
-            push(&mut out, display, first.start_ms, last.end_ms, index);
+            push(&mut out, display, (first.start_ms, last.end_ms), index, map);
             index = end;
             continue;
         }
         if let Some(word) = first {
             let text = edits.get(&WordIdx::new(index)).unwrap_or(&word.text);
-            push(&mut out, text, word.start_ms, word.end_ms, index);
+            push(&mut out, text, (word.start_ms, word.end_ms), index, map);
         }
         index = index.saturating_add(1);
     }
     out
 }
 
-fn push(out: &mut Vec<CaptionWord>, text: &str, start: TimeMs, end: TimeMs, word: u32) {
+fn push(
+    out: &mut Vec<CaptionWord>,
+    text: &str,
+    (start, end): (TimeMs, TimeMs),
+    word: u32,
+    map: &TimeMap,
+) {
     let text = text.trim();
     if text.is_empty() {
         return;
     }
-    out.push(CaptionWord {
-        text: text.to_owned(),
+    let spoken = Span {
         start,
         end: end.max(start),
+    };
+    let Some(shown) = map.out_span(spoken) else {
+        return;
+    };
+    out.push(CaptionWord {
+        text: text.to_owned(),
+        start: shown.start,
+        end: shown.end,
         word: WordIdx::new(word),
     });
 }
@@ -128,6 +150,8 @@ pub fn chunk(
     words: &[CaptionWord],
     sentences: &[Sentence],
     style: &StyleSpec,
+    theme: &Theme,
+    fonts: &FontSet,
 ) -> Result<Vec<Chunk>, SceneError> {
     let per_line = style.max_chars_per_line.max(1);
     let max_lines = style.max_lines.max(1);
@@ -165,7 +189,8 @@ pub fn chunk(
         }
     }
 
-    let space: f32 = shape(" ", style.font, style.size)?
+    let font = theme.font(style.font);
+    let space: f32 = shape(" ", font, style.size, fonts)?
         .iter()
         .map(|run| run.width)
         .sum();
@@ -174,7 +199,7 @@ pub fn chunk(
         let (Some(first), Some(last)) = (group.first(), group.last()) else {
             continue;
         };
-        let lines = lines(group, space, style)?;
+        let lines = lines(group, space, style, (font, fonts))?;
         // Shown from a little before its first word to a little after its
         // last, and never while the chunk before it is still shown. The
         // chunk before stays at least until its own last word has ended.
@@ -182,15 +207,15 @@ pub fn chunk(
         if let Some(before) = chunks.last_mut() {
             let last_word_end = before.words.last().map_or(0, |word| word.end.get());
             let hand_over = start.max(last_word_end).min(before.show.end.get());
-            before.show.end = TimeMs::new(hand_over.max(before.show.start.get()));
+            before.show.end = OutMs::new(hand_over.max(before.show.start.get()));
             start = start.max(before.show.end.get());
         }
         let end = last.word.end.get().saturating_add(CHUNK_TAIL_MS);
         chunks.push(Chunk {
             words: group.iter().map(|placed| placed.word.clone()).collect(),
-            show: Span {
-                start: TimeMs::new(start),
-                end: TimeMs::new(end.max(start)),
+            show: OutSpan {
+                start: OutMs::new(start),
+                end: OutMs::new(end.max(start)),
             },
             lines,
         });
@@ -199,11 +224,16 @@ pub fn chunk(
 }
 
 /// The lines of one chunk: centred in the caption zone, one under the other.
-fn lines(group: &[Placed<'_>], space: f32, style: &StyleSpec) -> Result<Vec<Line>, SceneError> {
+fn lines(
+    group: &[Placed<'_>],
+    space: f32,
+    style: &StyleSpec,
+    (font, fonts): (FontKey, &FontSet),
+) -> Result<Vec<Line>, SceneError> {
     let mut lines: Vec<Line> = Vec::new();
     let (mut ascent, mut descent) = (0.0f32, 0.0f32);
     for (index, placed) in group.iter().enumerate() {
-        let runs = shape(&placed.text, style.font, style.size)?;
+        let runs = shape(&placed.text, font, style.size, fonts)?;
         for run in &runs {
             ascent = ascent.max(run.ascent);
             descent = descent.max(run.descent);
@@ -234,60 +264,87 @@ fn lines(group: &[Placed<'_>], space: f32, style: &StyleSpec) -> Result<Vec<Line
     }
 
     let height = ascent + descent;
-    let top = CAPTION_ZONE.y + (CAPTION_ZONE.h - height * lines.len() as f32) / 2.0;
+    let caption_zone = zone(ZoneId::Caption);
+    let top = caption_zone.y + (caption_zone.h - height * lines.len() as f32) / 2.0;
     // The stroke of the outermost glyphs stays in the zone as well.
-    let room = CAPTION_ZONE.w - style.stroke_width.max(0.0);
+    let room = caption_zone.w - style.stroke_width.max(0.0);
     for (index, line) in lines.iter_mut().enumerate() {
         line.scale = if line.width > room {
             room / line.width
         } else {
             1.0
         };
-        line.x = CAPTION_ZONE.x + (CAPTION_ZONE.w - line.width * line.scale) / 2.0;
+        line.x = caption_zone.x + (caption_zone.w - line.width * line.scale) / 2.0;
         line.baseline = top + height * index as f32 + ascent;
     }
     Ok(lines)
 }
 
 /// Adds the chunk as it looks at `t`: the word that is being spoken in the
-/// active colour, the others in the fill colour.
-pub fn draw(chunk: &Chunk, t: TimeMs, style: &StyleSpec, out: &mut Vec<DrawCmd>) {
+/// active colour, the others in the fill colour, each moving as the style's
+/// motion says.
+pub fn draw(chunk: &Chunk, t: OutMs, style: &StyleSpec, theme: &Theme, out: &mut Vec<DrawCmd>) {
+    let motion = &style.motion;
     let stroke = (style.stroke_width > 0.0).then_some(Stroke {
         width: style.stroke_width,
-        color: style.stroke_color,
+        color: theme.color(style.stroke),
     });
+    // A fade is the chunk's, from its show start; a pop is each word's.
+    let (opacity, _) = enter_at(motion, t.get().saturating_sub(chunk.show.start.get()));
+    let fading = opacity < 1.0;
+    if fading {
+        out.push(DrawCmd::PushLayer {
+            opacity,
+            clip: None,
+        });
+    }
     for line in &chunk.lines {
         for placed in &line.words {
-            let active = chunk
-                .words
-                .get(placed.word)
-                .is_some_and(|word| word.start <= t && t < word.end);
-            let fill = if active {
-                style.active_color
-            } else {
-                style.fill
+            let word = chunk.words.get(placed.word);
+            let active = word.is_some_and(|word| word.start <= t && t < word.end);
+            let fill = match motion.active {
+                ActiveTreatment::Highlight if active => theme.color(style.active),
+                ActiveTreatment::Highlight => theme.color(style.fill),
+                // V4: the block after the spoken word (TS §19.4, V4 Prompt 105).
+                ActiveTreatment::Cursor => theme.color(style.fill),
             };
+            let since = word.map_or(0, |word| t.get().saturating_sub(word.start.get()));
+            let (_, pop) = enter_at(motion, since);
+            // A popping word scales about its centre on the baseline.
+            let width: f32 = placed.runs.iter().map(|run| run.width).sum();
+            let centre = line.x + (placed.x + width / 2.0) * line.scale;
             let mut x = placed.x;
             for run in &placed.runs {
                 let left = line.x + x * line.scale;
+                let transform = if pop == 1.0 {
+                    Affine::scale_then_translate(line.scale, left, line.baseline)
+                } else {
+                    let left = centre + (left - centre) * pop;
+                    Affine::scale_then_translate(line.scale * pop, left, line.baseline)
+                };
                 out.push(DrawCmd::GlyphRun {
                     font: run.font,
                     size: run.size,
                     glyphs: run.glyphs.clone(),
                     fill,
                     stroke,
-                    transform: Affine::scale_then_translate(line.scale, left, line.baseline),
+                    transform,
                     text: run.text.clone(),
                 });
                 x += run.width;
             }
         }
     }
+    if fading {
+        out.push(DrawCmd::PopLayer);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use offcut_types::StyleId;
+
+    use offcut_types::DurMs;
 
     use super::*;
     use crate::styles::spec;
@@ -296,8 +353,17 @@ mod tests {
     fn chunks_of(timed: &[(&str, u32, u32)]) -> Vec<Chunk> {
         let spoken: Vec<_> = timed.iter().map(|w| word(w.0, w.1, w.2)).collect();
         let transcript = transcript(&spoken);
-        let words = words(&transcript, &BTreeMap::new());
-        chunk(&words, &transcript.sentences, &spec(StyleId::Clean)).unwrap()
+        let map = TimeMap::identity(DurMs::new(10_000));
+        let words = words(&transcript, &BTreeMap::new(), &map);
+        let (theme, fonts) = (Theme::default_for(StyleId::Clean), FontSet::embedded());
+        chunk(
+            &words,
+            &transcript.sentences,
+            &spec(StyleId::Clean),
+            &theme,
+            &fonts,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -333,8 +399,9 @@ mod tests {
                     .map(|w| chunk.words[w.word].text.as_str())
                     .collect();
                 assert!(text.join(" ").chars().count() <= 18, "{text:?}");
-                assert!(line.x >= CAPTION_ZONE.x);
-                assert!(line.x + line.width <= CAPTION_ZONE.x + CAPTION_ZONE.w);
+                let caption_zone = zone(ZoneId::Caption);
+                assert!(line.x >= caption_zone.x);
+                assert!(line.x + line.width <= caption_zone.x + caption_zone.w);
             }
         }
         // The words keep their order. A number is shown as its display, also
@@ -363,9 +430,9 @@ mod tests {
             .map(|c| (c.show.start.get(), c.show.end.get()))
             .collect();
         assert_eq!(shows, [(920, 1_420), (4_920, 5_420)]);
-        assert!(chunks.iter().all(|c| !c.visible_at(TimeMs::new(3_000))));
-        assert!(chunks[0].visible_at(TimeMs::new(920)));
-        assert!(!chunks[0].visible_at(TimeMs::new(1_420)));
+        assert!(chunks.iter().all(|c| !c.visible_at(OutMs::new(3_000))));
+        assert!(chunks[0].visible_at(OutMs::new(920)));
+        assert!(!chunks[0].visible_at(OutMs::new(1_420)));
 
         // 349 ms is not a pause; 350 ms is.
         assert_eq!(chunks_of(&[("one", 0, 300), ("two", 649, 900)]).len(), 1);
@@ -380,6 +447,7 @@ mod tests {
     #[test]
     fn inside_a_chunk_exactly_one_glyph_run_uses_the_active_colour() {
         let style = spec(StyleId::Clean);
+        let theme = Theme::default_for(StyleId::Clean);
         let chunks = chunks_of(&[
             ("we", 1_000, 1_200),
             ("made", 1_250, 1_500),
@@ -388,7 +456,7 @@ mod tests {
         assert_eq!(chunks.len(), 1);
         let active_at = |t: u32| {
             let mut out = Vec::new();
-            draw(&chunks[0], TimeMs::new(t), &style, &mut out);
+            draw(&chunks[0], OutMs::new(t), &style, &theme, &mut out);
             assert_eq!(out.len(), 3);
             out.into_iter()
                 .filter_map(|cmd| match cmd {
@@ -396,12 +464,14 @@ mod tests {
                         fill, text, stroke, ..
                     } => {
                         assert_eq!(stroke.map(|s| s.width), Some(6.0));
-                        (fill == style.active_color).then_some(text)
+                        (fill == theme.color(style.active)).then_some(text)
                     }
                     DrawCmd::FillRect { .. }
                     | DrawCmd::FillPath { .. }
                     | DrawCmd::PushLayer { .. }
-                    | DrawCmd::PopLayer => panic!("a caption draws glyph runs only"),
+                    | DrawCmd::PopLayer
+                    | DrawCmd::Video { .. }
+                    | DrawCmd::Image { .. } => panic!("a caption draws glyph runs only"),
                 })
                 .collect::<Vec<String>>()
         };

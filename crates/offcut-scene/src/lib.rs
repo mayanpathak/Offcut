@@ -1,7 +1,8 @@
-//! From a transcript, its events and the user's choices to what each output
-//! frame draws (TS §19). A scene is built once; `frame_at` is then a pure
-//! function of the scene and a time. Nothing here touches a GPU, a pixel or
-//! a decoder, reads a clock, or moves a timestamp (INV-5).
+//! From a transcript, a valid plan and the user's choices to what each
+//! output frame draws (TS §19, §40.5). A scene is built once; `frame_at` is
+//! then a pure function of the scene and a program time. Nothing here
+//! touches a GPU, a pixel or a decoder, reads a clock, parses a number
+//! (D-121), or moves a timestamp except through the time map (D-126).
 
 pub mod anim;
 pub mod captions;
@@ -11,58 +12,65 @@ pub mod events;
 pub mod fonts;
 pub mod framing;
 pub mod layout;
+pub mod motion;
 pub mod safe_area;
 pub mod styles;
+pub mod theme;
+mod video;
 
+use offcut_plan::ValidPlan;
 use offcut_types::{
-    ChangeSummary, ClipInfo, DetectedEvent, DurMs, EditState, ExportProfile, OUTPUT_FPS, TimeMs,
+    ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
     Transcript,
 };
-use serde::Serialize;
 use thiserror::Error;
 
 use crate::captions::Chunk;
 pub use crate::display_list::{
-    Affine, DisplayList, DrawCmd, FontId, PathEl, PositionedGlyph, Rect, Rgba, Stroke,
+    Affine, CropRect, DisplayList, DrawCmd, FontKey, ImageKey, PathEl, PositionedGlyph, Rect, Rgba,
+    Stroke, VideoSlot,
 };
 use crate::events::EventTrack;
+pub use crate::fonts::{FontFace, FontSet};
 use crate::styles::StyleSpec;
+pub use crate::theme::{FontRole, Role, Theme};
 
-/// Why a scene cannot be built. Both are `E_INTERNAL` to the caller: the
-/// fonts are part of the program.
+/// Why a scene cannot be built. All are `E_INTERNAL` to the caller: the fonts
+/// are part of the program, and the time map is the program's own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
 pub enum SceneError {
     #[error("an embedded font could not be read")]
     Font,
     #[error("text could not be laid out")]
     Layout,
+    #[error("an item's span has no program time")]
+    TimeMap,
 }
 
 pub struct SceneInput<'a> {
     pub transcript: &'a Transcript,
-    pub events: &'a [DetectedEvent],
+    pub plan: &'a ValidPlan,
     pub edit: &'a EditState,
     pub clip: &'a ClipInfo,
     pub profile: &'a ExportProfile,
+    pub time_map: &'a TimeMap,
+    pub theme: &'a Theme,
+    pub fonts: &'a FontSet,
 }
 
-/// In source display pixels.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub struct CropRect {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
-}
-
-/// Everything that is drawn over one clip, laid out in logical pixels.
+/// Everything that is drawn over one clip, laid out in logical pixels, on
+/// program time.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scene {
-    duration: DurMs,
-    crop: CropRect,
+    time_map: TimeMap,
+    video: video::Track,
+    /// The output canvas, in output pixels.
+    canvas: (f32, f32),
     /// Output pixels per logical pixel.
     scale: f32,
     style: StyleSpec,
+    theme: Theme,
+    fonts: FontSet,
     chunks: Vec<Chunk>,
     tracks: Vec<EventTrack>,
 }
@@ -70,70 +78,85 @@ pub struct Scene {
 pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let crop = framing::crop_rect(input.clip, input.edit.crop_offset);
     let style = styles::spec(input.edit.style);
+    let (theme, fonts, map) = (input.theme, input.fonts, input.time_map);
 
-    let words = captions::words(input.transcript, &input.edit.word_edits);
-    let chunks = captions::chunk(&words, &input.transcript.sentences, &style)?;
+    let words = captions::words(input.transcript, &input.edit.word_edits, map);
+    let chunks = captions::chunk(&words, &input.transcript.sentences, &style, theme, fonts)?;
 
     let mut tracks = Vec::new();
-    for event in input.events {
-        // The user's choice for this event, when there is one (TS §10.8).
-        let enabled = input
+    for item in input.plan.items() {
+        // The user's choice for this item, when there is one; every V4 item
+        // is shown by default (TS §10.8, D-145).
+        let shown = input
             .edit
             .event_overrides
-            .get(&event.id)
+            .get(&item.id)
             .copied()
-            .unwrap_or(event.enabled);
-        if !enabled {
+            .unwrap_or(true);
+        if !shown {
             continue;
         }
-        if let Some(track) = events::layout(event, &style)? {
+        let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;
+        if let Some(track) =
+            events::layout(item, span, input.transcript, map, &style, theme, fonts)?
+        {
             tracks.push(track);
         }
     }
 
     // V4: the watermark, when `profile.watermark` is set.
-    let scale = input.profile.width.get() as f32 / safe_area::CANVAS_WIDTH;
+    let (width, height) = (input.profile.width.get(), input.profile.height.get());
+    let scale = width as f32 / safe_area::CANVAS_WIDTH;
     Ok(Scene {
-        duration: input.clip.duration,
-        crop,
+        time_map: map.clone(),
+        video: video::Track::fixed(crop),
+        canvas: (width as f32, height as f32),
         scale,
         style,
+        theme: theme.clone(),
+        fonts: fonts.clone(),
         chunks,
         tracks,
     })
 }
 
 impl Scene {
-    /// The length of the clip, always.
+    /// The length of the program: the time map's.
     pub fn duration(&self) -> DurMs {
-        self.duration
+        self.time_map.out_duration()
     }
 
     /// `ceil(duration_ms * OUTPUT_FPS / 1000)`: 2,700 for 90 s.
     pub fn frame_count(&self) -> u32 {
-        let frames = (u64::from(self.duration.get()) * u64::from(OUTPUT_FPS)).div_ceil(1_000);
+        let frames = (u64::from(self.duration().get()) * u64::from(OUTPUT_FPS)).div_ceil(1_000);
         u32::try_from(frames).unwrap_or(u32::MAX)
     }
 
-    /// The same for every frame of the scene.
-    pub fn crop(&self) -> CropRect {
-        self.crop
-    }
-
-    /// What is drawn at `t`, in pixels of the output canvas: the caption
-    /// chunk that is shown, then every event that is shown.
-    pub fn frame_at(&self, t: TimeMs) -> DisplayList {
-        let mut cmds = Vec::new();
+    /// What is drawn at `t`, in pixels of the output canvas: the video, the
+    /// caption chunk that is shown, then every item that is shown.
+    pub fn frame_at(&self, t: OutMs) -> DisplayList {
+        let mut cmds = vec![self.video.cmd(t, self.canvas)];
         if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
-            captions::draw(chunk, t, &self.style, &mut cmds);
+            captions::draw(chunk, t, &self.style, &self.theme, &mut cmds);
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
         }
+        // The video is placed in output pixels already; the rest is scaled.
         for cmd in &mut cmds {
             cmd.scale(self.scale);
         }
         DisplayList { cmds }
+    }
+
+    /// Where the main video's source is at `t`.
+    pub fn source_at(&self, t: OutMs) -> SrcPos {
+        self.time_map.to_src(t)
+    }
+
+    /// The faces the glyph runs of every frame are drawn with (D-132).
+    pub fn fonts(&self) -> &FontSet {
+        &self.fonts
     }
 
     /// V2 cleans no voice and emphasizes no caption word (D-22). An event
@@ -149,10 +172,13 @@ impl Scene {
 
 #[cfg(test)]
 pub(crate) mod testing {
+    use std::collections::BTreeMap;
+
+    use offcut_plan::{PlanConfig, from_rules, validate};
     use offcut_text::{RawWord, normalize_transcript};
     use offcut_types::{
-        BitsPerSec, Confidence, EventId, EventKind, EventParams, Orientation, ProfileKind, Px,
-        Quantity, Rotation, Span, WordIdx, WordRange,
+        BitsPerSec, Confidence, DetectedEvent, EventId, EventKind, EventParams, Orientation,
+        ProfileKind, Px, Quantity, Rotation, Span, StyleId, TimeMs, WordIdx, WordRange,
     };
 
     use super::*;
@@ -202,14 +228,16 @@ pub(crate) mod testing {
         }
     }
 
-    pub(crate) fn number_event(value: Quantity, start: u32, end: u32) -> DetectedEvent {
+    /// A NumberReveal on the word `word`. `validate` takes its span from
+    /// that word's times (D-121); `start` and `end` are V3's own span.
+    pub(crate) fn number_event(value: Quantity, word: u32, start: u32, end: u32) -> DetectedEvent {
         DetectedEvent {
             id: EventId::new(u64::from(start)),
             kind: EventKind::NumberReveal,
             span: Span::new(TimeMs::new(start), TimeMs::new(end)).unwrap(),
             anchors: WordRange {
-                start: WordIdx::new(0),
-                end: WordIdx::new(1),
+                start: WordIdx::new(word),
+                end: WordIdx::new(word + 1),
             },
             params: EventParams::NumberReveal { value, label: None },
             confidence: Confidence::new(1.0).unwrap(),
@@ -217,20 +245,34 @@ pub(crate) mod testing {
         }
     }
 
+    /// The rules plan of `events`, validated: what the pipeline draws.
+    /// Every event is kept.
+    pub(crate) fn plan(transcript: &Transcript, events: &[DetectedEvent]) -> ValidPlan {
+        let rules = from_rules(events, transcript);
+        let edits = BTreeMap::new();
+        let (plan, dropped) = validate(rules, transcript, &edits, &PlanConfig::default()).unwrap();
+        assert_eq!(dropped, [], "the test's events are all drawable");
+        plan
+    }
+
     /// A scene of a 10 s portrait clip, with no edits.
     pub(crate) fn build(transcript: &Transcript, events: &[DetectedEvent], width: u32) -> Scene {
         build_scene(SceneInput {
             transcript,
-            events,
+            plan: &plan(transcript, events),
             edit: &EditState::default(),
             clip: &clip(1080, 1920, 10_000),
             profile: &profile(width),
+            time_map: &TimeMap::identity(DurMs::new(10_000)),
+            theme: &Theme::default_for(StyleId::Clean),
+            fonts: &FontSet::embedded(),
         })
         .unwrap()
     }
 
     /// The box a command draws in, on the canvas. For a glyph run it is the
-    /// box of its line (ascent to descent, start to end) and its stroke.
+    /// box of its line (ascent to descent, start to end) and its stroke. The
+    /// video is under everything, on the whole canvas: no box.
     pub(crate) fn bounds(cmd: &DrawCmd) -> Option<Rect> {
         let corners: Vec<(f32, f32)> = match cmd {
             DrawCmd::GlyphRun {
@@ -241,7 +283,7 @@ pub(crate) mod testing {
                 text,
                 ..
             } => {
-                let runs = shape(text, *font, *size).unwrap();
+                let runs = shape(text, *font, *size, &FontSet::embedded()).unwrap();
                 assert_eq!(runs.len(), 1, "{text:?}");
                 let pad = stroke.map_or(0.0, |stroke| stroke.width / 2.0);
                 let (left, right) = (-pad, runs[0].width + pad);
@@ -254,7 +296,8 @@ pub(crate) mod testing {
                 vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
             }
             DrawCmd::FillPath { .. } => panic!("V2 draws no path"),
-            DrawCmd::PushLayer { .. } | DrawCmd::PopLayer => return None,
+            DrawCmd::Image { .. } => panic!("V4 draws no image"),
+            DrawCmd::PushLayer { .. } | DrawCmd::PopLayer | DrawCmd::Video { .. } => return None,
         };
         let fold = |pick: fn(&(f32, f32)) -> f32, by: fn(f32, f32) -> f32, from: f32| {
             corners.iter().map(pick).fold(from, by)
@@ -278,7 +321,7 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
-    use offcut_types::{FrameIdx, Quantity, Unit};
+    use offcut_types::{DetectedEvent, FrameIdx, Quantity, StyleId, Unit};
 
     use super::testing::*;
     use super::*;
@@ -313,32 +356,39 @@ mod tests {
             unit,
             display: display.to_owned(),
         };
+        // Each on a word of its own: `validate` takes an item's span from its
+        // words ("three" 1,100-1,350, "wanted." 3,500-3,750, "$250,000"
+        // 6,550-7,000), and two items on one word would be too close (V-6).
         let events = vec![
-            number_event(quantity(40.0, Unit::Percent, "40%"), 1_000, 1_400),
-            number_event(quantity(3.0, Unit::None, "3"), 3_500, 3_800),
-            number_event(quantity(250_000.0, Unit::Usd, "$250k"), 6_550, 7_000),
+            number_event(quantity(40.0, Unit::Percent, "40%"), 2, 1_000, 1_400),
+            number_event(quantity(3.0, Unit::None, "3"), 10, 3_500, 3_800),
+            number_event(quantity(250_000.0, Unit::Usd, "$250k"), 13, 6_550, 7_000),
         ];
         (transcript(&words), events)
     }
 
     fn frames(scene: &Scene) -> Vec<DisplayList> {
-        // A frame index is a program time (D-125); this scene still takes a
-        // recording time. The map is the identity: the number is the same.
+        // A frame index is a program time (D-125).
         (0..scene.frame_count())
-            .map(|frame| scene.frame_at(TimeMs::new(FrameIdx::new(frame).to_out_ms().get())))
+            .map(|frame| scene.frame_at(FrameIdx::new(frame).to_out_ms()))
             .collect()
     }
 
     #[test]
     fn a_60_000_ms_clip_has_1_800_frames_and_a_20_033_ms_clip_601() {
         let empty = transcript(&[]);
+        let no_items = plan(&empty, &[]);
+        let (theme, fonts) = (Theme::default_for(StyleId::Clean), FontSet::embedded());
         let count = |duration_ms: u32| {
             let scene = build_scene(SceneInput {
                 transcript: &empty,
-                events: &[],
+                plan: &no_items,
                 edit: &EditState::default(),
                 clip: &clip(1080, 1920, duration_ms),
                 profile: &profile(1080),
+                time_map: &TimeMap::identity(DurMs::new(duration_ms)),
+                theme: &theme,
+                fonts: &fonts,
             })
             .unwrap();
             assert_eq!(scene.duration(), DurMs::new(duration_ms));
@@ -384,9 +434,9 @@ mod tests {
         assert_eq!(frames(&first), frames(&second));
         // A frame is a function of the scene and the time: asked again, and
         // asked out of order, it is the same.
-        let t = TimeMs::new(6_700);
+        let t = OutMs::new(6_700);
         let before = first.frame_at(t);
-        first.frame_at(TimeMs::new(100));
+        first.frame_at(OutMs::new(100));
         assert_eq!(first.frame_at(t), before);
         assert!(!before.cmds.is_empty());
     }
@@ -444,6 +494,31 @@ mod tests {
                         },
                     ) => assert_eq!((opacity, clip), (opacity_h, clip_h)),
                     (DrawCmd::PopLayer, DrawCmd::PopLayer) => {}
+                    // The video is placed on the output canvas: the whole of
+                    // it at either width, from the same part of the source.
+                    (
+                        DrawCmd::Video {
+                            slot,
+                            src,
+                            dst,
+                            opacity,
+                            mask,
+                        },
+                        DrawCmd::Video {
+                            slot: slot_h,
+                            src: src_h,
+                            dst: dst_h,
+                            opacity: opacity_h,
+                            mask: mask_h,
+                        },
+                    ) => {
+                        assert_eq!(
+                            (slot, src, opacity, mask),
+                            (slot_h, src_h, opacity_h, mask_h)
+                        );
+                        assert_eq!((dst.w, dst.h), (1080.0, 1920.0));
+                        assert_eq!((dst_h.w, dst_h.h), (540.0, 960.0));
+                    }
                     other => panic!("{other:?}"),
                 }
             }

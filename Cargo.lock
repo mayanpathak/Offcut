@@ -1673,7 +1673,9 @@ dependencies = [
 name = "offcut-scene"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "offcut-detect",
+ "offcut-plan",
  "offcut-text",
  "offcut-types",
  "parley",
@@ -1727,6 +1729,7 @@ dependencies = [
  "offcut-detect",
  "offcut-entitlement",
  "offcut-mp4",
+ "offcut-plan",
  "offcut-render",
  "offcut-types",
  "serde",
