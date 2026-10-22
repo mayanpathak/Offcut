@@ -78,9 +78,10 @@ git diff --name-only "$BASE" -- \
   web/src/workers/media.worker.ts web/src/workers/asr.worker.ts web/src/workers/media web/src/workers/asr \
   web/src/workers/render/encoders.ts web/src/workers/render/opfs-sink.ts \
   verify bench/device-bench.ts corpus fixtures/gen_fixtures.sh fixtures/manifest.json fixtures/labeled fixtures/speech render.yaml
-# the frozen check (G 1.6): no output, except three recorded one-line diffs from Prompt 94 on (check each with git diff "$BASE" -- <file>):
-# crates/offcut-wasm-render/src/lib.rs (`mod scene_api;`), web/src/workers/media.worker.ts and asr.worker.ts (the import from ./rpc-worker, D-150);
-# and crates/offcut-dsp/tests/program_identity.rs from Prompt 100 on (a new file)
+# the frozen check (G 1.6): no output, except seven recorded one-line diffs from Prompt 94 on (check each with git diff "$BASE" -- <file>):
+# crates/offcut-wasm-render/src/lib.rs (`mod scene_api;`), web/src/workers/media.worker.ts and asr.worker.ts (the import from ./rpc-worker, D-150),
+# and, found in Prompt 94 (v4changelog Entry 4), the same import line of web/src/workers/media/import.ts, media/audio-decode.ts,
+# asr/whisper-runtime.ts and render/encoders.ts; and crates/offcut-dsp/tests/program_identity.rs from Prompt 100 on (a new file)
 git ls-files --cached | grep -E '^(testclips|fixtures/\.gen|fixtures/\.cache|corpus/\.clips|corpus/\.results|web/test-results|web/playwright-report)/|(^|/)\.env'   # no output
 ```
 

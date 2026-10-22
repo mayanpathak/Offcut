@@ -8,49 +8,25 @@
 // nowhere else (INV-9, D-27 c).
 
 import { ENTITLEMENT_PUBLIC_KEYS } from "../config/entitlement-public-key";
-import type {
-  ChangeSummary,
-  ClipId,
-  ClipInfo,
-  DetectedEvent,
-  DurMs,
-  EditState,
-  ExportId,
-  Prosody,
-  TimeMs,
-  Transcript,
-  UnixSecs,
-} from "../gen/domain";
-import { move, OpfsError, paths } from "../persistence/opfs";
-import { loadRender, type RenderApi, type RenderSession } from "../wasm/load-render";
+import type { ClipId, ClipInfo, DetectedEvent, EditState, Prosody, Transcript, UnixSecs } from "../gen/domain";
+import { OpfsError } from "../persistence/opfs";
+import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
-import type { ClockSync, FailureStage, RenderWorkerApi, StageTiming } from "./protocol";
-import { runExport } from "./render/export-loop";
-import { OpfsSink } from "./render/opfs-sink";
-import { runPreview } from "./render/preview-loop";
+import type { FailureStage, RenderWorkerApi } from "./protocol";
+import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
+import { previewClock, previewForget, previewPause, previewPlay } from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
-import { CANCELLED, type Handlers, type JobContext, serveWorker, toAppFailure, WorkerFailure } from "./rpc";
-
-type Exported = { opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] };
+import { toAppFailure } from "./rpc";
+import { type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The clip that is open, from `openSession` to `closeSession` (TS §14.3).
-type Session = {
-  api: RenderApi;
-  session: RenderSession;
-  /** The clip's file. The session reads the video samples through it. */
-  handle: FileSystemSyncAccessHandle;
-  clipInfo: ClipInfo;
-  source: VideoSource;
-};
+// The export and the preview are in `render/export-job.ts` and
+// `render/preview-job.ts`; they reach this state through `worker` below.
 let open: Session | undefined;
 /** What the scene was last built from, without its profile. */
-let scene: { transcript: Transcript; events: DetectedEvent[]; edit: EditState } | undefined;
+let scene: SceneState | undefined;
 /** The canvas of the page's player, once it is attached. */
 let previewCanvas: OffscreenCanvas | undefined;
-/** The page's audio clock as the page last told it, and the preview loop that follows it. */
-let clock: ClockSync | undefined;
-let stopPreview = false;
-let previewLoop: Promise<unknown> | undefined;
 
 /**
  * What was thrown, as the failure a handler throws, with the stage it
@@ -148,193 +124,13 @@ async function attachPreview(p: { canvas: OffscreenCanvas }): Promise<void> {
   previewCanvas = p.canvas;
 }
 
-/** What one export has got to: read when it fails, and when it is tidied up after. */
-type ExportRun = {
-  stage: FailureStage;
-  /** The scene and the canvas are the export's, not the preview's. */
-  switched: boolean;
-  sink: OpfsSink | undefined;
-};
-
-/**
- * Steps 1 to 6 and 8 of v2implementation §16.8: the profile from the token,
- * the scene and a canvas at the profile's size, the loop, and the file moved
- * to its place. What must be undone when it does not get there is in `run`.
- */
-async function writeExport(
-  p: { exportId: ExportId; entitlementToken: string; out48: Float32Array },
-  ctx: JobContext,
-  run: ExportRun,
-): Promise<Exported | typeof CANCELLED> {
-  const state = opened();
-  const { api, session } = state;
-  if (scene === undefined) {
-    throw new WorkerFailure("E_INTERNAL", "NoScene");
-  }
-  // The token is verified before anything is drawn or written (INV-9).
-  const profile = api.exportProfileFromToken(p.entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now());
-
-  run.switched = true;
-  session.set_scene({ ...scene, profile });
-  const canvas = new OffscreenCanvas(profile.width, profile.height);
-  await session.attach_canvas(canvas, profile.width, profile.height);
-
-  const temporary = paths.exportTmp(p.exportId);
-  const final = paths.exportFinal(p.exportId);
-  const sink = await OpfsSink.open(temporary);
-  run.sink = sink;
-
-  const started = performance.now();
-  let encoded = started;
-  const result = await runExport({
-    session,
-    source: state.source,
-    profile,
-    out48: p.out48,
-    sink,
-    canvas,
-    onProgress: (done, total) => {
-      ctx.progress({ stage: "render_encode", done, total });
-    },
-    onEncoded: () => {
-      encoded = performance.now();
-      run.stage = "mux";
-      // The page moves the export to `muxing` on this message.
-      ctx.progress({ stage: "mux", done: 0, total: 1 });
-    },
-    isCancelled: () => ctx.isCancelled(),
-  });
-  if ("cancelled" in result) {
-    return CANCELLED;
-  }
-  // Every frame the export obtained must be closed by now (INV-11, D-45).
-  if (!closeFrames(state)) {
-    throw new WorkerFailure("E_INTERNAL", "FrameLeak", "render_encode");
-  }
-
-  await sink.close();
-  await move(temporary, final);
-  run.sink = undefined;
-  const muxed = performance.now();
-
-  const summary = session.summary();
-  if (summary === null) {
-    throw new WorkerFailure("E_INTERNAL", "NoScene");
-  }
-  return {
-    opfsPath: final,
-    summary,
-    stageTimings: [
-      { stage: "render_encode", durationMs: Math.round(encoded - started) as DurMs },
-      { stage: "mux", durationMs: Math.round(muxed - encoded) as DurMs },
-    ],
-  };
-}
-
-/**
- * Steps 5, 7 and 9: after an export, however it ended. Nothing of one that
- * did not finish stays, no frame and no file, and the scene and the canvas
- * are the preview's again, when a preview canvas was attached.
- */
-async function afterExport(run: ExportRun): Promise<void> {
-  const state = open;
-  if (state !== undefined) {
-    closeFrames(state);
-  }
-  await run.sink?.abort();
-  if (run.switched && state !== undefined && scene !== undefined && previewCanvas !== undefined) {
-    const profile = state.api.previewProfile();
-    state.session.set_scene({ ...scene, profile });
-    await state.session.attach_canvas(previewCanvas, profile.width, profile.height);
-  }
-}
-
-async function exportClip(
-  p: { exportId: ExportId; entitlementToken: string; out48: Float32Array },
-  ctx: JobContext,
-): Promise<Exported | typeof CANCELLED> {
-  const run: ExportRun = { stage: "render_encode", switched: false, sink: undefined };
-  let result: Exported | typeof CANCELLED | undefined;
-  let failure: WorkerFailure | undefined;
-  try {
-    result = await writeExport(p, ctx, run);
-  } catch (thrown) {
-    failure = staged(thrown, run.stage);
-  }
-  try {
-    await afterExport(run);
-  } catch (thrown) {
-    // The first failure is the one that is reported.
-    failure ??= staged(thrown, run.stage);
-  }
-  if (failure !== undefined || result === undefined) {
-    throw failure ?? new WorkerFailure("E_INTERNAL", "NoResult", run.stage);
-  }
-  return result;
-}
-
-/**
- * The time on the clip that sounds now: where the audio was when the page
- * last said so, and what has passed since. The page's clock and this
- * worker's count from different starts; the sum of start and time passed is
- * the same moment in both (TS §20.2).
- */
-function previewTime(): TimeMs {
-  if (clock === undefined) {
-    return 0 as TimeMs;
-  }
-  const since = performance.timeOrigin + performance.now() - clock.epochMs;
-  return Math.max(0, clock.audioMs + since) as TimeMs;
-}
-
-/** Draws the preview until the clip ends or `previewPause` stops it. Answers when the loop has returned. */
-async function previewPlay(p: { clock: ClockSync }): Promise<void> {
-  const state = opened();
-  if (scene === undefined || previewCanvas === undefined) {
-    throw new WorkerFailure("E_INTERNAL", scene === undefined ? "NoScene" : "NoCanvas");
-  }
-  clock = p.clock;
-  stopPreview = false;
-  const loop = runPreview(state.session, state.source, previewTime, () => stopPreview);
-  previewLoop = loop;
-  let closed = false;
-  try {
-    await loop;
-  } finally {
-    previewLoop = undefined;
-    // The last frame stays on the canvas; no decoded frame stays open (INV-11).
-    closed = closeFrames(state);
-  }
-  if (!closed) {
-    throw new WorkerFailure("E_INTERNAL", "FrameLeak");
-  }
-}
-
-/**
- * One-way: nobody waits for an answer, and a failure thrown here would
- * reach the page as a crash of the worker. It only notes the time.
- */
-function previewClock(p: { clock: ClockSync }): void {
-  clock = p.clock;
-}
-
-/** Stops the loop and answers when it has returned, however it ended: its failure is `previewPlay`'s to report. */
-async function previewPause(): Promise<void> {
-  stopPreview = true;
-  await previewLoop?.then(
-    () => undefined,
-    () => undefined,
-  );
-}
-
 /** Idempotent. */
 function closeSession(): void {
   const state = open;
   open = undefined;
   scene = undefined;
   previewCanvas = undefined;
-  stopPreview = true;
-  clock = undefined;
+  previewForget();
   if (state === undefined) {
     return;
   }
@@ -351,17 +147,29 @@ function notYet(): never {
   throw new WorkerFailure("E_INTERNAL", "NotImplemented");
 }
 
+/** This worker's state, as the two job files reach it (v4implementation D-150). */
+const worker: WorkerState = {
+  opened,
+  open: () => open,
+  scene: () => scene,
+  previewCanvas: () => previewCanvas,
+  closeFrames,
+  staged,
+  exportProfile: (entitlementToken) =>
+    opened().api.exportProfileFromToken(entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now()),
+};
+
 const handlers: Handlers<RenderWorkerApi> = {
   openSession,
   detect,
   redetectSentence: notYet,
   setScene,
   attachPreview,
-  previewPlay,
+  previewPlay: (p: Parameters<typeof previewPlay>[0]) => previewPlay(p, worker),
   previewClock,
   previewPause,
   previewSeek: notYet,
-  exportClip,
+  exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
 };
 

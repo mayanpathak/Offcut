@@ -4,7 +4,7 @@
 // touches a browser API when the module loads.
 
 import { type BitsPerSec, type ExportProfile, LIMITS, type Px } from "../../gen/domain";
-import { WorkerFailure } from "../rpc";
+import { WorkerFailure } from "../rpc-worker";
 
 export type VideoLadderEntry = {
   codec: string;

@@ -8,7 +8,7 @@
 import type { Lufs, Prosody, Sentence, Word } from "../gen/domain";
 import { loadCore } from "../wasm/load-core";
 import type { AudioWorkerApi } from "./protocol";
-import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc";
+import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The cleaned voice of the clip in work, from `runChain` until `measureProsody` hands it over.
 let kept: Float32Array<ArrayBuffer> | null = null;

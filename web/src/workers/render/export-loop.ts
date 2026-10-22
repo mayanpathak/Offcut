@@ -11,7 +11,8 @@
 
 import { type Bytes, type ExportProfile, LIMITS, type TimeMs } from "../../gen/domain";
 import { loadRender, type Mp4MuxerHandle, type RenderSession } from "../../wasm/load-render";
-import { toAppFailure, WorkerFailure } from "../rpc";
+import { toAppFailure } from "../rpc";
+import { WorkerFailure } from "../rpc-worker";
 import {
   AAC_ENCODE_CONFIG,
   AAC_PRIMING_SAMPLES,

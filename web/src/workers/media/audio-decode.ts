@@ -4,7 +4,7 @@
 
 import type { ClipInfo } from "../../gen/domain";
 import { type CoreDemuxer, loadCore } from "../../wasm/load-core";
-import { CANCELLED, WorkerFailure } from "../rpc";
+import { CANCELLED, WorkerFailure } from "../rpc-worker";
 
 /** Compressed frames handed to the decoder between two looks at the cancel flag. */
 const BATCH = 32;
