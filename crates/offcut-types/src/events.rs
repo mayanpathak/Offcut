@@ -7,6 +7,11 @@ use crate::ids::{EventId, WordIdx, WordRange};
 use crate::transcript::Quantity;
 use crate::units::{Confidence, Span, TimeMs};
 
+/// The kind of a detected event, and from V4 the kind of a plan item
+/// (`PlanItem.kind`, v4implementation D-118): there is no second kind enum.
+/// The four variants have the codes 0-3 of the event-id hash (D-47), fixed
+/// forever. A release that draws a new kind appends a variant with the next
+/// code; none is moved or removed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum EventKind {

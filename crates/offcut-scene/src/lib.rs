@@ -322,8 +322,10 @@ mod tests {
     }
 
     fn frames(scene: &Scene) -> Vec<DisplayList> {
+        // A frame index is a program time (D-125); this scene still takes a
+        // recording time. The map is the identity: the number is the same.
         (0..scene.frame_count())
-            .map(|frame| scene.frame_at(FrameIdx::new(frame).to_time_ms()))
+            .map(|frame| scene.frame_at(TimeMs::new(FrameIdx::new(frame).to_out_ms().get())))
             .collect()
     }
 

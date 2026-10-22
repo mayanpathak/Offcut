@@ -52,7 +52,7 @@ function empty(): Fields {
   return {
     waitingModel: false,
     events: [],
-    edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0 },
+    edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true },
     feed: [],
     out48: null,
   };

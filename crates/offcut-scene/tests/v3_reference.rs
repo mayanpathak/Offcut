@@ -435,7 +435,9 @@ fn frames(scene: &Scene) -> Vec<Value> {
     (0..scene.frame_count())
         .step_by(STEP as usize)
         .map(|n| {
-            let list = scene.frame_at(FrameIdx::new(n).to_time_ms());
+            // A frame index is a program time from V4 on (D-125); V3's scene
+            // takes a recording time. The map is the identity: the same number.
+            let list = scene.frame_at(TimeMs::new(FrameIdx::new(n).to_out_ms().get()));
             let text = serde_json::to_string(&list).expect("a display list serializes");
             serde_json::from_str(&text).expect("and reads back")
         })

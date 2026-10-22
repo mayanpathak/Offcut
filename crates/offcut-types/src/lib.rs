@@ -6,10 +6,12 @@ pub mod events;
 pub mod ids;
 pub mod limits;
 pub mod media;
+pub mod plan;
 pub mod profile;
 pub mod prosody;
 pub mod stage;
 pub mod summary;
+pub mod timemap;
 pub mod transcript;
 pub mod units;
 
@@ -19,10 +21,12 @@ pub use events::*;
 pub use ids::*;
 pub use limits::*;
 pub use media::*;
+pub use plan::*;
 pub use profile::*;
 pub use prosody::*;
 pub use stage::*;
 pub use summary::*;
+pub use timemap::*;
 pub use transcript::*;
 pub use units::*;
 
@@ -104,6 +108,7 @@ mod typescript {
     /// `DurMs` cannot be passed where a `TimeMs` is expected there either.
     fn branded(v: &mut impl TypeVisitor) {
         v.visit::<TimeMs>();
+        v.visit::<OutMs>();
         v.visit::<DurMs>();
         v.visit::<Micros>();
         v.visit::<FrameIdx>();
@@ -132,6 +137,7 @@ mod typescript {
     /// Every other type, in module order.
     fn declared(v: &mut impl TypeVisitor) {
         v.visit::<Span>();
+        v.visit::<OutSpan>();
         v.visit::<WordRange>();
         v.visit::<Rotation>();
         v.visit::<Orientation>();
@@ -153,11 +159,27 @@ mod typescript {
         v.visit::<ListItem>();
         v.visit::<EventParams>();
         v.visit::<DetectedEvent>();
+        v.visit::<EditPlan>();
+        v.visit::<PlanSource>();
+        v.visit::<Cut>();
+        v.visit::<CutWhy>();
+        v.visit::<PlanItem>();
+        v.visit::<ItemParams>();
+        v.visit::<ListPoint>();
+        v.visit::<QuantityRef>();
+        v.visit::<Label>();
+        v.visit::<Chapter>();
+        v.visit::<TextExtras>();
+        v.visit::<MusicEnergy>();
+        v.visit::<MusicCue>();
         v.visit::<WordProsody>();
         v.visit::<Prosody>();
         v.visit::<StyleId>();
         v.visit::<CropOffset>();
+        v.visit::<CaptionPlacement>();
         v.visit::<EditState>();
+        v.visit::<Segment>();
+        v.visit::<TimeMap>();
         v.visit::<Plan>();
         v.visit::<ProfileKind>();
         v.visit::<ExportProfile>();
@@ -256,6 +278,8 @@ mod typescript {
             let _ = writeln!(out, "  {name}: {value},");
         }
         out.push_str("} as const;\n");
+        // The plan's wire format (v4implementation §12).
+        let _ = writeln!(out, "\nexport const PLAN_FORMAT = {PLAN_FORMAT};");
 
         code_array::<ErrorCode>(&mut out, &cfg, "ERROR_CODES");
         code_array::<RejectReason>(&mut out, &cfg, "REJECT_REASONS");
@@ -299,6 +323,8 @@ mod typescript {
 
         let sources = [
             include_str!("units.rs"),
+            include_str!("timemap.rs"),
+            include_str!("plan.rs"),
             include_str!("ids.rs"),
             include_str!("media.rs"),
             include_str!("transcript.rs"),
@@ -311,12 +337,27 @@ mod typescript {
             include_str!("error.rs"),
         ];
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
-        assert_eq!(names.len(), 59);
-        for name in names {
+        assert_eq!(names.len(), 79);
+        // Not serialized, so not generated: the binding returns a `SrcPos` as
+        // a plain object, and a `SilenceProfile` stays in the workers
+        // (v4implementation §6.2).
+        const NOT_GENERATED: [&str; 2] = ["SrcPos", "SilenceProfile"];
+        for name in NOT_GENERATED {
+            assert!(names.contains(&name), "{name}");
+            assert!(
+                !ts.contains(&format!("export type {name} ")),
+                "{name} is generated"
+            );
+        }
+        for name in names
+            .into_iter()
+            .filter(|name| !NOT_GENERATED.contains(name))
+        {
             let declarations = ts.matches(&format!("\nexport type {name} = ")).count();
             assert_eq!(declarations, 1, "{name} is declared {declarations} times");
         }
-        assert_eq!(ts.matches("readonly __unit: ").count(), 24);
+        assert_eq!(ts.matches("readonly __unit: ").count(), 25);
+        assert!(ts.contains("\nexport const PLAN_FORMAT = 1;\n"));
 
         let limit_names: Vec<&str> = include_str!("limits.rs")
             .split("\npub const ")

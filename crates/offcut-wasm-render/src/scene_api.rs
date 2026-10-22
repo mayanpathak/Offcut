@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::{Scene, SceneInput, build_scene};
 use offcut_types::{
-    CropOffset, DetectedEvent, EditState, ErrorCode, EventId, ExportProfile, StyleId, Transcript,
+    CaptionPlacement, CropOffset, DetectedEvent, EditState, ErrorCode, EventId, ExportProfile,
+    StyleId, Transcript,
 };
 use serde::Deserialize;
 use wasm_bindgen::JsValue;
@@ -18,13 +19,23 @@ use crate::session::{RenderSession, scene_error_name};
 use crate::{failure, from_js, to_plain, word_edits};
 
 /// The user's choices as JavaScript holds them: the keys of `word_edits` are
-/// strings there.
+/// strings there. A record V3 stored has no `caption_position` and no
+/// `highlight_numbers`: they take `EditState`'s defaults (D-169, D-171).
 #[derive(Deserialize)]
 struct EditInput {
     word_edits: BTreeMap<String, String>,
     event_overrides: BTreeMap<EventId, bool>,
     style: StyleId,
     crop_offset: CropOffset,
+    #[serde(default = "CaptionPlacement::bottom")]
+    caption_position: CaptionPlacement,
+    #[serde(default = "highlighted")]
+    highlight_numbers: bool,
+}
+
+/// `EditState`'s default for `highlight_numbers`, read from its one home.
+fn highlighted() -> bool {
+    EditState::default().highlight_numbers
 }
 
 /// A `SceneInput` by value: everything but the clip, which the session has.
@@ -50,6 +61,8 @@ impl RenderSession {
             event_overrides: input.edit.event_overrides,
             style: input.edit.style,
             crop_offset: input.edit.crop_offset,
+            caption_position: input.edit.caption_position,
+            highlight_numbers: input.edit.highlight_numbers,
         };
         let scene = build_scene(SceneInput {
             transcript: &input.transcript,
