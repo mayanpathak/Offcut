@@ -9,9 +9,12 @@ import type {
   ClipInfo,
   DetectedEvent,
   DurMs,
+  EditPlan,
   EditState,
   ExportId,
   ExportProfile,
+  Prosody,
+  TimeMap,
   Transcript,
 } from "../../gen/domain";
 import { move, paths } from "../../persistence/opfs";
@@ -32,10 +35,12 @@ export type Session = {
   handle: FileSystemSyncAccessHandle;
   clipInfo: ClipInfo;
   source: VideoSource;
+  /** What `detect` last found the clip's events in, and the events (D-146). */
+  detection?: { transcript: Transcript; prosody: Prosody; events: DetectedEvent[] };
 };
 
-/** What the scene was last built from, without its profile. */
-export type SceneState = { transcript: Transcript; events: DetectedEvent[]; edit: EditState };
+/** What the scene was last built from, without its profile: the export switches to it and back. */
+export type SceneState = { transcript: Transcript; plan: EditPlan; edit: EditState; timeMap: TimeMap };
 
 /** The render worker's state as its job files see it. `render.worker.ts` owns it. */
 export type WorkerState = {

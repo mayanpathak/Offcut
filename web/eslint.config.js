@@ -227,11 +227,13 @@ const NO_SWALLOWED_ERROR = [
 
 const restrictedSyntax = (...groups) => ["error", ...groups.flat()];
 
-// Seven files of the main thread turn a raw browser value into a unit or an
+// Nine files of the main thread turn a raw browser value into a unit or an
 // id (v2implementation D-59). Each may hold one cast, to one type, in one
 // named place: the last `return` of its minting helper or, in model-store.ts,
 // the constant that is the zero of the initial state. Every other cast in
-// the file is refused as before.
+// the file is refused as before. control-preview.ts mints program time
+// (D-126); run-pipeline.ts the two recording times of the identity time map
+// (V4 Prompt 99).
 const MINTING = [
   { file: "src/persistence/opfs.ts", brand: "Bytes", helper: "toBytes" },
   { file: "src/models/download.ts", brand: "Bytes", helper: "toBytes" },
@@ -239,7 +241,8 @@ const MINTING = [
   { file: "src/state/model-store.ts", brand: "Bytes", constant: "ZERO_BYTES" },
   { file: "src/usecases/import-clip.ts", brand: "ClipId", helper: "newClipId" },
   { file: "src/usecases/start-export.ts", brand: "ExportId", helper: "newExportId" },
-  { file: "src/usecases/control-preview.ts", brand: "TimeMs", helper: "toTimeMs" },
+  { file: "src/usecases/control-preview.ts", brand: "OutMs", helper: "toOutMs" },
+  { file: "src/usecases/run-pipeline.ts", brand: "TimeMs", helper: "recordingTime" },
   { file: "src/persistence/clips-repo.ts", brand: "Bytes", helper: "toBytes" },
 ];
 
@@ -350,7 +353,7 @@ export default defineConfig(
     files: ["src/analytics/client.ts"],
     rules: { "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST) },
   },
-  // The seven minting files: one named cast each (D-59).
+  // The nine minting files: one named cast each (D-59).
   ...MINTING.map((entry) => ({
     files: [entry.file],
     rules: {

@@ -12,11 +12,16 @@ import type {
   ChangeSummary,
   ClipInfo,
   DetectedEvent,
+  Dropped,
+  EditPlan,
   EditState,
   ExportProfile,
+  OutMs,
   Prosody,
   Px,
   SentenceIdx,
+  TimeMap,
+  TimeMs,
   Transcript,
   UnixSecs,
 } from "../gen/domain";
@@ -28,19 +33,27 @@ import initRender, {
   preview_profile,
   redetect_sentence,
   type RenderSession as ModuleSession,
+  rules_plan,
 } from "./pkg/render/offcut_render";
 import renderWasmUrl from "./pkg/render/offcut_render_bg.wasm?url";
 
 /** One compressed video frame, with its place on the clip's timeline in microseconds. */
 export type VideoSample = { data: Uint8Array; ptsUs: number; durationUs: number; isKeyframe: boolean };
 
-/** What a scene is built from, beside the clip the session was opened with. */
+/**
+ * What a scene is built from, beside the clip the session was opened with.
+ * The plan is validated against the transcript as edited first (TS §40.4).
+ */
 export type SceneInput = {
   transcript: Transcript;
-  events: readonly DetectedEvent[];
+  plan: EditPlan;
   edit: EditState;
   profile: ExportProfile;
+  timeMap: TimeMap;
 };
+
+/** Where the main video's source is at a program time (D-126). */
+export type SourcePos = { at: TimeMs } | { held: TimeMs };
 
 /**
  * One clip being drawn. This is the module's own object, with the types of
@@ -49,12 +62,19 @@ export type SceneInput = {
  * (v2implementation D-30). `free()` gives its memory in the module back. It
  * closes no `VideoFrame`.
  */
-export type RenderSession = Omit<ModuleSession, "set_scene" | "summary" | "read_video_sample"> & {
-  /** Builds the scene and keeps it in place of the one before. */
-  set_scene(input: SceneInput): void;
+export type RenderSession = Omit<
+  ModuleSession,
+  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame"
+> & {
+  /** Builds the scene and keeps it in place of the one before; what the plan's validation left out. */
+  set_scene(input: SceneInput): { dropped: Dropped[] };
   /** `null` before a scene is set. */
   summary(): ChangeSummary | null;
   read_video_sample(index: number): VideoSample;
+  /** Where the source is at the program time `tOut`; `null` before a scene is set. */
+  source_at(tOut: OutMs): SourcePos | null;
+  /** Draws what the scene shows at the program time `tOut`, with `frame` as its main video. */
+  render_frame(frame: VideoFrame, tOut: OutMs): void;
 };
 
 /** The module's MP4 writer. `finalize()` returns the size of the file in bytes and frees the writer. */
@@ -65,6 +85,8 @@ export type { Mp4MuxerHandle };
  * `{ code, detail }` the module made (TS §11.1).
  */
 export type RenderApi = {
+  /** The plan of the detector's events (D-124). */
+  rulesPlan(transcript: Transcript, events: readonly DetectedEvent[]): EditPlan;
   /** The visual events of a transcript. `edits` is the user's word edits, by word number. */
   detect(transcript: Transcript, prosody: Prosody, edits: Record<number, string>): DetectedEvent[];
   /**
@@ -112,6 +134,7 @@ export async function preloadRender(): Promise<void> {
 }
 
 const api: RenderApi = {
+  rulesPlan: (transcript, events) => rules_plan(transcript, [...events]) as EditPlan,
   detect: (transcript, prosody, edits) => detect(transcript, prosody, edits) as DetectedEvent[],
   redetectSentence: (transcript, prosody, edits, sentence, prev) =>
     redetect_sentence(transcript, prosody, edits, sentence, [...prev]) as DetectedEvent[],

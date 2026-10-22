@@ -3,7 +3,7 @@
 // the one `AudioContext` and tells the worker the time four times a second.
 
 import { track } from "../analytics/client";
-import type { TimeMs } from "../gen/domain";
+import type { OutMs } from "../gen/domain";
 import { noteFailure } from "../state/clip-store";
 import * as previewStore from "../state/preview-store";
 import { pool, WorkerCallError } from "../workers/pool";
@@ -33,23 +33,23 @@ type Player = {
 
 let player: Player | undefined;
 
-/** The one place of this file that turns a number into a time on the clip (v2implementation D-59). */
-function toTimeMs(ms: number): TimeMs {
-  return Math.max(0, Math.round(ms)) as TimeMs;
+/** The one place of this file that turns a number into a program time (v2implementation D-59, D-126). */
+function toOutMs(ms: number): OutMs {
+  return Math.max(0, Math.round(ms)) as OutMs;
 }
 
 function status(): previewStore.PreviewStatus {
   return previewStore.usePreviewStore.getState().status;
 }
 
-/** The place in the clip that is sounding now, in milliseconds. */
+/** The place in the program that is sounding now, in milliseconds. */
 function positionMs(p: Player): number {
   return (p.context.currentTime - p.startedAt) * 1000 + p.startOffsetMs;
 }
 
 /** The audio's time, with the moment it was read at: what the worker's clock runs on from. */
 function clockNow(p: Player): ClockSync {
-  return { audioMs: toTimeMs(positionMs(p)), epochMs: performance.timeOrigin + performance.now() };
+  return { audioMs: toOutMs(positionMs(p)), epochMs: performance.timeOrigin + performance.now() };
 }
 
 function stopSound(p: Player): void {

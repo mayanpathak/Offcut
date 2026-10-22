@@ -6,7 +6,9 @@ import type {
   ClipId,
   ClipInfo,
   DetectedEvent,
+  Dropped,
   DurMs,
+  EditPlan,
   EditState,
   ErrorCode,
   EventKind,
@@ -14,12 +16,13 @@ import type {
   FailureStage,
   JobId,
   Lufs,
+  OutMs,
   PipelineStage,
   Prosody,
   RejectReason,
   Sentence,
   SentenceIdx,
-  TimeMs,
+  TimeMap,
   Transcript,
   Word,
 } from "../gen/domain";
@@ -90,19 +93,23 @@ export interface RenderWorkerApi {
   openSession(p: { clipId: ClipId; clipInfo: ClipInfo }): Promise<void>;
   detect(p: { transcript: Transcript; prosody: Prosody }): Promise<DetectedEvent[]>;
   redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): Promise<DetectedEvent[]>;
+  /** The plan of the detector's events (D-124). Stateless. */
+  rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan>;
+  /** The plan is validated against the transcript as edited before the scene is built (TS §40.4). */
   setScene(p: {
     transcript: Transcript;
-    events: DetectedEvent[];
+    plan: EditPlan;
     edit: EditState;
+    timeMap: TimeMap;
     profile: "preview" | { entitlementToken: string };
-  }): Promise<void>;
+  }): Promise<SceneReport>;
   /** The canvas is transferred. */
   attachPreview(p: { canvas: OffscreenCanvas }): Promise<void>;
-  previewPlay(p: { clock: ClockSync }): Promise<void>;
+  previewPlay(p: { clock: ClockSync }): Promise<PreviewStats>;
   /** Fire-and-forget. */
   previewClock(p: { clock: ClockSync }): void;
   previewPause(): Promise<void>;
-  previewSeek(p: { at: TimeMs }): Promise<void>;
+  previewSeek(p: { at: OutMs }): Promise<void>;
   exportClip(p: {
     exportId: ExportId;
     entitlementToken: string;
@@ -111,7 +118,22 @@ export interface RenderWorkerApi {
   closeSession(): Promise<void>;
 }
 
-/** `epochMs` is `performance.timeOrigin + performance.now()`. */
-export type ClockSync = { audioMs: TimeMs; epochMs: number };
+/** `epochMs` is `performance.timeOrigin + performance.now()`. `audioMs` is program time (D-126). */
+export type ClockSync = { audioMs: OutMs; epochMs: number };
+
+/** What `setScene` answers: what the plan's validation left out (D-124). */
+export type SceneReport = { dropped: Dropped[] };
+
+/** What a play drew, when it ended (D-155). */
+export type PreviewStats = {
+  /** Frames drawn. */
+  frames: number;
+  /** Times the frame of the moment was not decoded yet, and the one before it was shown. */
+  late: number;
+  /** The most the time drawn lay from the time asked for. */
+  maxDriftMs: DurMs;
+  /** The preview was drawn at 360 x 640 (D-149). Always `false` before V4 Prompt 112. */
+  downscaled: boolean;
+};
 
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };

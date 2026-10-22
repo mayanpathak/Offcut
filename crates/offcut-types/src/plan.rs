@@ -177,6 +177,32 @@ pub struct MusicCue {
     pub energy: MusicEnergy,
 }
 
+/// What `offcut-plan`'s `validate` left out of a plan, and why (TS §40.4).
+/// `kind` is `None` for a cut, a chapter, a text extra or a music cue. No
+/// content: it may become an analytics event (V6.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+pub struct Dropped {
+    pub kind: Option<EventKind>,
+    pub reason: DropReason,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum DropReason {
+    UnknownKind,
+    WrongProducer,
+    ParamsMismatch,
+    AnchorsOutOfRange,
+    AnchorRule,
+    LabelTooLong,
+    LabelDigits,
+    NumberUnresolved,
+    OverLimit,
+    TooClose,
+    ZoneTaken,
+    NotInThisBuild,
+}
+
 impl Label {
     pub fn as_str(&self) -> &str {
         &self.0

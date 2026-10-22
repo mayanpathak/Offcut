@@ -1,13 +1,23 @@
 // C-3, C-4: from an accepted clip to one that can be previewed. The audio is
 // decoded, the speech model is made ready and hears it, the visual events are
-// found and the scene is built (TS §9). Every step runs in a worker; this
+// found and made the rules plan, and the scene is built from the plan on the
+// clip's identity time map (TS §9, §40.8). Every step runs in a worker; this
 // file puts them in order, keeps the clip store up to date and measures the
 // stages around the calls (v2implementation D-35). Nothing here calls the
 // API (INV-3), and nothing of what was said leaves in an analytics event.
 
 import { track } from "../analytics/client";
 import type { DownloadOutcome } from "../gen/api";
-import type { ClipId, DetectedEvent, EventKind, FailureStage, Transcript } from "../gen/domain";
+import type {
+  ClipId,
+  DetectedEvent,
+  DurMs,
+  EventKind,
+  FailureStage,
+  TimeMap,
+  TimeMs,
+  Transcript,
+} from "../gen/domain";
 import * as modelManager from "../models/model-manager";
 import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
@@ -25,6 +35,20 @@ const MAX_COUNT = 10_000;
 /** A time measured here, as analytics takes it: whole milliseconds, capped. */
 function capMs(ms: number): number {
   return Math.min(MAX_DURATION_MS, Math.max(0, Math.round(ms)));
+}
+
+/** The one place of this file that turns a number into a time of the recording (v2implementation D-59). */
+function recordingTime(ms: number): TimeMs {
+  return ms as TimeMs;
+}
+
+/**
+ * The time map of a clip played as it was recorded: the whole recording,
+ * once, so that every program time is its recording time (TS §40.1). V4
+ * builds no other map (D-164), and builds this one here only.
+ */
+function identityTimeMap(duration: DurMs): TimeMap {
+  return { segments: [{ kind: "source", src: { start: recordingTime(0), end: recordingTime(duration) } }] };
 }
 
 // When the import of a clip began. `probe_audio` and the total are counted
@@ -269,7 +293,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   const { prosody } = measured;
   const out48 = owned(measured.out48);
 
-  // 12. (E) The events and the scene.
+  // 12. (E) The events, their plan, and the scene built from it (D-124).
   run.stage = "detect_scene";
   clipStore.processing("detect_scene", false);
   const sceneStartedAt = performance.now();
@@ -285,7 +309,10 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
       ...(displayTo !== undefined && { displayTo }),
     });
   }
-  answered(await pool.render.setScene({ transcript, events, edit, profile: "preview" }), run.stage);
+  const plan = answered(await pool.render.rulesPlan({ transcript, events }), run.stage);
+  clipStore.setPlan(plan);
+  const timeMap = identityTimeMap(clipInfo.duration);
+  answered(await pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" }), run.stage);
   track({
     name: "stage_timing",
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
@@ -298,7 +325,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   await editsRepo.put(clipId, { editState: edit });
 
   // 14.
-  clipStore.ready({ transcript, prosody, events, out48 });
+  clipStore.ready({ transcript, prosody, events, timeMap, out48 });
   const count = (kind: EventKind): number =>
     Math.min(MAX_COUNT, events.filter((event) => event.kind === kind).length);
   track({

@@ -250,6 +250,15 @@ export type MusicEnergy = "calm" | "steady" | "upbeat";
 export type MusicCue = { fits: boolean, energy: MusicEnergy, };
 
 /**
+ * What `offcut-plan`'s `validate` left out of a plan, and why (TS §40.4).
+ * `kind` is `None` for a cut, a chapter, a text extra or a music cue. No
+ * content: it may become an analytics event (V6.1).
+ */
+export type Dropped = { kind: EventKind | null, reason: DropReason, };
+
+export type DropReason = "unknown_kind" | "wrong_producer" | "params_mismatch" | "anchors_out_of_range" | "anchor_rule" | "label_too_long" | "label_digits" | "number_unresolved" | "over_limit" | "too_close" | "zone_taken" | "not_in_this_build";
+
+/**
  * Both values are z-scores against the word's sentence.
  */
 export type WordProsody = { energy_z: number, pitch_z: number, };

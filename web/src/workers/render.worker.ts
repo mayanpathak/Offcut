@@ -1,18 +1,29 @@
-// The render worker: finds the visual events of a transcript, builds the
-// scene, draws it over the clip's frames, and exports the clip as an MP4
-// (TS §17 to §21). The rules are in Rust, in `offcut_render.wasm`; this file
-// is the browser glue around them: the session of one clip, and its handlers.
+// The render worker: finds the visual events of a transcript, makes them a
+// plan, builds the scene from a plan it validates, draws it over the clip's
+// frames, and exports the clip as an MP4 (TS §17 to §21, §40). The rules are
+// in Rust, in `offcut_render.wasm`; this file is the browser glue around
+// them: the session of one clip, and its handlers.
 //
 // This is the only worker file that reads the entitlement public keys: the
 // size and the watermark of an export come from the verified token and from
 // nowhere else (INV-9, D-27 c).
 
 import { ENTITLEMENT_PUBLIC_KEYS } from "../config/entitlement-public-key";
-import type { ClipId, ClipInfo, DetectedEvent, EditState, Prosody, Transcript, UnixSecs } from "../gen/domain";
+import type {
+  ClipId,
+  ClipInfo,
+  DetectedEvent,
+  EditPlan,
+  EditState,
+  Prosody,
+  TimeMap,
+  Transcript,
+  UnixSecs,
+} from "../gen/domain";
 import { OpfsError } from "../persistence/opfs";
 import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
-import type { FailureStage, RenderWorkerApi } from "./protocol";
+import type { FailureStage, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
 import { previewClock, previewForget, previewPause, previewPlay } from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
@@ -88,29 +99,54 @@ async function openSession(p: { clipId: ClipId; clipInfo: ClipInfo }): Promise<v
   }
 }
 
+/**
+ * The events of a whole transcript, with no word edits. The open clip keeps
+ * what they were found in, for `redetectSentence` (D-146): its handler takes
+ * no transcript.
+ */
 async function detect(p: { transcript: Transcript; prosody: Prosody }): Promise<DetectedEvent[]> {
   try {
-    // V2 has no word edits (V4).
-    return (await loadRender()).detect(p.transcript, p.prosody, {});
+    const events = (await loadRender()).detect(p.transcript, p.prosody, {});
+    if (open !== undefined) {
+      open.detection = { transcript: p.transcript, prosody: p.prosody, events };
+    }
+    return events;
   } catch (thrown) {
     throw staged(thrown, "detect_scene");
   }
 }
 
+/** The plan of the detector's events (D-124). It keeps nothing. */
+async function rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan> {
+  try {
+    return (await loadRender()).rulesPlan(p.transcript, p.events);
+  } catch (thrown) {
+    throw staged(thrown, "detect_scene");
+  }
+}
+
+/**
+ * Validates the plan and builds the scene (TS §40.8); keeps what it was
+ * built from, for the export's switch and back. A plan this build cannot
+ * read, or a time map that is not the identity, is refused as `E_INTERNAL`.
+ */
 function setScene(p: {
   transcript: Transcript;
-  events: DetectedEvent[];
+  plan: EditPlan;
   edit: EditState;
+  timeMap: TimeMap;
   profile: "preview" | { entitlementToken: string };
-}): void {
+}): Promise<SceneReport> {
   try {
     const { api, session } = opened();
     const profile =
       p.profile === "preview"
         ? api.previewProfile()
         : api.exportProfileFromToken(p.profile.entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now());
-    session.set_scene({ transcript: p.transcript, events: p.events, edit: p.edit, profile });
-    scene = { transcript: p.transcript, events: p.events, edit: p.edit };
+    const kept = { transcript: p.transcript, plan: p.plan, edit: p.edit, timeMap: p.timeMap };
+    const report = session.set_scene({ ...kept, profile });
+    scene = kept;
+    return Promise.resolve(report);
   } catch (thrown) {
     throw staged(thrown, "detect_scene");
   }
@@ -163,6 +199,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   openSession,
   detect,
   redetectSentence: notYet,
+  rulesPlan,
   setScene,
   attachPreview,
   previewPlay: (p: Parameters<typeof previewPlay>[0]) => previewPlay(p, worker),

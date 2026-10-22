@@ -6,10 +6,13 @@
 
 use std::collections::BTreeMap;
 
+// What `validate` leaves out, and why: in `offcut-types` so that the page's
+// TypeScript is generated from them (v4changelog known issue 18).
 use offcut_types::{
     Confidence, EditPlan, EventId, EventKind, EventParams, PLAN_FORMAT, PlanSource, Span, TimeMs,
     Transcript, WordIdx, WordRange,
 };
+pub use offcut_types::{DropReason, Dropped};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -57,31 +60,6 @@ pub struct ValidItem {
     pub params: EventParams,
     pub marks: Vec<TimeMs>,
     pub confidence: Option<Confidence>,
-}
-
-/// What was left out, and why. `kind` is `None` for a cut, a chapter, a text
-/// extra or a music cue. No content: it may become an analytics event (V6.1).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-pub struct Dropped {
-    pub kind: Option<EventKind>,
-    pub reason: DropReason,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DropReason {
-    UnknownKind,
-    WrongProducer,
-    ParamsMismatch,
-    AnchorsOutOfRange,
-    AnchorRule,
-    LabelTooLong,
-    LabelDigits,
-    NumberUnresolved,
-    OverLimit,
-    TooClose,
-    ZoneTaken,
-    NotInThisBuild,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

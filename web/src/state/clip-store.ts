@@ -9,10 +9,12 @@ import type {
   ClipId,
   ClipInfo,
   DetectedEvent,
+  EditPlan,
   EditState,
   PipelineStage,
   Prosody,
   RejectReason,
+  TimeMap,
   Transcript,
 } from "../gen/domain";
 import type { AppFailure, FeedLine } from "../workers/protocol";
@@ -31,6 +33,13 @@ export type ClipState = {
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
+  /**
+   * The plan the scene is built from: the rules plan of `events` in V4
+   * (D-124). In memory only; a restored clip makes it again (D-82).
+   */
+  plan?: EditPlan;
+  /** How the program plays the recording: the identity in V4 (D-164). */
+  timeMap?: TimeMap;
   /** The user's edits. V2 has none: this is the default and never changes. */
   edit: EditState;
   /** The lines of the processing feed, in the order they came. */
@@ -124,9 +133,20 @@ export function ready(result: {
   transcript: Transcript;
   prosody: Prosody;
   events: readonly DetectedEvent[];
+  timeMap: TimeMap;
   out48: Float32Array;
 }): void {
   apply("done", (current) => ({ ...settled(current), ...result }));
+}
+
+/** The plan the scene is built from now. The clip's state does not change. */
+export function setPlan(plan: EditPlan): void {
+  useClipStore.setState({ plan });
+}
+
+/** The events found now, after an edit (D-146). The clip's state does not change. */
+export function setEvents(events: readonly DetectedEvent[]): void {
+  useClipStore.setState({ events });
 }
 
 /** processing → rejected: fewer words were heard than a clip needs. */

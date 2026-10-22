@@ -172,6 +172,8 @@ mod typescript {
         v.visit::<TextExtras>();
         v.visit::<MusicEnergy>();
         v.visit::<MusicCue>();
+        v.visit::<Dropped>();
+        v.visit::<DropReason>();
         v.visit::<WordProsody>();
         v.visit::<Prosody>();
         v.visit::<StyleId>();
@@ -351,7 +353,7 @@ mod typescript {
             include_str!("error.rs"),
         ];
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
-        assert_eq!(names.len(), 79);
+        assert_eq!(names.len(), 81);
         // Not serialized, so not generated: the binding returns a `SrcPos` as
         // a plain object, and a `SilenceProfile` stays in the workers
         // (v4implementation §6.2).
