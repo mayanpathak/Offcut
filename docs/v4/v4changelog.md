@@ -17,7 +17,7 @@
 | 4 | **Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10) | Founder | V6.7 |
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
 | 6 | ~~**Open a draft pull request `v4-build` → `main`**~~ Done: PR #7 is open as a draft (closed in Entry 1) | Founder | Any time |
-| 7 | **Read ten rows of the line-break table** (D-167, G 8.2): rows 28, 27, 25, 26, 11, 20, 21, 12, 7, 16 of `crates/offcut-scene/tests/line_breaks.rs`, shown as a phone shows them (Entry 12). For each: "I would break it this way: yes / no, because …". A "no" changes that row now, with the reason, before the break search is written | Founder | P103 |
+| 7 | ~~**Read ten rows of the line-break table** (D-167, G 8.2): rows 28, 27, 25, 26, 11, 20, 21, 12, 7, 16 of `crates/offcut-scene/tests/line_breaks.rs`, shown as a phone shows them (Entry 12). For each: "I would break it this way: yes / no, because …". A "no" changes that row now, with the reason, before the break search is written~~ Done 2026-10-23: yes to all ten (Entry 13) | Founder | P103 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -42,7 +42,7 @@
 | 18 | ~~§12 lists `DropReason` and `Dropped` among the generated TypeScript types; they live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4. Not generated (Entry 6); generate them when a page or analytics consumer exists, or correct §12 in the copy-back~~ Closed in Entry 9: `Dropped` and `DropReason` moved to `offcut-types/src/plan.rs` (re-exported by `offcut-plan`) and generated, the page's `SceneReport` being their first reader | `web/src/gen`, plan §12 | P127 (copy-back) or V6.1 |
 | 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 | 20 | ~~**The identity proof cannot pass on `busy_1080` and `busy_540` as recorded.** V3's `busy()` gives its first two NumberReveals spans no word of its transcript has (1,000-1,400 and 3,500-3,800 ms); `validate` takes every item's span from its anchor words (D-121), so through the V4 contract they become 1,100-1,350 ("three") and 3,500-3,750 ("wanted."). In the comparison run (Entry 8) the four detector-built inputs are identical (836 frames) and each `busy` input differs in exactly 4 frames, all inside those two events' windows (count-up start, hold end, fade). **Decided by the founder on 2026-10-22 (Entry 9): re-derive the two `busy` files with V3's scene code (`09b1085`) on these anchored events, the other four files unchanged**; the alternative, accepting the 8 named frames, was declined. Prompt 100 does it, records it, and the proof then reads "6 inputs, identical"~~ Closed in Entry 10: re-derived, "6 inputs, 922 frames, identical" | `offcut-scene/tests/v3_reference.rs`, `tests/snapshots/v3_reference/busy_*.json` | P100 |
-| 21 | Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23) | `docs/v4/v4changelog.md` | P103 |
+| 21 | ~~Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23)~~ Closed in Entry 13: frozen at `01f406f` | `docs/v4/v4changelog.md` | P103 |
 
 ---
 
@@ -862,3 +862,28 @@ The four detector-built inputs (836 frames) are identical to V3's: glyphs, posit
 - The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (the first run failed at `cargo fmt --check` on one `assert!` the helper's renaming had lengthened; `cargo fmt` and the check run again, exit 0; `check-file-tree`: 309 files, 13 crates); **Rust 556 passed, 0 failed, 4 ignored** (Entry 11: 556/0/3; the ignored count rises by 1, `line_breaks::table`, as the prompt says); Vitest 92; `pnpm build` exit 0 (app shell 308.8 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`; no private path tracked.
 
 **Open.** Open item 7 (new, the founder's). Known issue 21 (new).
+
+---
+
+## Entry 13 - 2026-10-23 - P103 (S8): the founder's reading; readability, the break search, the reading floor
+
+**Line-break table frozen at `01f406f`** (`01f406f86778b2a7b4aabedd2964b7a2f744a1f2`, Prompt 102's commit; known issue 21 closed). From it on a row of `crates/offcut-scene/tests/line_breaks.rs` changes only with a changelog line naming the row and the reason (§23).
+
+**Line-break reading (D-167, G 8.2).** The founder read the ten rows drawn in Entry 12, each shown as a phone shows it (Clean, then Bold), on 2026-10-23. The answer, in the founder's words: "yes for all as far as it matches with the voice perfectly and eventually llm will tell the words that are emphasasized to make them bold and render".
+
+| Row | Sentence | Answer |
+|---|---|---|
+| 28 | "We spent months building it, and nobody used it." | yes |
+| 27 | "Oh wow, I love this!" | yes |
+| 25 | "The battery lasts all day, which is great." | yes |
+| 26 | "Pack light and arrive early." | yes |
+| 11 | "We found my favorite coffee shop." | yes |
+| 20 | "We tried it. It failed." | yes |
+| 21 | "Internationalization matters." | yes |
+| 12 | "The team loved it." | yes |
+| 7 | "Honestly, it was worth every minute." | yes |
+| 16 | "See you next week." | yes |
+
+No "no", so **no row changes**: the table stays as committed in `01f406f`. The founder's two remarks, and where each is held: "as far as it matches with the voice perfectly" is the timing rule that a caption word is shown, and its active state changes, at its own spoken time, and that no word moves (INV-5; the reading floor of D-168 only extends a chunk into the silence after it, never into the next words); "eventually llm will tell the words that are emphasasized" is V6.1's model plan, whose emphasis picks are drawn through the emphasis layers of D-169 (Prompt 104 builds them for V4's spoken-stress signal).
+
+**In progress.** This block is the reading's own commit, before any code (G 8.2); the rest of this entry (`readability.rs`, the break search, the floor, the property checks) follows in this prompt's final commit.
