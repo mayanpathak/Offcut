@@ -187,8 +187,15 @@ function modelReady(): Promise<AppFailure | null> {
 
 // --- The pipeline (C-4) ------------------------------------------------------
 
-/** What a run has got to: read when it fails. */
-type Run = { stage: FailureStage; sessionOpened: boolean };
+/** What a run has got to: read when it fails. `audioStarted`: the audio worker may hold the cleaned voice. */
+type Run = { stage: FailureStage; sessionOpened: boolean; audioStarted: boolean };
+
+/** The audio worker lets go of what it holds of this clip (D-128). One-way. */
+function releaseAudio(run: Run): void {
+  if (run.audioStarted) {
+    pool.audio.notify("release", {});
+  }
+}
 
 /** Steps 2 to 14 of v3implementation §15.2. A failure is thrown; `runPipeline` stores it. */
 async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void> {
@@ -213,6 +220,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   //    `pcm48` from here (D-90). Every path below waits for it.
   clipStore.pushFeed({ kind: "cleaning_voice" });
   const chainAt = performance.now();
+  run.audioStarted = true;
   const chain = settle(
     pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain")),
   ).then((c) => {
@@ -226,6 +234,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   const modelFailure = await model;
   if (modelFailure !== null) {
     await chain;
+    releaseAudio(run);
     clipStore.failed(modelFailure);
     return;
   }
@@ -271,6 +280,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   //    be used, and its file goes. Its record stays until the next import.
   if ("rejected" in heard) {
     await chain;
+    releaseAudio(run);
     clipStore.noSpeech();
     track({ name: "clip_rejected", props: { reject_reason: "REJECT_NO_SPEECH" } });
     await opfs.remove(opfs.paths.clipDir(clipId)).catch(() => undefined);
@@ -318,14 +328,23 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
   });
 
-  // 13. (F) The audio the export will read (D-51), then the clip's records.
+  // 13. (F) The audio the export will read (D-51, D-129), before it is
+  //     handed on; then the program's audio from it, on the identity map
+  //     (D-127); then the clip's records.
   run.stage = "storage";
   await opfs.writeAudio(clipId, out48);
+  run.stage = "audio_chain";
+  const program = answered(
+    await pool.audio.assemble({ out48, timeMap, speech: [] }, { transfer: [out48.buffer] }),
+    run.stage,
+  );
+  const prog48 = owned(program.prog48);
+  run.stage = "storage";
   await transcriptRepo.put(clipId, { transcript, prosody });
   await editsRepo.put(clipId, { editState: edit });
 
   // 14.
-  clipStore.ready({ transcript, prosody, events, timeMap, out48 });
+  clipStore.ready({ transcript, prosody, events, timeMap, prog48 });
   const count = (kind: EventKind): number =>
     Math.min(MAX_COUNT, events.filter((event) => event.kind === kind).length);
   track({
@@ -358,11 +377,13 @@ export async function runPipeline(clipId: ClipId): Promise<void> {
     return;
   }
 
-  const run: Run = { stage: "probe_audio", sessionOpened: false };
+  const run: Run = { stage: "probe_audio", sessionOpened: false, audioStarted: false };
   try {
     await steps(clipId, startedAt, run);
   } catch (error) {
-    // The model was unloaded where it failed; the render session is closed here.
+    // Every path that throws has let the chain settle (D-90): the audio is let
+    // go. The model was unloaded where it failed; the render session is closed here.
+    releaseAudio(run);
     if (run.sessionOpened) {
       await pool.render.closeSession().catch(() => undefined);
     }

@@ -1,12 +1,13 @@
-//! The exports of `offcut-dsp` for the audio worker: the voice chain and the
-//! prosody measure (v3implementation §10.1). The chain runs with
-//! `ChainConfig::default()`; the binding takes no configuration (D-110).
+//! The exports of `offcut-dsp` for the audio worker: the voice chain, the
+//! prosody measure (v3implementation §10.1) and the program's audio
+//! (v4implementation §11.2). The chain runs with `ChainConfig::default()`;
+//! the binding takes no configuration (D-110). PCM crosses by copy.
 
 use std::cell::Cell;
 
 use js_sys::{Float32Array, Function, Object, Reflect};
-use offcut_dsp::{ChainConfig, DspError, Flow};
-use offcut_types::{ErrorCode, Sentence, Word};
+use offcut_dsp::{ChainConfig, DspError, Flow, ProgramConfig};
+use offcut_types::{ErrorCode, OutSpan, Sentence, TimeMap, Word};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -44,8 +45,39 @@ pub fn run_chain(pcm48: &[f32], on_block: &Function) -> Result<JsValue, JsValue>
             ])
         }
         Ok(None) => object(&[("cancelled", JsValue::TRUE)]),
-        Err(DspError::Empty) => Err(failure(ErrorCode::Dsp, "Empty")),
-        Err(DspError::NonFinite) => Err(failure(ErrorCode::Dsp, "NonFinite")),
+        Err(error) => Err(failure(ErrorCode::Dsp, dsp_detail(error))),
+    }
+}
+
+/// `{ prog48: Float32Array, loudness: number }`: `out48` played on
+/// `time_map` (a `TimeMap`), with `speech` (`OutSpan[]`) where music would
+/// duck (V6.3). V4 takes the identity map only: any other is `E_DSP`
+/// `Unsupported` (D-164).
+#[wasm_bindgen]
+pub fn assemble(out48: &[f32], time_map: JsValue, speech: JsValue) -> Result<JsValue, JsValue> {
+    let map: TimeMap = serde_wasm_bindgen::from_value(time_map)
+        .map_err(|_| failure(ErrorCode::Internal, "TimeMap"))?;
+    let speech: Vec<OutSpan> = serde_wasm_bindgen::from_value(speech)
+        .map_err(|_| failure(ErrorCode::Internal, "Speech"))?;
+    let program = offcut_dsp::assemble(out48, &map, &speech, None, &ProgramConfig::default())
+        .map_err(|error| failure(ErrorCode::Dsp, dsp_detail(error)))?;
+    // A new array with its own buffer, so the worker can transfer it.
+    let prog48 = Float32Array::from(program.samples.as_slice());
+    object(&[
+        ("prog48", prog48.into()),
+        (
+            "loudness",
+            JsValue::from_f64(f64::from(program.loudness.get())),
+        ),
+    ])
+}
+
+/// The variant's name: the `detail` of an `E_DSP` failure.
+fn dsp_detail(error: DspError) -> &'static str {
+    match error {
+        DspError::Empty => "Empty",
+        DspError::NonFinite => "NonFinite",
+        DspError::Unsupported => "Unsupported",
     }
 }
 
@@ -71,4 +103,16 @@ fn object(fields: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
             .map_err(|_| failure(ErrorCode::Internal, "Serialize"))?;
     }
     Ok(target.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_dsp_failure_is_named_by_its_variant() {
+        assert_eq!(dsp_detail(DspError::Empty), "Empty");
+        assert_eq!(dsp_detail(DspError::NonFinite), "NonFinite");
+        assert_eq!(dsp_detail(DspError::Unsupported), "Unsupported");
+    }
 }

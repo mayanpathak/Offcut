@@ -11,7 +11,7 @@ import type { ClockSync } from "../workers/protocol";
 
 /** How often the worker is told the audio's time (TS §20.2). */
 const CLOCK_SYNC_INTERVAL_MS = 250;
-/** The rate of `out48`. */
+/** The rate of `prog48`. */
 const AUDIO_RATE = 48_000;
 
 /** What is attached: the audio of one clip, and where its playing is. */
@@ -76,11 +76,11 @@ function stored(error: unknown): void {
  * Hands the page's canvas to the render worker and makes the clip's audio
  * ready to play. A preview that is attached already is detached first.
  */
-export async function attach(canvas: HTMLCanvasElement, out48: Float32Array): Promise<void> {
+export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): Promise<void> {
   await detach();
   const context = new AudioContext();
-  const buffer = context.createBuffer(1, out48.length, AUDIO_RATE);
-  buffer.getChannelData(0).set(out48);
+  const buffer = context.createBuffer(1, prog48.length, AUDIO_RATE);
+  buffer.getChannelData(0).set(prog48);
   const offscreen = canvas.transferControlToOffscreen();
   try {
     await pool.render.attachPreview({ canvas: offscreen }, { transfer: [offscreen] });

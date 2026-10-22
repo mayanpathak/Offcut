@@ -47,10 +47,11 @@ export type ClipState = {
   reject?: RejectReason;
   failure?: AppFailure;
   /**
-   * The clip's audio at 48 kHz, for the preview, while the clip is `ready`
-   * (v2implementation D-51). The export reads its own copy from the device.
+   * The program's audio at 48 kHz, for the preview, while the clip is
+   * `ready` (D-127). The export reads the cleaned voice from the device,
+   * `out48.f32` (v2implementation D-51, D-129).
    */
-  out48: Float32Array | null;
+  prog48: Float32Array | null;
 };
 
 /** What a state holds beside its status. */
@@ -63,7 +64,7 @@ function empty(): Fields {
     events: [],
     edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true },
     feed: [],
-    out48: null,
+    prog48: null,
   };
 }
 
@@ -134,7 +135,7 @@ export function ready(result: {
   prosody: Prosody;
   events: readonly DetectedEvent[];
   timeMap: TimeMap;
-  out48: Float32Array;
+  prog48: Float32Array;
 }): void {
   apply("done", (current) => ({ ...settled(current), ...result }));
 }

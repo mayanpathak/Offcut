@@ -11,15 +11,18 @@ import {
   type Dbfs,
   type Hz,
   type Lufs,
+  type OutSpan,
   type ProbeInfo,
   type Prosody,
   REJECT_REASONS,
   type RejectReason,
   type Sentence,
+  type TimeMap,
   type Transcript,
   type Word,
 } from "../gen/domain";
 import initCore, {
+  assemble,
   core_version,
   type DemuxerHandle,
   measure_prosody,
@@ -73,6 +76,16 @@ export type CoreApi = {
   runChain(pcm48: Float32Array, onBlock: (done: number) => boolean): ChainResult;
   /** Per-word prosody of the cleaned audio. Reads only. */
   measureProsody(out48: Float32Array, words: readonly Word[], sentences: readonly Sentence[]): Prosody;
+  /**
+   * The program's audio: `out48` played on `timeMap`, in a buffer of its own,
+   * and its loudness (TS §40.6). V4 takes the identity map only; any other
+   * is thrown as `E_DSP` `Unsupported`.
+   */
+  assemble(
+    out48: Float32Array,
+    timeMap: TimeMap,
+    speech: readonly OutSpan[],
+  ): { prog48: Float32Array<ArrayBuffer>; loudness: Lufs };
 };
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -158,6 +171,8 @@ const api: CoreApi = {
   },
   runChain: (pcm48, onBlock) => run_chain(pcm48, onBlock) as ChainResult,
   measureProsody: (out48, words, sentences) => measure_prosody(out48, words, sentences) as Prosody,
+  assemble: (out48, timeMap, speech) =>
+    assemble(out48, timeMap, [...speech]) as { prog48: Float32Array<ArrayBuffer>; loudness: Lufs },
 };
 
 /**

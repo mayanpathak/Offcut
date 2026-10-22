@@ -9,7 +9,13 @@
 //! display list is serialized, normalized (the leading `Video` command
 //! removed, every `FontKey(n)` read as the name of V3's font of index `n`) and
 //! compared value for value, `f32` by equality, with the file. Nothing is
-//! written. Ignored until Prompt 100 makes it pass (S6).
+//! written. Passed at S6 (V4 Prompt 100).
+//!
+//! `busy_1080.json` and `busy_540.json` were written again in Prompt 100 by
+//! V3's scene code (`09b1085`), with `busy()`'s first two NumberReveals on the
+//! spans of the words they are anchored on (the founder's decision of
+//! 2026-10-22, v4changelog known issue 20): no plan item can carry a span no
+//! word has (D-121). The other four files are Prompt 93's, unchanged.
 
 #![allow(
     clippy::unwrap_used,
@@ -93,8 +99,8 @@ fn profile(width: u32) -> ExportProfile {
 }
 
 /// A NumberReveal on the word `word`. `validate` takes its span from that
-/// word's times (D-121); `start` and `end` are the span V3's `busy()` gave it,
-/// which no word of `busy()`'s transcript has for the first two (V4 Prompt 98).
+/// word's times (D-121); `start` and `end` are that word's span, the span
+/// V3's scene drew the reference with.
 fn number_event(value: Quantity, word: u32, start: u32, end: u32) -> DetectedEvent {
     DetectedEvent {
         id: EventId::new(u64::from(start)),
@@ -143,8 +149,8 @@ fn busy() -> (Transcript, Vec<DetectedEvent>) {
     // The words `lib.rs`'s `busy()` puts them on (V4 Prompt 98): "three"
     // 1,100-1,350, "wanted." 3,500-3,750, "$250,000" 6,550-7,000.
     let events = vec![
-        number_event(quantity(40.0, Unit::Percent, "40%"), 2, 1_000, 1_400),
-        number_event(quantity(3.0, Unit::None, "3"), 10, 3_500, 3_800),
+        number_event(quantity(40.0, Unit::Percent, "40%"), 2, 1_100, 1_350),
+        number_event(quantity(3.0, Unit::None, "3"), 10, 3_500, 3_750),
         number_event(quantity(250_000.0, Unit::Usd, "$250k"), 13, 6_550, 7_000),
     ];
     (transcript(&words), events)
@@ -512,7 +518,6 @@ fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
 }
 
 #[test]
-#[ignore = "identity proof, S6"]
 fn v3_reference() {
     let theme = Theme::default_for(StyleId::Clean);
     let fonts = FontSet::embedded();

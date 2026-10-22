@@ -63,9 +63,9 @@ export function PreviewPlayer() {
   // gives its drawing away for good. The audio is the clip's, read then.
   useEffect(() => {
     const element = canvas.current;
-    const { out48 } = useClipStore.getState();
-    if (element !== null && out48 !== null) {
-      inTurn(() => attach(element, out48));
+    const { prog48 } = useClipStore.getState();
+    if (element !== null && prog48 !== null) {
+      inTurn(() => attach(element, prog48));
     }
     return () => {
       inTurn(detach);
