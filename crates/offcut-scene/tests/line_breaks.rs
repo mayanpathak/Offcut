@@ -1,0 +1,287 @@
+//! The line-break table (v4implementation D-167, §8.10; G 8.1, G item 6):
+//! thirty sentences and how a person would break each into caption chunks
+//! and lines, in Clean (16 characters x 2 lines, 4 words, as spoken; D-170)
+//! and Bold (12 x 2, 3 words, upper case). Every expectation was decided by
+//! reading the sentence aloud, before any break search existed (V4 Prompt
+//! 102); from the table's commit on, a row changes only with a changelog line
+//! naming the row and the reason (§23).
+//!
+//! Each sentence is spoken at 300 ms a word, the words one after the other,
+//! with a 400 ms silence before each word `pause_before` names (a word index,
+//! from 0). A line holds caption words: a number with its unit is one word,
+//! shown as its display (TS §17.2), so `3 hours` and `$20k` are whole. A line
+//! of one word may be longer than its style's characters per line: it is
+//! scaled to fit (V2's rule).
+//!
+//! The comparison is ignored until the break search exists (V4 Prompt 103),
+//! which also adds the property checks over the labeled set.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
+use std::collections::BTreeMap;
+
+use offcut_scene::captions::{chunk, words};
+use offcut_scene::styles::{Case, StyleSpec, spec};
+use offcut_scene::{FontSet, Theme};
+use offcut_text::{RawWord, normalize_transcript};
+use offcut_types::{DurMs, StyleId, TimeMap, Transcript};
+
+/// How long each word is spoken, and the silence a row's pauses leave.
+const WORD_MS: u32 = 300;
+const PAUSE_MS: u32 = 400;
+
+struct Row {
+    id: u8,
+    sentence: &'static str,
+    pause_before: &'static [usize],
+    /// Chunks, each its lines.
+    clean: &'static [&'static [&'static str]],
+    bold: &'static [&'static [&'static str]],
+}
+
+#[rustfmt::skip]
+const ROWS: [Row; 30] = [
+    // An article never ends a line or a chunk.
+    Row { id: 1, sentence: "Today we shipped the new app.", pause_before: &[],
+        clean: &[&["Today we shipped"], &["the new app."]],
+        bold: &[&["TODAY WE", "SHIPPED"], &["THE NEW APP."]] },
+    Row { id: 2, sentence: "I bought a camera for Japan.", pause_before: &[],
+        clean: &[&["I bought", "a camera"], &["for Japan."]],
+        bold: &[&["I BOUGHT"], &["A CAMERA"], &["FOR JAPAN."]] },
+    Row { id: 3, sentence: "Grab the link in my bio.", pause_before: &[],
+        clean: &[&["Grab the link"], &["in my bio."]],
+        bold: &[&["GRAB", "THE LINK"], &["IN MY BIO."]] },
+    // A preposition never ends a line or a chunk.
+    Row { id: 4, sentence: "We moved everything to Postgres.", pause_before: &[],
+        clean: &[&["We moved", "everything"], &["to Postgres."]],
+        bold: &[&["WE MOVED", "EVERYTHING"], &["TO POSTGRES."]] },
+    Row { id: 5, sentence: "She waited for hours at Heathrow.", pause_before: &[],
+        clean: &[&["She waited", "for hours"], &["at Heathrow."]],
+        bold: &[&["SHE WAITED"], &["FOR HOURS"], &["AT HEATHROW."]] },
+    Row { id: 6, sentence: "I uploaded the video to YouTube.", pause_before: &[],
+        clean: &[&["I uploaded", "the video"], &["to YouTube."]],
+        bold: &[&["I UPLOADED"], &["THE VIDEO"], &["TO YOUTUBE."]] },
+    // A break after a comma.
+    Row { id: 7, sentence: "Honestly, it was worth every minute.", pause_before: &[],
+        clean: &[&["Honestly,", "it was worth"], &["every minute."]],
+        bold: &[&["HONESTLY,"], &["IT WAS WORTH"], &["EVERY", "MINUTE."]] },
+    Row { id: 8, sentence: "If it rains, we stay inside.", pause_before: &[],
+        clean: &[&["If it rains,"], &["we stay inside."]],
+        bold: &[&["IF IT RAINS,"], &["WE STAY", "INSIDE."]] },
+    // A clause starter begins a chunk.
+    Row { id: 9, sentence: "It worked because we cached it.", pause_before: &[],
+        clean: &[&["It worked"], &["because we", "cached it."]],
+        bold: &[&["IT WORKED"], &["BECAUSE WE"], &["CACHED IT."]] },
+    Row { id: 10, sentence: "Call me when it arrives.", pause_before: &[],
+        clean: &[&["Call me"], &["when it arrives."]],
+        bold: &[&["CALL ME"], &["WHEN IT", "ARRIVES."]] },
+    // Two lines of a chunk are balanced, not a full line and a short one.
+    Row { id: 11, sentence: "We found my favorite coffee shop.", pause_before: &[],
+        clean: &[&["We found"], &["my favorite", "coffee shop."]],
+        bold: &[&["WE FOUND"], &["MY FAVORITE"], &["COFFEE SHOP."]] },
+    Row { id: 12, sentence: "The team loved it.", pause_before: &[],
+        clean: &[&["The team", "loved it."]],
+        bold: &[&["THE TEAM"], &["LOVED IT."]] },
+    // A one-word beat between two pauses stays alone.
+    Row { id: 13, sentence: "And then... nothing.", pause_before: &[2],
+        clean: &[&["And then..."], &["nothing."]],
+        bold: &[&["AND THEN..."], &["NOTHING."]] },
+    Row { id: 14, sentence: "We opened it wow it was gone.", pause_before: &[3, 4],
+        clean: &[&["We opened it"], &["wow"], &["it was gone."]],
+        bold: &[&["WE OPENED IT"], &["WOW"], &["IT WAS GONE."]] },
+    // Otherwise no word is left alone.
+    Row { id: 15, sentence: "We launched on Monday.", pause_before: &[],
+        clean: &[&["We launched", "on Monday."]],
+        bold: &[&["WE LAUNCHED"], &["ON MONDAY."]] },
+    Row { id: 16, sentence: "See you next week.", pause_before: &[],
+        clean: &[&["See you", "next week."]],
+        bold: &[&["SEE YOU"], &["NEXT WEEK."]] },
+    // A number stays whole: one caption word, with its unit.
+    Row { id: 17, sentence: "We went from $2k to $20k in sales.", pause_before: &[],
+        clean: &[&["We went from $2k"], &["to $20k", "in sales."]],
+        bold: &[&["WE WENT"], &["FROM $2K"], &["TO $20K"], &["IN SALES."]] },
+    Row { id: 18, sentence: "It took 3 hours to edit.", pause_before: &[],
+        clean: &[&["It took 3 hours"], &["to edit."]],
+        bold: &[&["IT TOOK", "3 HOURS"], &["TO EDIT."]] },
+    // A sentence end is a hard break, even where one chunk would fit.
+    Row { id: 19, sentence: "It works. Ship it.", pause_before: &[],
+        clean: &[&["It works."], &["Ship it."]],
+        bold: &[&["IT WORKS."], &["SHIP IT."]] },
+    Row { id: 20, sentence: "We tried it. It failed.", pause_before: &[],
+        clean: &[&["We tried it."], &["It failed."]],
+        bold: &[&["WE TRIED IT."], &["IT FAILED."]] },
+    // A word longer than a line has a line of its own, scaled to fit.
+    Row { id: 21, sentence: "Internationalization matters.", pause_before: &[],
+        clean: &[&["Internationalization", "matters."]],
+        bold: &[&["INTERNATIONALIZATION", "MATTERS."]] },
+    Row { id: 22, sentence: "Congratulations everybody!", pause_before: &[],
+        clean: &[&["Congratulations", "everybody!"]],
+        bold: &[&["CONGRATULATIONS", "EVERYBODY!"]] },
+    // Everyday creator speech (D-177): a recipe step, a fitness cue, a
+    // product review line, a travel tip, a reaction.
+    Row { id: 23, sentence: "Season it, then stir gently.", pause_before: &[],
+        clean: &[&["Season it,"], &["then stir", "gently."]],
+        bold: &[&["SEASON IT,"], &["THEN STIR", "GENTLY."]] },
+    Row { id: 24, sentence: "Breathe in, now hold it.", pause_before: &[],
+        clean: &[&["Breathe in,"], &["now hold it."]],
+        bold: &[&["BREATHE IN,"], &["NOW HOLD IT."]] },
+    Row { id: 25, sentence: "The battery lasts all day, which is great.", pause_before: &[],
+        clean: &[&["The battery"], &["lasts all day,"], &["which is great."]],
+        bold: &[&["THE BATTERY"], &["LASTS", "ALL DAY,"], &["WHICH", "IS GREAT."]] },
+    Row { id: 26, sentence: "Pack light and arrive early.", pause_before: &[],
+        clean: &[&["Pack light"], &["and arrive", "early."]],
+        bold: &[&["PACK LIGHT"], &["AND ARRIVE", "EARLY."]] },
+    Row { id: 27, sentence: "Oh wow, I love this!", pause_before: &[],
+        clean: &[&["Oh wow,"], &["I love this!"]],
+        bold: &[&["OH WOW,"], &["I LOVE THIS!"]] },
+    // Longer sentences with several rules at once.
+    Row { id: 28, sentence: "We spent months building it, and nobody used it.", pause_before: &[],
+        clean: &[&["We spent months"], &["building it,"], &["and nobody", "used it."]],
+        bold: &[&["WE SPENT", "MONTHS"], &["BUILDING IT,"], &["AND NOBODY"], &["USED IT."]] },
+    Row { id: 29, sentence: "So I opened the app and it crashed.", pause_before: &[5],
+        clean: &[&["So I opened"], &["the app"], &["and it crashed."]],
+        bold: &[&["SO I OPENED"], &["THE APP"], &["AND IT", "CRASHED."]] },
+    Row { id: 30, sentence: "This camera is small but powerful.", pause_before: &[],
+        clean: &[&["This camera", "is small"], &["but powerful."]],
+        bold: &[&["THIS CAMERA"], &["IS SMALL"], &["BUT", "POWERFUL."]] },
+];
+
+/// A style's limits, as the table reads them: the rest of the row is
+/// `styles::spec`'s, which shapes and places but does not break.
+struct Limits {
+    style: StyleId,
+    case: Case,
+    chars: u32,
+    lines: u32,
+    words: u32,
+}
+
+const CLEAN: Limits = Limits {
+    style: StyleId::Clean,
+    case: Case::AsSpoken,
+    chars: 16,
+    lines: 2,
+    words: 4,
+};
+const BOLD: Limits = Limits {
+    style: StyleId::Bold,
+    case: Case::Upper,
+    chars: 12,
+    lines: 2,
+    words: 3,
+};
+
+impl Limits {
+    fn spec(&self) -> StyleSpec {
+        let mut row = spec(self.style);
+        row.case = self.case;
+        row.max_chars_per_line = self.chars;
+        row.max_lines = self.lines;
+        row.max_words = self.words;
+        row
+    }
+}
+
+/// The row's sentence as the pipeline transcribes it.
+fn transcript(row: &Row) -> (Transcript, u32) {
+    let mut at = 0u32;
+    let mut raw = Vec::new();
+    for (index, text) in row.sentence.split_whitespace().enumerate() {
+        if row.pause_before.contains(&index) {
+            at += PAUSE_MS;
+        }
+        raw.push(RawWord {
+            text: text.to_owned(),
+            start_ms: at,
+            end_ms: at + WORD_MS,
+            confidence: 1.0,
+        });
+        at += WORD_MS;
+    }
+    (normalize_transcript(raw, "line_breaks"), at)
+}
+
+/// The chunks and lines `captions::chunk` makes of the row, as text.
+fn broken(row: &Row, limits: &Limits) -> Vec<Vec<String>> {
+    let (t, length) = transcript(row);
+    let map = TimeMap::identity(DurMs::new(length + 1_000));
+    let shown = words(&t, &BTreeMap::new(), &map);
+    let theme = Theme::default_for(limits.style);
+    let chunks = chunk(
+        &shown,
+        &t.sentences,
+        &limits.spec(),
+        &theme,
+        &FontSet::embedded(),
+    )
+    .unwrap();
+    chunks
+        .iter()
+        .map(|c| {
+            c.lines
+                .iter()
+                .map(|line| {
+                    let text: Vec<String> = line
+                        .words
+                        .iter()
+                        .map(|w| match limits.case {
+                            Case::AsSpoken => c.words[w.word].text.clone(),
+                            Case::Upper => c.words[w.word].text.to_uppercase(),
+                        })
+                        .collect();
+                    text.join(" ")
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// A row's expectation keeps its own style's lines, characters and case.
+/// (Its word limit counts caption words, `3 hours` being one: the
+/// comparison holds it, since `chunk` never makes a longer chunk.)
+fn assert_fits(number: u8, expected: &[&[&str]], limits: &Limits) {
+    for lines in expected {
+        assert!(
+            lines.len() as u32 <= limits.lines,
+            "row {number}: {lines:?}"
+        );
+        for line in *lines {
+            let one_word = !line.contains(' ');
+            assert!(
+                one_word || line.chars().count() as u32 <= limits.chars,
+                "row {number}: {line:?}"
+            );
+            if let Case::Upper = limits.case {
+                assert_eq!(*line, line.to_uppercase(), "row {number}");
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "the break search arrives in P103"]
+fn table() {
+    let mut differ = Vec::new();
+    for row in &ROWS {
+        for (name, expected, limits) in [("Clean", row.clean, &CLEAN), ("Bold", row.bold, &BOLD)] {
+            assert_fits(row.id, expected, limits);
+            let want: Vec<Vec<String>> = expected
+                .iter()
+                .map(|lines| lines.iter().map(|l| (*l).to_owned()).collect())
+                .collect();
+            let got = broken(row, limits);
+            if got != want {
+                differ.push(format!("row {} {name}: want {want:?}, got {got:?}", row.id));
+            }
+        }
+    }
+    for line in &differ {
+        println!("{line}");
+    }
+    assert!(differ.is_empty(), "{} of 60 differ", differ.len());
+}

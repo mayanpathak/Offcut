@@ -17,6 +17,7 @@
 | 4 | **Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10) | Founder | V6.7 |
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
 | 6 | ~~**Open a draft pull request `v4-build` → `main`**~~ Done: PR #7 is open as a draft (closed in Entry 1) | Founder | Any time |
+| 7 | **Read ten rows of the line-break table** (D-167, G 8.2): rows 28, 27, 25, 26, 11, 20, 21, 12, 7, 16 of `crates/offcut-scene/tests/line_breaks.rs`, shown as a phone shows them (Entry 12). For each: "I would break it this way: yes / no, because …". A "no" changes that row now, with the reason, before the break search is written | Founder | P103 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -41,6 +42,7 @@
 | 18 | ~~§12 lists `DropReason` and `Dropped` among the generated TypeScript types; they live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4. Not generated (Entry 6); generate them when a page or analytics consumer exists, or correct §12 in the copy-back~~ Closed in Entry 9: `Dropped` and `DropReason` moved to `offcut-types/src/plan.rs` (re-exported by `offcut-plan`) and generated, the page's `SceneReport` being their first reader | `web/src/gen`, plan §12 | P127 (copy-back) or V6.1 |
 | 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 | 20 | ~~**The identity proof cannot pass on `busy_1080` and `busy_540` as recorded.** V3's `busy()` gives its first two NumberReveals spans no word of its transcript has (1,000-1,400 and 3,500-3,800 ms); `validate` takes every item's span from its anchor words (D-121), so through the V4 contract they become 1,100-1,350 ("three") and 3,500-3,750 ("wanted."). In the comparison run (Entry 8) the four detector-built inputs are identical (836 frames) and each `busy` input differs in exactly 4 frames, all inside those two events' windows (count-up start, hold end, fade). **Decided by the founder on 2026-10-22 (Entry 9): re-derive the two `busy` files with V3's scene code (`09b1085`) on these anchored events, the other four files unchanged**; the alternative, accepting the 8 named frames, was declined. Prompt 100 does it, records it, and the proof then reads "6 inputs, identical"~~ Closed in Entry 10: re-derived, "6 inputs, 922 frames, identical" | `offcut-scene/tests/v3_reference.rs`, `tests/snapshots/v3_reference/busy_*.json` | P100 |
+| 21 | Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23) | `docs/v4/v4changelog.md` | P103 |
 
 ---
 
@@ -816,3 +818,47 @@ The four detector-built inputs (836 frames) are identical to V3's: glyphs, posit
 **Open.** Known issue 3 closed. Open items 1-5 unchanged.
 
 **Follow-up (same prompt): the secret scan.** CI on `5cd1a24` failed at "Scan for secrets" (`gitleaks detect`, "leaks found: 1"; run 39828007019). No secret: gitleaks 8.18's default rule `generic-api-key` read `experiments.md` line 78, where the adapter name lavapipe was followed by a colon and a golden's name, as a key named "…api…" (the "api" in the name) with a value of entropy 3.61. The rule, reproduced in a scratch script over the commit's added lines, matches that line only and nothing in `1623d88`, which passed. The line is reworded ("crop_landscape_050 is 1.0000 on d1 WARP and 1.0000 on lavapipe; …", which the rule does not match), and since the scan reads the whole history, `.gitleaksignore` (new, at the root, listed in TS §5) holds that one finding's fingerprint, `5cd1a24…:docs/v4/experiments.md:generic-api-key:78`. Rewriting the pushed commit was not chosen: it needs a force-push of the pull request's branch.
+
+---
+
+## Entry 12 - 2026-10-23 - P102 (S8, table): the line-break table, before the algorithm
+
+**What.** Prompt 102 (G 8.1, G 8.2's preparation; D-167, D-170, D-177, §8.10, G item 6): `crates/offcut-scene/tests/line_breaks.rs`, thirty sentences and how a person would break each into caption chunks and lines, in Clean (16 characters x 2 lines, 4 words, as spoken: D-170's values) and Bold (12 x 2, 3 words, upper case), written and committed **before any break search exists**: `captions::chunk` is V3's, and `git ls-files crates/offcut-scene/src | grep readability` prints nothing. Every expectation was decided by reading the sentence aloud; no code produced or changed one. Then ten rows, drawn at random, are shown to the founder (open item 7). The comparison waits for the break search: Prompt 103 records the founder's answers first, then writes `readability.rs`.
+
+**The file.** `struct Row { id, sentence, pause_before, clean, bold }` and `const ROWS: [Row; 30]` (`#[rustfmt::skip]`, one row per three lines); the timing of D-167's table, 300 ms a word, the words one after another, 400 ms of silence before each word index `pause_before` names (400 ms is past `CHUNK_GAP_MS`, 350, so a pause is a hard break, as it is in V3); `Limits` (Clean: `AsSpoken`, 16, 2, 4; Bold: `Upper`, 12, 2, 3), applied over `styles::spec`, which shapes and places but holds V3's limits until Prompt 105; `transcript(row)` (`normalize_transcript`, so numbers become caption words as the pipeline makes them); `broken(row, limits)` (`captions::words` on the identity map, then `captions::chunk`, as text); `assert_fits` (lines, characters, upper case); and the one test, `table`, `#[ignore = "the break search arrives in P103"]`, which compares all sixty breaks and lists every row that differs.
+
+**What a line holds.** Caption words, shown as the screen shows them (TS §17.2): a number with its unit is one word with its display, so `3 hours` (from "3" and "hours") counts as one word and `$2k`, `$20k` are whole (`format_quantity`'s money rule, read in `offcut-text/src/numbers.rs`); Bold upper-cases the displays (`$2K`). A line of one word may be longer than its style's characters: V2 scales it (rows 21, 22). A chunk that fits on one line is one line. The sentences avoid spelled numbers ("three" becomes "3"), counted nouns after a number ("3 views" would join), and a number at a sentence end (its display drops the full stop), so that every row tests a break and not a number's display.
+
+**Coverage** (G 8.1's cases, each at least twice; a row often shows more than its heading):
+
+| Case | Rows |
+|---|---|
+| An article never ends a line or a chunk | 1, 2, 3 (also 6, 11, 29) |
+| A preposition never ends a line or a chunk | 4, 5, 6 (also 2, 17, 18) |
+| A break after a comma | 7, 8 (also 23, 24, 25, 27, 28) |
+| A clause starter begins a chunk | 9, 10 (also 23, 25, 26, 28, 29, 30) |
+| Balanced lines, not a full line and a short one | 11, 12 (also 9, 15, 16, 25) |
+| A one-word beat between pauses stays alone | 13 (a pause before "nothing."), 14 (pauses before and after "wow") |
+| Otherwise no word is left alone | 15, 16 (also 12, 18) |
+| A number stays whole | 17 (`$2k`, `$20k`), 18 (`3 hours`) |
+| A sentence end is a hard break | 19, 20 (two sentences that would fit one chunk) |
+| A word longer than a line | 21 (longer than both styles' lines), 22 (longer than Bold's only) |
+| Everyday creator speech (D-177) | 23 recipe step, 24 fitness cue, 25 product review, 26 travel tip, 27 reaction |
+| Several rules at once | 28, 29 (a pause), 30 |
+
+**Decided while writing, before the commit.** Several first sentences were changed because a style could not break them without a binder at a line's end, which would make the row test nothing: "at the airport" became "at Heathrow" (Bold: "AT THE / AIRPORT." or "AT / THE AIRPORT."), "to a new server" became "to Postgres", "to my channel" became "to YouTube", "for the trip" became "for Japan", "It worked because we cached everything" became "… cached it" (no 2-line Clean split fits 16), "This is the part nobody tells you about" was dropped (Bold must break after "is" or "the"), "Salt the water" and "Book your train tickets" were replaced by rows 23 and 26. G 8.1's own examples were not used as written: they were drawn for 18 characters a line (D-139), and "the new onboarding" (18) does not fit Clean's 16. Row 7 keeps "HONESTLY," alone in Bold: the comma's natural beat, and every other split ends a chunk with "was".
+
+**Checked by hand, and by a scratch script that decides nothing** (`check_table.py`, in the scratchpad, not committed): it reads the rows as written and reports any line over its characters (a one-word line excepted), more than two lines, more caption words in a chunk than the style allows, a lower-case Bold line, a two-line chunk that fits one line, and chunks that do not hold the sentence's caption words in order. On the table: 30 rows, 0 problems. Drill: a copy with a 20-character Clean line, a lower-case Bold line and a 5-word Clean chunk gave exactly those three reports.
+
+**The ten rows for the founder (G 8.2).** `seq 1 30 | shuf -n 10` (GNU coreutils 8.32): **28 27 25 26 11 20 21 12 7 16**, shown in the reply of this prompt as a phone would show them, Clean then Bold, with "Would you break it this way?" for each, and nothing about how a break will be computed. Open item 7. Prompt 103 records the answers before any code; a "no" changes its row then, with the founder's reason.
+
+**Frozen.** From this commit on a row changes only with a changelog line naming the row and the reason (§23). Its SHA is not known inside the commit: Prompt 103 records "line-break table frozen at <SHA>" (known issue 21).
+
+**How it was checked.**
+- `cargo test -p offcut-scene --test line_breaks`: 0 passed, 1 ignored ("the break search arrives in P103").
+- `grep -c "id:" crates/offcut-scene/tests/line_breaks.rs`: 31, the 30 rows and the field `id: u8` of `struct Row` that the prompt's own interface names (`grep -c "Row { id:"`: 30).
+- `git ls-files crates/offcut-scene/src | grep readability`: no output.
+- `cargo clippy -p offcut-scene --all-targets -- -D warnings`: clean; `node scripts/check-file-tree.mjs`: ok (TS §5 has listed `line_breaks.rs` since Prompt 92).
+- The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (the first run failed at `cargo fmt --check` on one `assert!` the helper's renaming had lengthened; `cargo fmt` and the check run again, exit 0; `check-file-tree`: 309 files, 13 crates); **Rust 556 passed, 0 failed, 4 ignored** (Entry 11: 556/0/3; the ignored count rises by 1, `line_breaks::table`, as the prompt says); Vitest 92; `pnpm build` exit 0 (app shell 308.8 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`; no private path tracked.
+
+**Open.** Open item 7 (new, the founder's). Known issue 21 (new).
