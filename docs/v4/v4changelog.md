@@ -886,4 +886,104 @@ The four detector-built inputs (836 frames) are identical to V3's: glyphs, posit
 
 No "no", so **no row changes**: the table stays as committed in `01f406f`. The founder's two remarks, and where each is held: "as far as it matches with the voice perfectly" is the timing rule that a caption word is shown, and its active state changes, at its own spoken time, and that no word moves (INV-5; the reading floor of D-168 only extends a chunk into the silence after it, never into the next words); "eventually llm will tell the words that are emphasasized" is V6.1's model plan, whose emphasis picks are drawn through the emphasis layers of D-169 (Prompt 104 builds them for V4's spoken-stress signal).
 
-**In progress.** This block is the reading's own commit, before any code (G 8.2); the rest of this entry (`readability.rs`, the break search, the floor, the property checks) follows in this prompt's final commit.
+**What.** Prompt 103 (G 8.2, G 8.3; D-167, D-168, §8.9, §8.10): the founder's reading in its own commit before any code (`7da641e`, `V4 P103 (S8, reading): the founder's ten rows`, the block above), then, in this commit, `readability.rs`, the break search, the reading floor, and `line_breaks.rs` un-ignored with the property checks over the labeled set. All 30 rows (60 breaks) pass as frozen at `01f406f`: no row changed. The costs were tuned against the table and the property checks, and every failure was fixed in the costs or the search (G 8.3's rule). No V3 inline caption expectation changed: `captions.rs`'s V3 tests pass as they were (`diff` of its test module against `7da641e`: only the two new tests added at its end), so there was nothing to list for approval.
+
+**`crates/offcut-scene/src/readability.rs`** (new, [ONLY], `pub mod`):
+- **The lists.** These are sorted, lower-case `const` slices, matched by binary search on the caption word's lower-cased text with the punctuation around it stripped.
+  - `CLAUSE_STARTERS`: 39 words (after, although, and, as, because, …, which, while, who, why, yet).
+  - `BINDERS`: 82 words: articles, possessives, prepositions, "to", the auxiliaries and modals, "not", "very", "really", and the cardinals one to ten. A number is one caption word with its display (TS §17.2), so a cardinal here is a spelled one.
+  - `VERB_BINDERS`: 24 words, the auxiliaries, modals and "not", a subset of `BINDERS` (see below).
+  - An inline test checks that the lists are sorted, lower case and free of repeats, and that `VERB_BINDERS` lies inside `BINDERS`.
+- **D-167's costs.** These are named constants, all (assumption, E-2):
+  - `COST_AFTER_PUNCT = 0`, `COST_CLAUSE = 1`, `COST_PLAIN = 3`, `COST_AFTER_BINDER = 12`, `COST_ONE_WORD = 8`, `ISOLATED_WORD_PAUSE_MS = 250`, the one-third imbalance rule, and D-168's `MIN_CHUNK_MS = 700`.
+  - Added by this prompt, each explained below: `COST_OPEN_CLAUSE = 8`, `COST_BINDER_AT_SCREEN_END = 16`, `CHUNK_BREAK_WEIGHT = 2`, `COST_NEW_CHUNK = 1` and `MAX_IMBALANCE = 8`.
+- **The functions:**
+  - `break_cost(prev, next)`: a line break inside a chunk.
+  - `chunk_break_cost(prev, next)`: a break that starts a new chunk.
+  - `imbalance(a, b)`.
+  - `ends_a_phrase(word)`: the word ends on `,` `;` `:` or `—`.
+  - `binds_to_next(word)`: the one `pub` question, which the property checks ask.
+  - The chunk's own cost, §8.9's `cost_of_chunk`: `Unit`, `Limits`, `width`, `fits` (a one-word line always fits; V2 scales it), `isolated` and `chunk_cost`, which gives one line when it fits, else the best two-line split with ties to the earlier split.
+- **Inline tests:** each kind of break and screen break; `imbalance` at the threshold (12 against 8 costs 0, 12 against 7 costs 5) and at the cap; `chunk_cost` on a one-word chunk (alone, after a comma, set apart by silence), on a chunk too long for its style, and on a two-line split.
+
+**The break search** (`captions::chunk`, §8.9):
+- **Hard breaks.** Words are cut into runs at hard breaks: a sentence end, a pause of `CHUNK_GAP_MS` (350) or more, and `MAX_SEGMENT_WORDS = 40` words (TS §17.2's split; now `pub`, for the test's own reading of the runs).
+- **The search.** `search` lays out each run: `best[i]` over `j` in `i - max_words .. i`, `best[j] + chunk_break_cost(before j) + chunk_cost(j..i)`. The run's first chunk has no break cost.
+- **Output.** `chunk` keeps V3's line shaping and placement (`lines`) and V3's show times (`CHUNK_LEAD_MS`, `CHUNK_TAIL_MS`, the hand-over to the next chunk).
+- **Determinism (INV-7).** Every cost is an integer, and every tie has one answer.
+
+**The reading floor** (D-168): `captions::hold_for_reading(chunks, program_end)`, which `build_scene` calls after `chunk`.
+- A chunk's `show.end` becomes `max(show.end, min(show.start + MIN_CHUNK_MS, cap))`. The cap is the next chunk's `show.start`, or for the last chunk the end of the program (`map.out_duration()`).
+- The next chunk starts at most 80 ms before its first word, so the floor reaches no later than the next word's start and the silence after the chunk's last word. No word moves (INV-5), and a chunk is never shortened.
+- The floor is a function of its own rather than part of `chunk`, so V3's inline test of `chunk`'s show times stays true unedited.
+- Inline tests: a 400 ms "Yes." before a pause is held to 700 ms; a chunk held to the next chunk's start; the last chunk held only to the end of the program; and never shortened.
+
+**`crates/offcut-scene/tests/line_breaks.rs`:**
+- `table` lost its `#[ignore]`. Its rows are untouched (`ROWS` is byte-for-byte as in `01f406f`).
+- New: the property checks of §8.10 over the 31 transcripts of `fixtures/labeled/`, for each style:
+  - **Loading.** Prompt 97's loader pattern: written files timed as `precision_recall.rs` times them (without prosody), ASR files as recorded, each file's word edits applied.
+  - **Check 1.** Every word appears exactly once and in order.
+  - **Check 2.** No chunk is over its style's words, lines or characters.
+  - **Check 3.** No line ends on a binder unless no layout allows it. This is checked more strictly than §8.10's "unless the chunk allows no other split": for every run, the lines the search ends on a binder (the run's own last word not counted) equal the fewest that any layout of the run within the limits can have. A separate DP in the test, over every layout, finds that fewest. Equality implies §8.10's per-chunk rule, since a chunk that could split without a binder would give a layout with one binder end fewer.
+- **The reading** (`--nocapture`): `31 files; Clean: 678 chunks, 14 unavoidable binder ends; Bold: 833 chunks, 88 unavoidable binder ends`.
+- **Limits.** The test sets D-170's limits (Clean 16 x 2, 4 words, as spoken; Bold 12 x 2, 3 words, upper case) over `styles::spec`, because `styles.rs` still holds V3's limits until Prompt 105 (the prompt's "record which").
+
+**`captions.rs` under 400 lines.** The search took `captions.rs` to 516 lines above its tests. Two moves bring it to 373, with no new file outside TS §5:
+- The chunk cost and its helpers (above) moved into `readability.rs`, beside the other costs (299 lines in all, 228 above its tests). The search, `chunk` and the floor stay in `captions.rs`.
+- `draw` moved, unchanged, into `captions_draw.rs`, the file TS §5 already lists for drawing a chunk (70 lines). This is the move Prompt 104 names ("the chunk drawing moved out of `captions.rs`"), made one prompt early; Prompt 104 adds the emphasis order to it.
+  - `captions.rs` keeps `pub use crate::captions_draw::draw`, so `Scene::frame_at` and V3's inline test of `draw` are unedited.
+  - That test reads `DrawCmd`, so `captions.rs` imports it under `#[cfg_attr(not(test), allow(unused_imports))]`. A `#[cfg(test)]` import would have hidden the file from `check-file-tree`, which counts up to the first `#[cfg(test)]` line.
+- `lib.rs`: `pub mod readability;`, `mod captions_draw;`, and the floor's call.
+
+**Differs from D-167 and §8.9 as written.** Below, `[ ]` is a screen (a chunk) and `/` a line break inside one. These are costs and rules the table or the property checks needed. The drill below shows that each one is needed.
+
+| Change | Why |
+|---|---|
+| **(a) Ties between layouts go to the layout whose last chunk starts later**, so the earlier screens are the fuller, as a reader fills them. §8.9 says "ties to the earlier break". A chunk's own line split still ties to the earlier split. | Without it, rows 2, 5 and 6 differ. |
+| **(b) A word ending on `,` `;` `:` `—` may be a chunk alone without the one-word cost:** the comma is the beat. | Without it, row 7 differs ("HONESTLY," alone in Bold). |
+| **(c) A screen break is weighed twice a line break, plus 1** (`CHUNK_BREAK_WEIGHT`, `COST_NEW_CHUNK`). The reader loses the context when the screen changes, not when a line wraps; of two layouts that read alike, the one with fewer screens wins. D-167 has one cost for both. | Weight 1: rows 9, 11, 25, 26 and 28 differ. No extra 1: rows 7 and 25 differ. |
+| **(d) A clause starter left at the end of a screen costs `COST_OPEN_CLAUSE = 8`** ("it worked because / we cached it": the clause waits for the next screen). Inside a chunk "which / it" stays a plain break. The cost is below a binder's, so a screen ends on "then" before it ends on "from". | At 12, a02 got `[and then from] [that feedback]`, a screen ending on "from", where `[and then] [from that / feedback]` avoids it. Without the cost, rows 25 and 26 differ. |
+| **(e) A break before an article, possessive or preposition costs `COST_CLAUSE`** (1, where a phrase starts), not plain (3). D-167 gives 1 only before a clause starter. | Without it, row 11 differs (Clean `[We found] [my favorite / coffee shop.]`). |
+| **(f) The discount in (e) leaves out `VERB_BINDERS`:** a break before "was" or "is" separates a subject from its verb. | With "every binder", row 7 differs. |
+| **(g) The imbalance is capped at `MAX_IMBALANCE = 8`**, below a binder's break less a plain one, so balance never buys a line that ends on a binder. D-167 has no cap. | Uncapped, w01's `[If your / customers]` (12 + 0) beat `[If / your customers]` (1 + 12): property check 3 fails. |
+| **(h) A binder left at the end of a screen costs `COST_BINDER_AT_SCREEN_END = 16`**, not 12, so that a screen ends on a binder only where no layout of the run avoids it. | At 12, four Bold runs ended a screen on "A", "THE" or "NOT" where a layout with a one-word chunk avoids it: w16, w20, w23 and w28 (w16: `[IT IS A] [DATE PARSER]`). 16 was the lowest value tried (16, 20 and 24 all pass). |
+
+The other differences from the plan:
+- **The floor is a separate function.** The floor is `hold_for_reading`, applied by `build_scene`, not code inside `chunk`. Its cap for the last chunk is the end of the program; the prompt's "the last word's end plus `CHUNK_TAIL_MS` plus the silence after it" is that same time.
+- **Two items made `pub` for the test.** `binds_to_next` and `MAX_SEGMENT_WORDS` are `pub`, so the property checks read the same lists and runs.
+- **The checks are one test.** The three property checks are three groups of assertions in one test, `every_labeled_transcript_breaks_within_its_limits_and_on_no_avoidable_binder`.
+- **The chunk cost lives in `readability.rs`.** The acceptance line says "the search and the floor are in `captions.rs`", which holds. The chunk's cost is in `readability.rs` with the other costs, for the line limit.
+
+**Drill (not committed): each change reverted alone** (`drill103.py` in the scratchpad), with `cargo test -p offcut-scene --test line_breaks`:
+
+| Reverted | Table | Property checks |
+|---|---|---|
+| (a) | 3 of 60 differ (rows 2, 5, 6) | pass |
+| (b) | 1 differs (row 7) | pass |
+| (c), weight 1 | 5 differ (rows 9, 11, 25, 26, 28) | pass |
+| (c), no extra 1 | 2 differ (rows 7, 25) | pass |
+| (d) | 2 differ (rows 25, 26) | pass |
+| (e) | 1 differs (row 11) | pass |
+| (f) | 1 differs (row 7) | pass |
+| (g) | passes | w01: 2 binder ends, 1 must |
+| (h) | passes | w16: 2 binder ends, 1 must |
+
+The files were restored, and the table and property checks pass again.
+
+**How it was checked.**
+- `cargo test -p offcut-scene --test line_breaks -- --nocapture`: `table` ok (60 of 60), and the property test ok with the reading above.
+- `cargo test -p offcut-scene`: 25 inline tests (the crate's 19 of `7da641e`, unchanged, and 6 new: 3 lists-and-costs, the chunk cost, 2 floor), 2 in `line_breaks`, 1 in `timemap_identity`.
+- `git log --diff-filter=A --format=%h -- crates/offcut-scene/src/readability.rs`: this commit, after `01f406f` (the table) and `7da641e` (the reading).
+- `cargo clippy -p offcut-scene --all-targets -- -D warnings`: clean. `node scripts/check-file-tree.mjs`: ok (311 files; `captions.rs` 373 lines counted).
+- **The SAB gate:**
+  - On `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0.
+  - **Rust: 564 passed, 0 failed, 3 ignored.** Entry 12 read 556/0/4. The table's `#[ignore]` is gone (ignored back to 3), and 8 tests were added: the table, the property test, 3 `readability` tests, the chunk-cost test and the 2 floor tests.
+  - Vitest 92; `pnpm build` exit 0 (app shell 308.8 kB); `pnpm e2e` 12 passed.
+  - The frozen check lists the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+  - `pnpm e2e:media` was not run: the prompt asks for none. CI's `e2e-media` job runs it on this commit.
+
+**Found, not fixed.**
+- Prompt 104's "the chunk drawing moved out of `captions.rs`" is already done (above); Prompt 104 adds the emphasis to `captions_draw.rs`.
+- Prompt 104's binder-cost drill now has two binder costs to drill: `COST_AFTER_BINDER` for lines, and `COST_BINDER_AT_SCREEN_END` for screens.
+
+**Open.** Open items 1-5 unchanged; open item 7 and known issue 21 closed (above). No new item or issue.

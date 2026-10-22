@@ -13,8 +13,10 @@
 //! of one word may be longer than its style's characters per line: it is
 //! scaled to fit (V2's rule).
 //!
-//! The comparison is ignored until the break search exists (V4 Prompt 103),
-//! which also adds the property checks over the labeled set.
+//! `table` compares the break search (V4 Prompt 103) with every row; the
+//! property checks run it over the 31 labeled transcripts (§8.10): every word
+//! once and in order, no chunk over its style's limits, and no line ended on
+//! a binder that a layout could have avoided.
 
 #![allow(
     clippy::unwrap_used,
@@ -24,12 +26,16 @@
 )]
 
 use std::collections::BTreeMap;
+use std::ops::Range;
+use std::path::PathBuf;
 
-use offcut_scene::captions::{chunk, words};
+use offcut_scene::captions::{CHUNK_GAP_MS, CaptionWord, Chunk, MAX_SEGMENT_WORDS, chunk, words};
+use offcut_scene::readability::binds_to_next;
 use offcut_scene::styles::{Case, StyleSpec, spec};
 use offcut_scene::{FontSet, Theme};
 use offcut_text::{RawWord, normalize_transcript};
-use offcut_types::{DurMs, StyleId, TimeMap, Transcript};
+use offcut_types::{DurMs, StyleId, TimeMap, Transcript, WordIdx};
+use serde_json::Value;
 
 /// How long each word is spoken, and the silence a row's pauses leave.
 const WORD_MS: u32 = 300;
@@ -264,7 +270,6 @@ fn assert_fits(number: u8, expected: &[&[&str]], limits: &Limits) {
 }
 
 #[test]
-#[ignore = "the break search arrives in P103"]
 fn table() {
     let mut differ = Vec::new();
     for row in &ROWS {
@@ -284,4 +289,275 @@ fn table() {
         println!("{line}");
     }
     assert!(differ.is_empty(), "{} of 60 differ", differ.len());
+}
+
+// --- The property checks over the labeled set (§8.10) ----------------------
+
+/// A labeled transcript, timed as `offcut-detect`'s `precision_recall.rs`
+/// times a written one, with the file's word edits.
+struct Labeled {
+    name: String,
+    t: Transcript,
+    edits: BTreeMap<WordIdx, String>,
+}
+
+/// `synthesize` of `precision_recall.rs` (v3implementation §17.5), without the
+/// prosody: a word lasts `clamp(120 + 45 x letters, 150, 700)` ms, 80 ms
+/// between the words of a sentence, 400 ms after a word ending in `.` `?` `!`.
+fn synthesize(sentences: &[String]) -> Vec<RawWord> {
+    let mut raw = Vec::new();
+    let mut at = 500u32;
+    for text in sentences {
+        for piece in text.split_whitespace() {
+            let word = piece.replace('*', "");
+            let letters = word.chars().filter(|c| c.is_alphanumeric()).count() as u32;
+            let length = (120 + 45 * letters).clamp(150, 700);
+            raw.push(RawWord {
+                text: word.clone(),
+                start_ms: at,
+                end_ms: at + length,
+                confidence: 1.0,
+            });
+            at += length
+                + if word.ends_with(['.', '?', '!']) {
+                    400
+                } else {
+                    80
+                };
+        }
+    }
+    raw
+}
+
+/// The files of `fixtures/labeled/`, as Prompt 97's tests read them.
+fn labeled() -> Vec<Labeled> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/labeled");
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .expect("fixtures/labeled")
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    paths.sort();
+    paths
+        .iter()
+        .map(|path| {
+            let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+            let json: Value =
+                serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+            let raw = match json["source"].as_str() {
+                Some("written") => synthesize(
+                    &serde_json::from_value::<Vec<String>>(json["sentences"].clone()).unwrap(),
+                ),
+                Some("asr") => json["words"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|w| RawWord {
+                        text: w["text"].as_str().unwrap().to_owned(),
+                        start_ms: u32::try_from(w["startMs"].as_u64().unwrap()).unwrap(),
+                        end_ms: u32::try_from(w["endMs"].as_u64().unwrap()).unwrap(),
+                        confidence: w["confidence"].as_f64().unwrap() as f32,
+                    })
+                    .collect(),
+                other => panic!("{name}: source {other:?}"),
+            };
+            let edits = json["edits"]
+                .as_object()
+                .map(|map| {
+                    map.iter()
+                        .map(|(word, text)| {
+                            (
+                                WordIdx::new(word.parse().unwrap()),
+                                text.as_str().unwrap().to_owned(),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Labeled {
+                t: normalize_transcript(raw, "labeled"),
+                name,
+                edits,
+            }
+        })
+        .collect()
+}
+
+/// A caption word in the style's case.
+fn styled(word: &CaptionWord, limits: &Limits) -> String {
+    match limits.case {
+        Case::AsSpoken => word.text.clone(),
+        Case::Upper => word.text.to_uppercase(),
+    }
+}
+
+/// The characters of `texts` set on one line.
+fn width(texts: &[String]) -> u32 {
+    let chars: usize = texts.iter().map(|t| t.chars().count()).sum();
+    (chars + texts.len().saturating_sub(1)) as u32
+}
+
+/// A line of these words fits: within the characters, or one word.
+fn line_fits(texts: &[String], limits: &Limits) -> bool {
+    texts.len() == 1 || width(texts) <= limits.chars
+}
+
+/// The runs between hard breaks, as `chunk` cuts them: a sentence end, a
+/// pause of `CHUNK_GAP_MS`, `MAX_SEGMENT_WORDS`.
+fn runs(shown: &[CaptionWord], t: &Transcript) -> Vec<Range<usize>> {
+    let sentence_of = |w: &CaptionWord| t.sentences.partition_point(|s| s.words.end <= w.word);
+    let mut runs = Vec::new();
+    let mut from = 0;
+    for to in 1..=shown.len() {
+        let hard = to == shown.len()
+            || sentence_of(&shown[to - 1]) != sentence_of(&shown[to])
+            || shown[to]
+                .start
+                .get()
+                .saturating_sub(shown[to - 1].end.get())
+                >= CHUNK_GAP_MS
+            || to - from >= MAX_SEGMENT_WORDS;
+        if hard {
+            runs.push(from..to);
+            from = to;
+        }
+    }
+    runs
+}
+
+/// The fewest lines ended on a binder that any layout of the run within the
+/// style's limits can have. A run's last word ends at a hard break and is not
+/// counted. Worked out here, by a search of its own over every layout.
+fn fewest_binder_ends(texts: &[String], limits: &Limits) -> u32 {
+    let n = texts.len();
+    let words = limits.words as usize;
+    let mut best = vec![u32::MAX; n + 1];
+    best[0] = 0;
+    for i in 1..=n {
+        for j in i.saturating_sub(words)..i {
+            if best[j] == u32::MAX {
+                continue;
+            }
+            let inside = if line_fits(&texts[j..i], limits) {
+                Some(0)
+            } else {
+                (j + 1..i)
+                    .filter(|&k| line_fits(&texts[j..k], limits) && line_fits(&texts[k..i], limits))
+                    .map(|k| u32::from(binds_to_next(&texts[k - 1])))
+                    .min()
+            };
+            let Some(inside) = inside else { continue };
+            let end = u32::from(i < n && binds_to_next(&texts[i - 1]));
+            best[i] = best[i].min(best[j] + inside + end);
+        }
+    }
+    best[n]
+}
+
+/// The lines of `chunks` ended on a binder, those at the end of a run left out.
+fn binder_ends(
+    chunks: &[Chunk],
+    run_ends: &[usize],
+    shown: &[CaptionWord],
+    limits: &Limits,
+) -> u32 {
+    let index_of = |w: &CaptionWord| {
+        shown
+            .iter()
+            .position(|s| s.word == w.word && s.start == w.start)
+            .unwrap()
+    };
+    let mut count = 0;
+    for c in chunks {
+        for line in &c.lines {
+            let last = &c.words[line.words.last().unwrap().word];
+            let ends_a_run = run_ends.contains(&(index_of(last) + 1));
+            if !ends_a_run && binds_to_next(&styled(last, limits)) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+#[test]
+fn every_labeled_transcript_breaks_within_its_limits_and_on_no_avoidable_binder() {
+    let files = labeled();
+    assert_eq!(files.len(), 31, "the labeled set");
+    let mut totals = Vec::new();
+    for limits in [&CLEAN, &BOLD] {
+        let (mut chunks_seen, mut binders_seen) = (0, 0);
+        for file in &files {
+            let length = file.t.words.last().map_or(0, |w| w.end_ms.get());
+            let map = TimeMap::identity(DurMs::new(length + 1_000));
+            let shown = words(&file.t, &file.edits, &map);
+            let theme = Theme::default_for(limits.style);
+            let chunks = chunk(
+                &shown,
+                &file.t.sentences,
+                &limits.spec(),
+                &theme,
+                &FontSet::embedded(),
+            )
+            .unwrap();
+            let name = &file.name;
+
+            // Every word exactly once, and in order.
+            let laid: Vec<&CaptionWord> = chunks.iter().flat_map(|c| c.words.iter()).collect();
+            assert_eq!(laid.len(), shown.len(), "{name}");
+            for (a, b) in laid.iter().zip(&shown) {
+                assert_eq!(
+                    (a.word, &a.text, a.start),
+                    (b.word, &b.text, b.start),
+                    "{name}"
+                );
+            }
+
+            // No chunk over its style's limits.
+            for c in &chunks {
+                assert!(
+                    c.words.len() <= limits.words as usize,
+                    "{name}: {:?}",
+                    c.words
+                );
+                assert!(
+                    c.lines.len() as u32 <= limits.lines,
+                    "{name}: {:?}",
+                    c.words
+                );
+                for line in &c.lines {
+                    let texts: Vec<String> = line
+                        .words
+                        .iter()
+                        .map(|w| styled(&c.words[w.word], limits))
+                        .collect();
+                    assert!(line_fits(&texts, limits), "{name}: {texts:?}");
+                }
+            }
+
+            // No line ended on a binder that another layout of its run avoids.
+            let runs = runs(&shown, &file.t);
+            let run_ends: Vec<usize> = runs.iter().map(|r| r.end).collect();
+            let fewest: u32 = runs
+                .iter()
+                .map(|r| {
+                    let texts: Vec<String> =
+                        shown[r.clone()].iter().map(|w| styled(w, limits)).collect();
+                    fewest_binder_ends(&texts, limits)
+                })
+                .sum();
+            let made = binder_ends(&chunks, &run_ends, &shown, limits);
+            assert_eq!(
+                made, fewest,
+                "{name}: {made} lines end on a binder, {fewest} must"
+            );
+            chunks_seen += chunks.len();
+            binders_seen += made;
+        }
+        totals.push(format!(
+            "{:?}: {chunks_seen} chunks, {binders_seen} unavoidable binder ends",
+            limits.style
+        ));
+    }
+    println!("31 files; {}", totals.join("; "));
 }

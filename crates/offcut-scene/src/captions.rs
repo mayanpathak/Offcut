@@ -7,10 +7,14 @@ use std::collections::BTreeMap;
 use offcut_types::{OutMs, OutSpan, Sentence, Span, TimeMap, TimeMs, Transcript, WordIdx};
 
 use crate::SceneError;
-use crate::display_list::{Affine, DrawCmd, FontKey, Stroke};
+pub use crate::captions_draw::draw;
+// The inline test of `draw`, below, reads the commands it adds.
+#[cfg_attr(not(test), allow(unused_imports))]
+use crate::display_list::DrawCmd;
+use crate::display_list::FontKey;
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
-use crate::motion::{ActiveTreatment, enter_at};
+use crate::readability::{Limits, MIN_CHUNK_MS, Unit, chunk_break_cost, chunk_cost, text_of};
 use crate::safe_area::{ZoneId, zone};
 use crate::styles::{Case, StyleSpec};
 use crate::theme::Theme;
@@ -143,9 +147,65 @@ struct Placed<'a> {
     line: u32,
 }
 
-/// The chunks of `words`, each one shaped and placed. A new chunk starts at
-/// a sentence boundary, after a pause of `CHUNK_GAP_MS`, when the chunk has
-/// `max_words`, and when the word would need a line more than `max_lines`.
+/// The most caption words between two hard breaks that one search lays out
+/// (TS §17.2's split): a longer run is cut there.
+pub const MAX_SEGMENT_WORDS: usize = 40;
+
+/// The least-cost layout of `units[from..to]`, a run between two hard breaks
+/// (D-167): its chunks, each `(start, end, second line)`. `best[i]` is the
+/// least cost of the first `i` words, and the start of its last chunk; of two
+/// layouts of one cost, the one whose last chunk starts later wins: the
+/// earlier screens are the fuller, as a reader fills them. A run of
+/// one word is one chunk.
+fn search(
+    units: &[Unit<'_>],
+    from: usize,
+    to: usize,
+    limits: &Limits,
+) -> Vec<(usize, usize, Option<usize>)> {
+    let n = to - from;
+    let mut best: Vec<Option<(u32, usize, Option<usize>)>> = vec![None; n + 1];
+    if let Some(first) = best.first_mut() {
+        *first = Some((0, 0, None));
+    }
+    for i in 1..=n {
+        for j in i.saturating_sub(limits.max_words)..i {
+            let Some(&Some((so_far, _, _))) = best.get(j) else {
+                continue;
+            };
+            let Some((cost, second)) = chunk_cost(units, from + j, from + i, limits) else {
+                continue;
+            };
+            let cut = if j == 0 {
+                0
+            } else {
+                chunk_break_cost(text_of(units, from + j - 1), text_of(units, from + j))
+            };
+            let total = so_far.saturating_add(cut).saturating_add(cost);
+            if let Some(slot) = best.get_mut(i)
+                && slot.is_none_or(|(least, ..)| total <= least)
+            {
+                *slot = Some((total, j, second.map(|k| k - from)));
+            }
+        }
+    }
+    let mut chunks = Vec::new();
+    let mut end = n;
+    while end > 0 {
+        let Some(&Some((_, start, second))) = best.get(end) else {
+            break;
+        };
+        chunks.push((from + start, from + end, second.map(|k| from + k)));
+        end = start;
+    }
+    chunks.reverse();
+    chunks
+}
+
+/// The chunks of `words`, each one shaped and placed. Hard breaks end a run
+/// of words: a sentence end and a pause of `CHUNK_GAP_MS`. Inside a run the
+/// chunks and their lines are the ones of least cost (D-167), within the
+/// style's `max_words`, `max_lines` and characters per line.
 pub fn chunk(
     words: &[CaptionWord],
     sentences: &[Sentence],
@@ -153,40 +213,51 @@ pub fn chunk(
     theme: &Theme,
     fonts: &FontSet,
 ) -> Result<Vec<Chunk>, SceneError> {
-    let per_line = style.max_chars_per_line.max(1);
-    let max_lines = style.max_lines.max(1);
-    let max_words = style.max_words.max(1) as usize;
+    let limits = Limits {
+        per_line: style.max_chars_per_line.max(1),
+        max_lines: style.max_lines.max(1),
+        max_words: style.max_words.max(1) as usize,
+    };
     let sentence_of = |word: &CaptionWord| sentences.partition_point(|s| s.words.end <= word.word);
+    let units: Vec<Unit<'_>> = words
+        .iter()
+        .map(|word| {
+            let text = match style.case {
+                Case::AsSpoken => word.text.clone(),
+                Case::Upper => word.text.to_uppercase(),
+            };
+            let chars = u32::try_from(text.chars().count()).unwrap_or(u32::MAX);
+            Unit { word, text, chars }
+        })
+        .collect();
 
     let mut groups: Vec<Vec<Placed<'_>>> = Vec::new();
-    let (mut line, mut line_chars) = (0u32, 0u32);
-    for word in words {
-        let text = match style.case {
-            Case::AsSpoken => word.text.clone(),
-            Case::Upper => word.text.to_uppercase(),
+    let mut from = 0;
+    for to in 1..=units.len() {
+        let hard = match (units.get(to - 1), units.get(to)) {
+            (Some(prev), Some(next)) => {
+                sentence_of(prev.word) != sentence_of(next.word)
+                    || next.word.start.get().saturating_sub(prev.word.end.get()) >= CHUNK_GAP_MS
+                    || to - from >= MAX_SEGMENT_WORDS
+            }
+            _ => true,
         };
-        let chars = u32::try_from(text.chars().count()).unwrap_or(u32::MAX);
-        let fits = line_chars.saturating_add(1).saturating_add(chars) <= per_line;
-        let before = groups
-            .last()
-            .and_then(|group| group.last().map(|placed| (placed.word, group.len())));
-        let starts_chunk = before.is_none_or(|(prev, len)| {
-            sentence_of(prev) != sentence_of(word)
-                || word.start.get().saturating_sub(prev.end.get()) >= CHUNK_GAP_MS
-                || len >= max_words
-                || (!fits && line.saturating_add(1) >= max_lines)
-        });
-        if starts_chunk {
-            groups.push(Vec::new());
-            (line, line_chars) = (0, chars);
-        } else if fits {
-            line_chars = line_chars.saturating_add(1).saturating_add(chars);
-        } else {
-            (line, line_chars) = (line.saturating_add(1), chars);
+        if !hard {
+            continue;
         }
-        if let Some(group) = groups.last_mut() {
-            group.push(Placed { word, text, line });
+        for (start, end, second) in search(&units, from, to, &limits) {
+            let placed = (start..end).filter_map(|i| {
+                let unit = units.get(i)?;
+                let line = u32::from(second.is_some_and(|k| i >= k));
+                Some(Placed {
+                    word: unit.word,
+                    text: unit.text.clone(),
+                    line,
+                })
+            });
+            groups.push(placed.collect());
         }
+        from = to;
     }
 
     let font = theme.font(style.font);
@@ -221,6 +292,25 @@ pub fn chunk(
         });
     }
     Ok(chunks)
+}
+
+/// The reading floor (D-168): a chunk stays up at least `MIN_CHUNK_MS` when
+/// the silence after it allows. Its end moves later, never past the next
+/// chunk's start (at most the next word's start) or, for the last chunk,
+/// `program_end`; no word moves (INV-5). Applied to `chunk`'s result by
+/// `build_scene`.
+pub fn hold_for_reading(chunks: &mut [Chunk], program_end: OutMs) {
+    let caps: Vec<OutMs> = chunks
+        .iter()
+        .skip(1)
+        .map(|next| next.show.start)
+        .chain(std::iter::once(program_end))
+        .collect();
+    for (chunk, cap) in chunks.iter_mut().zip(caps) {
+        let (start, end) = (chunk.show.start.get(), chunk.show.end.get());
+        let held = start.saturating_add(MIN_CHUNK_MS).min(cap.get());
+        chunk.show.end = OutMs::new(held.max(end));
+    }
 }
 
 /// The lines of one chunk: centred in the caption zone, one under the other.
@@ -278,66 +368,6 @@ fn lines(
         line.baseline = top + height * index as f32 + ascent;
     }
     Ok(lines)
-}
-
-/// Adds the chunk as it looks at `t`: the word that is being spoken in the
-/// active colour, the others in the fill colour, each moving as the style's
-/// motion says.
-pub fn draw(chunk: &Chunk, t: OutMs, style: &StyleSpec, theme: &Theme, out: &mut Vec<DrawCmd>) {
-    let motion = &style.motion;
-    let stroke = (style.stroke_width > 0.0).then_some(Stroke {
-        width: style.stroke_width,
-        color: theme.color(style.stroke),
-    });
-    // A fade is the chunk's, from its show start; a pop is each word's.
-    let (opacity, _) = enter_at(motion, t.get().saturating_sub(chunk.show.start.get()));
-    let fading = opacity < 1.0;
-    if fading {
-        out.push(DrawCmd::PushLayer {
-            opacity,
-            clip: None,
-        });
-    }
-    for line in &chunk.lines {
-        for placed in &line.words {
-            let word = chunk.words.get(placed.word);
-            let active = word.is_some_and(|word| word.start <= t && t < word.end);
-            let fill = match motion.active {
-                ActiveTreatment::Highlight if active => theme.color(style.active),
-                ActiveTreatment::Highlight => theme.color(style.fill),
-                // V4: the block after the spoken word (TS §19.4, V4 Prompt 105).
-                ActiveTreatment::Cursor => theme.color(style.fill),
-            };
-            let since = word.map_or(0, |word| t.get().saturating_sub(word.start.get()));
-            let (_, pop) = enter_at(motion, since);
-            // A popping word scales about its centre on the baseline.
-            let width: f32 = placed.runs.iter().map(|run| run.width).sum();
-            let centre = line.x + (placed.x + width / 2.0) * line.scale;
-            let mut x = placed.x;
-            for run in &placed.runs {
-                let left = line.x + x * line.scale;
-                let transform = if pop == 1.0 {
-                    Affine::scale_then_translate(line.scale, left, line.baseline)
-                } else {
-                    let left = centre + (left - centre) * pop;
-                    Affine::scale_then_translate(line.scale * pop, left, line.baseline)
-                };
-                out.push(DrawCmd::GlyphRun {
-                    font: run.font,
-                    size: run.size,
-                    glyphs: run.glyphs.clone(),
-                    fill,
-                    stroke,
-                    transform,
-                    text: run.text.clone(),
-                });
-                x += run.width;
-            }
-        }
-    }
-    if fading {
-        out.push(DrawCmd::PopLayer);
-    }
 }
 
 #[cfg(test)]
@@ -481,5 +511,53 @@ mod tests {
         // Between two words, and before the first, no word is active.
         assert!(active_at(1_520).is_empty());
         assert!(active_at(950).is_empty());
+    }
+
+    #[test]
+    fn the_reading_floor_holds_a_short_chunk_into_the_silence_after_it() {
+        // "Yes." alone is up 400 ms; the pause after it lets it stay 700.
+        let mut held = chunks_of(&[
+            ("Yes.", 1_000, 1_200),
+            ("Then", 2_500, 2_800),
+            ("we", 2_880, 3_000),
+            ("left.", 3_080, 3_400),
+        ]);
+        let before = held.clone();
+        assert_eq!(
+            (before[0].show.start.get(), before[0].show.end.get()),
+            (920, 1_320)
+        );
+        hold_for_reading(&mut held, OutMs::new(10_000));
+        assert_eq!(
+            (held[0].show.start.get(), held[0].show.end.get()),
+            (920, 1_620)
+        );
+        // A chunk up 700 ms or more is not changed, and no word moves.
+        assert_eq!(held[1].show, before[1].show);
+        for (after, was) in held.iter().zip(&before) {
+            assert_eq!(after.words, was.words);
+            assert_eq!(after.lines, was.lines);
+        }
+    }
+
+    #[test]
+    fn the_reading_floor_stops_at_the_next_chunk_and_at_the_end_of_the_program() {
+        let mut held = chunks_of(&[("Hi.", 1_000, 1_100), ("Okay.", 1_400, 1_600)]);
+        assert_eq!(held[1].show.start.get(), 1_320);
+        hold_for_reading(&mut held, OutMs::new(1_900));
+        // Held to the next chunk's start, not to 920 + 700.
+        assert_eq!(
+            (held[0].show.start.get(), held[0].show.end.get()),
+            (920, 1_320)
+        );
+        // The last chunk is held to the end of the program, not to 1,320 + 700.
+        assert_eq!(
+            (held[1].show.start.get(), held[1].show.end.get()),
+            (1_320, 1_900)
+        );
+        // Never shortened: a program end before a chunk's own end leaves it.
+        let mut late = chunks_of(&[("Hi.", 1_000, 1_100)]);
+        hold_for_reading(&mut late, OutMs::new(1_000));
+        assert_eq!(late[0].show.end.get(), 1_220);
     }
 }

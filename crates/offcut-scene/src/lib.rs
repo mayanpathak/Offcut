@@ -6,6 +6,7 @@
 
 pub mod anim;
 pub mod captions;
+mod captions_draw;
 pub mod display_list;
 pub mod easing;
 pub mod events;
@@ -13,6 +14,7 @@ pub mod fonts;
 pub mod framing;
 pub mod layout;
 pub mod motion;
+pub mod readability;
 pub mod safe_area;
 pub mod styles;
 pub mod theme;
@@ -81,7 +83,8 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let (theme, fonts, map) = (input.theme, input.fonts, input.time_map);
 
     let words = captions::words(input.transcript, &input.edit.word_edits, map);
-    let chunks = captions::chunk(&words, &input.transcript.sentences, &style, theme, fonts)?;
+    let mut chunks = captions::chunk(&words, &input.transcript.sentences, &style, theme, fonts)?;
+    captions::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
 
     let mut tracks = Vec::new();
     for item in input.plan.items() {
