@@ -93,6 +93,16 @@ jobs:
           # The whole history, for the secret scan.
           fetch-depth: 0
 
+      # The tests of offcut-render build wgpu's native backends (v4implementation
+      # D-134), and with the restored target/ the runner's disk ran out while
+      # linking (v4changelog Entry 2). Nothing in this job uses these
+      # preinstalled toolchains.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Check the configuration
         run: |
           if [ -z "$VITE_ASSET_BASE_URL" ]; then
