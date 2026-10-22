@@ -14,7 +14,7 @@
 | 1 | **Launch date.** V6.1-V6.7 now sit between V6 and V7 (BP §8A). The 21 Dec 2026 launch holds only if V6.x fits in the two weeks V1-V3 gained; the founder re-sets M2 and the launch when V6.7 closes (PS A-2, TS §39.3 item 32) | Founder | V6.7 |
 | 2 | **AI provider (TE-15).** Free-tier limits, structured output, latency and data-use terms decide the provider and the plan quotas. If the only fitting free tier trains on inputs, the founder decides between a paid tier, disclosing it, or making the AI plan opt-in (PS §17, TS §37) | Founder + V6.1 | V6.1 |
 | 3 | **Starting plan quotas** (anonymous 3/day, Free 30/month, Creator 300/month soft) and the default "AI edit plan: on" are (assumption) values chosen in this revision, not founder numbers; TE-15 replaces them (PS §11, TS §40.7) | Founder | V6.1 |
-| 4 | **Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10) | Founder | V6.7 |
+| 4 | ~~**Brand kit is Creator-only** in exports (Free sees it in preview). Chosen in this revision from the founder's "this is what makes people stay subscribed"; confirm or change (PS §11, TS §40.10)~~ Closed in Entry 7: `tempfile` and `offcut-plan` are wrappers | Founder | V6.7 |
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
 | 6 | ~~**Open a draft pull request `v4-build` → `main`**~~ Done: PR #7 is open as a draft (closed in Entry 1) | Founder | Any time |
 
@@ -39,7 +39,7 @@
 | 16 | TS §9 (the review call chain: "ReviewPanel shows …", `<EventToggleList …>`) and the TS §13 component table still name `ReviewPanel` and `EventToggleList`, which TS §5 now replaces with `SidePanel` and `PlanItemList` (Entry 2) | TS §9, §13 | P127 (copy-back) |
 | 17 | ~~Record "identity reference frozen at <SHA of Prompt 93's commit>" (the SHA is not known inside its own commit, Entry 3); from then on `git diff --stat <SHA> -- crates/offcut-scene/tests/snapshots/v3_reference` must print nothing until Prompt 101 deletes the files~~ Closed in Entry 4: frozen at `09b1085` | `docs/v4/v4changelog.md` | P94 |
 | 18 | §12 lists `DropReason` and `Dropped` among the generated TypeScript types; they live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4. Not generated (Entry 6); generate them when a page or analytics consumer exists, or correct §12 in the copy-back | `web/src/gen`, plan §12 | P127 (copy-back) or V6.1 |
-| 19 | **D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6) | `offcut-plan/src/catalog.rs` | P97 |
+| 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 
 ---
 
@@ -519,3 +519,62 @@ The event counts are the expected ones: the reference clip's four of README "Exp
 - The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (`check-file-tree`: 298 files, 13 crates; `check-gen-clean` clean with `domain.ts` staged); **Rust 498 passed, 0 failed, 3 ignored** (Entry 5: 478; +20, the inline tests above); Vitest 92; `pnpm build` exit 0 (app shell 307.5 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and nothing else; no private path tracked.
 
 **Open.** Known issues 18 and 19 (new).
+
+---
+
+## Entry 7 - 2026-10-22 - P97 (S4): plan prompt, validation tests, catalog snapshots
+
+**What.** Prompt 97 (G 4.4 rows 6 and 8-11, G 4.5, Milestone 4; §7.3, §7.8, D-123, D-163 to D-165): `prompt.rs`, the crate's five test files, the three snapshots read and committed, the guards proven. `offcut-plan` is complete for V4; nothing outside the crate calls it yet (Prompt 98).
+
+**`src/prompt.rs`** (behind the default feature `prompt`; the render bundle builds without it): `PromptInput { duration, words, prosody, sentences }`, `PAUSE_MARK_MS = 300` (assumption, V6.1), and three functions, all generated from the catalog and sent nowhere until V6.1 (D-164):
+- `system_prompt()`: a preamble (the task), the transcript's line format, one paragraph per catalog row (name, purpose, anchor rule, params with their limits, zone, per-clip limit, gap), and seven rules. It carries §7.3's three rules verbatim and no example number of its own; the only numbers in it are the catalog's limits.
+- `output_schema()`: JSON Schema (draft 2020-12) of an `EditPlan` restricted to the catalog. `items` is a `oneOf` of the four kinds with their word-pointing params under `"params"` (never `"detected"`), `confidence: null`; there is no `source` (the server sets it, TS §40.7); `format` and `catalog` are constants; `cuts` and `chapters` are empty arrays, `extras` an empty object, `music` null, so a plan written to it reads as an `EditPlan` once the server adds `source` (an inline test proves it).
+- `user_message()`: `DURATION {ms}`, then `{i}\t{text}\t{start}\t{end}\t{energy_z:.1}\t{pitch_z:.1}` per word, `PAUSE {ms}` before a word after a silence of at least `PAUSE_MARK_MS`, a blank line after each sentence. The ASR text, not the user's edits.
+
+**Read before accepting (G 4.4).** The system prompt's first paragraph, as committed:
+
+> You plan the edit of a short talking-head video from its transcript. The speaker talks to the camera; you choose the moments to show as visuals over the video, using only the kinds of item listed below, and you point at the words of the transcript where each one belongs. Leave out an item rather than force one: a plan with few good items is better than a busy one.
+
+One catalog paragraph:
+
+> from_to: A change from one number to another: show both with bars. Anchors: from 3 to 40 words in a row. Params: from (required): the range of words that says the number; to (required): the range of words that says the number; label (optional): text of at most 32 characters. Zone: event. At most 4 in a clip, at least 3000 ms apart.
+
+The rules: "Never write a number: point at the words that say it." / "Every item points at word indexes of the transcript." / "Every item has an id, a string of digits no other item of the plan has, and a confidence of null." / the half-open range form and that pointed words lie inside the anchors / "A label repeats or shortens what the speaker says; it holds no digit the speaker did not say." / one item per zone at a time and the distance between items of a kind / "Return JSON matching the schema; no prose." **Changed on reading:** the first draft did not say what to write in `id` and `confidence`, which the schema requires; the "id … confidence of null" rule was added before the snapshot was accepted. The schema was read whole (no `detected`, no `source`, the four kinds only), and the user message on `a01` (157 word lines, 16 `PAUSE 400` lines, a blank line after each of 17 sentences; insta trims the last).
+
+**Snapshots** (`crates/offcut-plan/tests/snapshots/`, ignored by the tree script as `*.snap`): `catalog_snapshot__system_prompt@v1.snap`, `catalog_snapshot__output_schema@v1.snap`, `catalog_snapshot__user_message@v1.snap`, accepted with `cargo insta accept` after the reading above. The names carry `CATALOG_VERSION`.
+
+**Test files.**
+
+| File | Cases |
+|---|---|
+| `tests/validate.rs` | The prompt's 21 cases, each with the smallest plan, on the `a01` transcript: V-1 format; V-1 catalog; `UnknownKind` (a config without KeywordPop, since every V4 kind is in the catalog); `WrongProducer` (Detected in Model; word arm in Rules); `ParamsMismatch` (arm against kind; a list with no point); `AnchorsOutOfRange` (empty; past the end); `AnchorRule` (seven words for a NumberReveal; a list point outside the anchors); `LabelTooLong` (33 characters; 32 two-byte characters pass); `LabelDigits` ("3x faster"); `NumberUnresolved` ("spent 3000 hours"; a Detected FromTo with one quantity in its anchors); `OverLimit`; `TooClose` (two KeywordPops 80 ms apart); `ZoneTaken` ("90 minutes" inside the FromTo); a KeywordPop never `ZoneTaken`; `NotInThisBuild` for each of the five cut arms, a chapter, the hook, the post caption, a hashtag and music, one at a time; the sort order. Plus: a model plan of the four kinds (five items) on `a01` that validates whole, with resolved values, list points, the FromTo mark and spans from the anchors; INV-22 (word 23 edited "3000" → "4000" shows `4,000 hours`); the six non-item fields dropped beside five kept items. 24 tests |
+| `tests/plan_from_rules.rs` | The reference clip's five events become five items with the detector's ids, kinds, anchors and params, and validate with the detector's spans; no event gives a valid empty plan. 2 tests |
+| `tests/validate_rules_plans.rs` | All 31 labeled files (written ones timed as `precision_recall.rs`, `a02`'s ASR words and prosody, `w11`'s and `w23`'s edits passed to `detect` and `validate`): **"31 files, 0 items dropped"**; 41 items kept with the detector's spans, ids, params and anchors; each of the 11 FromTos has one mark, after its first word and not after its last. 1 test |
+| `tests/catalog_snapshot.rs` | The three snapshots (`#![cfg(feature = "prompt")]`). 3 tests |
+| `tests/ui.rs`, `tests/ui/valid_plan_private.rs` (+ `.stderr`) | `ValidPlan { source, items }` outside the crate: `error[E0451]: fields \`source\` and \`items\` of struct \`ValidPlan\` are private`. 1 test |
+
+**Inputs, as built.**
+- **The reference clip's five events** come from `fixtures/labeled/a01-scriptA.json`, which README says holds the reference clip's recognized text in written form; its word indexes match README's (23-24, 31, 54-59, 75-94, 132-133). A written file has no prosody, and README says the KeywordPop passes "only with its loudness and pitch", so word 31 "brutal" is given the labeled files' stressed value, 2.0. The detector then finds README's five in order: `3,000 hours` "editing by hand", `brutal`, 90 → 10 minutes, the list "3 REASONS", `$12k` "in sales". (The per-word times of the real recording are not in the repository; Entry 3.)
+- The labeled loader and `synthesize` are copied into each of the four files that need them (the tree lists no `tests/common/` for this crate).
+
+**Changed in Prompt 96's code.** The prompt's case list names "`AnchorRule` (`at` outside anchors)"; Prompt 96 had mapped a pointer outside the anchors to `AnchorsOutOfRange` (§7.6 allowed either). Now a `ListPoint.at`, a `KeywordPop` word (also a detector's) or a `QuantityRef` range outside the anchors is `AnchorRule`; anchors outside the transcript and a detector list item's time outside it stay `AnchorsOutOfRange`. One assertion of `validate.rs`'s inline V-3 test followed (`validate_params.rs` 307 → 315 lines).
+
+**Other changes.**
+- `Cargo.toml` of `offcut-plan`: dev-dependencies `insta`, `offcut-detect`, `trybuild` (beside Prompt 96's `serde_json`); `offcut-text` is a normal dependency already.
+- `deny.toml` (known issue 4, closed): `tempfile` joins the `getrandom` ban's wrappers (`insta` writes pending snapshots through it; dev only), and `offcut-plan` joins the `offcut-detect` ban's wrappers (dev only). `cargo tree -p offcut-plan -e normal` resolves none of `web-sys js-sys wasm-bindgen getrandom rand wgpu offcut-detect insta tempfile`.
+- `lib.rs`: `#[cfg(feature = "prompt")] pub mod prompt;`.
+
+**Guards (G 4.5)**, each undone:
+1. `ValidPlan`'s fields made `pub` → `tests/ui.rs`: "Expected test case to fail to compile, but it succeeded."
+2. One word of the preamble ("edit" → "cut") → `catalog_snapshot.rs` with `INSTA_UPDATE=no`: "snapshot assertion for 'system_prompt@v1' failed"; no `.snap.new` left.
+3. A `Detected` item in a `Model` plan → `WrongProducer`: `case_04_wrong_producer_detected_in_a_model_plan` passes.
+
+**Known issue 19 closed.** The sweep drops nothing: on the labeled set no rules plan meets V-6's `min_gap` of 3,000 ms (FromTo) or 10,000 ms (ListReveal). The risk stays in principle for clips outside the set; the limits remain the (assumptions) of §7.2 (E-11).
+
+**How it was checked.**
+- `cargo test -p offcut-plan`: 23 inline + 3 + 2 + 24 + 1 + 1 = 54 passed; no pending snapshot. `INSTA_UPDATE=no CI=true cargo test -p offcut-plan` (what CI runs): the same. `--no-default-features`: 20 inline (no `prompt`), the snapshot file compiles empty, the rest pass.
+- `cargo clippy -p offcut-plan --all-targets -- -D warnings`, with and without default features: clean. `cargo deny check`: ok.
+- `cargo build -p offcut-plan --target wasm32-unknown-unknown --no-default-features --release`: Finished.
+- The SAB gate: on `v4-build`, no `zz` file, no test key; `pnpm fixtures` up to date; `pnpm check` exit 0 (`check-file-tree`: 305 files, 13 crates); **Rust 532 passed, 0 failed, 3 ignored** (Entry 6: 498; +34: 3 inline in `prompt.rs`, 24 + 2 + 1 + 3 + 1 in the five files); Vitest 92; `pnpm build` exit 0 (app shell 307.5 kB); `pnpm e2e` 12 passed; the frozen check lists the seven recorded one-line exceptions of Entry 4 and nothing else; no private path tracked.
+
+**Open.** Known issues 4 and 19 closed. Nothing new.

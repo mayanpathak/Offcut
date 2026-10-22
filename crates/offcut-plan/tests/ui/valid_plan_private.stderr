@@ -1,0 +1,9 @@
+error[E0451]: fields `source` and `items` of struct `ValidPlan` are private
+  --> tests/ui/valid_plan_private.rs:9:9
+   |
+ 8 |     let _plan = ValidPlan {
+   |                 --------- in this type
+ 9 |         source: PlanSource::Rules,
+   |         ^^^^^^ private field
+10 |         items: Vec::new(),
+   |         ^^^^^ private field

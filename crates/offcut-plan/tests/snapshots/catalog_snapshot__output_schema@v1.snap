@@ -1,0 +1,423 @@
+---
+source: crates/offcut-plan/tests/catalog_snapshot.rs
+expression: output_schema()
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "catalog": {
+      "const": 1
+    },
+    "chapters": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "cuts": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "extras": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "format": {
+      "const": 1
+    },
+    "items": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "number_reveal"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "number_reveal"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "label": {
+                        "maxLength": 32,
+                        "type": "string"
+                      },
+                      "value": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "list_reveal"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "list_reveal"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "header": {
+                        "maxLength": 24,
+                        "type": "string"
+                      },
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "at": {
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "label": {
+                              "maxLength": 32,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "at",
+                            "label"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 7,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "items"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "from_to"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "from_to"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "from": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      },
+                      "label": {
+                        "maxLength": 32,
+                        "type": "string"
+                      },
+                      "to": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "keyword_pop"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "keyword_pop"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "word": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "word"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "music": {
+      "type": "null"
+    }
+  },
+  "required": [
+    "format",
+    "catalog",
+    "cuts",
+    "items",
+    "chapters",
+    "extras",
+    "music"
+  ],
+  "title": "EditPlan",
+  "type": "object"
+}

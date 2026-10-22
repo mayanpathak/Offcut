@@ -60,6 +60,8 @@ deny = [
   # - `uuid`, `rand`, `rand_core` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
   # - `proptest`, a dev-dependency of the media crates, uses `rand`. A test may
   #   draw random cases; the `cargo tree` check keeps `rand` out of the crates.
+  # - `tempfile`, which `insta` (snapshot tests, a dev-dependency) writes its
+  #   pending snapshots with, uses `getrandom` for file names (v4implementation D-157).
   # - `vello`, which the renderer draws the overlay with, uses `wgpu`; `wgpu`
   #   and `wgpu-types` use the browser crates when built for wasm. Only
   #   `offcut-render` depends on any of the three.
@@ -70,16 +72,16 @@ deny = [
   { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys", "serde-wasm-bindgen", "wgpu"] },
   { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "vello"] },
   { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres", "proptest"] },
-  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring"] },
+  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring", "tempfile"] },
 
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.
   { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
   # `offcut-plan` resolves a plan's numbers from the words (v4implementation D-122).
   { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene", "offcut-plan"] },
-  # `offcut-scene` as a dev-dependency only: the identity reference and the
-  # labeled-set tests (v4implementation D-117, §3.2).
-  { crate = "offcut-detect", wrappers = ["offcut-wasm-render", "offcut-scene"] },
+  # `offcut-scene` and `offcut-plan` as a dev-dependency only: the identity
+  # reference and the labeled-set tests (v4implementation D-117, §3.2, D-165).
+  { crate = "offcut-detect", wrappers = ["offcut-wasm-render", "offcut-scene", "offcut-plan"] },
   { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
   { crate = "offcut-scene", wrappers = ["offcut-render"] },
   { crate = "offcut-render", wrappers = ["offcut-wasm-render"] },

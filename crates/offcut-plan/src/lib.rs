@@ -6,6 +6,8 @@
 pub mod catalog;
 pub mod config;
 pub mod from_rules;
+#[cfg(feature = "prompt")]
+pub mod prompt;
 pub mod resolve;
 pub mod validate;
 mod validate_params;

@@ -97,8 +97,10 @@ fn range_inside(anchors: WordRange, words: WordRange) -> bool {
     words.start < words.end && anchors.start <= words.start && words.end <= anchors.end
 }
 
-/// V-3: the anchors are words of the transcript and as many as the kind
-/// takes; every word an item points at is one of its anchors.
+/// V-3: the anchors are words of the transcript (`AnchorsOutOfRange`) and as
+/// many as the kind takes; every word an item points at is one of its anchors
+/// (`AnchorRule`); a detector event's own times lie in the transcript
+/// (`AnchorsOutOfRange`).
 fn v3_anchors(item: &PlanItem, row: &ItemSpec, t: &Transcript) -> Result<(), DropReason> {
     let anchors = item.anchors;
     let words = u32::try_from(t.words.len()).unwrap_or(u32::MAX);
@@ -120,25 +122,31 @@ fn v3_anchors(item: &PlanItem, row: &ItemSpec, t: &Transcript) -> Result<(), Dro
         ItemParams::FromTo { from, to, .. } => {
             range_inside(anchors, from.words) && range_inside(anchors, to.words)
         }
-        ItemParams::KeywordPop { word } => inside(anchors, *word),
-        ItemParams::Detected(detected) => detected_inside(detected, anchors, t),
+        ItemParams::KeywordPop { word }
+        | ItemParams::Detected(EventParams::KeywordPop { word }) => inside(anchors, *word),
+        ItemParams::Detected(_) => true,
     };
-    if pointed {
-        Ok(())
-    } else {
-        Err(DropReason::AnchorsOutOfRange)
+    if !pointed {
+        return Err(DropReason::AnchorRule);
     }
+    if let ItemParams::Detected(detected) = &item.params
+        && !detected_times_inside(detected, t)
+    {
+        return Err(DropReason::AnchorsOutOfRange);
+    }
+    Ok(())
 }
 
-/// A detector event's own words and times lie in its anchors and the transcript.
-fn detected_inside(detected: &EventParams, anchors: WordRange, t: &Transcript) -> bool {
+/// A detector event's own times lie in the transcript.
+fn detected_times_inside(detected: &EventParams, t: &Transcript) -> bool {
     let first = t.words.first().map(|w| w.start_ms);
     let last = t.words.last().map(|w| w.end_ms);
     let in_clip = |at: TimeMs| first.zip(last).is_some_and(|(a, b)| a <= at && at <= b);
     match detected {
-        EventParams::KeywordPop { word } => inside(anchors, *word),
         EventParams::ListReveal { items, .. } => items.iter().all(|item| in_clip(item.at)),
-        EventParams::NumberReveal { .. } | EventParams::FromTo { .. } => true,
+        EventParams::NumberReveal { .. }
+        | EventParams::FromTo { .. }
+        | EventParams::KeywordPop { .. } => true,
     }
 }
 

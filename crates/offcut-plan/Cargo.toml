@@ -26,3 +26,9 @@ serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 # The inline tests read and write JSON also when the feature `prompt` is off.
 serde_json = { workspace = true }
+# Snapshots of the prompt, the schema and the user message (D-157, section 7.3).
+insta = { workspace = true }
+# The labeled-set tests: detect, from_rules, validate (D-165).
+offcut-detect = { workspace = true }
+# ValidPlan has no public constructor (INV-21).
+trybuild = { workspace = true }

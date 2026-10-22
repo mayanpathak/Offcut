@@ -553,14 +553,14 @@ mod tests {
             reasons(model(vec![keyword((24, 26), 25)])),
             [DropReason::AnchorRule]
         );
-        // A word pointed at outside the anchors.
+        // A word pointed at outside the anchors breaks the anchor rule.
         assert_eq!(
             reasons(model(vec![keyword((24, 25), 25)])),
-            [DropReason::AnchorsOutOfRange]
+            [DropReason::AnchorRule]
         );
         assert_eq!(
             reasons(model(vec![list(None, &[(19, "a"), (24, "b")])])),
-            [DropReason::AnchorsOutOfRange]
+            [DropReason::AnchorRule]
         );
     }
 
