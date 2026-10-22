@@ -21,9 +21,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 # The display-list snapshots (v4implementation D-157, §8.10).
 insta = { workspace = true }
-# The identity reference, tests/v3_reference.rs (v4implementation D-117):
-# the detector's events of the reference clip and of three labeled files, and
-# the display lists written as JSON. Temporary until V4 Prompt 101; the
-# labeled-set tests keep offcut-detect (v4implementation §3.2).
+# The detector's events of labeled transcripts, read as JSON: the identity
+# map's test (timemap_identity.rs) and the labeled-set tests (v4implementation
+# §3.2). The identity reference that also used them is gone (V4 Prompt 101).
 offcut-detect = { workspace = true }
 serde_json = { workspace = true }

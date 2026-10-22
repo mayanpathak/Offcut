@@ -429,14 +429,7 @@ offcut/
 │   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
 │   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
 │   │       ├── hit.rs                 Scene::hit (D-174)
-│   │       ├── v3_reference.rs        temporary, V4 S2 to S7: the identity reference (D-117)
-│   │       ├── snapshots/             insta snapshot files
-│   │       ├── snapshots/v3_reference/busy_1080.json       temporary, V4 S2 to S7 (D-117)
-│   │       ├── snapshots/v3_reference/busy_540.json        temporary, V4 S2 to S7 (D-117)
-│   │       ├── snapshots/v3_reference/reference_1080.json  temporary, V4 S2 to S7 (D-117)
-│   │       ├── snapshots/v3_reference/a01_1080.json        temporary, V4 S2 to S7 (D-117)
-│   │       ├── snapshots/v3_reference/w01_1080.json        temporary, V4 S2 to S7 (D-117)
-│   │       └── snapshots/v3_reference/w07_1080.json        temporary, V4 S2 to S7 (D-117)
+│   │       └── snapshots/             insta snapshot files
 │   ├── offcut-render/
 │   │   ├── Cargo.toml
 │   │   ├── src/

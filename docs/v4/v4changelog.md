@@ -769,3 +769,9 @@ The four detector-built inputs (836 frames) are identical to V3's: glyphs, posit
 **Found, not fixed (for the copy-back, Prompt 127).** BP §6.1 A2 still places `timemap.rs` in `offcut-plan` and "`QuantityRef` resolution in `build_scene`"; the time map is in `offcut-types` (D-125) and resolution in `validate` (D-121). §24's item 1 covers TS §40.9 only.
 
 **Open.** Known issues 12 and 20 closed; 11 advanced. Open items 1-5 unchanged.
+
+---
+
+## Entry 11 - 2026-10-22 - P101 (S7): native rendering, SSIM, two video-only goldens; identity reference retired
+
+**In progress (the `wip` commit).** Native rendering, the SSIM measure, `golden_frames.rs`, the two goldens written on D1's WARP, Mesa in the Linux job, and the identity reference retired. The reading of the two goldens on the runner's lavapipe follows in this prompt's final commit, which completes this entry.

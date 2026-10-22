@@ -235,8 +235,35 @@ jobs:
       - name: Generate the fixtures
         run: pnpm fixtures
 
+      # The software adapter the golden frames are drawn on: lavapipe, Mesa's
+      # Vulkan driver (v4implementation D-134), with its version in the log.
+      - name: Install the software Vulkan driver
+        run: |
+          set -eu
+          sudo apt-get update -q
+          sudo apt-get install -y -q mesa-vulkan-drivers
+          dpkg -s mesa-vulkan-drivers | grep Version
+
       - name: cargo test
+        env:
+          # An unreviewed snapshot fails the job; nothing is written (D-157).
+          INSTA_UPDATE: "no"
+          CI: "true"
         run: cargo test --workspace
+
+      # Again, with each golden's similarity and the adapter it was read on in
+      # the log: `cargo test` keeps a passing test's output (v4implementation §21.1).
+      - name: Golden frames, with their readings
+        run: cargo test -p offcut-render --test golden_frames -- --nocapture
+
+      - name: Keep the frames that differ from their goldens
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: golden-out
+          path: target/golden-out
+          retention-days: 7
+          if-no-files-found: ignore
 
       # --- 5. The WASM bundle -----------------------------------------------
       - name: Build the WASM bundle

@@ -139,17 +139,10 @@ impl Compositor {
     }
 
     /// Draws the frame `video` holds, then the overlay when there is one to
-    /// draw, to the canvas, and presents it.
-    pub fn present(
-        &self,
-        gpu: &Gpu,
-        video: &VideoPass,
-        with_overlay: bool,
-    ) -> Result<(), RenderError> {
-        let target = gpu.target()?;
-        let view = target
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+    /// draw, to `target`, and submits the pass. Presenting or reading the
+    /// target is the caller's.
+    pub fn draw(&self, gpu: &Gpu, target: &wgpu::Texture, video: &VideoPass, with_overlay: bool) {
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -180,8 +173,6 @@ impl Compositor {
             }
         }
         gpu.queue.submit([encoder.finish()]);
-        gpu.queue.present(target);
-        Ok(())
     }
 }
 
