@@ -1151,3 +1151,39 @@ A first form of the watermark drill (a third parameter on `caption_block`) did n
 - **The manual check.** M-8's "Captions read naturally" (`pnpm dev`, the sample clip: no "the" or "to" at a line end, two-line chunks of similar length) is a look on the page, for the founder; the property check of Entry 13 tests the same rule over the 31 labeled transcripts.
 
 **Open.** Open items 1-5 unchanged. Known issue 22 (new): `captions.rs` is at 400 lines; Prompt 105 must move something out before adding to it.
+
+---
+
+## Entry 15 - 2026-10-23 - CI: apt fails fast and retries; the downloaded Ubuntu packages are cached (outside a prompt)
+
+**Why.** The founder asked why CI had grown slow. Runs took 28 to 30 minutes up to P101's fix (`a6dc4bc`, 27.7 min) and 40 to 49 minutes on P103 (`3659c8f`, 48.6 min) and P104 (`0fc25f9`, 39.8 min). The `ci` job's own steps were unchanged: `cargo test` took 2.4 to 4.6 minutes in every run. Two steps that download Ubuntu packages from the runner's mirror (`azure.archive.ubuntu.com`) made the difference:
+
+| Run | `ci` job | Install the software Vulkan driver | Install Chrome for Playwright |
+|---|---|---|---|
+| `a6dc4bc` (P101) | 15.2 min | under 20 s | 0.4 min |
+| `01f406f` (P102) | 19.3 min | under 20 s | 0.6 min |
+| `3659c8f` (P103) | 33.9 min | 9.5 min | 10.1 min |
+| `0fc25f9` (P104) | 26.1 min | 6.9 min | 7.2 min |
+
+- **The Vulkan step's log on `0fc25f9`.** `apt-get update` fetched 12.5 MB in 1 s (10.9 MB/s). The one package, `mesa-vulkan-drivers` 25.2.8-0ubuntu0.24.04.4 (17.5 MB), started at 22:51:37 and was given up (`Ign`) at 22:58:10; apt asked again, and the second try took 9 s. The step reported "Fetched 398 kB in 6min 45s (983 B/s)".
+- **The Chrome step.** `playwright install --with-deps chrome` installs fonts and libraries with `apt-get` from the same mirror: "Fetched 22.0 MB in 6min 53s (53.3 kB/s)".
+- **In the fast runs** the same downloads took seconds: it is the mirror's speed on the day, not a change of ours.
+- **The media job.** `e2e-media` (Windows, no apt) waits for the `ci` job's build, so all of the delay adds to the run.
+
+**What changed** (`.github/workflows/ci.yml` only; no build, test or deploy command changes):
+- **"Make apt fail fast and retry"** is a new step after "Free disk space". It writes `/etc/apt/apt.conf.d/80-fail-fast` with `Acquire::http::Timeout "20"`, `Acquire::https::Timeout "20"` and `Acquire::Retries "3"`, and prints them back with `apt-config dump`, so every `apt-get` of the job, Playwright's included, drops a connection silent for 20 s and asks again. The `deploy-web` job (main only) gets the same step before its Chrome install.
+- **"Restore the downloaded Ubuntu packages"** is a new `actions/cache` step (the pinned v6, as the other caches use) of `~/apt-archives`. Its key is `apt-<os>-<hash of ci.yml and pnpm-lock.yaml>`, the two files that decide which packages are installed, and it falls back to the last `apt-<os>-` cache.
+  - The Vulkan step first copies the cached `.deb` files into `/var/cache/apt/archives/` (and says how many).
+  - apt takes a file from its archive only when it is the version the index asks for, and downloads any other.
+- **"Keep the downloaded Ubuntu packages"** comes after the Chrome install, the job's last `apt-get`. It copies `/var/cache/apt/archives/*.deb` to `~/apt-archives`, which the cache saves at the end of a job whose key was not found. An image that keeps no downloaded package leaves the cache empty, not the job failed.
+
+**What it does not do.**
+- **A trickle is not cut.** The timeout ends a silent connection, not a slow one that still trickles.
+- **apt already retries.** Noble's apt retries on its own (the log shows the retry); the setting makes the count explicit.
+- **Where the gain comes from.** The cache removes the downloads when the versions are unchanged. A new Mesa or font version is downloaded once from the mirror, and the cache keeps the old file until its key changes (an edit of `ci.yml` or of the lockfile).
+- **The media job still waits for `ci`.** Running it beside `ci` is a restructure of the jobs, left to Prompt 125, which owns the rest of V4's CI changes (§19.3).
+- **The time limit.** The `ci` job's `timeout-minutes: 45` is unchanged. P103's run used 33.9 of it.
+
+**How it was checked.** On CI only (the steps run on the Linux runner, not on D1): this commit's run, which finds no `apt-` cache, downloads and saves it, and a re-run of the same commit, which must take the packages from the cache. The readings follow in this entry's follow-up commit.
+
+**Open.** Unchanged.
