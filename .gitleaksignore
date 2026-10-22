@@ -1,0 +1,7 @@
+# Findings of `gitleaks detect` that are not secrets, one fingerprint a line
+# (commit:file:rule:line). Each is explained in docs/v4/v4changelog.md.
+#
+# Entry 11: a reading in experiments.md, the adapter name lavapipe then a
+# colon then a golden's name, read by the generic-api-key rule as a key
+# (the "api" inside the name) and its value.
+5cd1a2447f1fc7c9676c5552b6a622059ccd654f:docs/v4/experiments.md:generic-api-key:78

@@ -269,6 +269,7 @@ offcut/
 ├── render.yaml                        Render blueprint: one free web service from GHCR image
 ├── .gitignore
 ├── .dockerignore                      allow-list for the image build context: Cargo files, crates/, server/
+├── .gitleaksignore                    findings of the secret scan that are not secrets, by fingerprint (V4 Prompt 101)
 ├── .github/workflows/
 │   ├── ci.yml                         lint, unit, golden, server tests, non-media E2E
 │   ├── e2e-media.yml                  media E2E on windows-latest with Chrome stable (TE-10)
