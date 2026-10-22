@@ -77,7 +77,9 @@ deny = [
   { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
   # `offcut-plan` resolves a plan's numbers from the words (v4implementation D-122).
   { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene", "offcut-plan"] },
-  { crate = "offcut-detect", wrappers = ["offcut-wasm-render"] },
+  # `offcut-scene` as a dev-dependency only: the identity reference and the
+  # labeled-set tests (v4implementation D-117, §3.2).
+  { crate = "offcut-detect", wrappers = ["offcut-wasm-render", "offcut-scene"] },
   { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
   { crate = "offcut-scene", wrappers = ["offcut-render"] },
   { crate = "offcut-render", wrappers = ["offcut-wasm-render"] },

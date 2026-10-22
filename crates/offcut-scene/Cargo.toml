@@ -14,3 +14,11 @@ offcut-text = { workspace = true }
 parley = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+# The identity reference, tests/v3_reference.rs (v4implementation D-117):
+# the detector's events of the reference clip and of three labeled files, and
+# the display lists written as JSON. Temporary until V4 Prompt 101; the
+# labeled-set tests keep offcut-detect (v4implementation §3.2).
+offcut-detect = { workspace = true }
+serde_json = { workspace = true }

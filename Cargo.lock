@@ -1628,10 +1628,12 @@ dependencies = [
 name = "offcut-scene"
 version = "0.1.0"
 dependencies = [
+ "offcut-detect",
  "offcut-text",
  "offcut-types",
  "parley",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 
