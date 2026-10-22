@@ -5,16 +5,12 @@ use offcut_types::{OUTPUT_FPS, OutMs, OutSpan, Quantity};
 
 use crate::SceneError;
 use crate::anim::{self, eval};
-use crate::display_list::{Affine, DrawCmd, FontKey, Rgba, Stroke};
+use crate::display_list::{Affine, DrawCmd, FontKey, Rect, Rgba, Stroke};
 use crate::easing::{Easing, ease};
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
-use crate::safe_area::{ZoneId, zone};
 use crate::styles::StyleSpec;
 use crate::theme::Theme;
-
-/// Where the number is shown.
-const ZONE: ZoneId = ZoneId::Event;
 
 /// The size of the number, in logical pixels, when it fits.
 pub const VALUE_SIZE: f32 = 200.0;
@@ -54,7 +50,9 @@ pub struct Track {
     opacity: anim::Track,
     fill: Rgba,
     stroke: Option<Stroke>,
-    /// The top of the number's box and of the label's, in logical pixels.
+    /// The middle of the event zone, and the top of the number's box and of
+    /// the label's, in logical pixels.
+    centre_x: f32,
     value_top: f32,
     label_top: f32,
     label_scale: f32,
@@ -89,11 +87,13 @@ fn count_up(value: &Quantity, easing: Easing) -> Vec<String> {
 }
 
 /// `None` when there is nothing to draw, or the number would have to be
-/// smaller than `MIN_VALUE_SIZE` to fit the zone.
+/// smaller than `MIN_VALUE_SIZE` to fit `event_zone`, the clip's event zone
+/// (D-171).
 pub fn layout(
     value: &Quantity,
     label: Option<&str>,
     span: OutSpan,
+    event_zone: Rect,
     style: &StyleSpec,
     theme: &Theme,
     fonts: &FontSet,
@@ -103,7 +103,6 @@ pub fn layout(
         color: theme.color(style.stroke),
     });
     let font = (theme.font(style.font), fonts);
-    let event_zone = zone(ZONE);
     let room = event_zone.w - style.stroke_width.max(0.0);
     let easing = style.motion.easing;
     let strings = count_up(value, easing);
@@ -167,6 +166,7 @@ pub fn layout(
         },
         fill: theme.color(style.fill),
         stroke,
+        centre_x: event_zone.x + event_zone.w / 2.0,
         value_top,
         label_top: value_top + value_height,
     }))
@@ -202,8 +202,7 @@ pub fn draw(track: &Track, t: OutMs, out: &mut Vec<DrawCmd>) {
             clip: None,
         });
     }
-    let event_zone = zone(ZONE);
-    let centre_x = event_zone.x + event_zone.w / 2.0;
+    let centre_x = track.centre_x;
     // The number grows from the middle of its own box.
     let height = track.value.ascent + track.value.descent;
     let pivot_y = track.value_top + height / 2.0;
@@ -245,9 +244,10 @@ fn runs(
 
 #[cfg(test)]
 mod tests {
-    use offcut_types::{DurMs, EditState, StyleId, TimeMap, Unit};
+    use offcut_types::{CaptionPlacement, DurMs, EditState, StyleId, TimeMap, Unit};
 
     use super::*;
+    use crate::safe_area::{ZoneId, zone};
     use crate::styles::spec;
     use crate::testing::{build, clip, number_event, plan, profile, transcript, word};
     use crate::{SceneInput, build_scene};
@@ -258,6 +258,7 @@ mod tests {
             value,
             label,
             span,
+            zone(ZoneId::Event, CaptionPlacement::bottom()),
             &spec(StyleId::Clean),
             &theme,
             &FontSet::embedded(),
@@ -393,7 +394,7 @@ mod tests {
         let track = track_of(&wide, None, span(2_000, 2_400)).unwrap();
         assert!(track.value.runs[0].size < VALUE_SIZE);
         assert!(track.value.runs[0].size > MIN_VALUE_SIZE);
-        let room = zone(ZONE).w - style.stroke_width;
+        let room = zone(ZoneId::Event, CaptionPlacement::bottom()).w - style.stroke_width;
         assert!(track.counting.iter().all(|text| text.width <= room + 0.01));
     }
 }

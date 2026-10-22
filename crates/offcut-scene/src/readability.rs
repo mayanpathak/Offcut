@@ -314,6 +314,7 @@ mod tests {
                 start: offcut_types::OutMs::new(*start),
                 end: offcut_types::OutMs::new(*end),
                 word: offcut_types::WordIdx::new(u32::try_from(i).unwrap()),
+                number: false,
             })
             .collect();
         let units: Vec<Unit<'_>> = words

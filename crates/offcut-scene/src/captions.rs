@@ -4,18 +4,20 @@
 
 use std::collections::BTreeMap;
 
-use offcut_types::{OutMs, OutSpan, Sentence, Span, TimeMap, TimeMs, Transcript, WordIdx};
+use offcut_text::{format_quantity, parse_quantity, tokenize};
+use offcut_types::{
+    Confidence, OutMs, OutSpan, Sentence, Span, TimeMap, TimeMs, Transcript, Word, WordIdx,
+};
 
 use crate::SceneError;
 pub use crate::captions_draw::draw;
 // The inline test of `draw`, below, reads the commands it adds.
 #[cfg_attr(not(test), allow(unused_imports))]
 use crate::display_list::DrawCmd;
-use crate::display_list::FontKey;
+use crate::display_list::{FontKey, Rect};
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
 use crate::readability::{Limits, MIN_CHUNK_MS, Unit, chunk_break_cost, chunk_cost, text_of};
-use crate::safe_area::{ZoneId, zone};
 use crate::styles::{Case, StyleSpec};
 use crate::theme::Theme;
 
@@ -28,12 +30,15 @@ pub const CHUNK_TAIL_MS: u32 = 120;
 
 /// One word of a caption. A number that was spoken in several words is one
 /// caption word; `word` is the first transcript word it stands for.
+/// `number`: it shows a number (D-169), made from a number span of the
+/// transcript or reading as one the way the captions show it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CaptionWord {
     pub text: String,
     pub start: OutMs,
     pub end: OutMs,
     pub word: WordIdx,
+    pub number: bool,
 }
 
 /// A word of a line: its runs, and where it starts, measured from the start
@@ -100,22 +105,42 @@ pub fn words(
                 .get(end.saturating_sub(1) as usize)
                 .unwrap_or(first);
             let display = &number.quantity.display;
-            push(&mut out, display, (first.start_ms, last.end_ms), index, map);
+            let times = (first.start_ms, last.end_ms);
+            push(&mut out, (display, true), times, index, map);
             index = end;
             continue;
         }
         if let Some(word) = first {
             let text = edits.get(&WordIdx::new(index)).unwrap_or(&word.text);
-            push(&mut out, text, (word.start_ms, word.end_ms), index, map);
+            let shown = (text.as_str(), shows_a_number(text));
+            push(&mut out, shown, (word.start_ms, word.end_ms), index, map);
         }
         index = index.saturating_add(1);
     }
     out
 }
 
+/// Whether `text` reads as the captions show a number: `parse_quantity`
+/// reads all of it but a closing mark, and `format_quantity` writes it back
+/// the same (TS §17.2). "$500" and "3" do; "2024" (shown "2,024") and "five"
+/// (shown "5") do not.
+fn shows_a_number(text: &str) -> bool {
+    let bare = text.trim_end_matches(['.', ',', '!', '?', ';', ':']);
+    let word = Confidence::new(1.0).map(|confidence| Word {
+        text: bare.to_owned(),
+        start_ms: TimeMs::new(0),
+        end_ms: TimeMs::new(0),
+        confidence,
+    });
+    let tokens = tokenize(word.as_slice(), &BTreeMap::new());
+    parse_quantity(&tokens).is_some_and(|(used, quantity)| {
+        used == tokens.len() && format_quantity(quantity.value, &quantity.unit) == bare
+    })
+}
+
 fn push(
     out: &mut Vec<CaptionWord>,
-    text: &str,
+    (text, number): (&str, bool),
     (start, end): (TimeMs, TimeMs),
     word: u32,
     map: &TimeMap,
@@ -136,6 +161,7 @@ fn push(
         start: shown.start,
         end: shown.end,
         word: WordIdx::new(word),
+        number,
     });
 }
 
@@ -205,13 +231,15 @@ fn search(
 /// The chunks of `words`, each one shaped and placed. Hard breaks end a run
 /// of words: a sentence end and a pause of `CHUNK_GAP_MS`. Inside a run the
 /// chunks and their lines are the ones of least cost (D-167), within the
-/// style's `max_words`, `max_lines` and characters per line.
+/// style's `max_words`, `max_lines` and characters per line. The lines are
+/// centred in `block`, the caption block of the clip's placement (D-171).
 pub fn chunk(
     words: &[CaptionWord],
     sentences: &[Sentence],
     style: &StyleSpec,
     theme: &Theme,
     fonts: &FontSet,
+    block: Rect,
 ) -> Result<Vec<Chunk>, SceneError> {
     let limits = Limits {
         per_line: style.max_chars_per_line.max(1),
@@ -270,7 +298,7 @@ pub fn chunk(
         let (Some(first), Some(last)) = (group.first(), group.last()) else {
             continue;
         };
-        let lines = lines(group, space, style, (font, fonts))?;
+        let lines = lines(group, space, style, block, (font, fonts))?;
         // Shown from a little before its first word to a little after its
         // last, and never while the chunk before it is still shown. The
         // chunk before stays at least until its own last word has ended.
@@ -313,11 +341,12 @@ pub fn hold_for_reading(chunks: &mut [Chunk], program_end: OutMs) {
     }
 }
 
-/// The lines of one chunk: centred in the caption zone, one under the other.
+/// The lines of one chunk: centred in the caption block, one under the other.
 fn lines(
     group: &[Placed<'_>],
     space: f32,
     style: &StyleSpec,
+    block: Rect,
     (font, fonts): (FontKey, &FontSet),
 ) -> Result<Vec<Line>, SceneError> {
     let mut lines: Vec<Line> = Vec::new();
@@ -354,17 +383,16 @@ fn lines(
     }
 
     let height = ascent + descent;
-    let caption_zone = zone(ZoneId::Caption);
-    let top = caption_zone.y + (caption_zone.h - height * lines.len() as f32) / 2.0;
+    let top = block.y + (block.h - height * lines.len() as f32) / 2.0;
     // The stroke of the outermost glyphs stays in the zone as well.
-    let room = caption_zone.w - style.stroke_width.max(0.0);
+    let room = block.w - style.stroke_width.max(0.0);
     for (index, line) in lines.iter_mut().enumerate() {
         line.scale = if line.width > room {
             room / line.width
         } else {
             1.0
         };
-        line.x = caption_zone.x + (caption_zone.w - line.width * line.scale) / 2.0;
+        line.x = block.x + (block.w - line.width * line.scale) / 2.0;
         line.baseline = top + height * index as f32 + ascent;
     }
     Ok(lines)
@@ -374,9 +402,10 @@ fn lines(
 mod tests {
     use offcut_types::StyleId;
 
-    use offcut_types::DurMs;
+    use offcut_types::{CaptionPlacement, DurMs};
 
     use super::*;
+    use crate::safe_area::{ZoneId, zone};
     use crate::styles::spec;
     use crate::testing::{transcript, word};
 
@@ -392,6 +421,7 @@ mod tests {
             &spec(StyleId::Clean),
             &theme,
             &fonts,
+            zone(ZoneId::Caption, CaptionPlacement::bottom()),
         )
         .unwrap()
     }
@@ -429,7 +459,7 @@ mod tests {
                     .map(|w| chunk.words[w.word].text.as_str())
                     .collect();
                 assert!(text.join(" ").chars().count() <= 18, "{text:?}");
-                let caption_zone = zone(ZoneId::Caption);
+                let caption_zone = zone(ZoneId::Caption, CaptionPlacement::bottom());
                 assert!(line.x >= caption_zone.x);
                 assert!(line.x + line.width <= caption_zone.x + caption_zone.w);
             }
@@ -559,5 +589,41 @@ mod tests {
         let mut late = chunks_of(&[("Hi.", 1_000, 1_100)]);
         hold_for_reading(&mut late, OutMs::new(1_000));
         assert_eq!(late[0].show.end.get(), 1_220);
+    }
+
+    #[test]
+    fn a_caption_word_shows_a_number_when_made_from_one_or_read_as_one() {
+        let spoken = [
+            word("it", 0, 200),
+            word("costs", 250, 500),
+            word("three", 550, 800),
+            word("dollars", 850, 1_100),
+            word("in", 1_150, 1_300),
+            word("2024.", 1_350, 1_700),
+        ];
+        let t = transcript(&spoken);
+        let map = TimeMap::identity(DurMs::new(10_000));
+        let shown = |edits: &BTreeMap<WordIdx, String>| -> Vec<(String, bool)> {
+            let shown = words(&t, edits, &map);
+            shown.into_iter().map(|w| (w.text, w.number)).collect()
+        };
+        // "three dollars" and "2024." are number spans, shown as their
+        // displays.
+        let plain = shown(&BTreeMap::new());
+        let numbers: Vec<&str> = plain.iter().filter(|w| w.1).map(|w| w.0.as_str()).collect();
+        assert_eq!(numbers, ["$3", "2,024"], "{plain:?}");
+        // A word edited to "2024" is not a number: the captions would show
+        // one as "2,024".
+        let edits = BTreeMap::from([(WordIdx::new(4), "2024".to_owned())]);
+        assert_eq!(shown(&edits)[3], ("2024".to_owned(), false));
+        // A number with an edited word is shown as its words: an edit that
+        // reads as a number shows one, one that does not is a word.
+        let edits = BTreeMap::from([(WordIdx::new(2), "$500".to_owned())]);
+        let edited = shown(&edits);
+        assert_eq!(edited[2], ("$500".to_owned(), true));
+        assert_eq!(edited[3], ("dollars".to_owned(), false));
+        let edits = BTreeMap::from([(WordIdx::new(2), "five,".to_owned())]);
+        assert_eq!(shown(&edits)[2], ("five,".to_owned(), false));
+        assert!(shows_a_number("40%") && shows_a_number("3,000.") && !shows_a_number("x3"));
     }
 }

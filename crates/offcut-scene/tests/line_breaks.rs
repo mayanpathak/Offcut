@@ -31,10 +31,11 @@ use std::path::PathBuf;
 
 use offcut_scene::captions::{CHUNK_GAP_MS, CaptionWord, Chunk, MAX_SEGMENT_WORDS, chunk, words};
 use offcut_scene::readability::binds_to_next;
+use offcut_scene::safe_area::{ZoneId, zone};
 use offcut_scene::styles::{Case, StyleSpec, spec};
 use offcut_scene::{FontSet, Theme};
 use offcut_text::{RawWord, normalize_transcript};
-use offcut_types::{DurMs, StyleId, TimeMap, Transcript, WordIdx};
+use offcut_types::{CaptionPlacement, DurMs, StyleId, TimeMap, Transcript, WordIdx};
 use serde_json::Value;
 
 /// How long each word is spoken, and the silence a row's pauses leave.
@@ -224,6 +225,7 @@ fn broken(row: &Row, limits: &Limits) -> Vec<Vec<String>> {
         &limits.spec(),
         &theme,
         &FontSet::embedded(),
+        zone(ZoneId::Caption, CaptionPlacement::bottom()),
     )
     .unwrap();
     chunks
@@ -498,6 +500,7 @@ fn every_labeled_transcript_breaks_within_its_limits_and_on_no_avoidable_binder(
                 &limits.spec(),
                 &theme,
                 &FontSet::embedded(),
+                zone(ZoneId::Caption, CaptionPlacement::bottom()),
             )
             .unwrap();
             let name = &file.name;

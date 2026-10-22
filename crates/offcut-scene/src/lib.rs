@@ -1,8 +1,9 @@
 //! From a transcript, a valid plan and the user's choices to what each
 //! output frame draws (TS §19, §40.5). A scene is built once; `frame_at` is
 //! then a pure function of the scene and a program time. Nothing here
-//! touches a GPU, a pixel or a decoder, reads a clock, parses a number
-//! (D-121), or moves a timestamp except through the time map (D-126).
+//! touches a GPU, a pixel or a decoder, reads a clock, parses an item's
+//! number (D-121; a caption word is read only to know whether it shows one,
+//! D-169), or moves a timestamp except through the time map (D-126).
 
 pub mod anim;
 pub mod captions;
@@ -12,8 +13,10 @@ pub mod easing;
 pub mod events;
 pub mod fonts;
 pub mod framing;
+pub mod hit;
 pub mod layout;
 pub mod motion;
+pub mod placement;
 pub mod readability;
 pub mod safe_area;
 pub mod styles;
@@ -22,8 +25,8 @@ mod video;
 
 use offcut_plan::ValidPlan;
 use offcut_types::{
-    ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
-    Transcript,
+    ChangeSummary, ClipInfo, DurMs, EditState, EventParams, ExportProfile, OUTPUT_FPS, OutMs,
+    SrcPos, TimeMap, Transcript,
 };
 use thiserror::Error;
 
@@ -34,6 +37,7 @@ pub use crate::display_list::{
 };
 use crate::events::EventTrack;
 pub use crate::fonts::{FontFace, FontSet};
+pub use crate::hit::Hit;
 use crate::styles::StyleSpec;
 pub use crate::theme::{FontRole, Role, Theme};
 
@@ -73,7 +77,10 @@ pub struct Scene {
     style: StyleSpec,
     theme: Theme,
     fonts: FontSet,
+    /// The caption block of the clip's placement, in logical pixels.
+    caption_block: Rect,
     chunks: Vec<Chunk>,
+    emphasis: captions_draw::Emphasis,
     tracks: Vec<EventTrack>,
 }
 
@@ -82,11 +89,20 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let style = styles::spec(input.edit.style);
     let (theme, fonts, map) = (input.theme, input.fonts, input.time_map);
 
+    // Where the captions sit, and the visuals on their free side (D-171).
+    let block = placement::caption_block(input.edit.caption_position, &style);
+    let event_zone = placement::event_zone(block);
+
     let words = captions::words(input.transcript, &input.edit.word_edits, map);
-    let mut chunks = captions::chunk(&words, &input.transcript.sentences, &style, theme, fonts)?;
+    let sentences = &input.transcript.sentences;
+    let mut chunks = captions::chunk(&words, sentences, &style, theme, fonts, block)?;
     captions::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
 
     let mut tracks = Vec::new();
+    let mut emphasis = captions_draw::Emphasis {
+        pops: Vec::new(),
+        numbers: input.edit.highlight_numbers,
+    };
     for item in input.plan.items() {
         // The user's choice for this item, when there is one; every V4 item
         // is shown by default (TS §10.8, D-145).
@@ -100,9 +116,13 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
             continue;
         }
         let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;
-        if let Some(track) =
-            events::layout(item, span, input.transcript, map, &style, theme, fonts)?
-        {
+        // A KeywordPop is drawn by the captions: its word, from its program
+        // start (TS §19.5, D-169).
+        if let EventParams::KeywordPop { word } = item.params {
+            emphasis.pops.push((word, span.start));
+        }
+        let (when, t) = ((span, event_zone), input.transcript);
+        if let Some(track) = events::layout(item, when, t, map, &style, theme, fonts)? {
             tracks.push(track);
         }
     }
@@ -118,7 +138,9 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         style,
         theme: theme.clone(),
         fonts: fonts.clone(),
+        caption_block: block,
         chunks,
+        emphasis,
         tracks,
     })
 }
@@ -140,7 +162,8 @@ impl Scene {
     pub fn frame_at(&self, t: OutMs) -> DisplayList {
         let mut cmds = vec![self.video.cmd(t, self.canvas)];
         if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
-            captions::draw(chunk, t, &self.style, &self.theme, &mut cmds);
+            let (style, theme) = (&self.style, &self.theme);
+            captions_draw::draw_with(chunk, t, style, theme, &self.emphasis, &mut cmds);
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
@@ -152,9 +175,23 @@ impl Scene {
         DisplayList { cmds }
     }
 
+    /// What the point `(x, y)` of the canvas, in logical pixels, is on at
+    /// `t` (D-174): a word of the chunk shown then, the caption block, or
+    /// the video. `None` outside the canvas.
+    pub fn hit(&self, t: OutMs, x: f32, y: f32) -> Option<Hit> {
+        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t));
+        hit::hit(shown, self.caption_block, x, y)
+    }
+
     /// Where the main video's source is at `t`.
     pub fn source_at(&self, t: OutMs) -> SrcPos {
         self.time_map.to_src(t)
+    }
+
+    /// The box the caption lines are centred in, for the clip's placement,
+    /// in logical pixels (D-171).
+    pub fn caption_block(&self) -> Rect {
+        self.caption_block
     }
 
     /// The faces the glyph runs of every frame are drawn with (D-132).
@@ -324,11 +361,15 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
-    use offcut_types::{DetectedEvent, FrameIdx, Quantity, StyleId, Unit};
+    use offcut_types::{
+        Confidence, DetectedEvent, EventId, EventKind, FrameIdx, Quantity, Span, StyleId, TimeMs,
+        Unit, WordIdx, WordRange,
+    };
 
     use super::testing::*;
     use super::*;
     use crate::safe_area::SAFE_AREA;
+    use crate::styles::spec;
 
     /// Captions with a long and a wide word, a pause, a number that counts
     /// up through texts wider than its end, and one that scales in.
@@ -527,5 +568,82 @@ mod tests {
             }
         }
         assert!(runs > 500, "{runs}");
+    }
+
+    #[test]
+    fn a_number_is_in_accent_when_highlighted_and_a_keyword_pop_from_its_start() {
+        let spoken = [
+            word("It", 1_000, 1_200),
+            word("made", 1_250, 1_500),
+            word("$5", 1_550, 1_800),
+            word("now.", 1_850, 2_200),
+        ];
+        let t = transcript(&spoken);
+        let pop = DetectedEvent {
+            id: EventId::new(1),
+            kind: EventKind::KeywordPop,
+            span: Span::new(TimeMs::new(1_250), TimeMs::new(1_500)).unwrap(),
+            anchors: WordRange {
+                start: WordIdx::new(1),
+                end: WordIdx::new(2),
+            },
+            params: EventParams::KeywordPop {
+                word: WordIdx::new(1),
+            },
+            confidence: Confidence::new(1.0).unwrap(),
+            enabled: true,
+        };
+        let plan = plan(&t, &[pop]);
+        let theme = Theme::default_for(StyleId::Clean);
+        let scene = |highlight_numbers| {
+            build_scene(SceneInput {
+                transcript: &t,
+                plan: &plan,
+                edit: &EditState {
+                    highlight_numbers,
+                    ..EditState::default()
+                },
+                clip: &clip(1080, 1920, 10_000),
+                profile: &profile(1080),
+                time_map: &TimeMap::identity(DurMs::new(10_000)),
+                theme: &theme,
+                fonts: &FontSet::embedded(),
+            })
+            .unwrap()
+        };
+        let fill = |scene: &Scene, at: u32, text: &str| {
+            let list = scene.frame_at(OutMs::new(at));
+            let fills: Vec<Rgba> = list
+                .cmds
+                .iter()
+                .filter_map(|cmd| match cmd {
+                    DrawCmd::GlyphRun {
+                        fill, text: run, ..
+                    } if run == text => Some(*fill),
+                    DrawCmd::GlyphRun { .. }
+                    | DrawCmd::FillRect { .. }
+                    | DrawCmd::FillPath { .. }
+                    | DrawCmd::PushLayer { .. }
+                    | DrawCmd::PopLayer
+                    | DrawCmd::Video { .. }
+                    | DrawCmd::Image { .. } => None,
+                })
+                .collect();
+            assert_eq!(fills.len(), 1, "{text:?} at {at}");
+            fills[0]
+        };
+        let (on, off) = (scene(true), scene(false));
+        // One chunk: "It made $5 now." fits one line.
+        // "It" is spoken: "made" is not popped yet; "$5" is a number.
+        assert_eq!(fill(&on, 1_100, "made"), theme.text);
+        assert_eq!(fill(&on, 1_100, "$5"), theme.accent);
+        assert_eq!(fill(&off, 1_100, "$5"), theme.text);
+        // "now." is spoken: "made" has popped and stays in `pop`.
+        let pop = theme.color(spec(StyleId::Clean).pop);
+        assert_eq!(fill(&on, 2_000, "made"), pop);
+        assert_eq!(fill(&off, 2_000, "made"), pop);
+        assert_eq!(fill(&on, 2_000, "now."), theme.accent);
+        assert_eq!(fill(&on, 2_000, "It"), theme.text);
+        assert_eq!(fill(&off, 2_000, "$5"), theme.text);
     }
 }

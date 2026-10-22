@@ -148,7 +148,20 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
     let (t, plan, length) = reference();
     let map = TimeMap::identity(DurMs::new(length));
     let theme = Theme::default_for(StyleId::Clean);
-    let edit = EditState::default();
+    // Numbers in the accent colour and the KeywordPop word ("brutal") would
+    // share the spoken word's colour in Clean (D-169): off here, so that the
+    // one run in that colour is the spoken word. `captions_draw.rs` and the
+    // scene's inline tests test the emphasis.
+    let edit = EditState {
+        highlight_numbers: false,
+        event_overrides: plan
+            .items()
+            .iter()
+            .filter(|item| item.kind == EventKind::KeywordPop)
+            .map(|item| (item.id, false))
+            .collect(),
+        ..EditState::default()
+    };
     let scene = build_scene(SceneInput {
         transcript: &t,
         plan: &plan,

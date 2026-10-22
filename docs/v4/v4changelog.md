@@ -43,6 +43,7 @@
 | 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 | 20 | ~~**The identity proof cannot pass on `busy_1080` and `busy_540` as recorded.** V3's `busy()` gives its first two NumberReveals spans no word of its transcript has (1,000-1,400 and 3,500-3,800 ms); `validate` takes every item's span from its anchor words (D-121), so through the V4 contract they become 1,100-1,350 ("three") and 3,500-3,750 ("wanted."). In the comparison run (Entry 8) the four detector-built inputs are identical (836 frames) and each `busy` input differs in exactly 4 frames, all inside those two events' windows (count-up start, hold end, fade). **Decided by the founder on 2026-10-22 (Entry 9): re-derive the two `busy` files with V3's scene code (`09b1085`) on these anchored events, the other four files unchanged**; the alternative, accepting the 8 named frames, was declined. Prompt 100 does it, records it, and the proof then reads "6 inputs, identical"~~ Closed in Entry 10: re-derived, "6 inputs, 922 frames, identical" | `offcut-scene/tests/v3_reference.rs`, `tests/snapshots/v3_reference/busy_*.json` | P100 |
 | 21 | ~~Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23)~~ Closed in Entry 13: frozen at `01f406f` | `docs/v4/v4changelog.md` | P103 |
+| 22 | `crates/offcut-scene/src/captions.rs` is exactly at the 400-line limit above its tests (Entry 14: the number rule of D-169 took the last lines). The next change there moves something out first: the reading floor to `readability.rs` (which holds `MIN_CHUNK_MS`) or the number rule beside the words | `offcut-scene/src/captions.rs` | P105 |
 
 ---
 
@@ -987,3 +988,166 @@ The files were restored, and the table and property checks pass again.
 - Prompt 104's binder-cost drill now has two binder costs to drill: `COST_AFTER_BINDER` for lines, and `COST_BINDER_AT_SCREEN_END` for screens.
 
 **Open.** Open items 1-5 unchanged; open item 7 and known issue 21 closed (above). No new item or issue.
+
+---
+
+## Entry 14 - 2026-10-23 - P104 (S8): emphasis, placement, hit test, shaping cache, parity
+
+**What.** Prompt 104 (G 8.4, G 8.5, M-8; D-169 to D-174, §8.6, §8.9, §8.10, §11.1): the caption block and the event zone from `EditState.caption_position`, the emphasis order in `captions_draw.rs`, `Scene::hit`, the per-thread shaping cache, the preview-equals-export parity test, and the binding's `hit`. With Prompt 103 this completes caption intelligence in the scene (S8).
+
+**1. Placement** (`placement.rs`, new, [ONLY], D-171):
+- **Constants.** `CAPTION_TOP = SAFE.top + 140` (390) and `CAPTION_BOTTOM = SAFE.bottom - 140` (1,360); `SNAP_TOP = 0.15`, `SNAP_MIDDLE = 0.55`, `SNAP_BOTTOM = 1.0`; `CAPTION_BLOCK_HEIGHT = 280`, `EVENT_ZONE_HEIGHT = 320`, `EVENT_ZONE_GAP = 40`, all (assumption, E-2).
+- **`caption_block(p, style)`.** The block is as wide as the safe area and 280 lp tall, centred at `CAPTION_TOP + p x (CAPTION_BOTTOM - CAPTION_TOP)`. Every V4 style has the same block: `style` is the seam for one that will not, and an inline test asserts all three styles agree.
+- **`event_zone(block)`.** When the block's centre is at or below 960, the zone ends 40 lp above the block; above 960, it starts 40 lp below it. At 1.0 this gives exactly V3's zones (block 1,220-1,500, event zone 860-1,180); at 0.0, block 250-530 and event zone 570-890.
+- **No profile.** Nothing in `placement.rs` reads `profile.watermark`.
+- **`safe_area::zone(id, placement)`.** It now takes the clip's placement and reads the same two functions (through `block_at`).
+- **`build_scene`.** It computes the block and the event zone once:
+  - `captions::chunk` takes the `block` (the plan's signature, §8.1), and `lines` centres in it.
+  - `events::layout` takes `(span, zone)`, when and where, as one argument, because it already had clippy's maximum of 7.
+  - `number_reveal::layout` takes the zone, and its `Track` keeps the zone's centre (`centre_x`), so `draw` no longer reads a fixed zone.
+- **`Scene::caption_block()`** gives the block (for `hit` and the tests).
+
+**2. Emphasis** (`captions_draw.rs`, D-169):
+- **The order.** `fill_role` gives each word's role, the first that applies of:
+  1. The spoken word, through the style's active treatment.
+  2. A KeywordPop word (`pop`).
+  3. A number, when `highlight_numbers` is on (`accent`).
+  4. `fill`.
+- **Cursor styles.** A style whose active word is not a colour (Tech's `Cursor`) leaves the spoken word to the next layers.
+- **The emphasis.** `Emphasis { pops: Vec<(WordIdx, OutMs)>, numbers }` is built by `build_scene`: each KeywordPop item gives its word and its program start (the hand-over of §8.1; `events/keyword_pop.rs` is Prompt 106's). A popped word is in `pop` from that start while its chunk is shown.
+- **Drawing.** `draw_with(chunk, t, style, theme, emphasis, out)` draws the scene. `draw` (no emphasis besides the spoken word, V3's look) stays for V3's inline test.
+- **Which words are numbers.** `CaptionWord` gains `number: bool`, set by `captions::words` (§8.9):
+  - A word made from a number span is a number.
+  - So is a word whose text, less a closing mark, `parse_quantity` reads whole and `format_quantity` writes back unchanged: "$500" and "3" are numbers; "2024" (shown "2,024") and "five" (shown "5") are not.
+  - The scene's crate doc now says it parses no item's number (D-121) and reads a caption word only to know whether it shows one. `Cargo.toml`'s comment on `offcut-text` names the two functions.
+- **Tests:**
+  - `captions_draw.rs` inline: every combination of the layers, and the cursor case.
+  - `lib.rs` inline: in a scene, "$5" is in `accent` with numbers highlighted and in `text` without, and a KeywordPop word turns `pop` from its start and not before.
+  - `captions.rs` inline: number spans, an edited "$500", an edited "2024", and "five,".
+
+**3. Hit testing** (`hit.rs`, new, D-174):
+- **`Hit`.** `Hit::{Word(WordIdx), Captions, Video}`.
+- **`word_boxes(chunk)`.** Each word's glyph box from the layout already built, at its line's scale; nothing is shaped.
+- **`Scene::hit(t, x, y)`.** The rules, in order:
+  1. A point off the canvas, or not a number, gives `None`.
+  2. While no chunk is shown, `Video`.
+  3. Otherwise, a word within `HIT_PADDING` (8 lp) of its box. Where two padded boxes meet, the nearer box wins, and of two equally near, the first drawn (the lines of a chunk touch, so padded boxes overlap).
+  4. Otherwise, `Captions` inside the block, `Video` outside it.
+- **`tests/hit.rs`:**
+  - Every word's centre over 85 instants hits that word (its index from `captions::words`).
+  - The block's four corners hit `Captions`, and points outside it hit `Video`.
+  - A word is hit 7.5 lp to its left and not 8.5 lp.
+  - Before and after the captions, the block's middle is `Video`.
+  - Points off the canvas, `NaN` and infinity give `None`, and a sweep of 8,591 points at three times never panics.
+
+**4. The shaping cache** (`layout.rs`, D-173):
+- **The structure.** A `thread_local!` `Cache` written in the file, following D-173's design:
+  - A `BTreeMap` keyed by `(String, FontKey, u32 size bits)` holds the runs and each entry's last use.
+  - A second `BTreeMap` from use to key evicts the least recently used past `SHAPE_CACHE_ENTRIES = 2,048`.
+- **Faces.** The cache remembers the `FontSet` it was filled with, compared by `FontSet::same_faces`: the same files by pointer, not byte by byte, and the same families, weights and coordinates. For another set it empties itself, so a key never answers for faces it was not shaped with.
+- **Errors.** A failed shaping is not kept.
+- **The switch.** `layout::set_shape_cache(on)` is `#[doc(hidden)]`; it turns the cache on or off and empties it. The program never calls it.
+- **`FontSet::empty()`.** A `const fn`, for the `const` thread-local.
+- **Tests:**
+  - Inline: the least recently used is dropped, the size is part of the key, another set empties the cache, and nothing is kept while off.
+  - `tests/scene_cache.rs`: six scenes, each built cold, warm and with the cache off. The three `Scene`s and every frame's display list are equal.
+
+**Build times** (`cargo test -p offcut-scene --release --test scene_cache -- --nocapture`, D1, d1):
+
+| Scene | Frames | Cold | Warm | Without the cache |
+|---|---|---|---|---|
+| a01-scriptA | 2,013 | 17.8 ms | 1.4 ms | 8.2 ms |
+| a02-v3testclip | 2,386 | 4.2 ms | 2.7 ms | 5.9 ms |
+| w01-saas-pricing | 876 | 2.9 ms | 0.7 ms | 2.1 ms |
+| w16-open-source | 740 | 3.4 ms | 0.6 ms | 2.6 ms |
+| w20-battery-life | 976 | 2.9 ms | 1.1 ms | 2.8 ms |
+| w28-mistakes | 906 | 1.7 ms | 0.6 ms | 1.4 ms |
+| **Six scenes** | | **32.8 ms** | **7.2 ms** | |
+
+- **The first build.** a01's cold build is the thread's first: it includes building the shaper and registering the fonts.
+- **Debug build.** The same run gave 434.0 ms cold and 22.2 ms warm for the six.
+- **The edit-to-preview budget.** D-173's 150 ms (TS §13.5) is measured end to end on the 60 s clip in Phase 13. A warm rebuild here is a few milliseconds.
+
+**5. Parity** (`tests/parity.rs`, D-172):
+- **The comparison.** For each of the six scenes, every frame at 540 and 720 wide is compared with 1080, command by command, in logical pixels.
+- **Lengths.** Glyph positions on the canvas, sizes, stroke widths, rectangles, radii, clip rectangles, path points and the video's `dst` are within 0.01 lp.
+- **Equal values.** Fonts, glyph ids, texts, colours, opacities and the video's source rectangle are equal.
+- **Result.** It passes. The image comparison of D-172 (`golden_frames.rs`'s parity case) is Prompt 107's.
+
+**The six scenes** (`tests/common/scenes.rs`, new, included by `#[path]` as `offcut-render` includes `common/ssim.rs`; added to TS §5's tree under the scene's `tests/`):
+- **Sources.** a01, a02, w01, w16, w20 and w28 of the labeled set, detected and validated as the pipeline does. Written files are timed and stressed as `precision_recall.rs` does them; a02 takes its recorded words and prosody; each file's own edits are applied.
+- **Choices across the six:**
+
+| Scene | Style | Placement | Other choice |
+|---|---|---|---|
+| a01 | Clean | 1.0 | |
+| a02 | Bold | 0.15 | |
+| w01 | Tech | 0.55 | |
+| w16 | Clean | 0.0 | numbers not highlighted |
+| w20 | Bold | 1.0 | word 3 edited to "$500" |
+| w28 | Clean | 0.55 | its first visual turned off |
+
+- **Output.** The tests print only file names and times; a02 is the founder's clip, and its words are not printed.
+
+**6. The binding** (`scene_api.rs`, §11.1):
+- **`RenderSession.hit(t_out_ms, x, y)`.** `x` and `y` are fractions of the canvas, mapped to logical pixels by `CANVAS_WIDTH` and `CANVAS_HEIGHT`.
+- **The answer.** `{ kind: "word", word }`, `{ kind: "captions" }` or `{ kind: "video" }`, through a tagged `HitValue`; `null` off the canvas or before a scene is set.
+- **Wiring.** Prompt 113 wires it to the worker's `hitTest`.
+- **Inline test:** the fractions, off-canvas answers, and the three JSON shapes.
+
+**`tests/placement.rs`** (§8.10):
+- **Inside and apart.** At 0.0, 0.15, 0.55 and 1.0, the block and the event zone are inside the safe area and apart, and `safe_area::zone` gives the same two boxes.
+- **The watermark's band.** The band is taken from the safe area until `watermark.rs` exists (D-143: 36 lp, baseline 6 lp above the safe area's bottom; band 1,458-1,500). It lies below `CAPTION_BOTTOM`, the lowest a block's centre goes, and is clear of the event zone everywhere and of the block at 0.0, 0.15 and 0.55.
+- **Drawn where placed.** Captions and numbers are drawn where the placement puts them: in the a01 scene at each placement, every caption run's baseline (over 1,000) is in the block and every number run's (over 50) is in the event zone.
+- **The watermark flag.** It changes no placement: at every placement, the scene with the watermark flag has the same block, and each frame without it is the start of the same frame with it. The watermark, once drawn (Prompt 106), is the last command.
+- **At 1.0.** Exactly 860-1,180.
+
+**The V3 expectations at placement 1.0** (the prompt's requirement). Every V3 inline test passes with its expectations unchanged. Three V3 tests changed by their calls only, because the functions they call now take the placement:
+- `safe_area`'s zone test: `zone(id, CaptionPlacement::bottom())`.
+- `captions.rs`'s `chunks_of` and its zone check: the default block, and the test module's imports of `zone`.
+- `number_reveal.rs`'s `track_of` and its room check: the default event zone.
+
+`line_breaks.rs` passes the default block to `chunk` in its two calls, with its `ROWS` byte for byte as in `01f406f`.
+
+**Changed beyond the prompt's files.** The emphasis of D-169 is on by default (`highlight_numbers` defaults to `true`, Prompt 95), and in Clean's V3 colours numbers and pops share the spoken word's `accent`. So `timemap_identity.rs`, which asserts that the one accent run at each word's time is that word, builds its scene with `highlight_numbers: false` and the KeywordPop item turned off (a comment says why). It tests timing, which this does not change. Its other assertions are unchanged.
+
+**Guards (G 8.5),** each a temporary edit, the test run, then the files restored and checked identical by SHA-256 (`drill104.py`, in the scratchpad):
+
+| Temporary edit | Result |
+|---|---|
+| `COST_AFTER_BINDER` 12 → 0 | `line_breaks.rs` fails: `table` 4 of 60 differ, rows 3 (an article row), 5 and 6 (preposition rows) and 25; the property check, a01: "9 lines end on a binder, 0 must" |
+| Both binder costs 0 (with `COST_BINDER_AT_SCREEN_END`, as Entry 13 asked) | 13 of 60 differ (rows 2, 3, 5, 6, 7, 11, 17, 25, 30); a01: 17 against 0 |
+| `placement.rs` gains `caption_block_for(p, style, profile)`, which raises the block by 48 lp when `profile.watermark` is set, and `build_scene` calls it | `placement.rs` fails `the_watermark_flag_changes_no_placement` at placement 0.0 |
+| The cache key `(text, key, 0)`, without the size | `scene_cache.rs` fails on a01: a text shaped at one size answers for another |
+
+A first form of the watermark drill (a third parameter on `caption_block`) did not compile, because the other callers use the two-argument form. The form above is the mistake as it would be written.
+
+**How it was checked.**
+- `cargo test -p offcut-scene`: all pass. Inline 32 (Entry 13: 25; +2 `placement`, +1 `captions_draw`, +1 `hit`, +1 `layout`, +1 `captions`, +1 `lib`), `line_breaks` 2, `placement` 3, `hit` 3, `scene_cache` 1, `parity` 1, `timemap_identity` 1.
+- `cargo test -p offcut-scene -p offcut-plan`: all pass (M-8).
+- `git log --oneline -3 -- crates/offcut-scene/tests/line_breaks.rs`: `3659c8f` (P103), `01f406f` (the table). `git log --diff-filter=A --format=%h -- crates/offcut-scene/src/readability.rs`: `3659c8f`, newer than the table's `01f406f` (M-8).
+- `cargo clippy --workspace --all-targets -- -D warnings` and `cargo clippy -p offcut-wasm-render --target wasm32-unknown-unknown -- -D warnings`: clean.
+  - `scene_cache.rs`'s timing helper carries `#[allow(clippy::disallowed_methods)]` for `Instant::now`, the one clock of the scene's tests, as `offcut-detect/tests/redetect.rs` does. The crate itself reads no clock.
+- `node scripts/check-file-tree.mjs`: ok, 318 files. `captions.rs` is 400 lines above its tests, exactly the limit (known issue 22).
+- **The SAB gate:**
+  - On `v4-build`, no `zz` file, no test key; `pnpm build:wasm` exit 0; `pnpm fixtures` up to date; `pnpm check` exit 0.
+  - **Rust: 580 passed, 0 failed, 3 ignored.** Entry 13 read 564/0/3; the 16 added are the 7 inline scene tests above, 8 in the four new test files, and 1 in `scene_api.rs`.
+  - Vitest 92; `pnpm build` exit 0 (app shell 308.8 kB, unchanged); `pnpm e2e` 12 passed.
+  - The frozen check lists the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+  - `pnpm e2e:media` was not run: the prompt asks for none. CI's `e2e-media` job runs it on this commit.
+
+**Differs from the plan or the prompt.**
+- **The watermark box at 1.0.** §8.10's "the watermark box disjoint from both" cannot hold for the block at 1.0: the block reaches the safe area's bottom, as V3's caption zone does, and the watermark sits there. The test asserts the band against the event zone everywhere, against the block at the three higher places, and below `CAPTION_BOTTOM`. D-143's test of the caption glyph boxes against the watermark's (`layout_safe_area.rs`, Prompt 106) is what guards 1.0.
+- **`events::layout`'s signature.** It takes `(span, zone)` as one argument, rather than §8.1's list plus a zone.
+- **`draw` stays beside `draw_with`.** `draw` is kept for V3's inline test of the active colour; `frame_at` calls `draw_with`.
+- **Hit points between two words.** Where padded boxes meet, the nearer box wins (D-174 does not say).
+- **A KeywordPop has no end of its own.** A pop lasts from its start while its chunk is shown, because §8.7 gives `keyword_pop.rs` "the word and its program start" only. Its scale (1.0 → 1.25 → 1.10) is Prompt 105's.
+- **The cache compares faces.** It also compares the `FontSet` it was filled with (by pointer), beside D-173's key, so that another set never gets runs it did not shape.
+- **New test file.** `tests/common/scenes.rs` and its TS §5 line.
+
+**Found, not fixed.**
+- **The summary.** `Scene::summary` still counts no emphasized caption (`captions_emphasized: 0`) although pops are now drawn; `summary.rs` (D-144) is Prompt 106's.
+- **A pop on a number.** It is matched on a caption word's first transcript word only, so a KeywordPop on the second word of a spoken number does not colour it. This is rare: the detector's KeywordPop is a content word outside every other event's anchors (TS §17.5), though a spoken number with no NumberReveal ("three thousand") is not excluded. Prompt 106's `keyword_pop.rs` can carry the range.
+- **The manual check.** M-8's "Captions read naturally" (`pnpm dev`, the sample clip: no "the" or "to" at a line end, two-line chunks of similar length) is a look on the page, for the founder; the property check of Entry 13 tests the same rule over the 31 labeled transcripts.
+
+**Open.** Open items 1-5 unchanged. Known issue 22 (new): `captions.rs` is at 400 lines; Prompt 105 must move something out before adding to it.

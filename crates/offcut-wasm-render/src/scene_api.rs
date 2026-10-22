@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 
 use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
-use offcut_render::scene::{FontSet, Scene, SceneInput, Theme, build_scene};
+use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
+use offcut_render::scene::{FontSet, Hit, Scene, SceneInput, Theme, build_scene};
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
     ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript,
@@ -64,6 +65,28 @@ struct SceneReport {
 enum SourcePos {
     At(u32),
     Held(u32),
+}
+
+/// What a point of the canvas is on, as JavaScript reads it (D-174):
+/// `{ kind: "word", word: number }`, `{ kind: "captions" }` or
+/// `{ kind: "video" }`.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum HitValue {
+    Word { word: u32 },
+    Captions,
+    Video,
+}
+
+/// What the point `(x, y)` is on at `t_out_ms`, `x` and `y` fractions of the
+/// canvas's width and height. `None` outside the canvas.
+fn hit_of(scene: &Scene, t_out_ms: u32, x: f32, y: f32) -> Option<HitValue> {
+    let at = OutMs::new(t_out_ms);
+    Some(match scene.hit(at, x * CANVAS_WIDTH, y * CANVAS_HEIGHT)? {
+        Hit::Word(word) => HitValue::Word { word: word.get() },
+        Hit::Captions => HitValue::Captions,
+        Hit::Video => HitValue::Video,
+    })
 }
 
 /// The plan of the detector's events: the plan the page holds and hands back
@@ -153,6 +176,21 @@ impl RenderSession {
             });
         // One number in one field always serializes.
         at.and_then(|at| to_plain(&at).ok())
+            .unwrap_or(JsValue::NULL)
+    }
+
+    /// What the point `(x, y)` of the canvas is on at the program time
+    /// `t_out_ms` (D-174), `x` and `y` fractions of its width and height:
+    /// `{ kind: "word", word }`, `{ kind: "captions" }`, `{ kind: "video" }`;
+    /// `null` outside the canvas or before a scene is set. Wired to the
+    /// worker's `hitTest` in V4 Prompt 113.
+    pub fn hit(&self, t_out_ms: u32, x: f32, y: f32) -> JsValue {
+        let hit = self
+            .scene
+            .as_ref()
+            .and_then(|scene| hit_of(scene, t_out_ms, x, y));
+        // A tag and at most one number always serialize.
+        hit.and_then(|hit| to_plain(&hit).ok())
             .unwrap_or(JsValue::NULL)
     }
 
@@ -269,5 +307,22 @@ mod tests {
             report,
             json!({ "dropped": [{ "kind": null, "reason": "not_in_this_build" }] })
         );
+    }
+
+    #[test]
+    fn a_point_is_read_as_fractions_of_the_canvas_and_answered_as_a_tagged_object() {
+        let (scene, _) = scene_of(input(|_| {}), &clip()).unwrap();
+        // No words: the caption block's middle is the video; off the canvas,
+        // nothing.
+        assert_eq!(hit_of(&scene, 0, 0.5, 0.5), Some(HitValue::Video));
+        assert_eq!(hit_of(&scene, 0, 1.01, 0.5), None);
+        assert_eq!(hit_of(&scene, 0, 0.5, -0.01), None);
+        let as_json = |hit: HitValue| serde_json::to_value(hit).unwrap();
+        assert_eq!(
+            as_json(HitValue::Word { word: 7 }),
+            json!({ "kind": "word", "word": 7 })
+        );
+        assert_eq!(as_json(HitValue::Captions), json!({ "kind": "captions" }));
+        assert_eq!(as_json(HitValue::Video), json!({ "kind": "video" }));
     }
 }

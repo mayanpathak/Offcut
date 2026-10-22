@@ -430,6 +430,7 @@ offcut/
 │   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
 │   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
 │   │       ├── hit.rs                 Scene::hit (D-174)
+│   │       ├── common/scenes.rs       six scenes of the labeled set, for parity.rs and scene_cache.rs
 │   │       └── snapshots/             insta snapshot files
 │   ├── offcut-render/
 │   │   ├── Cargo.toml

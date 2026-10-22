@@ -9,7 +9,8 @@ workspace = true
 
 [dependencies]
 offcut-types = { workspace = true }
-# For `format_quantity` only (D-28).
+# For `format_quantity` (D-28), and `tokenize` and `parse_quantity` to tell
+# a caption word that shows a number (D-169).
 offcut-text = { workspace = true }
 # The scene draws a valid plan, which only `offcut-plan` can make (D-122).
 # Without `prompt`: the scene needs no schema code.

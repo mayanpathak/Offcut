@@ -2,7 +2,10 @@
 //! the only file that holds these numbers. All layout is in logical pixels
 //! (lp); the insets are (assumption, E-2).
 
+use offcut_types::CaptionPlacement;
+
 use crate::display_list::Rect;
+use crate::placement;
 
 pub const CANVAS_WIDTH: f32 = 1080.0;
 pub const CANVAS_HEIGHT: f32 = 1920.0;
@@ -24,28 +27,22 @@ pub const SAFE_AREA: Rect = Rect {
 /// append rows (`Top`, `LowerThird`, …).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ZoneId {
-    /// y 860 to 1180, as wide as the safe area.
+    /// 320 lp tall, on the free side of the captions (D-171): y 860 to 1180
+    /// at the default placement.
     Event,
-    /// y 1220 to 1500, as wide as the safe area.
+    /// The caption block, 280 lp tall: y 1220 to 1500 at the default
+    /// placement.
     Caption,
     /// The safe area.
     Full,
 }
 
-pub const fn zone(id: ZoneId) -> Rect {
+/// The zone `id` for a clip whose captions are at `placement`, as wide as
+/// the safe area (`placement.rs`, D-171).
+pub fn zone(id: ZoneId, placement: CaptionPlacement) -> Rect {
     match id {
-        ZoneId::Event => Rect {
-            x: SAFE_AREA.x,
-            y: 860.0,
-            w: SAFE_AREA.w,
-            h: 320.0,
-        },
-        ZoneId::Caption => Rect {
-            x: SAFE_AREA.x,
-            y: 1220.0,
-            w: SAFE_AREA.w,
-            h: 280.0,
-        },
+        ZoneId::Event => placement::event_zone(placement::block_at(placement)),
+        ZoneId::Caption => placement::block_at(placement),
         ZoneId::Full => SAFE_AREA,
     }
 }
@@ -60,7 +57,7 @@ mod tests {
     #[test]
     fn the_zones_are_v3s_and_inside_the_safe_area() {
         let rows = |id| {
-            let r = zone(id);
+            let r = zone(id, CaptionPlacement::bottom());
             (r.x, r.y, r.w, r.h)
         };
         assert_eq!(rows(ZoneId::Event), (60.0, 860.0, 900.0, 320.0));

@@ -6,7 +6,7 @@ use offcut_plan::ValidItem;
 use offcut_types::{EventParams, OutMs, OutSpan, TimeMap, Transcript};
 
 use crate::SceneError;
-use crate::display_list::DrawCmd;
+use crate::display_list::{DrawCmd, Rect};
 use crate::fonts::FontSet;
 use crate::styles::StyleSpec;
 use crate::theme::Theme;
@@ -19,10 +19,11 @@ pub enum EventTrack {
 }
 
 /// `None` for an item that is not drawn: a kind V2 has no visual for, or a
-/// number that cannot fit (TS §19.7). `span` is the item's program time.
+/// number that cannot fit (TS §19.7). `span` is the item's program time and
+/// `zone` the clip's event zone (D-171): when and where it is shown.
 pub fn layout(
     item: &ValidItem,
-    span: OutSpan,
+    (span, zone): (OutSpan, Rect),
     t: &Transcript,
     map: &TimeMap,
     style: &StyleSpec,
@@ -33,7 +34,8 @@ pub fn layout(
     let _ = (t, map);
     match &item.params {
         EventParams::NumberReveal { value, label } => {
-            let track = number_reveal::layout(value, label.as_deref(), span, style, theme, fonts)?;
+            let label = label.as_deref();
+            let track = number_reveal::layout(value, label, span, zone, style, theme, fonts)?;
             Ok(track.map(EventTrack::NumberReveal))
         }
         // V4: the visuals of TS §19.5 for these three.

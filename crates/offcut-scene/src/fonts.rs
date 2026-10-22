@@ -64,8 +64,26 @@ impl FontSet {
         })
     }
 
+    /// No faces: what `Default` gives, usable in a `const`.
+    pub(crate) const fn empty() -> FontSet {
+        FontSet { faces: Vec::new() }
+    }
+
     pub fn get(&self, key: FontKey) -> Option<&FontFace> {
         self.faces.get(usize::from(key.0))
+    }
+
+    /// Whether `other` holds the same faces by key: the same files (not
+    /// compared byte by byte: shared), families, weights and coordinates.
+    /// What the shaping cache asks before it answers (D-173).
+    pub(crate) fn same_faces(&self, other: &FontSet) -> bool {
+        self.faces.len() == other.faces.len()
+            && self.faces.iter().zip(&other.faces).all(|(a, b)| {
+                Arc::ptr_eq(&a.data, &b.data)
+                    && a.family == b.family
+                    && a.weight == b.weight
+                    && a.coords == b.coords
+            })
     }
 }
 
