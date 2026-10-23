@@ -4,7 +4,7 @@
 // its bar in the brand colour. It only reads the model store; nothing is
 // started from here, and Cancel is wired in Prompt 119.
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import manifest from "../../config/model-manifest.json";
 import { messages } from "../../copy/messages";
@@ -28,11 +28,35 @@ function failureCopy(code: ErrorCode | undefined) {
   return undefined;
 }
 
+/** The time left is said in steps of this many seconds. */
+const ETA_STEP_S = 5;
+/** A higher time left is said only once it is this share above the one shown. */
+const ETA_RISE = 0.25;
+
+/**
+ * The time left as it is said (design review 1): rounded up to steps of
+ * ETA_STEP_S, always allowed to fall, and allowed to rise only when the
+ * download has really slowed. The estimate from the last 5 s of speed
+ * (model-manager.ts) would otherwise go up and down with every piece.
+ */
+function useSteadyEta(etaSecs: number | null): number | null {
+  const [shown, setShown] = useState<number | null>(null);
+  useEffect(() => {
+    if (etaSecs === null) {
+      setShown(null);
+      return;
+    }
+    const stepped = Math.ceil(etaSecs / ETA_STEP_S) * ETA_STEP_S;
+    setShown((last) => (last === null || stepped < last || stepped > last * (1 + ETA_RISE) ? stepped : last));
+  }, [etaSecs]);
+  return shown;
+}
+
 export function ModelDownloadPanel() {
   const status = useModelStore((state) => state.status);
   const done = useModelStore((state) => state.done);
   const total = useModelStore((state) => state.total);
-  const etaSecs = useModelStore((state) => state.etaSecs);
+  const etaSecs = useSteadyEta(useModelStore((state) => state.etaSecs));
   const error = useModelStore((state) => state.error);
   const bodyId = useId();
   const bar = useRef<HTMLDivElement>(null);

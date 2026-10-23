@@ -273,7 +273,7 @@
   color: var(--danger);
 }
 
-/* A bar in the brand colour (G 10.6); the component sets --progress, never a style attribute. */
+/* A bar in the brand colour (G 10.6), set through --progress (no style attribute); it glides to each new value over 1 s, never past it (design review 1). */
 .meter {
   height: var(--sp-1);
   overflow: hidden;
@@ -285,7 +285,7 @@
   width: var(--progress, 0%);
   height: 100%;
   background: var(--brand);
-  transition: width var(--base) linear;
+  transition: width calc(var(--base) * 5) var(--ease);
 }
 
 /* --- The processing card: its steps and the feed's chips ---------------------- */

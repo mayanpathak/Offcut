@@ -18,7 +18,7 @@
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
 | 6 | ~~**Open a draft pull request `v4-build` → `main`**~~ Done: PR #7 is open as a draft (closed in Entry 1) | Founder | Any time |
 | 7 | ~~**Read ten rows of the line-break table** (D-167, G 8.2): rows 28, 27, 25, 26, 11, 20, 21, 12, 7, 16 of `crates/offcut-scene/tests/line_breaks.rs`, shown as a phone shows them (Entry 12). For each: "I would break it this way: yes / no, because …". A "no" changes that row now, with the reason, before the break search is written~~ Done 2026-10-23: yes to all ten (Entry 13) | Founder | P103 |
-| 8 | **The brand colour and contrast** (design review 1's brand question, G 11.2). D-179's `--brand` `#8B5CF6` with light text measures 4.23:1, under WCAG AA's 4.5:1 for a button's 14 px label, so the primary button is filled with `--brand-hover` `#7C4DEE` (4.60:1 with `--text`) and `--brand` marks the selected tab, the progress bars, the drop zone's outline under a file and the focus ring (Entries 19, 21; the switches and the slider are monochrome since Entry 21). Keep this, or choose a brand that reaches 4.5:1 with light text, which lets the button take `--brand` again | Founder | P111 |
+| 8 | ~~**The brand colour and contrast** (design review 1's brand question, G 11.2). D-179's `--brand` `#8B5CF6` with light text measures 4.23:1, under WCAG AA's 4.5:1 for a button's 14 px label, so the primary button is filled with `--brand-hover` `#7C4DEE` (4.60:1 with `--text`) and `--brand` marks the selected tab, the progress bars, the drop zone's outline under a file and the focus ring (Entries 19, 21; the switches and the slider are monochrome since Entry 21). Keep this, or choose a brand that reaches 4.5:1 with light text, which lets the button take `--brand` again~~ Decided at design review 1 (Entry 22): keep the violet, the primary button on `--brand-hover` | Founder | P111 |
 | 9 | ~~**The error screen of design review 1.** The 14 error copies of D-159 are Prompt 119's (Entry 20), so `failClip("E_GPU_LOST")` (Prompt 110, G 10.8) shows `ErrorPanel`'s general card ("Something went wrong on this device.", "Start over"). Prompt 110 captures it so, or with a code that has copy now (`E_WORKER_CRASH`), and says which in its entry~~ Done in Entry 21: captured with `E_WORKER_CRASH`, which has its words | Agent | P110 |
 
 ## Known issues
@@ -1919,3 +1919,54 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
 
 **Open.** Known issues 23-27 unchanged; open items 1-5 and 8 unchanged. Open item 9 closed.
+
+---
+
+## Entry 22 - 2026-10-24 - P111 (S10A): Design review 1: go on 2026-10-24
+
+**What.** Prompt 111 (G Phase 11; D-191): the founder's first design review of the editor's shell. The sixteen captures and the note were prepared, the founder answered, the two changes asked for were made, the changed screens were captured again, and the founder said "go".
+
+**1. Preparation** (G 11.1):
+- **The captures:** the sixteen of `pnpm screens` from commit `ea0cc6e` (taken after that commit, from the same tree), copied to `~/v4-review-1/` as `01-empty-1280.png` … `08-exporting-1920.png` in G 10.8's order: empty, model download, processing, ready, editing a word, style tab, error, exporting.
+- **`~/v4-review-1/NOTE.md`:** per screen, what it is for, what the user does next, and what is not wired yet; the four questions; the two decisions, with the contrast figures of open item 8. 17 files.
+- **Nothing was uploaded or published:** the captures show the reference clip, and they stay on D1.
+
+**2. The review** (G 11.2), the founder's words as given:
+- **The four questions, all eight screens:** "yeah all look fine design wise". Recorded as yes to the four questions for each of the eight screens; no screen was answered separately.
+- **The founder's concern:** "but my biggest concern is the progress bar for model download and video preparationn willl it be accurate or it will jitter ? ciz if that happens its bad user experience".
+- **The answer given, from the code:**
+  - **The model download's bar** counts bytes only once a piece is written (`download.ts`: up to 8 MiB a request, `onBytes` after the piece). A failed piece counts nothing and is asked for again; a resumed download counts the bytes already kept; the total caps it. So it is accurate and never goes back. But it moves in steps of about 4% (about 31 requests for 210 MB), held between them on a slow connection, and briefly after the large file while it is checked. Its time left, from the last 5 s of speed (`model-manager.ts`), can go up and down. `web/src/models/` is frozen in V4, so the steps themselves stay.
+  - **Video preparation has no bar:** the four steps tick when done. The only measurable step, the captions, reports per 30 s window (3 or 4 a clip), so a bar would hold, then jump by a third.
+  - **The export's bar** counts frames; `export-creator.spec.ts` asserts that it never goes back.
+- **The founder's choices** (`AskUserQuestion`):
+  - Download bar: "Smooth both (Recommended)".
+  - Processing: "Keep the steps (Recommended)".
+  - Brand colour: "Keep the violet".
+  - Mono: "Keep \"Mono\"".
+
+**3. The changes** (G 11.3), through the shared bar's class and the download card:
+- **The bar glides** (`components.module.css` `.meterBar`): its width moves to each new value over 1 s (`calc(var(--base) * 5)`, `--ease`), not 0.2 s linear, never past the value. Under reduced motion it moves at once (`--base` is `0.01ms`). It is the bar of the model download and of the export (one class).
+- **The time left is steadied** (`ModelDownloadPanel.tsx`, `useSteadyEta`): rounded up to `ETA_STEP_S` 5 s steps (`waitText` says minutes from one minute on); always allowed to fall; allowed to rise only above `ETA_RISE` 25% over the one shown.
+- **Read in Chrome** (a temporary check on the dev server, deleted). Estimates 38, 41, 33, 36, 29, 31, 24, 27, 52, 49, 47, 12, 9, 7, 4, 1 s were said as 40, 40, 35, 35, 30, 30, 25, 25, 55, 50, 50, 15, 10, 10, 5, 5 seconds. The bar's transition read `width 1s cubic-bezier(0.2, 0.8, 0.2, 1)`, and `5e-05s` under reduced motion.
+- **The changed screens captured again:** `~/v4-review-1/after/` holds `02-model-download` and `08-exporting` at both widths. A still shows the 5 s step ("About 10 seconds left"), not the glide.
+
+**4. The decisions:**
+- **Brand colour:** `--brand` stays `#8B5CF6`, and the primary button stays on `--brand-hover` `#7C4DEE` for AA (Entry 19). Open item 8 closed.
+- **"Mono"** keeps its name; `StyleId::Tech` is unchanged (D-170).
+- **Processing** keeps its four steps without a bar.
+
+- **The go:** the founder's word, "go", on 2026-10-24, after the changed screens.
+
+**Differs from the prompt or the plan.**
+- The four questions were answered once for all screens, not per screen.
+- No change needed a flow, so none is recorded for a later prompt.
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file (the temporary check deleted); no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0. `pnpm test`: **Rust 643 passed, 0 failed, 3 ignored** (no Rust file changed; the whole log reads 647 with the type generator's 4), Vitest 92. `pnpm build` exit 0; **app shell 322.2 kB gzip** (Entry 21: 322.1). `pnpm e2e` 12 passed.
+- **M-10's commands:**
+  - One `inter-latin-*.woff2` in `web/dist/assets`; no `__offcutDev` in `web/dist`.
+  - `pnpm screens`: 6 passed, 16 PNGs (before the gate, which empties `test-results/`; captured again after this commit).
+  - `pnpm e2e:media` on the keyed build: **49 passed, 1 skipped (21.0 min)**, the baseline's count; the build after it has no key (the key's value is in no file of `web/dist`).
+- The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+
+**Open.** Open item 8 closed. Known issues 23-27 unchanged; open items 1-5 unchanged. Next: Prompt 112, the first that wires a flow (G Phase 12).
