@@ -204,15 +204,24 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
 
     // Every item the scene draws is there from its recording start until its
     // hold and fade end, and not a millisecond before or after (TS §19.5).
-    let numbers: Vec<_> = plan
-        .items()
-        .iter()
-        .filter(|item| item.kind == EventKind::NumberReveal)
-        .collect();
-    assert_eq!(numbers.len(), 2, "3,000 hours and $12k");
-    assert_eq!(scene.summary().visual_moments, 2);
-    for item in numbers {
-        let (start, end) = (item.span.start.get(), item.span.end.get() + 1_200 + 200);
+    // The reference's five: 3,000 hours and $12k, a from-to, a list, and
+    // the KeywordPop "brutal", which the captions draw (D-144).
+    let kinds: Vec<EventKind> = plan.items().iter().map(|item| item.kind).collect();
+    assert_eq!(kinds.len(), 5, "{kinds:?}");
+    let summary = scene.summary();
+    let counts = (
+        summary.voice_cleaned,
+        summary.captions_emphasized,
+        summary.visual_moments,
+    );
+    assert_eq!(counts, (true, 1, 4));
+    for item in plan.items() {
+        let hold = match item.kind {
+            EventKind::NumberReveal => 1_200,
+            EventKind::ListReveal | EventKind::FromTo => 1_500,
+            EventKind::KeywordPop => continue,
+        };
+        let (start, end) = (item.span.start.get(), item.span.end.get() + hold + 200);
         assert!(!item_drawn(&scene, start - 1), "{item:?}");
         assert!(item_drawn(&scene, start), "{item:?}");
         assert!(item_drawn(&scene, end - 1), "{item:?}");

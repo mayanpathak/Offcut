@@ -27,11 +27,11 @@ pub const SAFE_AREA: Rect = Rect {
 /// append rows (`Top`, `LowerThird`, …).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ZoneId {
-    /// 320 lp tall, on the free side of the captions (D-171): y 860 to 1180
+    /// 320 lp tall, on the free side of the captions (D-171): y 804 to 1124
     /// at the default placement.
     Event,
-    /// The caption block, 280 lp tall: y 1220 to 1500 at the default
-    /// placement.
+    /// The caption block, 280 lp tall: y 1164 to 1444 at the default
+    /// placement, above the watermark's band.
     Caption,
     /// The safe area.
     Full,
@@ -55,13 +55,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_zones_are_v3s_and_inside_the_safe_area() {
+    fn the_zones_at_the_default_placement_are_inside_the_safe_area() {
         let rows = |id| {
             let r = zone(id, CaptionPlacement::bottom());
             (r.x, r.y, r.w, r.h)
         };
-        assert_eq!(rows(ZoneId::Event), (60.0, 860.0, 900.0, 320.0));
-        assert_eq!(rows(ZoneId::Caption), (60.0, 1220.0, 900.0, 280.0));
+        // 56 lp above V3's (860 and 1220): the watermark's band (Entry 17).
+        assert_eq!(rows(ZoneId::Event), (60.0, 804.0, 900.0, 320.0));
+        assert_eq!(rows(ZoneId::Caption), (60.0, 1164.0, 900.0, 280.0));
         assert_eq!(rows(ZoneId::Full), (60.0, 250.0, 900.0, 1250.0));
     }
 }

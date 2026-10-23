@@ -11,6 +11,8 @@
     clippy::indexing_slicing
 )]
 
+#[path = "common/labeled.rs"]
+mod labeled;
 #[path = "common/scenes.rs"]
 mod scenes;
 
@@ -40,7 +42,7 @@ fn frames(scene: &Scene) -> Vec<DisplayList> {
 fn six_scenes_are_the_same_cold_warm_and_without_the_cache() {
     let ms = |d: Duration| d.as_secs_f64() * 1_000.0;
     let (mut cold_total, mut warm_total) = (0.0, 0.0);
-    for case in scenes::six() {
+    for case in labeled::six() {
         set_shape_cache(true);
         let (cold, cold_time) = timed(|| scenes::build(&case, 1080));
         let (warm, warm_time) = timed(|| scenes::build(&case, 1080));

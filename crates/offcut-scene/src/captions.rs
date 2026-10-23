@@ -17,7 +17,7 @@ use crate::display_list::DrawCmd;
 use crate::display_list::{FontKey, Rect};
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
-use crate::readability::{Limits, MIN_CHUNK_MS, Unit, chunk_break_cost, chunk_cost, text_of};
+use crate::readability::{Limits, Unit, chunk_break_cost, chunk_cost, text_of};
 use crate::styles::{Case, StyleSpec};
 use crate::theme::Theme;
 
@@ -322,25 +322,6 @@ pub fn chunk(
     Ok(chunks)
 }
 
-/// The reading floor (D-168): a chunk stays up at least `MIN_CHUNK_MS` when
-/// the silence after it allows. Its end moves later, never past the next
-/// chunk's start (at most the next word's start) or, for the last chunk,
-/// `program_end`; no word moves (INV-5). Applied to `chunk`'s result by
-/// `build_scene`.
-pub fn hold_for_reading(chunks: &mut [Chunk], program_end: OutMs) {
-    let caps: Vec<OutMs> = chunks
-        .iter()
-        .skip(1)
-        .map(|next| next.show.start)
-        .chain(std::iter::once(program_end))
-        .collect();
-    for (chunk, cap) in chunks.iter_mut().zip(caps) {
-        let (start, end) = (chunk.show.start.get(), chunk.show.end.get());
-        let held = start.saturating_add(MIN_CHUNK_MS).min(cap.get());
-        chunk.show.end = OutMs::new(held.max(end));
-    }
-}
-
 /// The lines of one chunk: centred in the caption block, one under the other.
 fn lines(
     group: &[Placed<'_>],
@@ -405,6 +386,7 @@ mod tests {
     use offcut_types::{CaptionPlacement, DurMs};
 
     use super::*;
+    use crate::readability::hold_for_reading;
     use crate::safe_area::{ZoneId, zone};
     use crate::styles::spec;
     use crate::testing::{transcript, word};

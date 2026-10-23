@@ -5,7 +5,9 @@
 //! E-2). The lists are sorted and lower case, and are searched by bisection;
 //! a caption word is matched by its lower-cased text, punctuation stripped.
 
-use crate::captions::CaptionWord;
+use offcut_types::OutMs;
+
+use crate::captions::{CaptionWord, Chunk};
 
 /// Words that open a new clause: a break before one is cheap.
 pub(crate) const CLAUSE_STARTERS: &[&str] = &[
@@ -224,6 +226,25 @@ pub(crate) fn chunk_cost(
         }
     }
     best.map(|(cost, second)| (cost + alone, second))
+}
+
+/// The reading floor (D-168): a chunk stays up at least `MIN_CHUNK_MS` when
+/// the silence after it allows. Its end moves later, never past the next
+/// chunk's start (at most the next word's start) or, for the last chunk,
+/// `program_end`; no word moves (INV-5). Applied to `captions::chunk`'s
+/// result by `build_scene`.
+pub fn hold_for_reading(chunks: &mut [Chunk], program_end: OutMs) {
+    let caps: Vec<OutMs> = chunks
+        .iter()
+        .skip(1)
+        .map(|next| next.show.start)
+        .chain(std::iter::once(program_end))
+        .collect();
+    for (chunk, cap) in chunks.iter_mut().zip(caps) {
+        let (start, end) = (chunk.show.start.get(), chunk.show.end.get());
+        let held = start.saturating_add(MIN_CHUNK_MS).min(cap.get());
+        chunk.show.end = OutMs::new(held.max(end));
+    }
 }
 
 #[cfg(test)]

@@ -2,8 +2,9 @@
 //! band and the three snap points, the caption block and the event zone are
 //! inside the safe area and apart, the watermark's band is clear of what it
 //! must not meet, the captions and the visuals are drawn where the placement
-//! puts them, and the watermark flag changes no placement. At 1.0 the event
-//! zone is V3's, 860 to 1180.
+//! puts them, and the watermark flag changes no placement. At 1.0 the block
+//! ends where the watermark's band begins (1164 to 1444, the event zone 804
+//! to 1124; V3's were 56 lp lower).
 //!
 //! The scene is the reference clip's transcript (`fixtures/labeled/a01-
 //! scriptA.json`, timed as the labeled tests time it), whose two numbers are
@@ -22,10 +23,11 @@ use std::path::PathBuf;
 use offcut_detect::{DetectorConfig, detect};
 use offcut_plan::{PlanConfig, from_rules, validate};
 use offcut_scene::placement::{
-    CAPTION_BOTTOM, SNAP_BOTTOM, SNAP_MIDDLE, SNAP_TOP, caption_block, event_zone,
+    CAPTION_BOTTOM, SNAP_BOTTOM, SNAP_MIDDLE, SNAP_TOP, WATERMARK_BAND, caption_block, event_zone,
 };
 use offcut_scene::safe_area::{SAFE_AREA, ZoneId, zone};
 use offcut_scene::styles::spec;
+use offcut_scene::watermark;
 use offcut_scene::{DrawCmd, FontSet, Rect, Scene, SceneInput, Theme, build_scene};
 use offcut_text::{RawWord, normalize_transcript};
 use offcut_types::{
@@ -36,13 +38,11 @@ use offcut_types::{
 /// The two ends of the band and its three snap points.
 const PLACES: [f32; 4] = [0.0, SNAP_TOP, SNAP_MIDDLE, SNAP_BOTTOM];
 
-/// D-143's watermark, read from the safe area until `watermark.rs` exists
-/// (V4 Prompt 106): Inter at 36 lp, its baseline 6 lp above the bottom of the
-/// safe area. Its band runs from a full size above the baseline to the
-/// bottom of the safe area.
+/// The rows of D-143's watermark box, as `watermark.rs` lays it out.
 fn watermark_band() -> (f32, f32) {
-    let bottom = SAFE_AREA.y + SAFE_AREA.h;
-    (bottom - 6.0 - 36.0, bottom)
+    let theme = Theme::default_for(StyleId::Clean);
+    let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+    (mark.y, mark.y + mark.h)
 }
 
 fn placement(p: f32) -> CaptionPlacement {
@@ -153,7 +153,10 @@ fn scene(p: f32, watermark: bool) -> Scene {
 #[test]
 fn the_block_and_the_event_zone_are_inside_the_safe_area_and_apart_at_every_snap_point() {
     let (band_top, band_bottom) = watermark_band();
-    // The band is below the lowest place a caption block's centre can be.
+    // The watermark's box lies in the band kept for it at the safe area's
+    // bottom, below the lowest place a caption block's centre can be.
+    let bottom = SAFE_AREA.y + SAFE_AREA.h;
+    assert!(band_top > bottom - WATERMARK_BAND && band_bottom <= bottom + 0.001);
     assert!(band_top > CAPTION_BOTTOM, "{band_top}");
     for p in PLACES {
         let block = caption_block(placement(p), &spec(StyleId::Clean));
@@ -165,18 +168,15 @@ fn the_block_and_the_event_zone_are_inside_the_safe_area_and_apart_at_every_snap
         assert!(inside(events, SAFE_AREA), "{p}: {events:?}");
         assert!(!overlap(rows(block), rows(events)), "{p}");
         assert!(!overlap(rows(events), (band_top, band_bottom)), "{p}");
-        // Above the bottom the block is clear of the band; at the bottom it
-        // reaches the safe area's bottom, as V3's caption zone does, and the
-        // caption glyphs are what must miss the watermark (D-143's test of
-        // `layout_safe_area.rs`, V4 Prompt 106).
-        if p < SNAP_BOTTOM {
-            assert!(!overlap(rows(block), (band_top, band_bottom)), "{p}");
-        }
+        // The block is clear of the watermark everywhere, the bottom
+        // included (the founder's choice of Entry 17; `layout_safe_area.rs`
+        // checks every caption box on the labeled set).
+        assert!(!overlap(rows(block), (band_top, band_bottom)), "{p}");
     }
-    // At 1.0, V3's zones.
+    // At 1.0, the block's bottom on the band: 56 lp above V3's zones.
     let block = caption_block(placement(1.0), &spec(StyleId::Clean));
-    assert_eq!(rows(block), (1_220.0, 1_500.0));
-    assert_eq!(rows(event_zone(block)), (860.0, 1_180.0));
+    assert_eq!(rows(block), (1_164.0, 1_444.0));
+    assert_eq!(rows(event_zone(block)), (804.0, 1_124.0));
 }
 
 #[test]

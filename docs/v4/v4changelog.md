@@ -43,7 +43,8 @@
 | 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 | 20 | ~~**The identity proof cannot pass on `busy_1080` and `busy_540` as recorded.** V3's `busy()` gives its first two NumberReveals spans no word of its transcript has (1,000-1,400 and 3,500-3,800 ms); `validate` takes every item's span from its anchor words (D-121), so through the V4 contract they become 1,100-1,350 ("three") and 3,500-3,750 ("wanted."). In the comparison run (Entry 8) the four detector-built inputs are identical (836 frames) and each `busy` input differs in exactly 4 frames, all inside those two events' windows (count-up start, hold end, fade). **Decided by the founder on 2026-10-22 (Entry 9): re-derive the two `busy` files with V3's scene code (`09b1085`) on these anchored events, the other four files unchanged**; the alternative, accepting the 8 named frames, was declined. Prompt 100 does it, records it, and the proof then reads "6 inputs, identical"~~ Closed in Entry 10: re-derived, "6 inputs, 922 frames, identical" | `offcut-scene/tests/v3_reference.rs`, `tests/snapshots/v3_reference/busy_*.json` | P100 |
 | 21 | ~~Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23)~~ Closed in Entry 13: frozen at `01f406f` | `docs/v4/v4changelog.md` | P103 |
-| 22 | `crates/offcut-scene/src/captions.rs` is exactly at the 400-line limit above its tests (Entry 14: the number rule of D-169 took the last lines). The next change there moves something out first: the reading floor to `readability.rs` (which holds `MIN_CHUNK_MS`) or the number rule beside the words. Prompt 105 changed one line in place (Entry 16); `captions_draw.rs` is at 396 | `offcut-scene/src/captions.rs` | P106 |
+| 22 | ~~`crates/offcut-scene/src/captions.rs` is exactly at the 400-line limit above its tests (Entry 14: the number rule of D-169 took the last lines). The next change there moves something out first: the reading floor to `readability.rs` (which holds `MIN_CHUNK_MS`) or the number rule beside the words. Prompt 105 changed one line in place (Entry 16); `captions_draw.rs` is at 396~~ Closed in Entry 17: the reading floor moved to `readability.rs`; `captions.rs` is 381 lines | `offcut-scene/src/captions.rs` | P106 |
+| 23 | Copy back to `v4implementation.md` what Entry 17 changed: D-143's baseline (the watermark's box on the safe area's bottom, about 10.2 lp, not 6); D-171's `CAPTION_BOTTOM` (`SAFE_AREA` bottom - `WATERMARK_BAND` 56 - 140 = 1,304, the founder's choice); D-140's fit (whenever the lines do not fit the 320 lp zone, width included); §8.10's `ok_portrait_3x4` (a 3:4 frame loses its sides); D-163 (`FontRole::Body` is the watermark's font) | `docs/v4/v4implementation.md` | P127 (copy-back) |
 
 ---
 
@@ -1399,3 +1400,172 @@ The prompt's drill text, `Rgba { r: 1.0, … }`, does not compile (the channels 
 - **Bold's touching words** at the pop's height: keep 1.12, or lower it (E-2, design review 1).
 - Open items 1-5 unchanged.
 - Known issue 22 moves to Prompt 106.
+
+---
+
+## Entry 17 - 2026-10-23 - P106 (S9): ListReveal, FromTo, KeywordPop, framing, watermark, summary, scene snapshots
+
+**What.** Prompt 106 (G 9.2 rows 1-7; D-140 to D-145, D-158, D-160, §8.7, §8.8, §8.10): the three visuals V3 did not draw, the crop offset, the watermark, the change summary, and the scene's test suite with 43 read snapshots. The founder decided one thing on the way: the captions' lowest position rises 56 lp, so that no caption can meet the watermark (below).
+
+**1. `events/mod.rs`** (§8.7, INV-23):
+- **The arms.** `EventTrack` has the four kinds: `NumberReveal`, `ListReveal`, `FromTo`, `KeywordPop`. `EventTrack::kind()` names the catalog kind a track draws.
+- **`layout`.** It returns `None` only for an item that cannot be drawn. FromTo's second value is timed by `item.marks[0]` through the time map. The `t: &Transcript` argument stays unread: the visuals draw resolved values (D-121).
+- **Shared helpers.** `Text`, `text()` and `after()` move here from `number_reveal.rs`, which uses them unchanged, so the new visuals do not copy them.
+
+**2. `events/list_reveal.rs`** (D-140, TS §19.5):
+- **The lines.** The header (when not empty) is at 56 lp in the display font, from the item's start. Each item is `"{ordinal}. {text}"` at 48 lp, from its own `at` through the map; an item said where the program does not play is not shown. The lines are 16 lp apart, left at the zone's left + 40 lp, and centred down the zone.
+- **The fit.** All texts share one factor, the largest at which every line fits the zone's height and width, never below 32 lp for the items. At 32 lp the last items that do not fit are left out, and the list still counts as drawn. A line still too wide at that size is drawn smaller on its own.
+- **The motion.** Each line fades in and rises 24 lp over 200 ms, ease-out cubic. The list holds to the span's end + 1,500 ms, then fades over 200 ms.
+- **Shaping.** Everything is shaped at layout, nothing in `draw`.
+- **Inline tests (5):**
+  - a header and three items at their sizes;
+  - four items shrinking together to exactly 320 lp, twelve stopping at 32 lp;
+  - a too-wide line shrinking the list, and past 32 lp shrinking alone;
+  - the entrance (opacity 0 and 24 lp low at the item's time, 87.5% up at +100 ms, at rest at +200);
+  - the hold and the fade;
+  - on a hand-made cut map, an item in the cut not shown and a later one at its program time.
+
+**3. `events/from_to.rs`** (D-141, §8.7):
+- **The columns.** Two columns, the zone's halves.
+  - The "from" value is in `fill`, from the item's start.
+  - The "to" value is in `accent` at ×1.15, from the mark through the map. The arrow (a filled path between the bars) comes with it.
+- **The value size.** One size for both: 96 lp when it fits, else the largest at which each value and its outline fit its half (the "to" value's outline grows with it) and the stack fits the zone's height. Below 56 lp, or with no mark in program time, the item is not drawn.
+- **The bars.** `value / max(from, to)` of 180 lp, at least 8% (8% for a value of zero or less), standing on one line.
+- **The motion.** Each column fades in and its bar grows over 200 ms, ease-out cubic. The visual holds to the span's end + 1,500 ms and fades over 200 ms.
+- **No parsing.** It never tokenizes or parses (Appendix A).
+- **Inline tests (4):** the size and bar ratio, the 8% cases, the fit and the 56 lp floor, the times (from, mark, grow, hold, fade, a mark before the start).
+
+**4. `events/keyword_pop.rs`** (§8.7):
+- **The track.** It holds the word and its program start, and draws nothing; the captions draw the pop.
+- **In `build_scene`.** The pops of `captions_draw` now come from these tracks. A pop whose word the captions do not show (edited to nothing) is undrawable: not drawn and not counted.
+
+**5. `framing.rs`** (D-131, D-160):
+- **The offset.** `crop_rect` uses `offset.get()`: `x = (w - crop_w) / 2 x (1 + offset)`. V2's stand-in is removed. A frame narrower than 9:16 ignores the offset (TS §19.7).
+- **The inline test.** "any offset" becomes `a_1920x1080_clip_is_cropped_to_the_strip_its_offset_names` and asserts x = 0, 492.1875, 656.25, 984.375, 1,312.5 for offsets -1, -0.25, 0, 0.5, 1. This is the one changed V2 expectation D-160 allows.
+
+**6. `watermark.rs`** (D-143, INV-9):
+- **The text.** `WATERMARK_TEXT = "Made with Offcut"`, Inter 700 (the theme's body font) at 36 lp, in `text` with a 3 lp `stroke` outline, inside one layer at 60%.
+- **The place.** Its box's left and bottom are on the safe area's (see "The founder's decision").
+- **When.** It is drawn last, only when `profile.watermark` (`build_scene` reads the flag; nothing else draws it).
+- **`bounds()`.** Its box, which the safe-area test checks.
+
+**7. `summary.rs`, `lib.rs`** (D-144, D-145):
+- **`change_summary`.** `voice_cleaned: true`, `captions_emphasized` = the KeywordPop tracks, `visual_moments` = the other tracks. A disabled item gets no track; an undrawable one returns `None`. `Scene::summary` calls it.
+- **Inline tests in `lib.rs`:**
+  - The busy scene counts 3. With its first item turned off, 2. Turned back on, with an override of an id the plan no longer has, 3.
+  - On a hand-made map that cuts the first number's time, `build_scene` returns `SceneError::TimeMap`.
+
+**The founder's decision (2026-10-23).** `layout_safe_area.rs` found what D-143 asked it to rule out. At Bottom (1.0, the default) the caption block reached the safe area's bottom, where the watermark is:
+- **Bold:** 21,720 caption glyph boxes met the watermark's box.
+- **Mono (Tech):** 6,510 panel rectangles did.
+- **Clean:** 3 boxes did.
+- **Top and Middle:** none.
+- **The watermark itself:** with D-143's baseline 6 lp above the bottom, its own box (Inter's 8.7 lp descent and the outline) reached 4.2 lp below the safe area.
+
+Asked, the founder chose **"Raise Bottom captions"** over moving the watermark to the top-left or checking the letters' ink only. So:
+- **The band.** `placement::WATERMARK_BAND = 56` lp at the safe area's bottom is reached by no caption block, on every clip, watermark or not, so that the preview and the export still place alike (D-171; `placement.rs` reads no flag).
+- **The Bottom position.** `CAPTION_BOTTOM` is `SAFE_AREA bottom - WATERMARK_BAND - 140` = 1,304. At 1.0 the block is 1,164-1,444 and the event zone 804-1,124: 56 lp higher than V3's 1,220-1,500 and 860-1,180. Top (0.0) is unchanged.
+- **The watermark.** It sits with its box's bottom on the safe area's bottom: its baseline is 10.2 lp above it, not D-143's 6. Its box is 46.6 lp tall, inside the band.
+
+Changed expectations because of the decision:
+- `placement.rs` inline `the_formula_at_the_two_ends_of_the_band`: 1,304, 1,164-1,444, 804-1,124.
+- `safe_area.rs` inline `the_zones_are_v3s_and_inside_the_safe_area` becomes `the_zones_at_the_default_placement_are_inside_the_safe_area`, with the same rows.
+- `tests/placement.rs`: the watermark band read from `watermark.rs` (it had been D-143's numbers, Entry 14), the block clear of it at every placement (the bottom was exempt), and 1.0's rows as above.
+
+**`readability.rs`** (known issue 22): the reading floor `hold_for_reading` moves from `captions.rs` to `readability.rs`, beside `MIN_CHUNK_MS`, with no change. `captions.rs` is 381 lines above its tests (it was 400).
+
+**The tests** (§8.10):
+- **`display_list_snapshots.rs`: 43 snapshots, each read before it was accepted.**
+  - **The inputs.** Each kind's input is a small written transcript, detected and validated as the pipeline does, plus a closing sentence that adds no item ("Thanks for watching, and see you next week."); these are Prompt 107's golden inputs:
+    - NumberReveal: "We crossed 3,000 users last month.";
+    - ListReveal: "Here are 3 reasons to ship. First, it is fast. Second, it is cheap. Third, it is simple.";
+    - FromTo: "Our build went from 90 minutes to 10 minutes.";
+    - KeywordPop: "The first week felt \*brutal\* for everyone.".
+  - **36:** 3 styles × 4 kinds × before, during (everything in) and after (100 ms past the fade).
+  - **The rest:** the watermark on and off; a 1920 × 1080 clip's `Video` command at offsets -1, 0, 1; "3,000" edited to "5,000" (the reveal shows "5,000 users", INV-22); the item disabled (captions only).
+  - **One test without a snapshot.** FromTo's "to" value and arrow are absent 1 ms before the mark and present at it. It was added when the guard below showed that the snapshots could not see the mark.
+  - **Reading.** Each snapshot was read as one line per command (kind, text, size, colour, stroke, place, rectangles, layers). What was checked:
+    - every caption state of Prompt 105 (pill, ink reveal, shadow layer, Bold's pop and back-out dip to 0.988, Tech's panel and cursor at ×1.25 with a popped word);
+    - each visual's sizes, places and colours as above;
+    - the crops: x 0, 656.25 and 1,312.5;
+    - the watermark as the last layer.
+  - **Size.** 403 KB, 16,843 lines, LF.
+- **`layout_safe_area.rs`** (D-158, D-143). With the watermark on, the 31 labeled files in the three styles at the three snap points, every 33 ms, are checked against the safe area and the watermark's box. The test checks every glyph run (font ascent to descent, outline included), rectangle and path. It reads: "279 scenes (31 files x 3 styles x 3 placements), 237177 frames, 1672008 boxes, 0 problems". It also holds:
+  - every FromTo of the labeled set has exactly one mark, after its first word and before its end (11 FromTos: the detector finds 11 of the 12 the labels hold);
+  - the six shared scenes without the watermark (placement 0.0, a "$500" edit, a visual turned off) stay inside the safe area.
+- **`determinism.rs`** (INV-7): each of the six scenes is built twice into equal scenes with byte-identical JSON at every frame (over 5,000 frames), and every frame asked out of order (a coprime stride, then backwards) equals the one asked in order.
+- **`framing.rs`:** §8.10's cases, and the `Video` command of every frame carrying the crop for offsets -1, 0.25, 1 at 540 wide.
+- **`catalog_complete.rs`** (INV-23):
+  - The catalog's kinds equal the kinds the scene lays out (one hand-made `ValidItem` per kind, matched without a wildcard).
+  - The catalog's zone names are `ZoneId` names.
+  - Each kind is drawn inside the zone its catalog row names, at the three snap points. KeywordPop's zone is the captions, and it draws nothing of its own.
+  - Each kind's golden frame is Prompt 107's.
+- **`tests/common/`:**
+  - `scenes.rs` now holds what every scene test uses: the timing of written sentences, `written`, `detected`, `build`, `build_with`.
+  - The new `labeled.rs` reads the labeled files and holds `six()`.
+  - The split keeps every included function used in every test that includes it, so no `dead_code` allow is needed. TS §5's tree gains `common/labeled.rs`, and the `common/scenes.rs` line is rewritten.
+- **`timemap_identity.rs`.** The reference clip's ListReveal and FromTo are now drawn, so its summary is `(true, 1, 4)` (was `visual_moments == 2`). The test now checks each drawn item's window (its start, hold and fade), not only the two NumberReveals'.
+- **New test crates' header.** The five new test files open with the `#![allow(clippy::unwrap_used, …, clippy::indexing_slicing)]` header that every existing scene test crate with helpers carries (`parity.rs`, `placement.rs`, `golden_frames.rs`): clippy allows `unwrap` inside `#[test]` functions, not in helpers.
+
+**Guards,** each a temporary edit, the tests run with `INSTA_UPDATE=no CI=true`, the file restored and checked identical by SHA-256 (`drill106.py`, in the scratchpad):
+
+| Temporary edit | Result |
+|---|---|
+| A snapshot changed by hand ("10 minutes" → "11 minutes" in `clean_from_to_during.snap`) | `display_list_snapshots.rs` fails on that snapshot (the prompt's failure-path test) |
+| `WATERMARK_BAND = 0` (V3's Bottom again) | `layout_safe_area.rs` fails: 35,377 problems, all on the watermark |
+| The watermark drawn without the profile asking (INV-9) | 4 tests of `display_list_snapshots.rs` fail (`watermark_off` and three more snapshots) |
+| FromTo's "to" value at the start, its mark ignored | First nothing failed: the snapshots' three instants cannot see the mark. The mark test was added; with it, it fails |
+| Every track counted as a visual moment | `summary.rs`'s inline test fails |
+
+**Bugs found by the new tests and fixed here:**
+- **The "to" value's outline.** `from_to.rs` first fitted the scaled "to" value but not its outline, which grows with it: a value filling its half (a01's "10 minutes" at 71.9 lp) reached 0.4 lp past the safe area. The six-scene safe-area test found it.
+
+**The look** (`d1`). A temporary `offcut-render/tests/zz_look.rs` drew the snapshot inputs over the golden pattern on WARP (with `offcut-plan`, `offcut-detect` and `offcut-text` added to `offcut-render`'s dev-dependencies for the run; `Cargo.toml` and `Cargo.lock` restored and checked identical by SHA-256; PNGs not committed):
+
+| Frame | Seen |
+|---|---|
+| Clean list, all in | "3 REASONS" over three numbered items, left-aligned, outlined; "Third," on the pill below |
+| Clean list, item 2 entering | Item 2 at about 70% opacity, still rising |
+| Clean, Bold FromTo | "90 minutes" and "10 minutes" (yellow, larger) side by side, the bars below, the arrow between. **At 160 lp wide the "from" bar read as a white card**: `BAR_WIDTH` became 96 lp (a value of this prompt, not of D-141), and the snapshots were rewritten before their first commit |
+| Clean NumberReveal with the watermark | "Made with Offcut" bottom-left at 60%, well clear of the raised captions |
+| Tech list | Pale green monospaced items with no panel or outline: legible on the pattern, weaker on a bright video (below) |
+
+**Differs from the plan or the prompt.**
+- **The Bottom placement and the watermark's baseline** (the founder's decision above). Copy-back: D-143's 6 lp and D-171's `CAPTION_BOTTOM = SAFE bottom - 140`.
+- **ListReveal fits whenever the lines do not fit.** D-140 starts shrinking from six items, but the event zone is 320 lp (D-171): a header and four items at 48 lp already need about 364 lp in Inter's line metrics. The one factor applies whenever needed, which is D-140's rule where it was meant, and it covers width too.
+- **FromTo's value size also fits the zone's height:** 96 lp × 1.15 + 16 + 180 lp of bars is 329 lp in 320 (so 96 lp is never reached; the snapshots show 65-72 lp).
+- **Values the decisions do not give** (all (assumption, E-2), each in one file):
+  - the header's entrance (the items' fade-and-rise) and that the list holds from the span's end (a `ListItem` has no end of its own);
+  - FromTo's bar width (96 lp) and corner radius (12), the 16 lp gap, the arrow (96 lp long, a 40 × 56 lp head, a 20 lp shaft);
+  - each column's 200 ms fade-in with its bar growing;
+  - a mark outside the span clamped into it.
+- **The watermark's colours and font are the theme's roles** (`text`, `stroke`, `FontRole::Body`): white and Inter 700 in every V4 theme but Tech's pale `#E8F0EA`. A brand kit (V6.7, Creator only) and the watermark (Free only) never meet. D-163 lists `FontRole::Body` as unused in V4; the watermark now uses it (copy-back).
+- **§8.10's `ok_portrait_3x4` says top and bottom go.** A 3:4 frame (1080 × 1440) is wider than 9:16, so its sides go: 810 of 1,080 shown at x = 135 (1 + offset). The test asserts what the crop does (copy-back).
+- **`catalog_complete.rs` checks the golden frame in Prompt 107**, when the goldens exist.
+- **"Every 33 ms" is a step of 33 ms from 0**, as D-158 says, not every output frame (33.3 ms).
+
+**Observations** (for design review 1 and E-2):
+- **Bold's visuals are not upper case** (D-139's case is the captions'), and Bold's 10 lp outline is heavy on the 48 lp list items.
+- **Tech's visuals have no panel and no outline:** pale text on a bright video may be hard to read.
+- **Clean's chunking** put "Third," alone before "it is simple." in the list input (D-167's comma waiver), as Prompt 103's search does.
+
+**How it was checked.**
+- **`cargo test -p offcut-scene` (`INSTA_UPDATE=no CI=true`):** 90 passed.
+  - Inline 59 (Entry 16: 45; +5 `list_reveal`, +4 `from_to`, +1 `keyword_pop`, +1 `watermark`, +1 `summary`, +2 `lib`).
+  - Integration 31 (Entry 16: 12; new: `catalog_complete` 3, `determinism` 2, `display_list_snapshots` 6, `framing` 5, `layout_safe_area` 3). `layout_safe_area` takes 9.7 s in a debug build.
+- **Snapshots:** 43 `.snap`, no `.snap.new`.
+- **Clippy.** `cargo clippy --workspace --all-targets -- -D warnings` and the wasm32 clippy are clean; `cargo fmt --check` passes.
+- **`node scripts/check-file-tree.mjs`:** ok, 330 files (319 + 5 source files + 5 test files + `common/labeled.rs`). Longest scene source: `captions.rs`, 381.
+- **The SAB gate:**
+  - On `v4-build`, no `zz` file, no test key. `pnpm build:wasm` exit 0 (render wasm 6,354,516 B). `pnpm fixtures` up to date. `pnpm check` exit 0.
+  - **Rust: 627 passed, 0 failed, 3 ignored.** Entry 16 read 594/0/3; the 33 added are the scene's 14 inline and 19 integration tests above.
+  - Vitest 92. `pnpm build` exit 0 (app shell 308.8 kB, unchanged). `pnpm e2e` 12 passed.
+  - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+  - `pnpm e2e:media` was not run: the prompt asks for none. CI's `e2e-media` job runs it on this commit.
+  - No page reads the summary's values (`git grep` of the three field names in `web/src` and `web/tests-e2e`: nothing).
+
+**Open.**
+- **Known issue 22 is closed.**
+- **Known issue 23 (new):** the copy-back of this entry's changes to `v4implementation.md` (P127).
+- **Prompt 107's goldens.** They need `offcut-render` to build these scenes: its dev-dependencies would gain `offcut-plan`, `offcut-detect` and `offcut-text`, as the look run above did.
+- Open items 1-5 unchanged.

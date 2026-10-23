@@ -5,10 +5,10 @@ use offcut_types::{OUTPUT_FPS, OutMs, OutSpan, Quantity};
 
 use crate::SceneError;
 use crate::anim::{self, eval};
-use crate::display_list::{Affine, DrawCmd, FontKey, Rect, Rgba, Stroke};
+use crate::display_list::{Affine, DrawCmd, Rect, Rgba, Stroke};
 use crate::easing::{Easing, ease};
+use crate::events::{Text, after, text};
 use crate::fonts::FontSet;
-use crate::layout::{ShapedRun, shape};
 use crate::styles::StyleSpec;
 use crate::theme::Theme;
 
@@ -26,15 +26,6 @@ pub const SCALE_IN_FROM: f32 = 0.8;
 pub const HOLD_MS: u32 = 1_200;
 /// and how long it then takes to fade.
 pub const FADE_MS: u32 = 200;
-
-/// A text shaped once: its runs and what they measure together.
-#[derive(Clone, Debug, PartialEq)]
-struct Text {
-    runs: Vec<ShapedRun>,
-    width: f32,
-    ascent: f32,
-    descent: f32,
-}
 
 /// A NumberReveal laid out. `draw` shapes nothing: every text it can show
 /// was shaped here.
@@ -56,16 +47,6 @@ pub struct Track {
     value_top: f32,
     label_top: f32,
     label_scale: f32,
-}
-
-fn text(string: &str, (font, fonts): (FontKey, &FontSet), size: f32) -> Result<Text, SceneError> {
-    let runs = shape(string, font, size, fonts)?;
-    Ok(Text {
-        width: runs.iter().map(|run| run.width).sum(),
-        ascent: runs.iter().map(|run| run.ascent).fold(0.0, f32::max),
-        descent: runs.iter().map(|run| run.descent).fold(0.0, f32::max),
-        runs,
-    })
 }
 
 /// The number at each frame of its count-up, as text. Empty when it does
@@ -170,10 +151,6 @@ pub fn layout(
         value_top,
         label_top: value_top + value_height,
     }))
-}
-
-fn after(t: OutMs, ms: u32) -> OutMs {
-    OutMs::new(t.get().saturating_add(ms))
 }
 
 /// Shown from the start of its first word until the fade has ended.

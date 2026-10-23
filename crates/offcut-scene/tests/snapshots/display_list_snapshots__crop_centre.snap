@@ -1,0 +1,23 @@
+---
+source: crates/offcut-scene/tests/display_list_snapshots.rs
+expression: "scene.frame_at(OutMs::new(0)).cmds[0]"
+---
+{
+  "Video": {
+    "slot": "Main",
+    "src": {
+      "x": 656.25,
+      "y": 0.0,
+      "w": 607.5,
+      "h": 1080.0
+    },
+    "dst": {
+      "x": 0.0,
+      "y": 0.0,
+      "w": 1080.0,
+      "h": 1920.0
+    },
+    "opacity": 1.0,
+    "mask": null
+  }
+}

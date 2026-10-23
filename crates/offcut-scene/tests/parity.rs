@@ -10,6 +10,8 @@
     clippy::indexing_slicing
 )]
 
+#[path = "common/labeled.rs"]
+mod labeled;
 #[path = "common/scenes.rs"]
 mod scenes;
 
@@ -183,7 +185,7 @@ fn same(cmd: &DrawCmd, k: f32, full: &DrawCmd, what: &str) {
 
 #[test]
 fn six_scenes_draw_the_same_lists_at_540_720_and_1080_after_scaling() {
-    for case in scenes::six() {
+    for case in labeled::six() {
         let full = scenes::build(&case, 1080);
         let mut compared = 0usize;
         for width in [540u32, 720] {

@@ -9,10 +9,17 @@ use crate::display_list::Rect;
 use crate::safe_area::{CANVAS_HEIGHT, SAFE_AREA};
 use crate::styles::StyleSpec;
 
+/// The bottom of the safe area that no caption block reaches: the room of
+/// the Free export's watermark (D-143), its box (about 47 lp) and a gap.
+/// Every clip keeps it, with the watermark or without, so that the preview
+/// and the export place captions alike (founder's choice, 2026-10-23,
+/// v4changelog Entry 17).
+pub const WATERMARK_BAND: f32 = 56.0;
 /// The caption block's centre at placement 0.0,
 pub const CAPTION_TOP: f32 = SAFE_AREA.y + 140.0;
-/// and at 1.0: V3's caption zone, 1,220 to 1,500.
-pub const CAPTION_BOTTOM: f32 = SAFE_AREA.y + SAFE_AREA.h - 140.0;
+/// and at 1.0: the block's bottom on the watermark's band, 1,164 to 1,444.
+pub const CAPTION_BOTTOM: f32 =
+    SAFE_AREA.y + SAFE_AREA.h - WATERMARK_BAND - CAPTION_BLOCK_HEIGHT / 2.0;
 /// The three snap points of the drag (D-171).
 pub const SNAP_TOP: f32 = 0.15;
 pub const SNAP_MIDDLE: f32 = 0.55;
@@ -75,16 +82,18 @@ mod tests {
 
     #[test]
     fn the_formula_at_the_two_ends_of_the_band() {
-        assert_eq!((CAPTION_TOP, CAPTION_BOTTOM), (390.0, 1_360.0));
-        // 1.0: V3's caption zone, and V3's event zone above it.
+        assert_eq!((CAPTION_TOP, CAPTION_BOTTOM), (390.0, 1_304.0));
+        // 1.0: the block ends where the watermark's band begins, 56 lp
+        // above the safe area's bottom (V3's zone was 1,220 to 1,500), and
+        // the event zone is above it.
         let (block, events) = at(1.0);
         assert_eq!(
             (block.x, block.y, block.w, block.h),
-            (60.0, 1_220.0, 900.0, 280.0)
+            (60.0, 1_164.0, 900.0, 280.0)
         );
         assert_eq!(
             (events.x, events.y, events.w, events.h),
-            (60.0, 860.0, 900.0, 320.0)
+            (60.0, 804.0, 900.0, 320.0)
         );
         // 0.0: the block at the top of the safe area, the visuals below it.
         let (block, events) = at(0.0);

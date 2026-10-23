@@ -20,13 +20,15 @@ pub mod placement;
 pub mod readability;
 pub mod safe_area;
 pub mod styles;
+pub mod summary;
 pub mod theme;
 mod video;
+pub mod watermark;
 
 use offcut_plan::ValidPlan;
 use offcut_types::{
-    ChangeSummary, ClipInfo, DurMs, EditState, EventParams, ExportProfile, OUTPUT_FPS, OutMs,
-    SrcPos, TimeMap, Transcript,
+    ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
+    Transcript,
 };
 use thiserror::Error;
 
@@ -82,6 +84,8 @@ pub struct Scene {
     chunks: Vec<Chunk>,
     emphasis: captions_draw::Emphasis,
     tracks: Vec<EventTrack>,
+    /// Drawn over everything when the export profile asks (INV-9).
+    watermark: Option<watermark::Track>,
 }
 
 pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
@@ -96,7 +100,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let words = captions::words(input.transcript, &input.edit.word_edits, map);
     let sentences = &input.transcript.sentences;
     let mut chunks = captions::chunk(&words, sentences, &style, theme, fonts, block)?;
-    captions::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
+    readability::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
 
     let mut tracks = Vec::new();
     let mut emphasis = captions_draw::Emphasis {
@@ -116,18 +120,27 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
             continue;
         }
         let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;
-        // A KeywordPop is drawn by the captions: its word, from its program
-        // start (TS §19.5, D-169).
-        if let EventParams::KeywordPop { word } = item.params {
-            emphasis.pops.push((word, span.start));
-        }
         let (when, t) = ((span, event_zone), input.transcript);
-        if let Some(track) = events::layout(item, when, t, map, &style, theme, fonts)? {
-            tracks.push(track);
+        let Some(track) = events::layout(item, when, t, map, &style, theme, fonts)? else {
+            continue;
+        };
+        // A KeywordPop is drawn by the captions: its word, from its program
+        // start (TS §19.5, D-169). A word the captions do not show cannot
+        // be popped.
+        if let EventTrack::KeywordPop(pop) = &track {
+            if !words.iter().any(|shown| shown.word == pop.word) {
+                continue;
+            }
+            emphasis.pops.push((pop.word, pop.start));
         }
+        tracks.push(track);
     }
 
-    // V4: the watermark, when `profile.watermark` is set.
+    let watermark = if input.profile.watermark {
+        Some(watermark::layout(theme, fonts)?)
+    } else {
+        None
+    };
     let (width, height) = (input.profile.width.get(), input.profile.height.get());
     let scale = width as f32 / safe_area::CANVAS_WIDTH;
     Ok(Scene {
@@ -142,6 +155,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         chunks,
         emphasis,
         tracks,
+        watermark,
     })
 }
 
@@ -158,7 +172,8 @@ impl Scene {
     }
 
     /// What is drawn at `t`, in pixels of the output canvas: the video, the
-    /// caption chunk that is shown, then every item that is shown.
+    /// caption chunk that is shown, every item that is shown, and the
+    /// watermark when the profile asks.
     pub fn frame_at(&self, t: OutMs) -> DisplayList {
         let mut cmds = vec![self.video.cmd(t, self.canvas)];
         if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
@@ -167,6 +182,9 @@ impl Scene {
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
+        }
+        if let Some(mark) = &self.watermark {
+            watermark::draw(mark, &mut cmds);
         }
         // The video is placed in output pixels already; the rest is scaled.
         for cmd in &mut cmds {
@@ -199,14 +217,9 @@ impl Scene {
         &self.fonts
     }
 
-    /// V2 cleans no voice and emphasizes no caption word (D-22). An event
-    /// that could not be placed is not counted (TS §19.7).
+    /// What was changed (D-144): the items drawn, by kind.
     pub fn summary(&self) -> ChangeSummary {
-        ChangeSummary {
-            voice_cleaned: false,
-            captions_emphasized: 0,
-            visual_moments: u32::try_from(self.tracks.len()).unwrap_or(u32::MAX),
-        }
+        summary::change_summary(&self.tracks)
     }
 }
 
@@ -362,8 +375,8 @@ pub(crate) mod testing {
 #[cfg(test)]
 mod tests {
     use offcut_types::{
-        Confidence, DetectedEvent, EventId, EventKind, FrameIdx, Quantity, Span, StyleId, TimeMs,
-        Unit, WordIdx, WordRange,
+        Confidence, DetectedEvent, EventId, EventKind, EventParams, FrameIdx, Quantity, Span,
+        StyleId, TimeMs, Unit, WordIdx, WordRange,
     };
 
     use super::testing::*;
@@ -678,5 +691,56 @@ mod tests {
         assert_eq!(fill(&on, 2_000, "now."), theme.on_accent);
         assert_eq!(fill(&on, 2_000, "It"), theme.text);
         assert_eq!(fill(&off, 2_000, "$5"), theme.text);
+    }
+
+    /// The busy scene with `edit` and the time map `map`.
+    fn busy_with(edit: &EditState, map: &TimeMap) -> Result<Scene, SceneError> {
+        let (transcript, events) = busy();
+        build_scene(SceneInput {
+            transcript: &transcript,
+            plan: &plan(&transcript, &events),
+            edit,
+            clip: &clip(1080, 1920, 10_000),
+            profile: &profile(1080),
+            time_map: map,
+            theme: &Theme::default_for(StyleId::Clean),
+            fonts: &FontSet::embedded(),
+        })
+    }
+
+    #[test]
+    fn the_summary_counts_the_items_drawn_and_not_a_disabled_one() {
+        let identity = TimeMap::identity(DurMs::new(10_000));
+        let counts = |edit: &EditState| {
+            let s = busy_with(edit, &identity).unwrap().summary();
+            (s.voice_cleaned, s.captions_emphasized, s.visual_moments)
+        };
+        assert_eq!(counts(&EditState::default()), (true, 0, 3));
+        let (transcript, events) = busy();
+        let first = plan(&transcript, &events).items()[0].id;
+        let overrides = |pairs: &[(EventId, bool)]| EditState {
+            event_overrides: pairs.iter().copied().collect(),
+            ..EditState::default()
+        };
+        assert_eq!(counts(&overrides(&[(first, false)])), (true, 0, 2));
+        // Turned back on it is drawn; an override of an id the plan no
+        // longer has is ignored (D-145).
+        let gone = EventId::new(999_999);
+        assert_eq!(
+            counts(&overrides(&[(first, true), (gone, false)])),
+            (true, 0, 3)
+        );
+    }
+
+    #[test]
+    fn an_item_the_program_does_not_play_is_an_error() {
+        // A map made by hand (D-164: in tests only) that leaves out 1,000 to
+        // 1,500 ms of the recording, where the first number is said.
+        let cut: TimeMap = serde_json::from_str(
+            r#"{"segments":[{"kind":"source","src":{"start":0,"end":1000}},{"kind":"source","src":{"start":1500,"end":10000}}]}"#,
+        )
+        .unwrap();
+        let result = busy_with(&EditState::default(), &cut);
+        assert_eq!(result.err(), Some(SceneError::TimeMap));
     }
 }
