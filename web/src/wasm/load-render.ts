@@ -64,7 +64,7 @@ export type SourcePos = { at: TimeMs } | { held: TimeMs };
  */
 export type RenderSession = Omit<
   ModuleSession,
-  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame"
+  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize"
 > & {
   /** Builds the scene and keeps it in place of the one before; what the plan's validation left out. */
   set_scene(input: SceneInput): { dropped: Dropped[] };
@@ -75,6 +75,8 @@ export type RenderSession = Omit<
   source_at(tOut: OutMs): SourcePos | null;
   /** Draws what the scene shows at the program time `tOut`, with `frame` as its main video. */
   render_frame(frame: VideoFrame, tOut: OutMs): void;
+  /** Draws at this size from now on, on the same canvas; the scene is set again at it (v4implementation D-149). */
+  resize(width: Px, height: Px): void;
 };
 
 /** The module's MP4 writer. `finalize()` returns the size of the file in bytes and frees the writer. */

@@ -25,7 +25,15 @@ import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
 import type { FailureStage, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
-import { previewClock, previewForget, previewPause, previewPlay } from "./render/preview-job";
+import {
+  drawStill,
+  previewClock,
+  previewForget,
+  previewPause,
+  previewPlay,
+  previewProfile,
+  previewSeek,
+} from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
 import { toAppFailure } from "./rpc";
 import { type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
@@ -129,35 +137,45 @@ async function rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] })
  * Validates the plan and builds the scene (TS §40.8); keeps what it was
  * built from, for the export's switch and back. A plan this build cannot
  * read, or a time map that is not the identity, is refused as `E_INTERNAL`.
+ * While the preview is paused, the frame at its position is drawn again
+ * with the new scene before this answers (D-173): a change shows at once.
  */
-function setScene(p: {
+async function setScene(p: {
   transcript: Transcript;
   plan: EditPlan;
   edit: EditState;
   timeMap: TimeMap;
   profile: "preview" | { entitlementToken: string };
 }): Promise<SceneReport> {
+  let report: SceneReport;
   try {
-    const { api, session } = opened();
+    const state = opened();
     const profile =
       p.profile === "preview"
-        ? api.previewProfile()
-        : api.exportProfileFromToken(p.profile.entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now());
+        ? previewProfile(state)
+        : state.api.exportProfileFromToken(p.profile.entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now());
     const kept = { transcript: p.transcript, plan: p.plan, edit: p.edit, timeMap: p.timeMap };
-    const report = session.set_scene({ ...kept, profile });
+    report = state.session.set_scene({ ...kept, profile });
     scene = kept;
-    return Promise.resolve(report);
   } catch (thrown) {
     throw staged(thrown, "detect_scene");
   }
+  try {
+    await drawStill(worker);
+  } catch (thrown) {
+    throw staged(thrown, "preview");
+  }
+  return report;
 }
 
+/** Hands the canvas to the session and draws the frame at the position: the preview shows before its first play. */
 async function attachPreview(p: { canvas: OffscreenCanvas }): Promise<void> {
-  const { api, session } = opened();
-  const size = api.previewProfile();
+  const state = opened();
+  const size = previewProfile(state);
   // No other call on the session until this has answered.
-  await session.attach_canvas(p.canvas, size.width, size.height);
+  await state.session.attach_canvas(p.canvas, size.width, size.height);
   previewCanvas = p.canvas;
+  await drawStill(worker);
 }
 
 /** Idempotent. */
@@ -205,7 +223,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   previewPlay: (p: Parameters<typeof previewPlay>[0]) => previewPlay(p, worker),
   previewClock,
   previewPause,
-  previewSeek: notYet,
+  previewSeek: (p: Parameters<typeof previewSeek>[0]) => previewSeek(p, worker),
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
 };

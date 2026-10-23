@@ -2,7 +2,23 @@
    frame and its transport under it. The direct-manipulation chrome joins it
    in Prompt 113. */
 
-/* Drawn at 540 x 960 and shown at the frame's size, which is 9:16 too. */
+/* The frame's content: the canvas, and over it the spinner of a slow seek. */
+.player {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.seekSpinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+
+/* Drawn at 540 x 960 (360 x 640 on a slow machine, D-149) and shown at the
+   frame's size, which is 9:16 too. */
 .previewCanvas {
   display: block;
   width: 100%;
@@ -27,12 +43,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Where the scrub bar goes (Prompt 112). */
+/* The scrub bar takes the rest of the row. */
 .scrub {
   flex: 1;
-  height: var(--sp-1);
-  border-radius: var(--sp-1);
-  background: var(--border);
+  min-width: 0;
 }
 
 .badge,

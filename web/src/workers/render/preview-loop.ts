@@ -10,7 +10,7 @@ import type { PreviewStats } from "../protocol";
 import type { VideoSource } from "./video-source";
 
 /** The recording time a source position shows: a held one shows its frame still. */
-function recorded(pos: SourcePos): TimeMs {
+export function recorded(pos: SourcePos): TimeMs {
   return "at" in pos ? pos.at : pos.held;
 }
 
@@ -38,15 +38,17 @@ function nextStep(): Promise<void> {
  * Draws the program at the clock's time until the clock passes its end, or
  * `isStopped` says so, or no scene is set. `source` keeps every decoded
  * frame: none is closed here, and the caller closes the source's frames
- * afterwards.
+ * afterwards. `drawn` hears of every frame drawn, with the time it shows and
+ * what drawing it cost: its owner keeps the position and decides the 360 x
+ * 640 fallback (D-149), and sets `downscaled` in what this returns.
  */
 export async function runPreview(
   session: RenderSession,
   source: VideoSource,
   clock: () => OutMs,
   isStopped: () => boolean,
+  drawn: (tn: OutMs, costMs: number) => void,
 ): Promise<PreviewStats> {
-  // V4 Prompt 112 adds the 360 x 640 fallback (D-149).
   const stats: PreviewStats = { frames: 0, late: 0, maxDriftMs: 0 as DurMs, downscaled: false };
   const total = session.frame_count();
   let lastN = -1;
@@ -74,7 +76,9 @@ export async function runPreview(
       // A late frame: the one before it is drawn again, with the scene of now.
       const frame: VideoFrame | null = decoded ?? lastFrame;
       if (frame !== null) {
+        const started = performance.now();
         session.render_frame(frame, tn);
+        drawn(tn, performance.now() - started);
         lastFrame = frame;
         stats.frames += 1;
         stats.maxDriftMs = Math.max(stats.maxDriftMs, Math.abs(t - tn)) as DurMs;

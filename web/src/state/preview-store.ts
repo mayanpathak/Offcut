@@ -7,6 +7,8 @@
 
 import { create } from "zustand";
 
+import type { OutMs } from "../gen/domain";
+import type { PreviewStats } from "../workers/protocol";
 import { type MachineDef, transition } from "./machines/transition";
 
 export type PreviewStatus = "detached" | "stopped" | "playing" | "paused" | "seeking" | "locked";
@@ -15,6 +17,12 @@ export type PreviewState = {
   status: PreviewStatus;
   /** The preview was played since it was attached. */
   playedOnce: boolean;
+  /** Where the preview is in the program: each clock sync while it plays, and each seek. Unknown before either. */
+  position: OutMs | undefined;
+  /** A seek's frame is being drawn (D-148). */
+  seekBusy: boolean;
+  /** What the last play drew (D-155). */
+  lastStats: PreviewStats | undefined;
 };
 
 type PreviewEvent =
@@ -30,8 +38,8 @@ type PreviewEvent =
   | "detach";
 
 // `lock` and `detach` are accepted in every state. `detached` does not lead
-// to `playing` (TS §12.3). The three seek events are here for V4, the first
-// version to fire them.
+// to `playing` (TS §12.3). The three seek events fire from the scrub bar
+// (v4implementation D-148).
 const MACHINE: MachineDef<PreviewStatus, PreviewEvent> = {
   detached: { attach: "stopped", lock: "locked", detach: "detached" },
   stopped: { play: "playing", lock: "locked", detach: "detached" },
@@ -41,7 +49,13 @@ const MACHINE: MachineDef<PreviewStatus, PreviewEvent> = {
   locked: { unlock: "paused", lock: "locked", detach: "detached" },
 };
 
-export const usePreviewStore = create<PreviewState>(() => ({ status: "detached", playedOnce: false }));
+export const usePreviewStore = create<PreviewState>(() => ({
+  status: "detached",
+  playedOnce: false,
+  position: undefined,
+  seekBusy: false,
+  lastStats: undefined,
+}));
 
 /** Applies `event`; `change` is stored only if the transition led to another state. */
 function apply(event: PreviewEvent, change: Partial<Omit<PreviewState, "status">> = {}): void {
@@ -86,5 +100,30 @@ export function unlock(): void {
 
 /** any → detached */
 export function detached(): void {
-  apply("detach", { playedOnce: false });
+  apply("detach", { playedOnce: false, position: undefined, seekBusy: false, lastStats: undefined });
+}
+
+/** playing | paused → seeking: the scrub bar is held. */
+export function seekStart(): void {
+  apply("seek");
+}
+
+/** seeking → playing or paused, as it was before: the scrub bar is let go. */
+export function seekDone(playing: boolean): void {
+  apply(playing ? "seek_done_playing" : "seek_done_paused");
+}
+
+/** Where the preview is now. Not a change of state. */
+export function at(position: OutMs): void {
+  usePreviewStore.setState({ position });
+}
+
+/** Whether a seek's frame is being drawn. */
+export function seekBusy(busy: boolean): void {
+  usePreviewStore.setState({ seekBusy: busy });
+}
+
+/** What the last play drew. */
+export function played(stats: PreviewStats): void {
+  usePreviewStore.setState({ lastStats: stats });
 }

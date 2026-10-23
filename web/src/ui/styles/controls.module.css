@@ -315,3 +315,12 @@
   box-shadow: var(--focus);
 }
 
+/* A slider's label for assistive technology only (`labelHidden`). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

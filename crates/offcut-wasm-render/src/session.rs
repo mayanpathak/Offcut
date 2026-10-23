@@ -221,6 +221,18 @@ impl RenderSession {
         }
     }
 
+    /// Draws at `width` by `height` from now on, on the canvas it has: the
+    /// preview's 360 x 640 fallback (v4implementation D-149). The scene is
+    /// the caller's to set again at that size.
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), JsValue> {
+        let Some(renderer) = self.renderer.as_mut() else {
+            return Err(failure(ErrorCode::Internal, "NoCanvas"));
+        };
+        renderer
+            .resize(Px::new(width), Px::new(height))
+            .map_err(render_error)
+    }
+
     /// Draws what the scene shows at the program time `t_out_ms`, with
     /// `frame` as its main video: the frame of the source time `source_at`
     /// gives. The frame stays the caller's.

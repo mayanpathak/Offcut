@@ -1,22 +1,30 @@
 // J7: the preview. The canvas is drawn by the render worker and the sound is
 // played by the page; `PreviewPlayer` hands the canvas over when it appears
-// and gives the preview up when it goes. It fills the stage's frame; under
-// the frame, `PreviewTransport` offers play and pause, the time, the scrub
-// bar (wired in Prompt 112) and the watermark badge (v4implementation D-172).
+// and gives the preview up when it goes. It fills the stage's frame, shows a
+// spinner when a seek's frame is slow, and carries the last play's
+// statistics as `data-*` for the tests (D-155). Under the frame,
+// `PreviewTransport` offers play and pause, the time, the scrub bar (D-148)
+// and the watermark badge (v4implementation D-172).
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { messages } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
 import { type PreviewState, usePreviewStore } from "../../state/preview-store";
-import { attach, detach, pause, play } from "../../usecases/control-preview";
+import { attach, detach, pause, play, scrub, seekDone, seekStart } from "../../usecases/control-preview";
 import { Pause, Play } from "../icons";
 import { IconButton } from "../primitives/IconButton";
+import { Slider } from "../primitives/Slider";
+import { Spinner } from "../primitives/Spinner";
 import styles from "../styles/preview.module.css";
 
 // The size the preview is drawn at (TS §20.1). The page shows it scaled.
 const PREVIEW_WIDTH = 540;
 const PREVIEW_HEIGHT = 960;
+/** A seek's frame that takes longer than this shows a spinner (D-148). */
+const SEEK_SPINNER_MS = 300;
+/** The scrub bar moves one output frame at a time. */
+const FRAME_MS = 1000 / 30;
 
 // An attach and a detach each take a moment, and a player that goes and
 // comes back at once would otherwise have both under way together.
@@ -58,8 +66,29 @@ function assertNever(value: never): never {
   throw new Error("a state of the preview this build does not know");
 }
 
+/** Whether a seek has been drawing for longer than `SEEK_SPINNER_MS`. */
+function useSlowSeek(): boolean {
+  const busy = usePreviewStore((state) => state.seekBusy);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!busy) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSlow(true);
+    }, SEEK_SPINNER_MS);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
+  }, [busy]);
+  return slow;
+}
+
 export function PreviewPlayer() {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const stats = usePreviewStore((state) => state.lastStats);
+  const slow = useSlowSeek();
 
   // The canvas is handed over once, when the player appears: an element
   // gives its drawing away for good. The audio is the clip's, read then.
@@ -88,23 +117,37 @@ export function PreviewPlayer() {
   }, []);
 
   return (
-    <canvas
-      ref={canvas}
-      className={styles.previewCanvas}
-      width={PREVIEW_WIDTH}
-      height={PREVIEW_HEIGHT}
-      role="img"
-      aria-label={messages.preview.canvas}
-      data-testid="preview-canvas"
-    />
+    <div
+      className={styles.player}
+      data-frames={stats?.frames}
+      data-late={stats?.late}
+      data-max-drift-ms={stats?.maxDriftMs}
+      data-downscaled={stats?.downscaled}
+    >
+      <canvas
+        ref={canvas}
+        className={styles.previewCanvas}
+        width={PREVIEW_WIDTH}
+        height={PREVIEW_HEIGHT}
+        role="img"
+        aria-label={messages.preview.canvas}
+        data-testid="preview-canvas"
+      />
+      {slow ? (
+        <span className={styles.seekSpinner} aria-hidden="true">
+          <Spinner />
+        </span>
+      ) : null}
+    </div>
   );
 }
 
 /**
- * Under the frame: the one button, the clip's length (the position joins it
- * in Prompt 112, with the preview store's `position`), the scrub bar, and the
- * badge that says Free exports carry the watermark. V4 has no accounts, so
- * every export is Free's and the badge is always shown; V6 hides it for Creator.
+ * Under the frame: the one button, where the preview is and the program's
+ * length, the scrub bar (D-148), and the badge that says Free exports carry
+ * the watermark. V4 has no accounts, so every export is Free's and the badge
+ * is always shown; V6 hides it for Creator. The program is as long as the
+ * clip in V4 (the identity time map).
  */
 export function PreviewTransport() {
   const preview = usePreviewStore();
@@ -112,6 +155,7 @@ export function PreviewTransport() {
   const lengthMs = useClipStore((state) => state.clipInfo?.duration) ?? 0;
   const { label, press } = control(preview);
   const locked = preview.status === "locked";
+  const position = preview.position ?? 0;
 
   return (
     <div className={styles.transport}>
@@ -125,8 +169,33 @@ export function PreviewTransport() {
             void press?.();
           }}
         />
-        <span className={styles.time}>{messages.preview.clock(lengthMs)}</span>
-        <span className={styles.scrub} aria-hidden="true" />
+        <span className={styles.time}>{messages.preview.time(position, lengthMs)}</span>
+        <span className={styles.scrub}>
+          <Slider
+            min={0}
+            max={lengthMs}
+            step={FRAME_MS}
+            value={position}
+            label={messages.preview.seek}
+            labelHidden
+            format={messages.preview.clock}
+            disabled={locked || preview.status === "detached"}
+            {...(locked ? { disabledReason: messages.editor.availableAfterExport } : {})}
+            onGrab={() => {
+              void seekStart();
+            }}
+            onInput={(ms) => {
+              void scrub(ms);
+            }}
+            onRelease={() => {
+              void seekDone();
+            }}
+            onCommit={() => {
+              void seekDone();
+            }}
+            data-testid="preview-scrub"
+          />
+        </span>
       </div>
       {failure === undefined ? (
         <p className={styles.badge}>{messages.preview.watermarkBadge}</p>

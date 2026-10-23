@@ -23,6 +23,7 @@ import type { FailureStage, StageTiming } from "../protocol";
 import { CANCELLED, type JobContext, WorkerFailure } from "../rpc-worker";
 import { runExport } from "./export-loop";
 import { OpfsSink } from "./opfs-sink";
+import { previewProfile } from "./preview-job";
 import type { VideoSource } from "./video-source";
 
 export type Exported = { opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] };
@@ -37,6 +38,8 @@ export type Session = {
   source: VideoSource;
   /** What `detect` last found the clip's events in, and the events (D-146). */
   detection?: { transcript: Transcript; prosody: Prosody; events: DetectedEvent[] };
+  /** The preview draws at 360 x 640 for the rest of this clip (D-149). */
+  downscaled?: boolean;
 };
 
 /** What the scene was last built from, without its profile: the export switches to it and back. */
@@ -158,7 +161,8 @@ async function afterExport(run: ExportRun, w: WorkerState): Promise<void> {
   const scene = w.scene();
   const previewCanvas = w.previewCanvas();
   if (run.switched && state !== undefined && scene !== undefined && previewCanvas !== undefined) {
-    const profile = state.api.previewProfile();
+    // The preview's size for this clip: 360 x 640 if it was downscaled (D-149).
+    const profile = previewProfile(state);
     state.session.set_scene({ ...scene, profile });
     await state.session.attach_canvas(previewCanvas, profile.width, profile.height);
   }

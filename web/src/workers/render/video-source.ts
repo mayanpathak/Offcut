@@ -127,9 +127,21 @@ export class VideoSource {
     }
   }
 
-  /** V4: starts decoding at `from` before a frame of it is asked for. */
+  /**
+   * Starts decoding at the keyframe at or before `from`, before a frame of
+   * it is asked for, and hands no frame out (v4implementation §15.3): a play
+   * or a seek that follows finds its frames decoded. A failure is kept for
+   * the next `frameAt` to throw.
+   */
   prefetch(from: TimeMs): void {
-    void from;
+    if (this.#closed || this.#failed !== undefined) {
+      return;
+    }
+    try {
+      this.#ask(from * 1000, PREVIEW_QUEUE);
+    } catch (thrown) {
+      this.#failed ??= asFailure(thrown);
+    }
   }
 
   /** Closes every frame this object holds, the one handed out last too, and the decoder. */
@@ -182,6 +194,11 @@ export class VideoSource {
     }
     this.#wantUs = tUs;
     this.#ahead = ahead;
+    // Of the frames at or before the time asked for, only the latest can be
+    // shown: the others are closed now, not when the next frame arrives. A
+    // decoder gives out a frame only while it has one free (it has a few),
+    // so after a seek forward the next frame would otherwise never come.
+    this.#dropDue();
     try {
       // The time of the oldest frame that is still held, if any: a time
       // before it is a jump back (`FrameDecoder.jumped`).
@@ -212,6 +229,11 @@ export class VideoSource {
   #keep(frame: VideoFrame): void {
     const after = this.#queue.findIndex((queued) => queued.timestamp > frame.timestamp);
     this.#queue.splice(after === -1 ? this.#queue.length : after, 0, frame);
+    this.#dropDue();
+  }
+
+  /** Closes the queued frames at or before the time asked for, all but the latest of them. */
+  #dropDue(): void {
     const due = this.#queue.filter((queued) => queued.timestamp <= this.#wantUs).length;
     for (const old of this.#queue.splice(0, Math.max(0, due - 1))) {
       this.#release(old);

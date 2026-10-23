@@ -1970,3 +1970,88 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
 
 **Open.** Open item 8 closed. Known issues 23-27 unchanged; open items 1-5 unchanged. Next: Prompt 112, the first that wires a flow (G Phase 12).
+
+---
+
+## Entry 23 - 2026-10-24 - P112 (S11): seek, prefetch, resize rule, preview statistics, redraw while paused
+
+**What.** Prompt 112 (G 12.1, G 12.2, G 12.4 rows 1 and 6; D-148, D-149, D-155, D-173; §15.2, §15.3, §16.1, §16.2): the preview scrubs, draws a still frame (the first one, a seek's, a change's while paused), falls back to 360 x 640 on a slow machine, and reports its statistics. Found and fixed on the way: a decoder deadlock on a seek forward.
+
+**1. The worker** (`render/preview-job.ts`, `render/preview-loop.ts`, `render.worker.ts`, `render/export-job.ts`):
+- **The position.** `preview-job.ts` keeps the program time of the frame last drawn: set by every frame the loop draws, and by a seek.
+- **`drawStill(w)`.** Draws the frame at the position with `frameAtBlocking`, when a canvas and a scene exist and no loop runs. It is called in three places:
+  - **after `attachPreview`:** the preview shows its first frame before any play; the empty frame of design review 1 is gone;
+  - **in `previewSeek`;**
+  - **after `setScene` (D-173):** `setScene` answers once the frame is drawn again with the new scene. A failure of that drawing is `preview`'s, not the scene's.
+- **`previewSeek({ at })`.** Stops a loop that runs (`previewPause`), so no two loops run; takes the output frame that shows `at` (clamped to the program); draws it. A play that follows starts there.
+- **The fallback (D-149):**
+  - `runPreview` takes a fifth argument, `drawn(tn, costMs)`, called for every frame drawn with the time it shows and what `render_frame` cost. `preview-job.ts` keeps the last `DOWNSCALE_WINDOW` = 60 costs. When their mean exceeds `DOWNSCALE_MEAN_MS` = 28, it calls `session.resize(360, 640)` and sets the scene again at the preview profile scaled by `DOWNSCALE_FACTOR` = 2/3; it does so once.
+  - `Session.downscaled` keeps it for the clip, and `previewProfile(state)` gives every later preview scene the smaller size: `setScene`, `attachPreview`, and the export's switch back (`export-job.ts`). So it is never undone.
+  - `PreviewStats.downscaled` reads it. The page's canvas keeps its CSS size.
+  - The constants are in `preview-job.ts`, Appendix D's home for them.
+- **`prefetch`.** After a play's frames are closed (`closeFrames`, unchanged), the new source starts decoding at the stopped position, so a play or a seek that follows starts at once.
+
+**2. The decoder** (`render/video-source.ts`):
+- **`prefetch(from)`** (V3's marker filled): asks for `from` as `frameAt` does, and so restarts at the keyframe at or before it when it is outside what is decoded, without handing a frame out. A failure is kept for the next `frameAt`.
+- **The keyframe restart** of a far seek was already there (`FrameDecoder.jumped`, `stop()`, `start(tUs)` at `keyframe_at_or_before`). `frame-decoder.ts` is unchanged: its `stop()` and `start()` are the prompt's `restartAt`.
+- **The deadlock, found by looking at a seek (and fixed).** A seek from 1 s to 5 s never answered.
+  - **The trace:** the source held 8 decoded frames up to 1.23 s, all before the target, and nothing more came out of the decoder.
+  - **Why no restart:** this clip's keyframe for 5 s had already been fed, so the source decoded on rather than restarting.
+  - **Why it stalled:** Chrome's `VideoDecoder` gives out a frame only while it has one free (a small pool). The source closed the frames before the target only in `#keep`, when the next frame arrived, and that frame never came.
+  - **The fix:** `#ask` now closes the queued frames at or before the time asked for, all but the latest, before it feeds (`#dropDue`, shared with `#keep`).
+  - **Effect on a seek within the same keyframe interval:** 0.1 s to 1 s went from 1,206 ms (one frame out per frame closed) to 11 ms.
+  - **INV-11 holds:** a frame closed early is closed once, by the source.
+
+**3. The binding** (`crates/offcut-wasm-render/src/session.rs`, `web/src/wasm/load-render.ts`):
+- `RenderSession.resize(width, height)` calls `Renderer::resize`, which reconfigures the canvas's surface; `NoCanvas` when no renderer exists.
+- `load-render.ts` types it with `Px`. The render wasm is 6,357,893 bytes.
+
+**4. The page:**
+- **`preview-store.ts`** (§16.1):
+  - New fields: `position` (each clock sync and each seek; `undefined` before either, since the store may not cast a 0 to `OutMs`), `seekBusy`, `lastStats`.
+  - New actions: `seekStart()`, `seekDone(playing)`, `at(position)`, `seekBusy(busy)`, `played(stats)`.
+  - The three seek events of V2's table now fire; `detached()` forgets all three fields. V3's marker is filled.
+- **`control-preview.ts`** (§16.2, D-148):
+  - **`seek(at)`:** one `previewSeek` in flight and one pending target; when the one in flight answers, the latest pending is sent. A failure is stored as V3 stores one (`E_DECODE_VIDEO`), and the spinner's flag clears.
+  - **`seekStart()`:** a preview that plays is paused first and plays on when the bar is let go.
+  - **`seekDone()`:** waits for the seek in flight, then `seek_done_playing` (the sound restarts at the position and the loop runs again) or `seek_done_paused`.
+  - **`scrub(ms)`:** the scrub bar's number made `OutMs` by `toOutMs`, the file's minting helper. From the keyboard while playing, it is a hold, a seek and a release in one.
+  - **The position:** `previewStore.at` at each clock sync (4 Hz) and at a pause.
+  - **The statistics:** `lastStats` after each play.
+  - **Playing:** a play starts at `resumeAtMs` from `stopped` too, so a seek before the first play is where it starts. `startPlaying` holds the sound and loop start that `play` and `seekDone` share.
+- **`PreviewPlayer.tsx`** (D-148, D-155):
+  - **The root** is a wrapper around the canvas, carrying `data-frames`, `data-late`, `data-max-drift-ms` and `data-downscaled` of the last play. Over the canvas, a `Spinner` when a seek takes longer than `SEEK_SPINNER_MS` = 300.
+  - **The transport** shows "position / length". The scrub bar is a `Slider` (0 to the program's length, step one frame, value the store's position, named "Position", `data-testid="preview-scrub"`): pointer-down → `seekStart`, input → `scrub`, pointer-up and change → `seekDone`. It is disabled while an export locks the preview (tooltip "Available when the export finishes").
+- **`Slider`** (primitive) gains `onInput`, `onGrab`, `onRelease` and `labelHidden` (the label for assistive technology only; `controls.module.css` gains `.srOnly`).
+- **`preview.module.css`:** `.player`, `.seekSpinner`; the placeholder scrub track gone.
+
+**5. Looked at in Chrome** (G 12.4 rows 1 and 6; temporary checks on the dev server with the reference clip, deleted):
+
+| Check | Reading |
+|---|---|
+| First frame before any play | Drawn (not blank) |
+| Seeks while paused (to 0.1, 1, 5, 60, 10, 70, 70.5, 71, 30, 0, 73 s) | 3, 11, 108, 175, 57, 60, 9, 15, 50, 22, 90 ms: every one under 300 ms, so no spinner |
+| A burst of ten scrubs (20 s to 29 s) | Two seeks reach the worker, 20 s and 29 s; the position ends at 29 s |
+| `setScene` (style Bold) while paused | Answered in 7 ms with the frame drawn again: "THAT CHANGE" in Bold capitals at 29 s |
+| A 20 s play from 10 s | `data-frames` 601, `data-late` 0, `data-max-drift-ms` 21.8, `data-downscaled` false; the time read "0:30 / 1:14" |
+| Scrubbing while playing (hold, drag, let go) | Played on from 0:58 |
+
+- **The fallback on D1 at its real threshold:** a play with the processor throttled 20 times (CDP) drew 246 frames, 0 late, and did not fall back. D1's frame cost is far under 28 ms even so.
+- **The fallback path forced** (`DOWNSCALE_MEAN_MS` set to 0 for one run, then put back): `data-downscaled` true after the first 60 frames and still true on the next play; a seek after it took 126 ms; `setScene` drew at the smaller size; the 360 x 640 frame fills the frame with the same layout as at 540 x 960.
+
+**Differs from the prompt or the plan.**
+- **`frame-decoder.ts` is unchanged** (its restart exists).
+- **The first frame is drawn on `attachPreview`**, beyond G 12.2's `setScene`: TS §20.3's "first preview frame at most 500 ms after `ready`".
+- **`previewSeek` keeps the source's frames open** for the next seek (the decoder stays warm); `previewPlay`'s end still closes them all and checks the count (D-45).
+- **Seeking from `stopped`:** V2's preview machine has no `seek` from `stopped`, and its table is not changed here. A scrub there draws the frame and moves `resumeAtMs` without a change of status.
+- **The spinner flag:** `preview-store.ts`'s `seekBusy` is a field §16.1 does not list; the spinner needs it.
+- **The `Slider` primitive** gains four props, and `controls.module.css` one class.
+- **`setScene` is now `async`** in the worker: its answer waits for the redraw.
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file (every temporary check and the temporary logging deleted; `DOWNSCALE_MEAN_MS` back at 28); no test key in the environment. `pnpm build:wasm` exit 0 (render wasm 6,357,893 bytes). `pnpm fixtures` up to date. `pnpm check` exit 0. `pnpm test`: **Rust 643 passed, 0 failed, 3 ignored** (`resize` adds no test; the whole log reads 647 with the type generator's 4), Vitest 92. `pnpm build` exit 0; **app shell 323.3 kB gzip** (Entry 22: 322.2). No `__offcutDev` in `web/dist`. `pnpm e2e` 12 passed.
+- `git grep -nE "\bV4\b" -- web/src/workers/render/video-source.ts web/src/state/preview-store.ts`: nothing (the two markers are filled).
+- **`pnpm e2e:media`** on the keyed build: **49 passed, 1 skipped (17.4 min)**, the baseline's count. A first run was cut short at its 11th case (all passed so far) when the agent's session restarted, and it was run again whole; that is the reading here. The build after it has no key: the key's value is in no file of `web/dist`.
+- The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+
+**Open.** Known issues 23-27 unchanged; open items 1-5 unchanged. Next: Prompt 113 (hit testing, the gestures on the preview).

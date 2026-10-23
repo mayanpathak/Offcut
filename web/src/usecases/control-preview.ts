@@ -6,8 +6,8 @@ import { track } from "../analytics/client";
 import type { OutMs } from "../gen/domain";
 import { noteFailure } from "../state/clip-store";
 import * as previewStore from "../state/preview-store";
-import { pool, WorkerCallError } from "../workers/pool";
-import type { ClockSync } from "../workers/protocol";
+import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
+import type { ClockSync, PreviewStats } from "../workers/protocol";
 
 /** How often the worker is told the audio's time (TS §20.2). */
 const CLOCK_SYNC_INTERVAL_MS = 250;
@@ -23,15 +23,21 @@ type Player = {
   /** The context's time at which the node was started, in seconds, and the place in the clip it started at. */
   startedAt: number;
   startOffsetMs: number;
-  /** Where a preview that was paused goes on. 0 for one that is stopped. */
+  /** Where a play starts: where the preview was paused or scrubbed to; 0 at the start and after the end. */
   resumeAtMs: number;
   syncTimer: ReturnType<typeof setInterval> | undefined;
   /** Goes up with every play and every pause: what an older play still has to do is dropped. */
   turn: number;
   pausing: boolean;
+  /** The scrub bar was taken while the preview played: it plays on when let go. */
+  playAfterSeek: boolean;
 };
 
 let player: Player | undefined;
+
+/** The seek being drawn, and the latest target asked for since: sent when it answers (D-148). */
+let seekInFlight: Promise<void> | undefined;
+let seekPending: OutMs | undefined;
 
 /** The one place of this file that turns a number into a program time (v2implementation D-59, D-126). */
 function toOutMs(ms: number): OutMs {
@@ -99,14 +105,19 @@ export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): P
     syncTimer: undefined,
     turn: 0,
     pausing: false,
+    playAfterSeek: false,
   };
   previewStore.attached();
 }
 
 /** What a play does when the worker's loop has returned: the clip's end, or a failure. */
-async function afterPlay(p: Player, turn: number, loop: Promise<unknown>): Promise<void> {
+async function afterPlay(p: Player, turn: number, loop: Promise<PreviewStats | Cancelled>): Promise<void> {
   try {
-    await loop;
+    const stats = await loop;
+    // What the loop drew reaches the page, never the network (D-155).
+    if (!("cancelled" in stats)) {
+      previewStore.played(stats);
+    }
   } catch (error) {
     stored(error);
     await detach();
@@ -120,10 +131,29 @@ async function afterPlay(p: Player, turn: number, loop: Promise<unknown>): Promi
   }
 }
 
+/** The sound from `resumeAtMs`, the worker's loop after it, and the clock four times a second. */
+function startPlaying(p: Player): void {
+  const offsetMs = p.resumeAtMs;
+  const node = p.context.createBufferSource();
+  node.buffer = p.buffer;
+  node.connect(p.context.destination);
+  node.start(0, offsetMs / 1000);
+  p.node = node;
+  p.startedAt = p.context.currentTime;
+  p.startOffsetMs = offsetMs;
+  p.turn += 1;
+  p.syncTimer = setInterval(() => {
+    const clock = clockNow(p);
+    pool.render.notify("previewClock", { clock });
+    previewStore.at(clock.audioMs);
+  }, CLOCK_SYNC_INTERVAL_MS);
+  void afterPlay(p, p.turn, pool.render.previewPlay({ clock: clockNow(p) }));
+}
+
 /**
- * Plays from the start, or from where the preview was paused. The first play
- * follows a click, which is what lets the browser sound (TS §20.3). Resolves
- * when the preview is playing, not when it ends.
+ * Plays from where the preview was paused or scrubbed to, or from the start.
+ * The first play follows a click, which is what lets the browser sound (TS
+ * §20.3). Resolves when the preview is playing, not when it ends.
  */
 export async function play(): Promise<void> {
   const p = player;
@@ -135,25 +165,12 @@ export async function play(): Promise<void> {
   if (player !== p || (status() !== "stopped" && status() !== "paused")) {
     return;
   }
-  const offsetMs = status() === "paused" ? p.resumeAtMs : 0;
-  const node = p.context.createBufferSource();
-  node.buffer = p.buffer;
-  node.connect(p.context.destination);
-  node.start(0, offsetMs / 1000);
-  p.node = node;
-  p.startedAt = p.context.currentTime;
-  p.startOffsetMs = offsetMs;
-  p.turn += 1;
-
   const first = !previewStore.usePreviewStore.getState().playedOnce;
   previewStore.play();
   if (first) {
     track({ name: "preview_played" });
   }
-  p.syncTimer = setInterval(() => {
-    pool.render.notify("previewClock", { clock: clockNow(p) });
-  }, CLOCK_SYNC_INTERVAL_MS);
-  void afterPlay(p, p.turn, pool.render.previewPlay({ clock: clockNow(p) }));
+  startPlaying(p);
 }
 
 /** Stops the sound and the drawing where they are. The last frame stays on the canvas. */
@@ -164,6 +181,7 @@ export async function pause(): Promise<void> {
   }
   p.pausing = true;
   p.resumeAtMs = positionMs(p);
+  previewStore.at(toOutMs(p.resumeAtMs));
   p.turn += 1;
   stopSound(p);
   try {
@@ -176,6 +194,90 @@ export async function pause(): Promise<void> {
   }
   if (player === p) {
     previewStore.pause();
+  }
+}
+
+/**
+ * The scrub bar is taken (D-148): a preview that plays stops its sound and
+ * its loop, and plays on from the new place when the bar is let go.
+ */
+export async function seekStart(): Promise<void> {
+  const p = player;
+  if (p === undefined) {
+    return;
+  }
+  if (status() === "playing") {
+    await pause();
+    p.playAfterSeek = player === p;
+  }
+  if (status() === "paused") {
+    previewStore.seekStart();
+  }
+}
+
+/**
+ * Draws the frame of `at` (D-148). One seek is drawn at a time: a target
+ * asked for meanwhile waits, and only the latest is drawn after it. A play
+ * that follows starts at `at`. Resolves when the latest target is drawn.
+ */
+export async function seek(at: OutMs): Promise<void> {
+  const p = player;
+  if (p === undefined || status() === "locked" || status() === "detached") {
+    return;
+  }
+  p.resumeAtMs = at;
+  previewStore.at(at);
+  if (seekInFlight !== undefined) {
+    seekPending = at;
+    return seekInFlight;
+  }
+  previewStore.seekBusy(true);
+  seekInFlight = (async () => {
+    let target: OutMs | undefined = at;
+    while (target !== undefined) {
+      seekPending = undefined;
+      await pool.render.previewSeek({ at: target });
+      target = seekPending;
+    }
+  })();
+  try {
+    await seekInFlight;
+  } catch (error) {
+    // A decode failure shows as V3 shows it (E_DECODE_VIDEO); the targets after it are dropped.
+    seekPending = undefined;
+    stored(error);
+  } finally {
+    seekInFlight = undefined;
+    previewStore.seekBusy(false);
+  }
+}
+
+/** The scrub bar's value, in milliseconds: a seek there. From the keyboard while playing, the play goes on from it. */
+export async function scrub(ms: number): Promise<void> {
+  if (status() === "playing") {
+    await seekStart();
+    await seek(toOutMs(ms));
+    await seekDone();
+    return;
+  }
+  await seek(toOutMs(ms));
+}
+
+/** The scrub bar is let go: once its last frame is drawn, the preview plays on if it played before. */
+export async function seekDone(): Promise<void> {
+  const p = player;
+  if (p === undefined || status() !== "seeking") {
+    return;
+  }
+  await seekInFlight;
+  if (player !== p || status() !== "seeking") {
+    return;
+  }
+  const playing = p.playAfterSeek;
+  p.playAfterSeek = false;
+  previewStore.seekDone(playing);
+  if (playing) {
+    startPlaying(p);
   }
 }
 

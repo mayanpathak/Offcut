@@ -1,5 +1,6 @@
 // A value on a range (v4implementation D-181): a native range input, styled,
-// with its label and its value above it. The value shown follows the thumb
+// with its label and its value above it (or its label for assistive
+// technology only, `labelHidden`). The value shown follows the thumb
 // while it moves; `onCommit` is called once it is let go (the input's
 // `change` event), and once per key press. The filled part of the track is
 // set through a custom property: the CSP allows no style attribute.
@@ -24,6 +25,13 @@ export type SliderProps = {
   disabled?: boolean;
   /** Why the slider is disabled, shown as its tooltip. */
   disabledReason?: string;
+  /** Each value while the thumb moves (the input event): for a slider that acts at once, as the scrub bar. */
+  onInput?: (value: number) => void;
+  /** The pointer takes the thumb, and lets it go. */
+  onGrab?: () => void;
+  onRelease?: () => void;
+  /** The label is for assistive technology only, and the value is not shown: the caller shows it its own way. */
+  labelHidden?: boolean;
   "data-testid"?: string;
 };
 
@@ -37,6 +45,10 @@ export function Slider({
   format = String,
   disabled = false,
   disabledReason,
+  onInput,
+  onGrab,
+  onRelease,
+  labelHidden = false,
   "data-testid": testId,
 }: SliderProps) {
   const id = useId();
@@ -101,11 +113,25 @@ export function Slider({
       onPointerDown={(event) => {
         if (disabled) {
           event.preventDefault();
+          return;
+        }
+        onGrab?.();
+      }}
+      onPointerUp={() => {
+        if (!disabled) {
+          onRelease?.();
+        }
+      }}
+      onPointerCancel={() => {
+        if (!disabled) {
+          onRelease?.();
         }
       }}
       onChange={(event) => {
         if (!disabled) {
-          setLive(Number(event.target.value));
+          const next = Number(event.target.value);
+          setLive(next);
+          onInput?.(next);
         }
       }}
     />
@@ -113,14 +139,20 @@ export function Slider({
 
   return (
     <div className={styles.slider}>
-      <div className={styles.sliderHead}>
-        <label htmlFor={id} className={styles.sliderLabel}>
+      {labelHidden ? (
+        <label htmlFor={id} className={styles.srOnly}>
           {label}
         </label>
-        <output htmlFor={id} className={styles.sliderValue}>
-          {format(live)}
-        </output>
-      </div>
+      ) : (
+        <div className={styles.sliderHead}>
+          <label htmlFor={id} className={styles.sliderLabel}>
+            {label}
+          </label>
+          <output htmlFor={id} className={styles.sliderValue}>
+            {format(live)}
+          </output>
+        </div>
+      )}
       {reason === undefined ? range : <Tooltip content={reason}>{range}</Tooltip>}
     </div>
   );
