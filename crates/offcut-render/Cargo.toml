@@ -23,3 +23,10 @@ web-sys = { workspace = true, features = ["OffscreenCanvas", "VideoFrame"] }
 # reaches the browser bundle.
 wgpu = { workspace = true, features = ["vulkan", "dx12", "wgsl"] }
 png = { workspace = true }
+# The golden frames draw the scenes of `offcut-scene`'s snapshot inputs, made
+# as the pipeline makes them: written sentences timed and normalized
+# (`offcut-text`), detected (`offcut-detect`) and validated (`offcut-plan`)
+# (v4implementation §9.4, V4 Prompt 107).
+offcut-text = { workspace = true }
+offcut-detect = { workspace = true }
+offcut-plan = { workspace = true }

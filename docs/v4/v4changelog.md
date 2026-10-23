@@ -1569,3 +1569,131 @@ Changed expectations because of the decision:
 - **Known issue 23 (new):** the copy-back of this entry's changes to `v4implementation.md` (P127).
 - **Prompt 107's goldens.** They need `offcut-render` to build these scenes: its dev-dependencies would gain `offcut-plan`, `offcut-detect` and `offcut-text`, as the look run above did.
 - Open items 1-5 unchanged.
+
+---
+
+## Entry 18 - 2026-10-23 - P107 (S9): fourteen goldens and the parity case; the look checked moving
+
+**What.** Prompt 107 (G 9.3, G 9.4, M-9; D-135, D-170, D-172, §9.4): the fourteen goldens and the parity case, all sixteen PNGs looked at against G 9.3's checklist, the three styles and the four visuals checked moving on the sample clip, and the media suite. One fault the stills showed was fixed in code before the goldens were written: a word that grows ran into its neighbours (below). This closes S9.
+
+**1. `golden_frames.rs`** (D-135, §9.4):
+- **Fourteen new cases, at 540 x 960 over the synthetic pattern:**
+  - `<style>_<kind>` for 3 styles x 4 kinds, as `clean_number`, `clean_list`, `clean_from_to`, `clean_keyword` and the same for `bold_` and `tech_`;
+  - `clean_number_watermark` and `clean_number_nowatermark`.
+- **The scenes.** Each draws the scene of `offcut-scene`'s snapshot input of its kind at the snapshot's middle instant ("during"), when a caption word is spoken, so Clean's pill shows. The inputs now live in `offcut-scene/tests/common/inputs.rs` (below), which both test files include, so the goldens and the snapshots draw one set of scenes.
+- **The rotation case.** `tech_list` is drawn over a clip with `ok_rotated_90.mov`'s display size (§18): `ClipInfo` 720 x 1280 with `Rotation::R90`, the pattern drawn 1280 x 720 (its coded orientation) and turned by the video pass. The test asserts the `Video` command takes the whole turned frame (0, 0, 720, 1280).
+- **The parity case** (D-172), `parity_1080_box_filtered_is_540`. Each style's from-to frame is drawn at 1080 x 1920, box-filtered to 540 x 960 (2 x 2 mean, rounded, written in the test file), and compared with the same frame drawn at 540 x 960, at `PARITY_SSIM_MIN = 0.99`. `GOLDEN_SSIM_MIN` stays 0.98.
+- **The harness.** `golden()` takes the source's rotation. The software-adapter check moved to `software()`, which the parity case also uses for its two renderers.
+- **New dev-dependencies of `offcut-render`.** `offcut-text`, `offcut-detect` and `offcut-plan` (workspace crates, no new external one), so that the test builds the scenes as the pipeline does. Recorded in:
+  - `offcut-render/Cargo.toml`, with a comment;
+  - `deny.toml`: `offcut-render` is a wrapper of the `offcut-text` and `offcut-detect` bans, dev only;
+  - `scripts/check-file-tree.mjs`: `ALLOWED_CRATE_DEPS`;
+  - TS §7's graph text: three dev edges.
+  - `Cargo.lock` gains the three edges.
+
+**2. Words that grow make room** (`captions_draw.rs`, fixing what the goldens showed). In the first writing:
+- **What the stills showed.** `clean_keyword`'s "brutal" (spoken and a KeywordPop, at 1.25) ran its pill into "felt" ("feltbrutal"), `bold_keyword`'s "BRUTAL" into "FOR", and `tech_keyword`'s "brutal" crowded "felt". G 9.3 asks for "the pill behind exactly one word and clear of the next word's stroke". It is also the touching Entry 16 found in Bold's 1.12 pop.
+- **The cause.** A word grew about its own centre while its neighbours stayed.
+- **The fix.** A line whose words grow at `t` now widens (`reflow`):
+  - each word keeps its room to the next, the others move aside, the line stays centred;
+  - a growth `g = (k - 1) x width` moves the words before it left by `g / 2` and the words after it right by `g / 2`;
+  - a word that shrinks (back-out's dip to 0.988) draws its neighbours in.
+- **The safe-area limit becomes the line's.** The line widens by at most the room beside it on each side, the growth cut in proportion past it (it was each word's own room, Entry 16). The vertical limit stays per word (`room_down`). A line that fills the block still barely grows, as before.
+- **At rest nothing moves.** A word not growing and not moved is drawn with exactly the transform it had, so frames without a pop are byte-identical to before.
+- **Bold's 1.12 stays.** The founder's question of Entry 16 ("keep 1.12 or lower it") needs no answer for the look: at 1.12 the neighbours now move aside.
+- **Tests:**
+  - New inline test `a_growing_word_moves_its_neighbours_aside_and_its_line_stays_centred`: in Clean, "made" at 1.25 moves "we" left and "it" right by half its growth, the pill clear of both, the line's middle kept; Bold's "WE" moves for "MADE"'s 1.12; at rest nothing moves.
+  - `a_word_that_fills_its_line_pops_only_as_far_as_the_safe_area_lets_it` reads the drawn scale where it read `room_to_grow` (removed).
+
+**Changed snapshots** (committed in `3d63e58`; each changed by this fix, read, and accepted). Every change is a neighbour making room; nothing else moved:
+
+| Snapshot | Change |
+|---|---|
+| `clean_keyword_pop_during` | "felt" 26.6 lp left, for "brutal" at 1.25 (and its shadow) |
+| `tech_keyword_pop_during` | "felt" 25.2 lp left, for "brutal" at 1.25 |
+| `bold_keyword_pop_during` | "FOR" 42.2 lp right, for "BRUTAL" at 1.25 |
+| `bold_from_to_after`, `bold_list_reveal_after` | "SEE", "YOU" 12.5 lp right, for "AND" at 1.131 |
+| `bold_keyword_pop_after` | "BRUTAL" 1 lp right, "FOR" at 0.988 drawing it in |
+
+`layout_safe_area.rs` reads again, with the reflow: "279 scenes (31 files x 3 styles x 3 placements), 237177 frames, 1672008 boxes, 0 problems".
+
+**`motion.rs` takes the motion's geometry.** With the reflow, `captions_draw.rs` reached 465 lines above its tests. `PILL_SLIDE_MS`, `PILL_GROW_FROM`, the pill's easing, `scaled_about`, `reflow` and `pill` move, unchanged, to `motion.rs` ("how captions move"), beside the KeywordPop keys: `captions_draw.rs` 393 lines, `motion.rs` 183.
+
+**Out of the prompt: `tokio` 1.53.2 → 1.53.3** (`Cargo.lock` only).
+- **The advisory.** RUSTSEC-2026-0386, published during this prompt (the first gate's `cargo deny` passed, the second failed): `tokio::io::unix::AsyncFd`'s safe constructors accept any file descriptor. The fix is "Upgrade to >=1.51.6, <1.52.0 OR >=1.53.3".
+- **Where it is used.** Through the server's `axum`, `hyper`, `sqlx` and `reqwest`; the server's code does not change.
+- **The bump.** `cargo update -p tokio --precise 1.53.3` also moved three unrelated `windows-sys` entries (`errno`, `rustix`, `tempfile`, 0.61.2 → 0.52.0), so the lockfile was restored and only `tokio`'s version and checksum were changed by hand. Cargo checked the checksum on download; `cargo deny check` passes all four checks.
+
+**3. `offcut-scene/tests/common/inputs.rs`** (new; TS §5's tree gains its line). It holds each kind's input (the `Input` table, `TAIL`, `STYLES`, `style_name`, `case`), moved out of `display_list_snapshots.rs` unchanged, so that `golden_frames.rs` includes the same table. It needs `scenes.rs` as the module `scenes`, as `labeled.rs` does. The 43 snapshots read the same from it (before the reflow above).
+
+**The sixteen PNGs, looked at** (`d1`, WARP, 540 x 960; G 9.3's checklist):
+
+| Golden | Seen |
+|---|---|
+| `clean_number` | "3,000 users" counted to its end with "last month" beneath in the event zone; the pill behind "3,000 users" only; "We crossed" outlined, the shadow below it |
+| `clean_list` | "3 REASONS" and three numbered items, aligned on their left at the zone's left + 40 lp; "Third," alone on the pill |
+| `clean_from_to` | "90 minutes" and "10 minutes" (yellow, larger) on one baseline; the bars (96 lp wide) standing on one line, the "to" bar short; the arrow between; the pill behind "10 minutes" |
+| `clean_keyword` | After the fix: "felt" moved aside, the pill behind "brutal" (at 1.25) clear of it |
+| `bold_number` | Upper case fits two lines ("WE CROSSED / 3,000 USERS"); the spoken number in yellow (numbers and the spoken word share `accent`, Entry 16) |
+| `bold_list` | As Clean's, in Bold's 10 lp outline; "THIRD, IT" in upper case |
+| `bold_from_to` | As Clean's; "TO / 10 MINUTES" in upper case below |
+| `bold_keyword` | After the fix: "BRUTAL" (1.25, yellow) and "FOR" apart |
+| `tech_number` | The panel even around the text, the cursor in its cell after "3,000 users"; the reveal in pale monospace, no outline |
+| `tech_list` | The source turned 90°: the disc at the top right and the gradient mirrored, as a turned pattern shows; the list in monospace; the cursor after "Third," |
+| `tech_from_to` | As Clean's, in monospace; the panel around the caption |
+| `tech_keyword` | After the fix: "felt" and "brutal" (1.25, green) apart, the cursor inside the panel |
+| `clean_number_watermark` | "Made with Offcut" at the safe area's bottom-left, legible at 60%, well clear of the raised captions |
+| `clean_number_nowatermark` | The same frame without it |
+| `crop_landscape_050`, `punch_in_110` | Unchanged since Prompt 101 |
+
+- **No text clipped.** Nothing touches the safe area's edges except the Tech reveal, which starts at its left edge (no outline, the zone's full width).
+- **Two goldens are one image.** `clean_number` and `clean_number_nowatermark` are the same frame, both kept as D-135 names them.
+
+**WARP is not byte-stable.** Written twice from the same code, three goldens differed in 1 to 7 pixels by one level (`bold_number`, `tech_from_to`, `tech_list`): SSIM 1.0000. The committed set is one run's.
+
+**Readings on D1** (`cargo test -p offcut-render --test golden_frames -- --nocapture`, after the writing):
+- **Goldens:** all 16 read 1.0000 against themselves on Microsoft Basic Render Driver (DX12).
+- **Parity:** Clean from-to 0.9996, Bold 0.9997, Tech 0.9998, each at least 0.99.
+- **The run:** 19 passed (16 goldens, the parity case, the 2 inline tests of `common/ssim.rs`). The prompt's "17 passed" counts the goldens and the parity case.
+
+**Readings on lavapipe:** see the continuation of this entry (the next commit), from the CI log of this commit.
+
+**The look moving** (G 9.4). A temporary Playwright spec (`zz-look.spec.ts` with `zz-pw.config.ts`, deleted) took the sample clip through the keyed build in Chrome on D1. It pressed play and kept a picture of the preview about every 270 ms for 78 s, about 290 pictures per style, kept in the session's scratchpad (the founder's clip, never committed). They were looked at as contact sheets. The style was changed in `clip-store.ts` (`"bold"`, then `"tech"`) for one keyed build each and reverted: `git diff web/src/state/clip-store.ts` shows nothing.
+
+| G 9.4's check | Seen |
+|---|---|
+| Clean: the pill glides from word to word, never jumps; no pill during a pause | The pill caught between "making" and "videos," mid-slide; no pill on "making videos," in the pause after it; chunks fading in ("at almost" faint at its first picture) |
+| Bold: words pop one by one; upper case; three words a chunk | "QUIT MAKING", "EDITING 8 EVERY", "NOBODY WATCHED.": upper case, at most three words, the spoken one yellow |
+| Mono: the panel follows the chunk; the cursor only while a word is active | The panel around each chunk; the cursor after the spoken word ("So I added it up."), none in the pauses |
+| Visuals: "3 reasons" builds item by item; "90 minutes to 10 minutes" shows two bars, the second in the accent | "3 REASONS", then "1. the captions write themselves", "2. the numbers animate automatically", "3. everything runs on my laptop", each at its time; "90 minutes" with its white bar, then the arrow and "10 minutes" in yellow with its short bar; held, faded. "3,000 hours" counting up ("1,047 hours", "2,889 hours", "3,000 hours") over "editing by hand" |
+
+- **The live recognition found no KeywordPop on "brutal"** this run, which the README allows ("only if event 2 is detected"). The KeywordPop is seen in the goldens and the snapshots.
+- **The list's items** ("the numbers animate automatically" is 35 characters) shrink every line by one factor to fit the zone's width (D-140's fit, Entry 17): about half the captions' height on the phone.
+
+**The media suite** (M-9). `pnpm e2e:media` on D1 with the keyed build (the key read from `ci.yml` inside the one build command, unset after): **49 passed, 1 skipped (10.8 min)**, the baseline's count (the skip is V3's `test.fixme`). No case asserts a look (D-160).
+
+**Differs from the plan or the prompt.**
+- **The reflow (2)** is not in D-139 or D-170, which give the scales; it is what makes them meet G 9.3's checklist.
+- **The three dev-dependencies of `offcut-render`** (1) and the file they need, `common/inputs.rs` (3), are beyond the prompt's files, as Entry 17 foresaw.
+- **The golden names** use the short kinds `number`, `list`, `from_to`, `keyword`, as D-135's `clean_number_watermark` does.
+- **The parity case** draws the from-to frame of each style: text, a pill, bars and a path.
+
+**How it was checked.**
+- **`cargo test -p offcut-scene` (`INSTA_UPDATE=no CI=true`):** 91 passed (Entry 17: 90; the reflow test). `cargo test -p offcut-render --test golden_frames`: 19 passed. Every `.snap` reviewed; no `.snap.new`.
+- **Clippy.** `cargo clippy --workspace --all-targets -- -D warnings` and the wasm32 clippy are clean; `cargo fmt --check` passes.
+- **`node scripts/check-file-tree.mjs`:** ok, 331 files (330 + `common/inputs.rs`).
+- **The SAB gate:**
+  - On `v4-build`, no `zz` file, no test key in the environment; the build has no key in it (the key's value searched in `web/dist`: no file).
+  - `pnpm build:wasm` exit 0 (render wasm 6,357,263 B). `pnpm fixtures` up to date. `pnpm check` exit 0 (after the `tokio` bump).
+  - **Rust: 643 passed, 0 failed, 3 ignored.** Entry 17 read 627/0/3; the 16 added are the 15 golden-frame tests (14 goldens and the parity case) and the reflow test.
+  - Vitest 92. `pnpm build` exit 0 (app shell 308.8 kB, unchanged). `pnpm e2e` 12 passed. `pnpm e2e:media` 49 passed, 1 skipped (above).
+  - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+- **`git diff web/src/state/clip-store.ts`:** nothing.
+
+**CI reading promised by Entry 17** (run 39953786408 on `3d63e58`, green):
+- **Times.** `ci` 12.3 min, `e2e-media` 22.8 min: 23 passed (17.5 min), 1 flaky, 1 skipped.
+- **Where the extra time went.** All of it was in `model-download.spec.ts`: its wrong-hash case took 5.2 min (27 s on P105's run 39943148521) and its second-session case 4.5 min (43 s), the runner downloading slowly.
+- **The flaky case.** "a download that keeps failing ends with its message" passed on retry. It did the same on P105's run, so it was flaky before this prompt.
+- **The scene.** The sample-clip case, the one that runs the scene, took 11.4 s on both runs.
+
+**Open.** Known issue 23 unchanged; open items 1-5 unchanged. The founder's question of Entry 16 on Bold's pop is answered by the reflow (above); the founder may still choose another value in design review 1.

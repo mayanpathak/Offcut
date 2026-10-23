@@ -78,10 +78,12 @@ deny = [
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.
   { crate = "offcut-mp4", wrappers = ["offcut-wasm-core", "offcut-wasm-render"] },
   # `offcut-plan` resolves a plan's numbers from the words (v4implementation D-122).
-  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene", "offcut-plan"] },
-  # `offcut-scene` and `offcut-plan` as a dev-dependency only: the identity
-  # reference and the labeled-set tests (v4implementation D-117, §3.2, D-165).
-  { crate = "offcut-detect", wrappers = ["offcut-wasm-render", "offcut-scene", "offcut-plan"] },
+  # `offcut-render` as a dev-dependency only, for the golden frames' scenes (§9.4).
+  { crate = "offcut-text", wrappers = ["offcut-wasm-core", "offcut-detect", "offcut-scene", "offcut-plan", "offcut-render"] },
+  # `offcut-scene`, `offcut-plan` and `offcut-render` as a dev-dependency only:
+  # the identity reference, the labeled-set tests and the golden frames'
+  # scenes (v4implementation D-117, §3.2, D-165, §9.4).
+  { crate = "offcut-detect", wrappers = ["offcut-wasm-render", "offcut-scene", "offcut-plan", "offcut-render"] },
   { crate = "offcut-dsp", wrappers = ["offcut-wasm-core"] },
   { crate = "offcut-scene", wrappers = ["offcut-render"] },
   { crate = "offcut-render", wrappers = ["offcut-wasm-render"] },

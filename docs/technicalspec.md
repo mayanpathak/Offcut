@@ -430,6 +430,7 @@ offcut/
 │   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
 │   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
 │   │       ├── hit.rs                 Scene::hit (D-174)
+│   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
 │   │       ├── common/scenes.rs       written sentences timed like the labeled set, detected and validated; their scenes, watermark on or off
 │   │       └── snapshots/             insta snapshot files
@@ -901,7 +902,7 @@ offcut-api (server) ─► offcut-api-types, offcut-entitlement[sign] ───�
 
 `offcut-scene` also depends on `offcut-text`, for `format_quantity` only (count-up values, §19.5). `check-file-tree.mjs` allows that pair, and the `offcut-text` ban in `deny.toml` lists `offcut-scene` as a wrapper (v2implementation D-28). It creates no cycle.
 
-`offcut-plan` (V4, v4implementation D-122) depends on `offcut-text` and `offcut-types`. `offcut-scene` depends on `offcut-plan` (it reads a `ValidPlan`), and `offcut-wasm-render` depends on it with `default-features = false` (no schema code in the render bundle). Two edges are dev-only, for the labeled-set tests (v4implementation §3.2): `offcut-scene → offcut-detect` and `offcut-plan → offcut-detect`. `check-file-tree.mjs` counts dev-dependencies, so its table allows all of them; the `offcut-text` ban in `deny.toml` lists `offcut-plan` as a wrapper. None creates a cycle: `offcut-detect` and `offcut-text` depend on no crate above them.
+`offcut-plan` (V4, v4implementation D-122) depends on `offcut-text` and `offcut-types`. `offcut-scene` depends on `offcut-plan` (it reads a `ValidPlan`), and `offcut-wasm-render` depends on it with `default-features = false` (no schema code in the render bundle). Two edges are dev-only, for the labeled-set tests (v4implementation §3.2): `offcut-scene → offcut-detect` and `offcut-plan → offcut-detect`; three more, for the golden frames' scenes (v4implementation §9.4, V4 Prompt 107): `offcut-render → offcut-text`, `offcut-render → offcut-detect` and `offcut-render → offcut-plan`. `check-file-tree.mjs` counts dev-dependencies, so its table allows all of them; the `offcut-text` and `offcut-detect` bans in `deny.toml` list `offcut-plan` and `offcut-render` as wrappers. None creates a cycle: `offcut-detect` and `offcut-text` depend on no crate above them.
 
 **Web (arrows point to what may be imported)**
 

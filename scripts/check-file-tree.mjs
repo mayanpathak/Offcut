@@ -59,7 +59,9 @@ const ALLOWED_CRATE_DEPS = {
   "offcut-scene": ["offcut-text", "offcut-types", "offcut-plan", "offcut-detect"],
   "offcut-entitlement": ["offcut-types"],
   "offcut-detect": ["offcut-text", "offcut-types"],
-  "offcut-render": ["offcut-scene", "offcut-types"],
+  // offcut-text, offcut-detect, offcut-plan: dev-dependencies only, the golden
+  // frames' scenes (v4implementation §9.4).
+  "offcut-render": ["offcut-scene", "offcut-types", "offcut-text", "offcut-detect", "offcut-plan"],
   "offcut-wasm-core": ["offcut-mp4", "offcut-text", "offcut-dsp", "offcut-types"],
   // offcut-plan without default features: no schema code in the bundle (D-122).
   "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types", "offcut-plan"],

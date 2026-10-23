@@ -79,6 +79,13 @@ Numbers: crop_landscape_050 is 1.0000 on d1 WARP and 1.0000 on lavapipe; punch_i
 Date: 2026-10-22
 Decision: Both at least 0.98 on both adapters: one folder, `fixtures/golden/`, serves both; no per-adapter folders. The threshold stays 0.98. The two goldens hold a `Video` command only; the other fourteen (Prompt 107) draw glyphs through Vello, and are read on both adapters again then.
 
+Prompt 107, the other fourteen and the parity case (2026-10-23):
+- **The cases.** Each style with each kind's visual, drawn from `offcut-scene`'s snapshot inputs at their "during" instant (`tech_list` on a source turned 90°), and Clean's NumberReveal with and without the watermark; all written on D1 with `OFFCUT_GOLDEN_UPDATE=1`, then compared.
+- **The parity case** draws each style's from-to frame at 1080 x 1920, box-filters it to 540 x 960 (2 x 2 mean), and compares it with the same frame drawn at 540 x 960, at SSIM >= 0.99 (D-172).
+- **D1 numbers.** Every golden is 1.0000 on d1 WARP against itself on the rerun. Parity is 0.9996 (Clean), 0.9997 (Bold), 0.9998 (Tech) on d1 WARP.
+- **Stability.** WARP is not byte-stable: two writings differed in 1 to 7 pixels by one level in three goldens, at SSIM 1.0000.
+- **Lavapipe:** the readings from the CI log of `V4 P107`'s commit, below.
+
 ## offcut_render.wasm size
 Question:
 Method:

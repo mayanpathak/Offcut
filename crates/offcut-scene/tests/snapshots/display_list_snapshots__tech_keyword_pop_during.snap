@@ -217,7 +217,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             0.0,
             1.0,
-            325.19998,
+            299.99997,
             1361.12
           ]
         },

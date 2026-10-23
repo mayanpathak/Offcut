@@ -120,7 +120,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             0.0,
             1.0,
-            433.30078,
+            445.83868,
             1338.5566
           ]
         },
@@ -169,7 +169,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             0.0,
             1.0,
-            608.9297,
+            621.4676,
             1338.5566
           ]
         },
@@ -268,7 +268,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             0.0,
             1.0,
-            433.30078,
+            445.83868,
             1334.5566
           ]
         },
@@ -317,7 +317,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             0.0,
             1.0,
-            608.9297,
+            621.4676,
             1334.5566
           ]
         },

@@ -8,19 +8,14 @@ use offcut_types::{OutMs, WordIdx};
 
 use crate::captions::{CaptionWord, Chunk};
 use crate::display_list::{Affine, DrawCmd, Rect, Rgba, Stroke};
-use crate::easing::{Easing, ease};
 use crate::hit::word_box;
 use crate::layout::ShapedRun;
-use crate::motion::{ActiveTreatment, ShadowSpec, enter_at, keyword_scale};
+use crate::motion::{
+    ActiveTreatment, PILL_SLIDE_MS, ShadowSpec, enter_at, keyword_scale, pill, reflow, scaled_about,
+};
 use crate::safe_area::SAFE_AREA;
-use crate::styles::{CURSOR_WIDTH_EM, PILL_PADDING, PILL_RADIUS, PanelSpec, StyleSpec};
+use crate::styles::{CURSOR_WIDTH_EM, PILL_PADDING, PanelSpec, StyleSpec};
 use crate::theme::{Role, Theme};
-
-/// The pill's move from the word before to the spoken word, from the spoken
-/// word's start, and the scale it grows from on the way (D-170).
-pub const PILL_SLIDE_MS: u32 = 90;
-pub const PILL_GROW_FROM: f32 = 0.9;
-const PILL_EASING: Easing = Easing::EaseOutCubic;
 
 /// What a chunk's words are emphasized by besides the spoken word (D-169).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -72,61 +67,34 @@ fn word_scale(word: &CaptionWord, t: OutMs, style: &StyleSpec, emphasis: &Emphas
     enter_at(&style.motion, t.get().saturating_sub(word.start.get())).1
 }
 
-/// `r` scaled by `k` about the point `about`.
-fn scaled_about(r: Rect, (x, y): (f32, f32), k: f32) -> Rect {
-    Rect {
-        x: x + (r.x - x) * k,
-        y: y + (r.y - y) * k,
-        w: r.w * k,
-        h: r.h * k,
-    }
-}
-
-/// The largest scale a word with the box `r`, on a line drawn at
-/// `line_scale`, can be drawn at about `(x, y)` with what is drawn around it
-/// inside the safe area, and never less than 1: a word that fills its line
-/// pops less rather than leave the area (TS §19.6). Its outline, half the
-/// stroke, grows with it; the pill's padding, the panel's, the cursor's cell
-/// and the shadow's move do not.
-fn room_to_grow(r: Rect, (x, y): (f32, f32), style: &StyleSpec, line_scale: f32) -> f32 {
+/// What is drawn beside a word's glyph box that does not grow with it, and
+/// its outline, which does (half the stroke, at the line's scale): the pill's
+/// padding, the panel's and the cursor's cell, the shadow's move.
+fn margins(style: &StyleSpec, line_scale: f32) -> (f32, f32) {
     let stroke = style.stroke_width.max(0.0) / 2.0;
-    let outline = stroke * line_scale;
     let pill = match style.motion.active {
         ActiveTreatment::Pill => PILL_PADDING.0,
         ActiveTreatment::Highlight | ActiveTreatment::Cursor => 0.0,
     };
-    let fixed = (style.decoration_width() / 2.0 - stroke).max(pill);
-    let drop = style.shadow.map_or(0.0, |s| s.offset.1.abs());
-    let area = SAFE_AREA;
-    // How far the outline may reach from the point, over how far it reaches.
-    let limit = |room: f32, reach: f32| room / (reach + outline);
-    let across =
-        limit(x - area.x - fixed, x - r.x).min(limit(area.x + area.w - fixed - x, r.x + r.w - x));
-    let down = limit(y - area.y - fixed, y - r.y)
-        .min(limit(area.y + area.h - fixed - drop - y, r.y + r.h - y));
-    across.min(down).max(1.0)
+    (
+        (style.decoration_width() / 2.0 - stroke).max(pill),
+        stroke * line_scale,
+    )
 }
 
-/// The pill `since_ms` after the spoken word's start, and its corner
-/// radius: on its way from the box `from` to the box `to`, padded, growing
-/// from `PILL_GROW_FROM` to its size as it arrives (D-170).
-fn pill(from: Rect, to: Rect, since_ms: u32) -> (Rect, f32) {
-    let e = ease(PILL_EASING, since_ms as f32 / PILL_SLIDE_MS as f32);
-    // Exactly `a` at the start and `b` at the end.
-    let mix = |a: f32, b: f32| a * (1.0 - e) + b * e;
-    let k = mix(PILL_GROW_FROM, 1.0);
-    let (pad_x, pad_y) = PILL_PADDING;
-    let w = (mix(from.w, to.w) + 2.0 * pad_x) * k;
-    let h = (mix(from.h, to.h) + 2.0 * pad_y) * k;
-    let x = mix(from.x + from.w / 2.0, to.x + to.w / 2.0);
-    let y = mix(from.y + from.h / 2.0, to.y + to.h / 2.0);
-    let rect = Rect {
-        x: x - w / 2.0,
-        y: y - h / 2.0,
-        w,
-        h,
-    };
-    (rect, PILL_RADIUS * k)
+/// The largest scale a word with the box `r`, on a line drawn at
+/// `line_scale`, can grow to about the point `(x, y)` on its baseline with
+/// its top and bottom, and what is drawn around them, inside the safe area;
+/// never less than 1 (TS §19.6).
+fn room_down(r: Rect, (x, y): (f32, f32), style: &StyleSpec, line_scale: f32) -> f32 {
+    let _ = x;
+    let (fixed, outline) = margins(style, line_scale);
+    let drop = style.shadow.map_or(0.0, |s| s.offset.1.abs());
+    let area = SAFE_AREA;
+    let limit = |room: f32, reach: f32| room / (reach + outline);
+    limit(y - area.y - fixed, y - r.y)
+        .min(limit(area.y + area.h - fixed - drop - y, r.y + r.h - y))
+        .max(1.0)
 }
 
 /// The width of a cursor's cell on a line drawn at `scale`.
@@ -176,7 +144,9 @@ struct Drawn<'a> {
     active: bool,
 }
 
-/// Each word of `chunk` as it is drawn at `t`, in the order of its words.
+/// Each word of `chunk` as it is drawn at `t`, in the order of its words:
+/// a word that grows scales about its centre on the baseline, and its line
+/// widens around it (`reflow`).
 fn lay_out<'a>(
     chunk: &'a Chunk,
     t: OutMs,
@@ -186,10 +156,37 @@ fn lay_out<'a>(
 ) -> Vec<Drawn<'a>> {
     let mut drawn = Vec::new();
     for line in &chunk.lines {
-        for placed in &line.words {
-            let Some(word) = chunk.words.get(placed.word) else {
-                continue;
-            };
+        let words: Vec<_> = line
+            .words
+            .iter()
+            .filter_map(|placed| Some((placed, chunk.words.get(placed.word)?)))
+            .collect();
+        let boxes: Vec<Rect> = words
+            .iter()
+            .map(|(placed, _)| word_box(line, placed))
+            .collect();
+        let scales: Vec<f32> = words
+            .iter()
+            .zip(&boxes)
+            .map(|((_, word), r)| {
+                let about = (r.x + r.w / 2.0, line.baseline);
+                let up_to = room_down(*r, about, style, line.scale);
+                word_scale(word, t, style, emphasis).min(up_to)
+            })
+            .collect();
+        let room = match (boxes.first(), boxes.last()) {
+            (Some(first), Some(last)) => {
+                let (fixed, outline) = margins(style, line.scale);
+                let reach = fixed + outline * scales.iter().fold(1.0, |a: f32, k| a.max(*k));
+                let area = SAFE_AREA;
+                (first.x - area.x - reach).min(area.x + area.w - reach - (last.x + last.w))
+            }
+            _ => 0.0,
+        };
+        let (scales, shifts) = reflow(&boxes, &scales, room.max(0.0));
+        for ((((placed, word), laid_out), pop), shift) in
+            words.into_iter().zip(boxes).zip(scales).zip(shifts)
+        {
             let active = word.start <= t && t < word.end;
             let popped = emphasis
                 .pops
@@ -197,28 +194,28 @@ fn lay_out<'a>(
                 .any(|&(at, start)| at == word.word && start <= t);
             let role = fill_role(style, active, popped, word.number, emphasis.numbers);
             let quiet = fill_role(style, false, popped, word.number, emphasis.numbers);
-            // A popping word scales about its centre on the baseline, as
-            // far as the safe area lets it.
-            let laid_out = word_box(line, placed);
             let centre = laid_out.x + laid_out.w / 2.0;
-            let room = room_to_grow(laid_out, (centre, line.baseline), style, line.scale);
-            let pop = word_scale(word, t, style, emphasis).min(room);
+            let moved = centre + shift;
             let mut runs = Vec::with_capacity(placed.runs.len());
             let mut x = placed.x;
             for run in &placed.runs {
                 let left = line.x + x * line.scale;
-                let transform = if pop == 1.0 {
+                let transform = if pop == 1.0 && shift == 0.0 {
                     Affine::scale_then_translate(line.scale, left, line.baseline)
                 } else {
-                    let left = centre + (left - centre) * pop;
+                    let left = moved + (left - centre) * pop;
                     Affine::scale_then_translate(line.scale * pop, left, line.baseline)
                 };
                 runs.push((run, transform));
                 x += run.width;
             }
+            let rect = Rect {
+                x: laid_out.x + shift,
+                ..laid_out
+            };
             drawn.push(Drawn {
                 index: placed.word,
-                rect: scaled_about(laid_out, (centre, line.baseline), pop),
+                rect: scaled_about(rect, (moved, line.baseline), pop),
                 scale: line.scale * pop,
                 runs,
                 fill: theme.color(role),
@@ -824,23 +821,60 @@ mod tests {
         let chunk = chunk_with(&[("internationalization", 1_000, 1_600)], &style, &theme);
         let line = &chunk.lines[0];
         assert!(line.scale < 1.0, "{}", line.scale);
-        let r = word_boxes(&chunk)[0].1;
-        let about = (r.x + r.w / 2.0, line.baseline);
-        let room = room_to_grow(r, about, &style, line.scale);
-        assert!((1.0..POP_SCALE).contains(&room), "{room}");
-        // At the pop's height it is drawn at that scale, outline inside.
+        // At the pop's height it is drawn smaller than 1.12, its outline (half
+        // the 10 lp stroke, growing with it) inside the safe area.
         let words = words_of(&plain(&chunk, 1_070, &style, &theme), &theme);
-        assert!(near(words[0].3.m[0], line.scale * room), "{:?}", words[0].3);
-        // The outline, half the 10 lp stroke, grows with the word.
-        let grown = scaled_about(r, about, room);
-        let outline = 5.0 * line.scale * room;
+        let k = words[0].3.m[0] / line.scale;
+        assert!((1.0..POP_SCALE).contains(&k), "{k}");
+        let r = word_boxes(&chunk)[0].1;
+        let grown = scaled_about(r, (r.x + r.w / 2.0, line.baseline), k);
+        let outline = 5.0 * line.scale * k;
         assert!(grown.x - outline >= SAFE_AREA.x - 1e-3, "{grown:?}");
         assert!(grown.x + grown.w + outline <= SAFE_AREA.x + SAFE_AREA.w + 1e-3);
         // A word with room pops all the way (bolds_spoken_word_pops_in_the_accent).
         let short = chunk_of(StyleId::Bold).0;
-        let made = word_boxes(&short)[1].1;
-        let about = (made.x + made.w / 2.0, short.lines[0].baseline);
-        assert!(room_to_grow(made, about, &style, short.lines[0].scale) > POP_SCALE);
+        let words = words_of(&plain(&short, 1_320, &style, &theme), &theme);
+        assert!(near(words[1].3.m[0], short.lines[0].scale * POP_SCALE));
+    }
+
+    #[test]
+    fn a_growing_word_moves_its_neighbours_aside_and_its_line_stays_centred() {
+        // "made", a KeywordPop at its peak (1.25) on Clean's pill: "we" moves
+        // left and "it" right by half its growth, the room between the boxes
+        // kept, the pill clear of both.
+        let (chunk, style, theme) = chunk_of(StyleId::Clean);
+        let pops = Emphasis {
+            pops: vec![(WordIdx::new(1), OutMs::new(1_250))],
+            numbers: true,
+        };
+        let boxes: Vec<Rect> = word_boxes(&chunk).into_iter().map(|(_, r)| r).collect();
+        let (we, made, it) = (boxes[0], boxes[1], boxes[2]);
+        let half = made.w * 0.25 / 2.0;
+        let cmds = drawn(&chunk, 1_340, &style, &theme, &pops);
+        let words = words_of(&cmds, &theme);
+        assert!(near(words[0].3.m[4], we.x - half), "{:?}", words[0].3);
+        assert!(near(words[1].3.m[0], chunk.lines[0].scale * 1.25));
+        assert!(near(words[2].3.m[4], it.x + half), "{:?}", words[2].3);
+        let moved = |r: Rect, by: f32| Rect { x: r.x + by, ..r };
+        let pill = rects(&cmds)[0].0;
+        assert!(!overlap(pill, moved(we, -half)) && !overlap(pill, moved(it, half)));
+        // The line widened by the growth about its middle.
+        let (left, right) = (we.x - half, it.x + it.w + half);
+        let middle = (we.x + it.x + it.w) / 2.0;
+        assert!(near((left + right) / 2.0, middle));
+        // Bold's own pop moves its line too: "WE" 70 ms into "MADE" (1.12).
+        let (bold, style, theme) = chunk_of(StyleId::Bold);
+        let first = word_boxes(&bold)[0].1;
+        let grown = word_boxes(&bold)[1].1.w * (POP_SCALE - 1.0);
+        let words = words_of(&plain(&bold, 1_320, &style, &theme), &theme);
+        assert!(
+            near(words[0].3.m[4], first.x - grown / 2.0),
+            "{:?}",
+            words[0].3
+        );
+        // At rest nothing moves: the words are where the layout put them.
+        let rest = words_of(&plain(&bold, 1_850, &style, &theme), &theme);
+        assert!(near(rest[0].3.m[4], first.x));
     }
 
     #[test]
