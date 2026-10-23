@@ -113,6 +113,12 @@ export const messages = {
     startOver: "Start over",
   },
 
+  // How a keyboard shortcut names the key it is pressed with (`Kbd`, v4implementation D-181).
+  keys: {
+    modMac: "⌘",
+    modOther: "Ctrl",
+  },
+
   capability: {
     checking: "Checking your browser…",
     supported: "Your browser can do this.",

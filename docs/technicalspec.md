@@ -764,6 +764,7 @@ offcut/
 │   │           ├── editor.module.css      the editor layout (v4implementation §17.6)
 │   │           ├── panel.module.css       the side panel and its tabs
 │   │           ├── primitives.module.css  the primitives (D-181)
+│   │           ├── controls.module.css    the primitives that hold a value: Tabs, Switch, SegmentedControl, Slider (v4changelog Entry 19)
 │   │           └── preview.module.css     the player, its transport and the direct-manipulation chrome
 │   └── tests-e2e/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
