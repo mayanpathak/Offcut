@@ -384,8 +384,8 @@ fn lines(
 
     let height = ascent + descent;
     let top = block.y + (block.h - height * lines.len() as f32) / 2.0;
-    // The stroke of the outermost glyphs stays in the zone as well.
-    let room = block.w - style.stroke_width.max(0.0);
+    // What is drawn around the outermost glyphs stays in the block as well.
+    let room = block.w - style.decoration_width();
     for (index, line) in lines.iter_mut().enumerate() {
         line.scale = if line.width > room {
             room / line.width
@@ -505,7 +505,9 @@ mod tests {
     }
 
     #[test]
-    fn inside_a_chunk_exactly_one_glyph_run_uses_the_active_colour() {
+    fn inside_a_chunk_exactly_one_glyph_run_is_the_spoken_word_on_the_pill() {
+        // D-170: Clean's spoken word is in ink on the pill, the others white
+        // with a 5 lp outline over their shadow.
         let style = spec(StyleId::Clean);
         let theme = Theme::default_for(StyleId::Clean);
         let chunks = chunks_of(&[
@@ -517,21 +519,33 @@ mod tests {
         let active_at = |t: u32| {
             let mut out = Vec::new();
             draw(&chunks[0], OutMs::new(t), &style, &theme, &mut out);
-            assert_eq!(out.len(), 3);
-            out.into_iter()
+            let words: Vec<(String, Option<f32>, bool)> = out
+                .into_iter()
                 .filter_map(|cmd| match cmd {
                     DrawCmd::GlyphRun {
                         fill, text, stroke, ..
-                    } => {
-                        assert_eq!(stroke.map(|s| s.width), Some(6.0));
-                        (fill == theme.color(style.active)).then_some(text)
+                    } if fill != theme.shadow => {
+                        Some((text, stroke.map(|s| s.width), fill == theme.on_accent))
                     }
-                    DrawCmd::FillRect { .. }
-                    | DrawCmd::FillPath { .. }
+                    DrawCmd::GlyphRun { .. }
+                    | DrawCmd::FillRect { .. }
                     | DrawCmd::PushLayer { .. }
-                    | DrawCmd::PopLayer
-                    | DrawCmd::Video { .. }
-                    | DrawCmd::Image { .. } => panic!("a caption draws glyph runs only"),
+                    | DrawCmd::PopLayer => None,
+                    DrawCmd::FillPath { .. } | DrawCmd::Video { .. } | DrawCmd::Image { .. } => {
+                        panic!("a caption draws no path, video or image")
+                    }
+                })
+                .collect();
+            // While the pill slides in (90 ms), the spoken word is also
+            // drawn outlined under it.
+            let texts: std::collections::BTreeSet<&str> =
+                words.iter().map(|w| w.0.as_str()).collect();
+            assert_eq!(texts, ["it", "made", "we"].into());
+            words
+                .into_iter()
+                .filter_map(|(text, stroke, on_pill)| {
+                    assert_eq!(stroke, (!on_pill).then_some(5.0), "{text}");
+                    on_pill.then_some(text)
                 })
                 .collect::<Vec<String>>()
         };

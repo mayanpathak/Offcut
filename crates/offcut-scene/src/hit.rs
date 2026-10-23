@@ -4,7 +4,7 @@
 
 use offcut_types::WordIdx;
 
-use crate::captions::Chunk;
+use crate::captions::{Chunk, Line, LineWord};
 use crate::display_list::Rect;
 use crate::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
 
@@ -23,9 +23,27 @@ pub enum Hit {
     Video,
 }
 
-/// The glyph box of each word of `chunk`, as it is laid out: from the left
-/// of its first run to the right of its last, from its ascent above the
-/// line's baseline to its descent below, at the line's scale.
+/// The glyph box of a word as it is laid out: from the left of its first run
+/// to the right of its last, from its ascent above the line's baseline to its
+/// descent below, at the line's scale. Also the box the pill and the cursor
+/// are placed by (D-170).
+pub(crate) fn word_box(line: &Line, placed: &LineWord) -> Rect {
+    let width: f32 = placed.runs.iter().map(|run| run.width).sum();
+    let ascent = placed.runs.iter().map(|run| run.ascent).fold(0.0, f32::max);
+    let descent = placed
+        .runs
+        .iter()
+        .map(|run| run.descent)
+        .fold(0.0, f32::max);
+    Rect {
+        x: line.x + placed.x * line.scale,
+        y: line.baseline - ascent * line.scale,
+        w: width * line.scale,
+        h: (ascent + descent) * line.scale,
+    }
+}
+
+/// The glyph box of each word of `chunk` (`word_box`).
 pub fn word_boxes(chunk: &Chunk) -> Vec<(WordIdx, Rect)> {
     let mut boxes = Vec::new();
     for line in &chunk.lines {
@@ -33,22 +51,7 @@ pub fn word_boxes(chunk: &Chunk) -> Vec<(WordIdx, Rect)> {
             let Some(word) = chunk.words.get(placed.word) else {
                 continue;
             };
-            let width: f32 = placed.runs.iter().map(|run| run.width).sum();
-            let ascent = placed.runs.iter().map(|run| run.ascent).fold(0.0, f32::max);
-            let descent = placed
-                .runs
-                .iter()
-                .map(|run| run.descent)
-                .fold(0.0, f32::max);
-            boxes.push((
-                word.word,
-                Rect {
-                    x: line.x + placed.x * line.scale,
-                    y: line.baseline - ascent * line.scale,
-                    w: width * line.scale,
-                    h: (ascent + descent) * line.scale,
-                },
-            ));
+            boxes.push((word.word, word_box(line, placed)));
         }
     }
     boxes

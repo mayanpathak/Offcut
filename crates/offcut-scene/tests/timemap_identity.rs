@@ -148,20 +148,10 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
     let (t, plan, length) = reference();
     let map = TimeMap::identity(DurMs::new(length));
     let theme = Theme::default_for(StyleId::Clean);
-    // Numbers in the accent colour and the KeywordPop word ("brutal") would
-    // share the spoken word's colour in Clean (D-169): off here, so that the
-    // one run in that colour is the spoken word. `captions_draw.rs` and the
-    // scene's inline tests test the emphasis.
-    let edit = EditState {
-        highlight_numbers: false,
-        event_overrides: plan
-            .items()
-            .iter()
-            .filter(|item| item.kind == EventKind::KeywordPop)
-            .map(|item| (item.id, false))
-            .collect(),
-        ..EditState::default()
-    };
+    // The default edit: numbers in the accent and the KeywordPop word
+    // ("brutal") in its pop colour (D-169), the spoken word in ink on
+    // Clean's pill (D-170), which no other run is drawn in.
+    let edit = EditState::default();
     let scene = build_scene(SceneInput {
         transcript: &t,
         plan: &plan,
@@ -190,12 +180,12 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
     }
 
     // Every caption word is spoken at its recording time: from its first
-    // millisecond to its last it is the one run in the active colour.
-    let accent = [
-        theme.accent.r,
-        theme.accent.g,
-        theme.accent.b,
-        theme.accent.a,
+    // millisecond to its last it is the one run on the pill.
+    let ink = [
+        theme.on_accent.r,
+        theme.on_accent.g,
+        theme.on_accent.b,
+        theme.on_accent.a,
     ];
     let shown = words(&t, &edit.word_edits, &map);
     assert!(shown.len() > 100, "{}", shown.len());
@@ -205,7 +195,7 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
         for at in [word.start.get(), word.end.get() - 1] {
             let active: Vec<String> = runs(&scene.frame_at(OutMs::new(at)))
                 .into_iter()
-                .filter(|run| run.1 == accent && !run.2)
+                .filter(|run| run.1 == ink && !run.2)
                 .map(|run| run.0)
                 .collect();
             assert_eq!(active.concat(), word.text, "at {at} ms");

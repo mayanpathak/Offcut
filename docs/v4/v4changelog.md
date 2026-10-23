@@ -43,7 +43,7 @@
 | 19 | ~~**D-165 at risk for FromTo and ListReveal.** V-6's `min_gap` (3,000 ms FromTo, 10,000 ms ListReveal) is larger than the spacing the detector guarantees between two overlays (about 1,850 ms), so a rules plan could lose an item to `TooClose`. `validate_rules_plans.rs` runs every labeled file; if one loses an item, the (assumption) limit is revisited, not the detector (Entry 6)~~ Closed in Entry 7: 31 files, 0 items dropped | `offcut-plan/src/catalog.rs` | P97 |
 | 20 | ~~**The identity proof cannot pass on `busy_1080` and `busy_540` as recorded.** V3's `busy()` gives its first two NumberReveals spans no word of its transcript has (1,000-1,400 and 3,500-3,800 ms); `validate` takes every item's span from its anchor words (D-121), so through the V4 contract they become 1,100-1,350 ("three") and 3,500-3,750 ("wanted."). In the comparison run (Entry 8) the four detector-built inputs are identical (836 frames) and each `busy` input differs in exactly 4 frames, all inside those two events' windows (count-up start, hold end, fade). **Decided by the founder on 2026-10-22 (Entry 9): re-derive the two `busy` files with V3's scene code (`09b1085`) on these anchored events, the other four files unchanged**; the alternative, accepting the 8 named frames, was declined. Prompt 100 does it, records it, and the proof then reads "6 inputs, identical"~~ Closed in Entry 10: re-derived, "6 inputs, 922 frames, identical" | `offcut-scene/tests/v3_reference.rs`, `tests/snapshots/v3_reference/busy_*.json` | P100 |
 | 21 | ~~Record "line-break table frozen at <SHA of Prompt 102's commit>" (the SHA is not known inside its own commit, Entry 12); from then on a row of `line_breaks.rs` changes only with a changelog line naming the row and the reason (§23)~~ Closed in Entry 13: frozen at `01f406f` | `docs/v4/v4changelog.md` | P103 |
-| 22 | `crates/offcut-scene/src/captions.rs` is exactly at the 400-line limit above its tests (Entry 14: the number rule of D-169 took the last lines). The next change there moves something out first: the reading floor to `readability.rs` (which holds `MIN_CHUNK_MS`) or the number rule beside the words | `offcut-scene/src/captions.rs` | P105 |
+| 22 | `crates/offcut-scene/src/captions.rs` is exactly at the 400-line limit above its tests (Entry 14: the number rule of D-169 took the last lines). The next change there moves something out first: the reading floor to `readability.rs` (which holds `MIN_CHUNK_MS`) or the number rule beside the words. Prompt 105 changed one line in place (Entry 16); `captions_draw.rs` is at 396 | `offcut-scene/src/captions.rs` | P106 |
 
 ---
 
@@ -1192,3 +1192,210 @@ A first form of the watermark drill (a third parameter on `caption_block`) did n
 - **This commit.** It changes `ci.yml`, so its key is new, and the cache falls back to the `apt-Linux-` cache saved above. Its run is the first to install from the cache; its reading is recorded in the next entry.
 
 **Open.** Unchanged.
+
+---
+
+## Entry 16 - 2026-10-23 - P105 (S9): Inter 800, the theme table, Clean with the sliding pill, Bold, Mono
+
+**What.** Prompt 105 (G 9.1 rows 1-6; D-136 to D-139, D-170, §8.4, §8.5, §8.9): the premium default. Clean is Inter 800 with a drop shadow, and its spoken word sits on a yellow pill that slides from word to word. Bold pops each word in upper case. Mono (`StyleId::Tech`) has its dark panel, green spoken word and block cursor. Every colour is a theme role and every motion value is data. Until now the three styles drew V3's Clean.
+
+**1. Fonts** (`fonts.rs`, D-170):
+- **Key 4.** Inter 800 is appended after Noto Emoji (D-132's rule: V2's keys keep their faces). Its coordinates are computed by `coords_of` like the others' (the same file as keys 0 and 1, one registration).
+- **Tests.** The two inline tests now cover five faces: key 4 is "Inter Variable" at 800 and shares the file of keys 0 and 1, key 5 is empty, and 800's coordinates differ from 700's and 900's and lie between them.
+
+**2. The theme** (`theme.rs`, §8.4, D-136):
+- **The table.** `Theme::default_for` gives each style its row:
+
+| | Clean | Bold | Tech ("Mono") |
+|---|---|---|---|
+| `text` | `#FFFFFF` | `#FFFFFF` | `#E8F0EA` |
+| `stroke` | `#101014` | `#101014` | `#101014` |
+| `accent` | `#FFD60A` | `#FFD60A` | `#3DDC84` |
+| `accent_alt` | `#FFD60A` | `#FF5E3A` | `#3DDC84` |
+| `panel` | `#101014` at 85% (alpha 217) | `#101014` at 85% | `#0B0F0C` at 85% |
+| `on_accent` (new) | `#111114` | `#111114` | `#111114` |
+| `shadow` (new) | `#000000` | `#000000` | `#000000` |
+| display / body / mono | Inter 800 (key 4) / Inter 700 / JetBrains Mono 700 | Inter 900 / Inter 700 / JetBrains Mono 700 | JetBrains Mono 700 / Inter 700 / JetBrains Mono 700 |
+
+- **V3's colours are gone.** `v3()` (the identity proof's theme, D-117) is removed. The proof was retired in Prompt 101.
+- **Two roles beyond §8.4's struct.** The table's pill row ("word in `#111114`") and shadow row ("black") need colours that §8.4's `Theme` has no field for, and the prompt asks for the pill's word "via the theme". So `Role` gains `OnAccent` and `Shadow`, and `Theme` gains `on_accent` and `shadow`. `backdrop` (the canvas behind no video) holds the same black, but a brand kit (V6.7) may change it without changing the shadow.
+
+**3. Motion** (`motion.rs`, D-137, D-170):
+- **New types.** `ActiveTreatment::Pill` is appended, and so is `ShadowSpec { offset, role, opacity }`.
+- **`enter_at`.** It is unchanged. A new inline test reads it on the styles' own values:
+  - Clean's fade (120 ms, ease-out cubic): opacity 0 at 0 ms, 0.875 at 60, 1 at 120.
+  - Bold's pop (140 ms, back-out): 1.0 at 0 ms, past 1.12 at 49, exactly 1.12 at 70, 1.0 at 140.
+  - Tech: at rest at once.
+
+**4. The styles** (`styles.rs`, D-139, D-170):
+
+| | Clean | Bold | Tech |
+|---|---|---|---|
+| font, size | `Display` (Inter 800), 72 lp | `Display` (Inter 900), 84 lp | `Mono`, 56 lp |
+| case; chars x lines; words | as spoken; 16 x 2; 4 | upper; 12 x 2; 3 | as spoken; 22 x 2; 5 |
+| stroke | 5 lp | 10 lp | none |
+| shadow | 0 x 4 lp, `Shadow`, 45% | the same | none |
+| panel | none | none | radius 24, padding 32, `Panel` |
+| motion | `Fade`, `Pill`, ease-out cubic, 120 ms | `Pop`, `Highlight`, back-out, 140 ms | `None`, `Cursor`, linear, 80 ms |
+| fill / active / pop | `Text` / `Accent` / `AccentAlt` | the same | the same |
+
+- **The constants.** `PILL_RADIUS = 14`, `PILL_PADDING = (12, 4)` and `CURSOR_WIDTH_EM = 0.6` are in `styles.rs` (Appendix D), and so is the shared `DROP_SHADOW`.
+- **KeywordPop's colour.** It moves from Clean's `Accent` to `AccentAlt` in every style (D-139). The value is the same in Clean.
+- **`StyleSpec::decoration_width()`.** The width beside a line, both sides together, that what is drawn around its glyphs needs: half the stroke plus the shadow's sideways move, the pill's padding, the panel's padding plus the cursor's cell. Clean gives 24, Bold 10, Tech 131.2.
+- **Tests.** Every row's values. The existing `no_style_moves_glyph_by_glyph` is the refusal of `MotionUnit::Glyph`.
+
+**5. Drawing** (`captions_draw.rs`, §8.9). A chunk is drawn in this order, all inside the fade's layer while Clean fades in:
+1. Tech's panel.
+2. The shadow.
+3. Clean's pill.
+4. The words.
+5. Tech's cursor.
+
+- **The pill** (D-170): a `FillRect` in the style's `active` (`accent`), drawn only while a word is spoken. Between two words, in a pause, before the first word and after the last, there is none.
+  - **The slide.** From the spoken word's start, over `PILL_SLIDE_MS = 90`, eased ease-out cubic, its box goes from the previous word's box to the spoken word's. The first word of a chunk grows on its own box. Its scale goes from `PILL_GROW_FROM = 0.9` to 1, and its 14 lp radius scales with it. It is padded 12 x 4 lp.
+  - **The word on it.** At rest (from +90 ms) it is in `on_accent`, with no outline and no shadow.
+  - **While the pill slides in** (the first 90 ms), the spoken word is drawn twice:
+    - as it looks off the pill (outlined, its shadow cast), under the pill;
+    - in ink, over the pill, inside a `PushLayer { opacity: 1, clip: pill }`.
+    It turns to ink exactly where the pill has reached it (see "The look").
+- **The shadow:** every run but the pill's word, drawn again moved by the offset, in `shadow` with the same stroke, all inside one `PushLayer` at the shadow's opacity, before any word is drawn.
+- **Bold's pop:** each word scales about its centre on the baseline, from its own start (`enter_at`). The spoken word is in `accent`.
+- **Tech:**
+  - **The panel.** One `FillRect` (radius 24) behind the lines: the box of the lines and of a cursor's cell on either side of each, plus 32 lp of padding.
+  - **The cursor.** A `FillRect` of 0.6 em by the word's height, right after the spoken word, in `active`. The spoken word is in `active` too.
+- **KeywordPop's scale:** 1.0 → 1.25 at 90 ms → 1.10 at 180 ms from the item's start, eased ease-out cubic (`KEYWORD_POP_PEAK`, `KEYWORD_POP_HOLD` and `keyword_scale` in `motion.rs`, beside Bold's `POP_SCALE`, through `anim::Track`), held until the word ends, then 1.0. Its colour stays as Prompt 104 made it. On a popped word the KeywordPop's scale replaces the style's pop. The pill grows with the word it sits behind.
+- **A pop that would leave the safe area:** a word grows by its pop or its KeywordPop only as far as the safe area allows (`room_to_grow`), counting:
+  - its outline, which grows with it;
+  - the pill's and panel's padding, the cursor's cell and the shadow's drop, which do not.
+  A word that fills its line pops less, rather than leave the area (TS §19.6). See "Checked beyond the prompt" below.
+- **Word boxes.** The pill and the cursor are placed by `hit::word_box(line, placed)`, the box hit testing uses (D-174), split out of `word_boxes`.
+- **Tests** (inline, 9 new):
+  - The emphasis order with the cursor and the pill.
+  - The pill at the word start, +45 ms and +90 ms, never jumping (each millisecond moves it at most ease-out cubic's steepest step), on the first word, and absent in the pause and outside the words.
+  - The pill's word in ink with no outline.
+  - The shadow's layer and offset, in Bold too, none in Tech.
+  - The shadow and the pill change no layout box.
+  - Bold's pop.
+  - Tech's panel and cursor at three times.
+  - KeywordPop's scale and the pill growing with it.
+  - A full-line word popping only within the safe area.
+  - The word turning to ink under the sliding pill, and the ink alone at rest.
+
+**6. `tests/styles_use_theme.rs`** (D-136): reads every `.rs` file under `offcut-scene/src` (19 files) and fails on any line with `Rgba {` outside `src/theme.rs` and `src/display_list.rs`, naming the file and line.
+
+**Changed beyond the prompt's files.**
+- **`captions.rs`, one line.** `lines` fits each line in the block less `style.decoration_width()`, where it took off the stroke only. A line that fits is unchanged. A line wider than the block less the pill's padding (Clean), the panel and cursor (Tech) is drawn smaller, so that the pill, the panel and the cursor stay in the block. Without it, the inline safe-area test (`every_command_of_every_frame_is_inside_the_safe_area`, whose 18-letter word fills its line) fails on the pill. The file is still 400 lines above its tests (known issue 22 stays open).
+- **`hit.rs`.** `word_box` is split out of `word_boxes`, so the pill and cursor use the same box. No behaviour changes.
+- **`lib.rs`** inline tests: see below.
+- **`tests/timemap_identity.rs`:** see below.
+
+**Changed inline expectations** (each because of D-170's redesign, as the prompt's requirement 2 asks):
+- **`theme.rs`.** `every_style_is_drawn_in_v3s_colours_and_font` is replaced by `each_style_is_drawn_in_the_colours_and_fonts_of_its_row` and `each_style_sets_its_captions_in_its_rows_font` (§8.4's table, D-170).
+- **`fonts.rs`.** `the_embedded_set_has_v2s_four_fonts_in_v2s_order` becomes `..._then_inter_800` (five faces). The coordinates test reads five (D-170).
+- **`captions.rs`** (V3's test). `inside_a_chunk_exactly_one_glyph_run_uses_the_active_colour` becomes `..._is_the_spoken_word_on_the_pill`.
+  - **Now:** the same three words at the same five times give the one run in ink, with no outline, and the other runs outlined at 5 lp.
+  - **Was:** the one run in `accent`, every run outlined at 6 lp, exactly three commands.
+  - **Allowed now:** layers, rectangles, and the spoken word's second run while the pill slides in.
+- **`lib.rs`** (V3's and P104's tests):
+  - `a_number_is_in_accent_when_highlighted_and_a_keyword_pop_from_its_start`: its helper skips shadow runs (fill `shadow`), and the spoken "now." is `on_accent` (was `accent`).
+  - `at_a_profile_width_of_540_every_coordinate_is_half`: gains a `FillRect` arm (half the rectangle and the radius, the same colour); V3 drew no rectangle. Its `PushLayer` arm compares a clip as half the box, where it compared clips as equal. V3's layers had no clip, and a clip is a length, which `DrawCmd::scale` halves.
+- **`captions_draw.rs`** (P104's test). `the_spoken_word_then_a_keyword_pop_then_a_number_then_the_fill`'s cursor case: Tech's spoken word is now in `active` (D-139 and D-170 both say "green active word"), where Prompt 104 had left it to the next layers. Prompt 104 read §8.5's `Cursor` as no colour; the decisions bind over the plan section (SAB precedence). The test's base style sets `Highlight` itself, since Clean is `Pill` now.
+- **`timemap_identity.rs`.**
+  - It finds the spoken word as the one run in `on_accent`, where it was the one run in `accent`.
+  - Its edit is the default again: the two overrides Prompt 104 added (numbers not highlighted, the KeywordPop off) are gone, because no other run is in `on_accent`. It now times the default scene.
+  - Its other assertions are unchanged.
+
+**Checked beyond the prompt** (temporary `zz_` tests, deleted before the gate):
+- **The safe area, corpus-wide.** All 31 labeled files in the three styles at 0.0, 0.15, 0.55 and 1.0, every frame (313,068 frames). The check covered every glyph run (outline included), shadow, pill, panel and cursor.
+  - **The first run found Bold's pop leaving the area.** 8 frames of w10 ("25,000 DOWNLOADS", one caption word wider than Bold's line, shrunk to the block) went out by 59.0 lp at the pop's height, along with their shadow runs. This is new with this prompt (Bold did not pop before), and Prompt 106's `layout_safe_area.rs` would have failed on it. Hence `room_to_grow`.
+  - **The second run** found 0.13 lp in 2 frames of w11: the outline grows with the word, which the first form of `room_to_grow` had counted as fixed. It is counted now.
+  - **The third run:** nothing outside.
+- **The pill at rest, corpus-wide.** In Clean, over the same files and placements, the pill at rest (its box the spoken word's, padded) never overlapped another word's glyph box on its line (0 of 56,012 frames). The 4 lp of vertical padding reaches into the empty top of the next line's box, which is expected.
+- **The look:** see "The look" below.
+
+**Guards.**
+
+| Temporary edit | Result |
+|---|---|
+| `const DRILL: Rgba = Rgba { r: 255, g: 0, b: 0, a: 255 };` appended to `captions_draw.rs` | `styles_use_theme.rs` fails, naming the file, the line and the text; the file was restored and checked identical by SHA-256 |
+
+The prompt's drill text, `Rgba { r: 1.0, … }`, does not compile (the channels are `u8`), so the drill wrote 255.
+
+**Differs from the plan or the prompt.**
+- **`Theme` and `Role` gain `on_accent`/`OnAccent` and `shadow`/`Shadow`.** See 2.
+- **One shadow layer.** The shadow runs are opaque in one layer at 45%, rather than each run's colour at 45%: drawn separately, a run's fill and stroke would overlap and darken to about 70%, giving a two-tone shadow.
+- **The word on the pill has no outline and no shadow.** D-170 does not say. A dark outline on dark text only thickens Inter 800, and a shadow on the pill shows as a smudge.
+- **The ink is revealed by the pill while it slides.** D-170 has the word in `#111114` from its start, while the pill takes 90 ms to arrive. Drawn that way, the start of the word was dark text with no outline on the video for 2 or 3 frames (seen in the look frames below). Now it is outlined until the pill reaches it.
+- **Tech's panel** is the lines' box with a cursor's cell on either side, plus 32 lp. §8.6 says the lines' box plus 32 lp, but a cursor after a line's last word (0.6 x 56 = 33.6 lp) would then reach past the panel's edge. Taking a cell on both sides keeps the panel centred on the text and its padding even.
+- **Tech's spoken word is coloured.** D-139 and D-170 over §8.5, as above.
+- **Lines are fitted to the block less the decorations** (`captions.rs`, one line). See above.
+- **A pop is limited by the safe area** (`room_to_grow`). TS §19.6 over D-170's 1.12 and D-139's 1.25.
+- **Values the decisions do not give:**
+  - KeywordPop's easing (ease-out cubic).
+  - That a KeywordPop's scale replaces Bold's pop on the same word.
+  - That the pill's radius scales with the pill.
+  - That the pill slides across lines, diagonally, when the previous word ends a line.
+- **The cursor does not blink.** G 9.4 says "the cursor blinks only while a word is active", but no decision gives a rate. It shows while a word is spoken, so it goes and comes between words.
+- **Tech's motion values** (linear, 80 ms) move nothing: its `enter` is `None`.
+- **Where the new constants live.** Each is in one file:
+  - `captions_draw.rs`: `PILL_SLIDE_MS` (named by §8.9) and `PILL_GROW_FROM`.
+  - `motion.rs`: the KeywordPop keys, beside Bold's `POP_SCALE`. They were first written in `captions_draw.rs`, which then had 417 lines above its tests, so they moved; it now has 396.
+  - `styles.rs`: the pill's radius and padding and the cursor's width (Appendix D).
+
+**Observations** (for design review 1 and E-2):
+- **Bold's numbers share the spoken word's colour.** Numbers highlighted (D-169, on by default) are in `accent`, which in Bold is also the spoken word's colour (§8.4). This is the clash Prompt 104 found in V3's Clean, which Clean's pill now avoids.
+- **Tech's numbers** are green like its spoken word.
+
+**The look** (`d1`). A temporary `offcut-render/tests/zz_look.rs` drew one sentence ("we spent three months building something nobody wanted.") over the golden pattern on WARP at 1080 x 1920 (PNGs in the session's scratchpad, not committed; the goldens are Prompt 107's):
+
+| Frame | Seen |
+|---|---|
+| Clean, "spent" at rest | Two lines, "we spent / three months". The pill sits behind "spent" only, in ink, and the other words are white with a dark outline and the hard shadow below |
+| Clean, 30 ms into "three" (first form) | The pill was half-way from the end of line 1 to the start of line 2, and "th" was dark on the video with no outline. This led to the reveal above |
+| Clean, 30 and 60 ms into "three" (the reveal) | 30 ms: the word white and outlined where the pill has not reached it, ink where it has. 60 ms: the pill almost on "three", the word in ink |
+| Clean, the first word at its start | The pill grows on "we" itself |
+| Clean, between two words | No pill |
+| Bold, 70 ms into "SPENT" | Upper case, "SPENT" in yellow at 1.12. **At the pop's height its outline touches "WE"**: 1.12 about the word's centre closes the 21 lp space. It lasts 2 or 3 frames. D-170's value is kept; it is a question for design review 1 (E-2) |
+| Mono, "spent" spoken | The dark panel, even on every side; "spent" green; the cursor right after it, a monospaced cell wide, touching the next word as a terminal's cursor does |
+
+**Out of the prompt: `ctutils` 0.4.3 → 0.4.5** (`Cargo.lock` only).
+- **The advisory.** `pnpm check` failed on `cargo deny check advisories`: RUSTSEC-2026-0385 ("Non-constant-time mask generation and `u128` comparisons"), published after Prompt 104's run, against `ctutils` 0.4.3. The fix is "Upgrade to >=0.4.4".
+- **Where it is used.** `ctutils` comes in through `digest` 0.11.3: `ed25519-dalek` (the entitlement check), `sha2` and `sqlx-postgres`.
+- **The bump.** `cargo update -p ctutils` took it to 0.4.5, its latest release. No manifest and no other package changes.
+- **CI.** It runs the same check, so this commit needs it.
+
+**REOPENED CONTRACT** `offcut-scene/src/styles.rs` (D-136, D-170):
+- `StyleSpec` gains `shadow`, and the three rows take their V4 values.
+- Known issue 9 (closed in Entry 8) covered the move to theme roles. This is D-170's part of the same contract, so it gets no new row.
+
+**How it was checked.**
+- **`cargo test -p offcut-scene`:** all pass.
+  - Inline 45 (Entry 14: 32): +1 `theme`, +1 `motion`, +2 `styles`, +9 `captions_draw`.
+  - Integration: `hit` 3, `line_breaks` 2, `parity` 1, `placement` 3, `scene_cache` 1, `styles_use_theme` 1 (new), `timemap_identity` 1.
+- **The prompt's grep.** `git grep -n "Rgba {" -- crates/offcut-scene/src | grep -vE "theme.rs|display_list.rs"` prints nothing.
+- **Clippy.** `cargo clippy --workspace --all-targets -- -D warnings` and the wasm32 `offcut-wasm-render` clippy are clean; `cargo fmt --check` passes.
+- **`node scripts/check-file-tree.mjs`:** ok, 319 files. `captions.rs` is 400 lines above its tests (unchanged), `captions_draw.rs` 396.
+- **The SAB gate:**
+  - On `v4-build`, no `zz` file, no test key. `pnpm build:wasm` exit 0 (render wasm 6,330,865 B; 6,287,309 at Prompt 98). `pnpm fixtures` up to date. `pnpm check` exit 0, after the `ctutils` bump.
+  - **Rust: 594 passed, 0 failed, 3 ignored.** Entry 14 read 580/0/3; the 14 added are the 13 inline tests above and `styles_use_theme`.
+  - Vitest 92. `pnpm build` exit 0 (app shell 308.8 kB, unchanged). `pnpm e2e` 12 passed.
+  - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+  - `pnpm e2e:media` was not run: the prompt asks for none. CI's `e2e-media` job runs it on this commit.
+- **The look in `pnpm dev`** (the prompt's third validation command) is for the founder: see "Open".
+
+**CI reading promised by Entry 15** (run 39878070122 on `86101dc`, green):
+- **Times.** The run took 23.1 min: `ci` 13.0 min (00:25:57-00:38:55), `e2e-media` 10.1 min.
+- **The cache.** "Restore the downloaded Ubuntu packages" fell back to the `apt-Linux-6e6f…` cache saved on `75c02c3` ("Cache hit for restore-key"). The Vulkan step reported "12 packages from the cache" and "Need to get 0 B/17.5 MB of archives", and took 10 s (6.9 min on `0fc25f9`).
+- **Chrome.** The Playwright install needed "0 B/22.0 MB" and "0 B/145 MB" and took 22 s (7.2 min).
+- **Saved.** The cache was saved under the new key `apt-Linux-f342…`.
+
+**Found, not fixed.**
+- **A KeywordPop in Tech may reach past the panel.** The panel is built from the layout boxes. A popped word grows 12.5% of its width each side at 1.25, past the panel's 65.6 lp of side room for a word wider than about 525 lp (16 or more monospaced characters at 56 lp). The corpus check above tested the safe area, not the panel. Prompt 106's `layout_safe_area.rs` checks Tech's panel box.
+- **`Scene::summary`.** It still counts no emphasized caption (`summary.rs`, Prompt 106).
+- **`captions.rs`.** Still exactly 400 lines (known issue 22, now Prompt 106's).
+
+**Open.**
+- **The look in motion, for the founder** (G 9.4, the prompt's `pnpm dev` check). Switch `empty().edit.style` in `web/src/state/clip-store.ts` to `"bold"`, then `"tech"`, and revert. Look for: Clean's pill gliding and never jumping, no pill in a pause; Bold popping, upper case, three words a chunk; Mono's panel following the chunk.
+- **Bold's touching words** at the pop's height: keep 1.12, or lower it (E-2, design review 1).
+- Open items 1-5 unchanged.
+- Known issue 22 moves to Prompt 106.

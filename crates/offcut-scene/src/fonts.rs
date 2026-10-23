@@ -1,5 +1,6 @@
 //! The faces a scene may use, as a registry by key (TS §19.4, D-132). The
-//! three embedded files make keys 0 to 3, in V2's order. No other font is
+//! three embedded files make keys 0 to 3, in V2's order, and key 4, Inter
+//! 800, appended for Clean (D-170). No other font is
 //! ever read: the shaping collection is built without the fonts of the
 //! machine, from the faces of a `FontSet` only.
 
@@ -53,8 +54,8 @@ impl FontSet {
     /// What a character no face of the set has is set in.
     pub const EMOJI: FontKey = FontKey(3);
 
-    /// The embedded faces, keys 0 to 3: Inter 700, Inter 900, JetBrains Mono
-    /// 700, Noto Emoji. Built once per thread. When an embedded file cannot
+    /// The embedded faces, keys 0 to 4: Inter 700, Inter 900, JetBrains Mono
+    /// 700, Noto Emoji, Inter 800. Built once per thread. When an embedded file cannot
     /// be read the set is empty, and every use of it fails as
     /// `SceneError::Font`: the files are part of the program.
     pub fn embedded() -> FontSet {
@@ -221,8 +222,8 @@ fn coords_of(
     Err(SceneError::Font)
 }
 
-/// Keys 0 to 3 in V2's order, each file registered once, in the order V2
-/// registered them: Inter, JetBrains Mono, Noto Emoji.
+/// Keys 0 to 3 in V2's order, then Inter 800 (D-170), each file registered
+/// once, in the order V2 registered them: Inter, JetBrains Mono, Noto Emoji.
 fn build_embedded() -> Result<FontSet, SceneError> {
     let (inter, mono, emoji) = (
         Arc::<[u8]>::from(INTER),
@@ -241,6 +242,8 @@ fn build_embedded() -> Result<FontSet, SceneError> {
             (&mono, &families.1, 700.0, TEXT_PROBE),
             // Its axis ends at 700, the weight every style asks for or more.
             (&emoji, &families.2, 700.0, EMOJI_PROBE),
+            // Appended, so that V2's keys keep their faces (D-132).
+            (&inter, &families.0, 800.0, TEXT_PROBE),
         ];
         let mut faces = Vec::with_capacity(rows.len());
         for (data, family, weight, probe) in rows {
@@ -278,12 +281,12 @@ mod tests {
     #[test]
     fn the_coordinates_of_a_font_are_those_of_its_weight() {
         let fonts = FontSet::embedded();
-        let coords: Vec<Vec<i16>> = (0..4)
+        let coords: Vec<Vec<i16>> = (0..5)
             .map(|key| fonts.get(FontKey(key)).unwrap().coords.clone())
             .collect();
         for (key, coords) in coords.iter().enumerate() {
-            // No file has 700 or 900 as its default weight, so every font is
-            // away from the default on one axis at least.
+            // No file has 700, 800 or 900 as its default weight, so every
+            // font is away from the default on one axis at least.
             assert!(coords.iter().any(|coord| *coord != 0), "{key} {coords:?}");
         }
         // Built once per thread: asked again, the same faces, the same files.
@@ -294,8 +297,11 @@ mod tests {
             again.get(FontKey(0)).unwrap(),
         );
         assert!(Arc::ptr_eq(&a.data, &b.data));
-        // One file, two weights: the two differ.
+        // One file, three weights: the three differ, 800 between the others.
         assert_ne!(coords[0], coords[1]);
+        assert_ne!(coords[4], coords[0]);
+        assert_ne!(coords[4], coords[1]);
+        assert!(coords[0] < coords[4] && coords[4] < coords[1], "{coords:?}");
         // 900 is the end of Inter's weight axis and 700 the end of Noto
         // Emoji's: 1.0, which a font writes as 16384.
         assert!(coords[1].contains(&16384), "{:?}", coords[1]);
@@ -303,9 +309,9 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_set_has_v2s_four_fonts_in_v2s_order() {
+    fn the_embedded_set_has_v2s_four_fonts_in_v2s_order_then_inter_800() {
         let fonts = FontSet::embedded();
-        let faces: Vec<(&str, f32, usize)> = (0..4)
+        let faces: Vec<(&str, f32, usize)> = (0..5)
             .map(|key| {
                 let face = fonts.get(FontKey(key)).unwrap();
                 (face.family.as_str(), face.weight, face.data.len())
@@ -318,15 +324,18 @@ mod tests {
                 ("Inter Variable", 900.0, INTER.len()),
                 ("JetBrains Mono", 700.0, JETBRAINS_MONO.len()),
                 ("Noto Emoji", 700.0, NOTO_EMOJI.len()),
+                ("Inter Variable", 800.0, INTER.len()),
             ]
         );
-        assert!(fonts.get(FontKey(4)).is_none());
+        assert!(fonts.get(FontKey(5)).is_none());
         assert_eq!(FontSet::EMOJI, FontKey(3));
-        // Inter 700 and Inter 900 are one file.
-        let (inter, black) = (
+        // Inter 700, 900 and 800 are one file.
+        let (inter, black, extra_bold) = (
             fonts.get(FontKey(0)).unwrap(),
             fonts.get(FontKey(1)).unwrap(),
+            fonts.get(FontKey(4)).unwrap(),
         );
         assert!(Arc::ptr_eq(&inter.data, &black.data));
+        assert!(Arc::ptr_eq(&inter.data, &extra_bold.data));
     }
 }

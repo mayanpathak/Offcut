@@ -1,7 +1,11 @@
 //! How captions move, as data (TS §19.4, D-137). A style's motion is one
 //! `CaptionMotion`; V6.5's kinetic presets append members to the enums here.
 
+use offcut_types::OutMs;
+
+use crate::anim::{Track, eval};
 use crate::easing::{Easing, ease};
+use crate::theme::Role;
 
 /// What one step of a motion moves. No V4 style moves glyph by glyph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,8 +30,21 @@ pub enum MotionPreset {
 pub enum ActiveTreatment {
     /// Its fill is the style's `active` colour.
     Highlight,
-    /// A block in the `active` colour after it.
+    /// Its fill is the style's `active` colour, and a block in that colour
+    /// follows it (D-139).
     Cursor,
+    /// It sits on a rounded pill in the `active` colour, drawn in
+    /// `OnAccent`; the pill slides from the word before (D-170).
+    Pill,
+}
+
+/// A hard drop shadow: each glyph run drawn again under itself, moved by
+/// `offset` (logical pixels), in `role`'s colour at `opacity` (D-170).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShadowSpec {
+    pub offset: (f32, f32),
+    pub role: Role,
+    pub opacity: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +58,26 @@ pub struct CaptionMotion {
 
 /// The middle of a `Pop` (TS §19.4).
 pub const POP_SCALE: f32 = 1.12;
+
+/// A KeywordPop word's scale from its start: up to the peak at 90 ms, back
+/// to the hold at 180 ms, held until the word ends (D-139, TS §19.4).
+pub const KEYWORD_POP_PEAK: (u32, f32) = (90, 1.25);
+pub const KEYWORD_POP_HOLD: (u32, f32) = (180, 1.10);
+const KEYWORD_POP_EASING: Easing = Easing::EaseOutCubic;
+
+/// A KeywordPop word's scale `since_ms` after its start, before it ends.
+pub(crate) fn keyword_scale(since_ms: u32) -> f32 {
+    let at = OutMs::new;
+    let track = Track {
+        keys: vec![
+            (at(0), 1.0),
+            (at(KEYWORD_POP_PEAK.0), KEYWORD_POP_PEAK.1),
+            (at(KEYWORD_POP_HOLD.0), KEYWORD_POP_HOLD.1),
+        ],
+        easing: KEYWORD_POP_EASING,
+    };
+    eval(&track, at(since_ms))
+}
 
 /// Opacity and scale `since_ms` after the motion's start: for `Fade` the
 /// chunk's show start, for `Pop` the word's own start. Pure: a function of
@@ -68,7 +105,10 @@ pub(crate) fn enter_at(m: &CaptionMotion, since_ms: u32) -> (f32, f32) {
 
 #[cfg(test)]
 mod tests {
+    use offcut_types::StyleId;
+
     use super::*;
+    use crate::styles::spec;
 
     fn motion(enter: MotionPreset, easing: Easing) -> CaptionMotion {
         CaptionMotion {
@@ -102,5 +142,27 @@ mod tests {
             ..fade
         };
         assert_eq!(enter_at(&instant, 0), (1.0, 1.0));
+    }
+
+    #[test]
+    fn cleans_fade_and_bolds_pop_at_their_start_half_and_end() {
+        // Clean: a fade over 120 ms, ease-out cubic (D-170).
+        let clean = spec(StyleId::Clean).motion;
+        assert_eq!(enter_at(&clean, 0), (0.0, 1.0));
+        assert_eq!(enter_at(&clean, 60), (0.875, 1.0));
+        assert_eq!(enter_at(&clean, 120), (1.0, 1.0));
+        // Bold: a pop over 140 ms, back-out: at its height half-way, past
+        // it on the way, at rest at the end (D-170).
+        let bold = spec(StyleId::Bold).motion;
+        assert_eq!(enter_at(&bold, 0), (1.0, 1.0));
+        assert_eq!(enter_at(&bold, 70), (1.0, POP_SCALE));
+        let (_, rising) = enter_at(&bold, 49);
+        assert!(rising > POP_SCALE, "{rising}");
+        assert_eq!(enter_at(&bold, 140), (1.0, 1.0));
+        // Tech: shown at once.
+        let tech = spec(StyleId::Tech).motion;
+        for since in [0, 40, 80] {
+            assert_eq!(enter_at(&tech, since), (1.0, 1.0));
+        }
     }
 }

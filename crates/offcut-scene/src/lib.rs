@@ -536,8 +536,39 @@ mod tests {
                             opacity: opacity_h,
                             clip: clip_h,
                         },
-                    ) => assert_eq!((opacity, clip), (opacity_h, clip_h)),
+                    ) => {
+                        assert_eq!(opacity, opacity_h);
+                        // The sliding pill's clip (D-170): half the box.
+                        let half = clip.map(|r| [r.x / 2.0, r.y / 2.0, r.w / 2.0, r.h / 2.0]);
+                        let got = clip_h.map(|r| [r.x, r.y, r.w, r.h]);
+                        assert_eq!(half.is_some(), got.is_some());
+                        for (a, b) in half.iter().flatten().zip(got.iter().flatten()) {
+                            assert!((a - b).abs() < 0.001, "{clip:?} {clip_h:?}");
+                        }
+                    }
                     (DrawCmd::PopLayer, DrawCmd::PopLayer) => {}
+                    // Clean's pill (D-170): half the box and the radius.
+                    (
+                        DrawCmd::FillRect {
+                            rect,
+                            radius,
+                            color,
+                        },
+                        DrawCmd::FillRect {
+                            rect: rect_h,
+                            radius: radius_h,
+                            color: color_h,
+                        },
+                    ) => {
+                        assert_eq!(color, color_h);
+                        let (full, half) = (
+                            [rect.x, rect.y, rect.w, rect.h, *radius],
+                            [rect_h.x, rect_h.y, rect_h.w, rect_h.h, *radius_h],
+                        );
+                        for (a, b) in full.iter().zip(half) {
+                            assert!((b - a / 2.0).abs() < 0.001, "{full:?} {half:?}");
+                        }
+                    }
                     // The video is placed on the output canvas: the whole of
                     // it at either width, from the same part of the source.
                     (
@@ -617,9 +648,10 @@ mod tests {
                 .cmds
                 .iter()
                 .filter_map(|cmd| match cmd {
+                    // The run over its shadow (D-170).
                     DrawCmd::GlyphRun {
                         fill, text: run, ..
-                    } if run == text => Some(*fill),
+                    } if run == text && *fill != theme.shadow => Some(*fill),
                     DrawCmd::GlyphRun { .. }
                     | DrawCmd::FillRect { .. }
                     | DrawCmd::FillPath { .. }
@@ -642,7 +674,8 @@ mod tests {
         let pop = theme.color(spec(StyleId::Clean).pop);
         assert_eq!(fill(&on, 2_000, "made"), pop);
         assert_eq!(fill(&off, 2_000, "made"), pop);
-        assert_eq!(fill(&on, 2_000, "now."), theme.accent);
+        // The spoken word is in ink on Clean's pill (D-170).
+        assert_eq!(fill(&on, 2_000, "now."), theme.on_accent);
         assert_eq!(fill(&on, 2_000, "It"), theme.text);
         assert_eq!(fill(&off, 2_000, "$5"), theme.text);
     }
