@@ -1,6 +1,8 @@
 // The first-run download of the speech model (J4): what is being
-// downloaded and why, how far it is, and what went wrong if it failed.
-// It only reads the model store; nothing is started from here.
+// downloaded and why, how far it is, and what went wrong if it failed. It
+// fills the stage's frame like the processing card (v4implementation D-188),
+// its bar in the brand colour. It only reads the model store; nothing is
+// started from here, and Cancel is wired in Prompt 119.
 
 import { useEffect, useId, useRef } from "react";
 
@@ -8,6 +10,7 @@ import manifest from "../../config/model-manifest.json";
 import { messages } from "../../copy/messages";
 import type { ErrorCode } from "../../gen/domain";
 import { useModelStore } from "../../state/model-store";
+import { Button } from "../primitives/Button";
 import styles from "../styles/components.module.css";
 
 const BYTES_PER_MB = 1_000_000;
@@ -49,30 +52,34 @@ export function ModelDownloadPanel() {
   }
 
   return (
-    <section className={styles.modelPanel}>
-      <p id={bodyId} className={styles.notice}>
+    <section className={styles.card} aria-busy={status !== "failed"} data-testid="model-download">
+      <h2 className={styles.cardTitle}>{messages.modelDownload.title}</h2>
+      <p id={bodyId} className={styles.cardText}>
         {messages.modelDownload.body(SIZE_MB)}
       </p>
       <div
-        className={styles.progressTrack}
+        className={styles.meter}
         role="progressbar"
         aria-labelledby={bodyId}
         aria-valuemin={0}
         aria-valuemax={PERCENT}
         aria-valuenow={percent}
       >
-        <div ref={bar} className={styles.progressBar} />
+        <div ref={bar} className={styles.meterBar} />
       </div>
-      <p className={styles.status} role="status">
-        {line}
-      </p>
+      <p className={styles.cardHint}>{line}</p>
       {failure !== undefined && (
-        <div className={styles.statusError} role="alert">
-          <p className={styles.label}>{failure.title}</p>
-          <p className={styles.notice}>{failure.body}</p>
-          <p className={styles.notice}>{failure.action}</p>
+        <div className={styles.cardFailure} role="alert">
+          <p className={styles.cardText}>{failure.title}</p>
+          <p className={styles.cardHint}>{failure.body}</p>
+          <p className={styles.cardHint}>{failure.action}</p>
         </div>
       )}
+      <div className={styles.cardActions}>
+        <Button variant="ghost" size="sm">
+          {messages.cancel.button}
+        </Button>
+      </div>
     </section>
   );
 }

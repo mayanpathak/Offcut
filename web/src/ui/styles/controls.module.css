@@ -100,14 +100,16 @@
 
 /* --- Switch --------------------------------------------------------------- */
 
+/* The row reaches into the space beside it by its own padding, so its words
+   line up with the text above and below it, and its hover fills the gap. */
 .switchRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  width: 100%;
+  width: calc(100% + 2 * var(--sp-3));
   min-height: calc(var(--sp-7) - var(--sp-2));
-  margin: 0;
+  margin: 0 calc(-1 * var(--sp-3));
   padding: var(--sp-2) var(--sp-3);
   border: 0;
   border-radius: var(--r-control);

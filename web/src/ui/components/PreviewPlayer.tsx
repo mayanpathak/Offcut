@@ -1,6 +1,8 @@
 // J7: the preview. The canvas is drawn by the render worker and the sound is
-// played by the page; this component hands the canvas over when it appears,
-// gives the preview up when it goes, and offers play and pause.
+// played by the page; `PreviewPlayer` hands the canvas over when it appears
+// and gives the preview up when it goes. It fills the stage's frame; under
+// the frame, `PreviewTransport` offers play and pause, the time, the scrub
+// bar (wired in Prompt 112) and the watermark badge (v4implementation D-172).
 
 import { useEffect, useRef } from "react";
 
@@ -8,7 +10,9 @@ import { messages } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
 import { type PreviewState, usePreviewStore } from "../../state/preview-store";
 import { attach, detach, pause, play } from "../../usecases/control-preview";
-import styles from "../styles/components.module.css";
+import { Pause, Play } from "../icons";
+import { IconButton } from "../primitives/IconButton";
+import styles from "../styles/preview.module.css";
 
 // The size the preview is drawn at (TS §20.1). The page shows it scaled.
 const PREVIEW_WIDTH = 540;
@@ -55,8 +59,6 @@ function assertNever(value: never): never {
 }
 
 export function PreviewPlayer() {
-  const preview = usePreviewStore();
-  const failure = useClipStore((state) => state.failure);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   // The canvas is handed over once, when the player appears: an element
@@ -85,31 +87,51 @@ export function PreviewPlayer() {
     };
   }, []);
 
+  return (
+    <canvas
+      ref={canvas}
+      className={styles.previewCanvas}
+      width={PREVIEW_WIDTH}
+      height={PREVIEW_HEIGHT}
+      role="img"
+      aria-label={messages.preview.canvas}
+      data-testid="preview-canvas"
+    />
+  );
+}
+
+/**
+ * Under the frame: the one button, the clip's length (the position joins it
+ * in Prompt 112, with the preview store's `position`), the scrub bar, and the
+ * badge that says Free exports carry the watermark. V4 has no accounts, so
+ * every export is Free's and the badge is always shown; V6 hides it for Creator.
+ */
+export function PreviewTransport() {
+  const preview = usePreviewStore();
+  const failure = useClipStore((state) => state.failure);
+  const lengthMs = useClipStore((state) => state.clipInfo?.duration) ?? 0;
   const { label, press } = control(preview);
+  const locked = preview.status === "locked";
 
   return (
-    <div className={styles.player}>
-      <canvas
-        ref={canvas}
-        className={styles.previewCanvas}
-        width={PREVIEW_WIDTH}
-        height={PREVIEW_HEIGHT}
-        data-testid="preview-canvas"
-      />
-      <div className={styles.playerControls}>
-        <button
-          className={styles.button}
-          type="button"
+    <div className={styles.transport}>
+      <div className={styles.transportRow}>
+        <IconButton
+          icon={preview.status === "playing" ? <Pause /> : <Play />}
+          label={label}
           disabled={press === null}
+          {...(locked ? { disabledReason: messages.editor.availableAfterExport } : {})}
           onClick={() => {
             void press?.();
           }}
-        >
-          {label}
-        </button>
+        />
+        <span className={styles.time}>{messages.preview.clock(lengthMs)}</span>
+        <span className={styles.scrub} aria-hidden="true" />
       </div>
-      {failure !== undefined && (
-        <p className={styles.statusError} role="alert">
+      {failure === undefined ? (
+        <p className={styles.badge}>{messages.preview.watermarkBadge}</p>
+      ) : (
+        <p className={styles.previewFailure} role="alert">
           {messages.editor.failedStub}
         </p>
       )}

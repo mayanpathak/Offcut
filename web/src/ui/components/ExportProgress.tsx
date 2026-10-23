@@ -55,14 +55,14 @@ export function ExportProgress() {
 
   if (status === "done") {
     return (
-      <p className={styles.statusDone} role="status" data-testid="export-done">
+      <p className={styles.exportDone} role="status" data-testid="export-done">
         {messages.export.done}
       </p>
     );
   }
   if (status === "failed") {
     return (
-      <p className={styles.statusError} role="alert" data-testid="export-failed">
+      <p className={styles.exportFailed} role="alert" data-testid="export-failed">
         {messages.editor.failedStub}
       </p>
     );
@@ -73,21 +73,21 @@ export function ExportProgress() {
 
   return (
     <section className={styles.exportProgress} data-testid="export-progress">
-      <p id={stageId} className={styles.label} data-testid="export-stage">
+      <p id={stageId} className={styles.exportStage} data-testid="export-stage">
         {messages.export.stage[stage]}
       </p>
       <div
-        className={styles.progressTrack}
+        className={styles.meter}
         role="progressbar"
         aria-labelledby={stageId}
         aria-valuemin={0}
         aria-valuemax={PERCENT}
         aria-valuenow={percent}
       >
-        <div ref={bar} className={styles.progressBar} />
+        <div ref={bar} className={styles.meterBar} />
       </div>
-      <p className={styles.notice}>{messages.export.elapsed(seconds)}</p>
-      <p className={styles.notice}>{messages.export.renderingLocally}</p>
+      <p className={styles.cardHint}>{messages.export.elapsed(seconds)}</p>
+      <p className={styles.cardHint}>{messages.export.renderingLocally}</p>
     </section>
   );
 }

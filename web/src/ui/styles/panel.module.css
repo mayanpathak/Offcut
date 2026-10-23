@@ -1,0 +1,157 @@
+/* The side panel and what its tabs show (v4implementation D-178, §17.6). */
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The export's progress, above the tabs while it is shown. */
+.export {
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.export:empty {
+  display: none;
+}
+
+/* The tabs take the rest of the height; their panel scrolls on its own. */
+.tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabs > * {
+  flex: 1;
+}
+
+.waiting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
+/* --- Captions -------------------------------------------------------------- */
+
+.transcript {
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: var(--lh-body);
+}
+
+/* --- Style ----------------------------------------------------------------- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.styleCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.styleCardOn {
+  composes: styleCard;
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+/* Where the card's frame of the clip goes (Prompt 116). */
+.thumb {
+  aspect-ratio: 9 / 16;
+  margin-bottom: var(--sp-1);
+  border-radius: var(--r-control);
+  background: var(--bg);
+}
+
+.styleName {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.styleLine {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-tight);
+}
+
+/* --- Visuals --------------------------------------------------------------- */
+
+.empty {
+  margin: 0;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.rowIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--sp-6);
+  height: var(--sp-6);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.rowText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowKind {
+  font-weight: var(--fw-500);
+}
+
+.rowWords {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTime {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+}

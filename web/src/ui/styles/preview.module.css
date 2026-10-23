@@ -1,0 +1,51 @@
+/* The preview player (v4implementation §17.6): its canvas in the stage's
+   frame and its transport under it. The direct-manipulation chrome joins it
+   in Prompt 113. */
+
+/* Drawn at 540 x 960 and shown at the frame's size, which is 9:16 too. */
+.previewCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.transport {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.transportRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.time {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Where the scrub bar goes (Prompt 112). */
+.scrub {
+  flex: 1;
+  height: var(--sp-1);
+  border-radius: var(--sp-1);
+  background: var(--border);
+}
+
+.badge,
+.previewFailure {
+  align-self: center;
+  margin: 0;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+
+.previewFailure {
+  color: var(--danger);
+}
