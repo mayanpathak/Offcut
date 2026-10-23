@@ -103,16 +103,16 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      # The Ubuntu mirror sometimes stalls a download for minutes: in the run
-      # of 0fc25f9, 17.5 MB of Mesa took 6 min 45 s before apt gave up and
-      # asked again (v4changelog Entry 15). A connection silent for 20 s is
-      # dropped and the file asked again, up to 3 times, in every apt-get of
-      # the job, Playwright's included.
-      - name: Make apt fail fast and retry
+      # The Ubuntu mirror sometimes drops a download: in the run of 0fc25f9
+      # apt gave the Mesa package up after 6 min 33 s and asked again
+      # (v4changelog Entry 15). The image's own apt settings give a 15 s
+      # timeout and one retry; this file is read after them (apt reads
+      # apt.conf.d in name order) and gives three, for every apt-get of the
+      # job, Playwright's included. The values apt uses are printed last.
+      - name: Make apt retry
         run: |
-          printf '%s\n' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' 'Acquire::Retries "3";' \
-            | sudo tee /etc/apt/apt.conf.d/80-fail-fast
-          apt-config dump | grep -E '^Acquire::(https?::Timeout|Retries) '
+          echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/zz-offcut-retries
+          apt-config dump | grep -E '^Acquire::(https?::Timeout|Retries) ' | tail -n 3
 
       - name: Check the configuration
         run: |
@@ -528,12 +528,10 @@ jobs:
       - name: Headers of the deployment
         run: node scripts/check-headers.mjs "$APP_ORIGIN"
 
-      # Smoke: isolated, WASM compiles under the CSP, API reachable. apt fails
-      # fast and retries as in the ci job.
-      - name: Make apt fail fast and retry
-        run: |
-          printf '%s\n' 'Acquire::http::Timeout "20";' 'Acquire::https::Timeout "20";' 'Acquire::Retries "3";' \
-            | sudo tee /etc/apt/apt.conf.d/80-fail-fast
+      # Smoke: isolated, WASM compiles under the CSP, API reachable. apt
+      # retries as in the ci job.
+      - name: Make apt retry
+        run: echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/zz-offcut-retries
 
       - name: Install Chrome for Playwright
         run: pnpm --filter web exec playwright install --with-deps chrome

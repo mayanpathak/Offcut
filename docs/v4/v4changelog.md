@@ -1154,7 +1154,7 @@ A first form of the watermark drill (a third parameter on `caption_block`) did n
 
 ---
 
-## Entry 15 - 2026-10-23 - CI: apt fails fast and retries; the downloaded Ubuntu packages are cached (outside a prompt)
+## Entry 15 - 2026-10-23 - CI: the downloaded Ubuntu packages are cached; apt retries three times (outside a prompt)
 
 **Why.** The founder asked why CI had grown slow. Runs took 28 to 30 minutes up to P101's fix (`a6dc4bc`, 27.7 min) and 40 to 49 minutes on P103 (`3659c8f`, 48.6 min) and P104 (`0fc25f9`, 39.8 min). The `ci` job's own steps were unchanged: `cargo test` took 2.4 to 4.6 minutes in every run. Two steps that download Ubuntu packages from the runner's mirror (`azure.archive.ubuntu.com`) made the difference:
 
@@ -1171,19 +1171,24 @@ A first form of the watermark drill (a third parameter on `caption_block`) did n
 - **The media job.** `e2e-media` (Windows, no apt) waits for the `ci` job's build, so all of the delay adds to the run.
 
 **What changed** (`.github/workflows/ci.yml` only; no build, test or deploy command changes):
-- **"Make apt fail fast and retry"** is a new step after "Free disk space". It writes `/etc/apt/apt.conf.d/80-fail-fast` with `Acquire::http::Timeout "20"`, `Acquire::https::Timeout "20"` and `Acquire::Retries "3"`, and prints them back with `apt-config dump`, so every `apt-get` of the job, Playwright's included, drops a connection silent for 20 s and asks again. The `deploy-web` job (main only) gets the same step before its Chrome install.
+- **"Make apt retry"** is a new step after "Free disk space". It writes `Acquire::Retries "3"` to `/etc/apt/apt.conf.d/zz-offcut-retries`, read after the image's own settings, and prints the values apt then uses. Every `apt-get` of the job, Playwright's included, asks again for a dropped file up to three times, where the image allows one. The `deploy-web` job (main only) gets the same step before its Chrome install.
 - **"Restore the downloaded Ubuntu packages"** is a new `actions/cache` step (the pinned v6, as the other caches use) of `~/apt-archives`. Its key is `apt-<os>-<hash of ci.yml and pnpm-lock.yaml>`, the two files that decide which packages are installed, and it falls back to the last `apt-<os>-` cache.
   - The Vulkan step first copies the cached `.deb` files into `/var/cache/apt/archives/` (and says how many).
   - apt takes a file from its archive only when it is the version the index asks for, and downloads any other.
 - **"Keep the downloaded Ubuntu packages"** comes after the Chrome install, the job's last `apt-get`. It copies `/var/cache/apt/archives/*.deb` to `~/apt-archives`, which the cache saves at the end of a job whose key was not found. An image that keeps no downloaded package leaves the cache empty, not the job failed.
 
 **What it does not do.**
-- **A trickle is not cut.** The timeout ends a silent connection, not a slow one that still trickles.
-- **apt already retries.** Noble's apt retries on its own (the log shows the retry); the setting makes the count explicit.
+- **No timeout of ours.** The image already sets a 15 s timeout, which ends a silent connection, not a slow one that still sends.
 - **Where the gain comes from.** The cache removes the downloads when the versions are unchanged. A new Mesa or font version is downloaded once from the mirror, and the cache keeps the old file until its key changes (an edit of `ci.yml` or of the lockfile).
 - **The media job still waits for `ci`.** Running it beside `ci` is a restructure of the jobs, left to Prompt 125, which owns the rest of V4's CI changes (§19.3).
 - **The time limit.** The `ci` job's `timeout-minutes: 45` is unchanged. P103's run used 33.9 of it.
 
-**How it was checked.** On CI only (the steps run on the Linux runner, not on D1): this commit's run, which finds no `apt-` cache, downloads and saves it, and a re-run of the same commit, which must take the packages from the cache. The readings follow in this entry's follow-up commit.
+**How it was checked.** On CI only: the steps run on the Linux runner, not on D1.
+
+- **`75c02c3`, the first form (run 39872773582, green, 49.7 min).** It had a step "Make apt fail fast and retry", which wrote `Acquire::http::Timeout "20"`, `Acquire::https::Timeout "20"` and `Acquire::Retries "3"` to `80-fail-fast`. `apt-config dump` printed those three and then `Timeout "15"`, `Timeout "15"`, `Retries "1"`: the image's own file is read after `80-…`, so its values won.
+  - **Its timings.** The downloads did not stall; they trickled. Mesa came at 44.7 kB/s (17.5 MB in 6 min 31 s; step 6.9 min) and Playwright's packages at 50.8 kB/s (22.0 MB in 7 min 13 s; step 7.7 min). No timeout would have cut them, so the step was reduced to the retries, in a file named to be read last.
+  - **The cache.** "Cache not found for input keys: apt-Linux-6e6f…"; "Keep the downloaded Ubuntu packages" printed "12 packages, 38M"; "Cache saved with key: apt-Linux-6e6f…".
+  - **Overall.** `ci` 32.4 min, `e2e-media` 17.2 min.
+- **This commit.** It changes `ci.yml`, so its key is new, and the cache falls back to the `apt-Linux-` cache saved above. Its run is the first to install from the cache; its reading is recorded in the next entry.
 
 **Open.** Unchanged.
