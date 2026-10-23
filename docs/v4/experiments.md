@@ -84,7 +84,11 @@ Prompt 107, the other fourteen and the parity case (2026-10-23):
 - **The parity case** draws each style's from-to frame at 1080 x 1920, box-filters it to 540 x 960 (2 x 2 mean), and compares it with the same frame drawn at 540 x 960, at SSIM >= 0.99 (D-172).
 - **D1 numbers.** Every golden is 1.0000 on d1 WARP against itself on the rerun. Parity is 0.9996 (Clean), 0.9997 (Bold), 0.9998 (Tech) on d1 WARP.
 - **Stability.** WARP is not byte-stable: two writings differed in 1 to 7 pixels by one level in three goldens, at SSIM 1.0000.
-- **Lavapipe:** the readings from the CI log of `V4 P107`'s commit, below.
+- **Lavapipe** (llvmpipe, LLVM 20.1.2, 256 bits; CI run 39975720726 on `248a44a`, step "Golden frames, with their readings"):
+  - Goldens: `bold_from_to` 0.9994, `bold_keyword` 0.9994, `bold_list` 0.9994, `bold_number` 0.9995, `clean_from_to` 0.9995, `clean_keyword` 0.9994, `clean_list` 0.9994, `clean_number` 0.9995, `clean_number_nowatermark` 0.9995, `clean_number_watermark` 0.9995, `tech_from_to` 0.9994, `tech_keyword` 0.9995, `tech_list` 0.9997, `tech_number` 0.9995; `crop_landscape_050` 1.0000 and `punch_in_110` 0.9999 as in Prompt 101.
+  - Parity: Clean 0.9994, Bold 0.9995, Tech 0.9995.
+  - 19 passed.
+- **Decision:** every golden is at least 0.98 and every parity case at least 0.99 on both adapters, with WARP and lavapipe at least 0.9994 apart from 1.0. One folder, `fixtures/golden/` (16 PNGs), still serves both. The thresholds stay 0.98 and 0.99.
 
 ## offcut_render.wasm size
 Question:

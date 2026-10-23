@@ -1656,7 +1656,12 @@ Changed expectations because of the decision:
 - **Parity:** Clean from-to 0.9996, Bold 0.9997, Tech 0.9998, each at least 0.99.
 - **The run:** 19 passed (16 goldens, the parity case, the 2 inline tests of `common/ssim.rs`). The prompt's "17 passed" counts the goldens and the parity case.
 
-**Readings on lavapipe:** see the continuation of this entry (the next commit), from the CI log of this commit.
+**Readings on lavapipe** (added in the commit after this entry's own, from CI run 39975720726 on `248a44a`; llvmpipe, LLVM 20.1.2):
+- **The fourteen:** 0.9994 to 0.9997 (`tech_list`, the turned one, 0.9997).
+- **Prompt 101's two:** `crop_landscape_050` 1.0000 and `punch_in_110` 0.9999, as in Prompt 101.
+- **Parity:** Clean 0.9994, Bold 0.9995, Tech 0.9995.
+- **The run:** 19 passed.
+- **One folder serves both adapters**; per name in `experiments.md`, "Golden similarity across adapters".
 
 **The look moving** (G 9.4). A temporary Playwright spec (`zz-look.spec.ts` with `zz-pw.config.ts`, deleted) took the sample clip through the keyed build in Chrome on D1. It pressed play and kept a picture of the preview about every 270 ms for 78 s, about 290 pictures per style, kept in the session's scratchpad (the founder's clip, never committed). They were looked at as contact sheets. The style was changed in `clip-store.ts` (`"bold"`, then `"tech"`) for one keyed build each and reverted: `git diff web/src/state/clip-store.ts` shows nothing.
 
