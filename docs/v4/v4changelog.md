@@ -18,8 +18,8 @@
 | 5 | V3 CL item 7 (the Linux ffmpeg URL, before about 2026-11-27) carries over unchanged | Founder | V4 |
 | 6 | ~~**Open a draft pull request `v4-build` → `main`**~~ Done: PR #7 is open as a draft (closed in Entry 1) | Founder | Any time |
 | 7 | ~~**Read ten rows of the line-break table** (D-167, G 8.2): rows 28, 27, 25, 26, 11, 20, 21, 12, 7, 16 of `crates/offcut-scene/tests/line_breaks.rs`, shown as a phone shows them (Entry 12). For each: "I would break it this way: yes / no, because …". A "no" changes that row now, with the reason, before the break search is written~~ Done 2026-10-23: yes to all ten (Entry 13) | Founder | P103 |
-| 8 | **The brand colour and contrast** (design review 1's brand question, G 11.2). D-179's `--brand` `#8B5CF6` with light text measures 4.23:1, under WCAG AA's 4.5:1 for a button's 14 px label, so the primary button is filled with `--brand-hover` `#7C4DEE` (4.60:1 with `--text`) and `--brand` marks the selected tab, the switch, the slider and the focus ring (Entry 19). Keep this, or choose a brand that reaches 4.5:1 with light text, which lets the button take `--brand` again | Founder | P111 |
-| 9 | **The error screen of design review 1.** The 14 error copies of D-159 are Prompt 119's (Entry 20), so `failClip("E_GPU_LOST")` (Prompt 110, G 10.8) shows `ErrorPanel`'s general card ("Something went wrong on this device.", "Start over"). Prompt 110 captures it so, or with a code that has copy now (`E_WORKER_CRASH`), and says which in its entry | Agent | P110 |
+| 8 | **The brand colour and contrast** (design review 1's brand question, G 11.2). D-179's `--brand` `#8B5CF6` with light text measures 4.23:1, under WCAG AA's 4.5:1 for a button's 14 px label, so the primary button is filled with `--brand-hover` `#7C4DEE` (4.60:1 with `--text`) and `--brand` marks the selected tab, the progress bars, the drop zone's outline under a file and the focus ring (Entries 19, 21; the switches and the slider are monochrome since Entry 21). Keep this, or choose a brand that reaches 4.5:1 with light text, which lets the button take `--brand` again | Founder | P111 |
+| 9 | ~~**The error screen of design review 1.** The 14 error copies of D-159 are Prompt 119's (Entry 20), so `failClip("E_GPU_LOST")` (Prompt 110, G 10.8) shows `ErrorPanel`'s general card ("Something went wrong on this device.", "Start over"). Prompt 110 captures it so, or with a code that has copy now (`E_WORKER_CRASH`), and says which in its entry~~ Done in Entry 21: captured with `E_WORKER_CRASH`, which has its words | Agent | P110 |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -1841,3 +1841,81 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
 
 **Open.** Open item 9 (Prompt 110's error capture). Known issues 26 and 27. Known issues 23-25 unchanged; open items 1-5 and 8 unchanged.
+
+---
+
+## Entry 21 - 2026-10-24 - P110 (S10): screen capture tool, dev hooks, self-review fixes
+
+**What.** Prompt 110 (G 10.8, G 10.9, M-10; D-155, D-191): the `screens` project and script, the page's development hooks, the sixteen captures for design review 1, and the fixes the self-review found. No design skill for application interfaces was available to load.
+
+**1. The development hooks** (`web/src/ui/dev-hooks.ts`, new; its TS §5 line added):
+- `window.__offcutDev`:
+  - `openWordField(i)`: the Captions tab, with a word's field open.
+  - `failClip(code)`: the clip in `failed` with `code`, as a failure of the preview. It sets the store past the clip machine, since `ready` has no `fail` edge (TS §12.1).
+  - `fakeExport(fraction)`: an export rendering at that share of 1,000 frames, 12 s in; nothing is rendered.
+- **`openWordField` without a cast.** The `ui` layer may not cast to `WordIdx` (the brand rule of D-59), and no typed word index exists on the page before the transcript editor. So the field is the first word of the sentence that holds word `i`, whose index the transcript gives typed (`Sentence.words.start`): word 0 for `openWordField(0)`, the one G 10.8 uses. Prompt 115 gives every word its index.
+- **Installed only outside production.** `EditorPage.tsx` calls `installDevHooks()` when `DEV_HOOKS` holds, a constant `env.ts` now exports: `import.meta.env.MODE !== "production"`. The prompt writes the condition in `EditorPage.tsx`, but `import.meta.env` may be read in `config/env.ts` only (TS §7's lint rule), so the condition lives there.
+- **Dead-code elimination, read:** a production build (`vite build`) has no file containing `__offcutDev`, `installDevHooks` or the module's constants; a `vite build --mode development` build has one. The gate's `pnpm build` is clean (below). Prompt 124 makes `check-hosts.mjs` refuse the names.
+- **The word field** (`SidePanel.tsx`, `panel.module.css`; D-182's look): with `ui-store.editingWord` set, the sentence that holds the word shows it as a field: as wide as its text (`field-sizing: content`), the word selected, outlined with `--focus`, named "Fix this word" (`captions.wordField`, new). Enter, Escape or leaving the field closes it; nothing is committed until Prompt 115.
+
+**2. `screens`** (G 10.8):
+- **The project** (`web/playwright.config.ts`): `screens` (`testMatch: "screens.spec.ts"`, `dependencies: ["media-setup"]`, `use: MEDIA_USE`, one worker, the media timeout).
+- **The script** (root `package.json`): `"screens": "pnpm --filter web exec vite build --mode development && pnpm --filter web exec playwright test --project=screens"`. The prompt's script runs only Playwright. The suite runs on `vite preview`, which serves `web/dist`, and a production build has no hooks; the build in development mode makes the run self-contained. It leaves `web/dist` built so: the next `pnpm build` (the gate's) replaces it.
+- **CI never runs it.** `ci.yml` runs `pnpm e2e` (`non-media`) and `e2e-media.yml` `pnpm e2e:media` (`media`). `playwright test --list` without `--project` lists `screens.spec.ts` under `[screens]` only (4 cases; 69 in all).
+- **`web/tests-e2e/screens.spec.ts`**, per width (`test.use({ viewport })`). Every picture is taken after `document.fonts.ready` and 600 ms, so the movement has ended, into `test-results/screens/<state>-<w>x<h>.png`:
+
+| State | How it is reached |
+|---|---|
+| `model-download` | A fresh context (the model absent); the reference clip dropped; `routeAssets` fails the model's requests after 30% of its bytes, so the download holds there while it retries; pictured once the bar reads 25% or more (31% in the capture) |
+| `empty` | `/app`, the model cached (`ensureModelCached`) |
+| `processing` | The reference clip dropped; pictured when the second step is done, which is when the found moments are chips (the visuals being looked for). That lasts a second or less, so the page is read at every frame (`waitForFunction`, `polling: "raf"`) and the picture is taken at once; if the preview comes first the case fails at once, and the describe block allows one retry |
+| `ready` | Play, 3 s, Pause, both clicked without moving the pointer (`dispatchEvent`), so that a frame of the clip is on the stage (the preview draws while it plays; a paused frame is redrawn from Prompt 112) and no tooltip is in the picture |
+| `editing-word` | `__offcutDev.openWordField(0)` |
+| `style-tab` | A click on the Style tab |
+| `exporting` | `__offcutDev.fakeExport(0.42)` |
+| `error` | `__offcutDev.failClip("E_WORKER_CRASH")`, not G 10.8's `E_GPU_LOST`: that code has no words until Prompt 119 and shows the general card; this one shows a title, a sentence and what to do (open item 9, closed) |
+
+- **The clip** is the reference clip, the one the media suites take to `ready` and whose found moments the README lists; `speech_60s_portrait.mp4` would do as well, but its found moments are not listed anywhere.
+- **`pnpm screens`: 6 passed (3.0 min), 16 PNGs**, in the third run (the first two found the faults below). The pictures stay in `web/test-results/screens/` (git-ignored) and are the founder's to review at Prompt 111.
+
+**3. The self-review** (G 10.9), finding by finding:
+
+| Finding | Fix |
+|---|---|
+| `processing-1280x800` missing in the first run: the "Found" chips were on the page for under a second and the default polling missed them, so the case waited out its 240 s | Read at every frame and pictured at once; fail fast if the preview comes first; one retry |
+| `ready`: an empty frame. The preview draws only while it plays, so the brightest thing on screen was the panel's text, not the video | The capture plays 3 s and pauses; the frame shows the clip with Clean's highlight on "almost". Redrawing a paused frame is D-173's (Prompt 112) |
+| The brand colour beyond the one primary action and the selected tab: the switches' on track and the slider's fill were `--brand` | On: `--text` track, `--bg` thumb; the slider's fill `--text-2` (`controls.module.css`). The progress bars keep `--brand`, which G 10.6 names; the drop zone's outline under a file and the focus ring keep it too |
+| Cancel (ghost) in the processing and download cards stood 12 px in from the card's text, the ghost button's padding | Cancel is a small secondary button: its edge lines up with the text, and §17.2 makes it the processing state's primary action |
+| A "Play" tooltip in the second run's `ready` picture: the pointer rested on the button through Play and Pause | Not a fault of `Tooltip`: a temporary check showed it opens on hover only (not on a mouse click's focus) and hides when the pointer leaves. The capture clicks without the pointer |
+
+**Checked and found right:**
+- **The 4 px grid:** every space a `--sp-*` token. The 2 px of the switch's thumb and the tab's line are borders, not spaces.
+- **One grey per role:** text `--text`, hints and secondary words `--text-2`, chips and wells `--surface-2`.
+- **AA:** the lowest pair is `--text-2` on `--surface-2` (6.71:1, the chips and the length).
+- **States:** every control has hover, focus and disabled; undo and redo are disabled in every capture.
+- **Jargon:** none of D-177's words; "Transcribing…" and "Cleaning voice" are V3's feed lines, kept by the suites.
+- **No layout shift:** the frame stands in the same place in the `processing` and `ready` pictures at both widths (looked at side by side; Entry 20 measured the box: 344 x 612 at (288, 80), and 502 x 892 at (529, 80)).
+
+**Not changed, for design review 1 or a later prompt:**
+- During the fake export the preview's Play stays enabled: a real export locks the preview, the hook does not.
+- During an export, the panel's tabs stay as they are: §17.2's "Available when the export finishes" on review controls is Prompt 119's.
+- E_WORKER_CRASH's sentence says "background task"; Prompt 119 writes the error copies in D-190's tone.
+
+**Differs from the prompt or the plan.**
+- `env.ts` gains `DEV_HOOKS` (the lint rule; above).
+- The `screens` script builds in development mode first (above).
+- The error capture uses `E_WORKER_CRASH` (above).
+- `openWordField(i)` opens the first word of `i`'s sentence (above).
+- Beyond the prompt's files: `SidePanel.tsx` and `panel.module.css` (the word field that `openWordField` needs), `messages.ts` (`captions.wordField`), `controls.module.css`, `ProcessingCard.tsx` and `ModelDownloadPanel.tsx` (self-review fixes).
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file (the temporary tooltip check and its config deleted); no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (tree: 360 files; copy: ok). `pnpm test`: **Rust 643 passed, 0 failed, 3 ignored** (no Rust file changed; the whole log reads 647 with the type generator's 4, Entry 19), Vitest 92. `pnpm build` exit 0; **app shell 322.1 kB gzip** (Entry 20: 321.8; the hooks are not in it). `pnpm e2e` 12 passed.
+- **M-10's commands:**
+  - `pnpm build && grep -rl "__offcutDev" web/dist`: nothing (clean).
+  - `pnpm screens`: 16 PNGs.
+  - `pnpm e2e`: 12 passed.
+  - `pnpm e2e:media` on the keyed build: **49 passed, 1 skipped (12.2 min)**, the baseline's count; `screens` is not in it. The build after it has no key: the key's value is in no file of `web/dist`.
+- **The pictures are not kept by the other suites.** Playwright empties `web/test-results/` when a run starts, so the media run removed the sixteen captures. They were captured again after this commit; Prompt 111's Step 11.1 captures afresh in any case and copies them to `~/v4-review-1/`.
+- The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+
+**Open.** Known issues 23-27 unchanged; open items 1-5 and 8 unchanged. Open item 9 closed.

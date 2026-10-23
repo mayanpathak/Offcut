@@ -50,6 +50,18 @@ export default defineConfig({
       workers: 1,
       use: MEDIA_USE,
     },
+    // `pnpm screens`, on D1 only: the eight states at the two reference widths
+    // for the design reviews (v4implementation D-191). CI names its projects
+    // and never runs this one; the pictures stay in test-results/.
+    {
+      name: "screens",
+      testMatch: "screens.spec.ts",
+      dependencies: ["media-setup"],
+      timeout: MEDIA_TIMEOUT_MS,
+      fullyParallel: false,
+      workers: 1,
+      use: MEDIA_USE,
+    },
     {
       name: "bench",
       testDir: "../bench",

@@ -16,6 +16,7 @@
     "e2e:media": "pnpm --filter web exec playwright test --project=media",
     "e2e:device": "pnpm --filter web exec playwright test --project=non-media --project=media --headed",
     "bench:device": "pnpm --filter web exec playwright test --project=bench",
+    "screens": "pnpm --filter web exec vite build --mode development && pnpm --filter web exec playwright test --project=screens",
     "verify": "python verify/verify_mp4.py",
     "fixtures": "sh fixtures/gen_fixtures.sh",
     "corpus": "sh corpus/fetch_corpus.sh && pnpm --filter web exec playwright test --project=corpus"

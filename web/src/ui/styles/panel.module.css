@@ -155,3 +155,16 @@
   font-size: var(--fs-12);
   font-variant-numeric: tabular-nums;
 }
+
+/* The open field of a word: as wide as its text, on the line it sits in. */
+.wordField {
+  field-sizing: content;
+  min-width: 2ch;
+  padding: 0 var(--sp-1);
+  border: 0;
+  border-radius: var(--sp-1);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  box-shadow: var(--focus);
+}

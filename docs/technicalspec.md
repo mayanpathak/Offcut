@@ -710,6 +710,7 @@ offcut/
 │   │       ├── assets/
 │   │       │   └── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
 │   │       ├── icons.tsx              inline SVG icons (D-181)
+│   │       ├── dev-hooks.ts           `__offcutDev`: the page's development hooks, never in a production build (v4implementation D-155, v4changelog Entry 21)
 │   │       ├── hooks/
 │   │       │   └── use-shortcuts.ts   the keyboard shortcuts (D-185)
 │   │       ├── layout/

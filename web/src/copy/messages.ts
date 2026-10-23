@@ -141,7 +141,7 @@ export const messages = {
   captions: {
     hint: "Click any word to fix it.",
     follow: "Follow playback", followHint: "The text scrolls with the video.",
-    hide: "Hide word", restore: "Restore original", show: "Show", wordMenu: "Word options",
+    hide: "Hide word", restore: "Restore original", show: "Show", wordMenu: "Word options", wordField: "Fix this word",
     replaceAll: (n: number, from: string, to: string) => `Change all ${String(n)} “${from}” to “${to}”?`,
   },
   style: {

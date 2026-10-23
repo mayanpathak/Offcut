@@ -76,7 +76,7 @@ export function ModelDownloadPanel() {
         </div>
       )}
       <div className={styles.cardActions}>
-        <Button variant="ghost" size="sm">
+        <Button variant="secondary" size="sm">
           {messages.cancel.button}
         </Button>
       </div>

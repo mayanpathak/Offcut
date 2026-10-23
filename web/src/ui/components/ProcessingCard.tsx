@@ -78,7 +78,7 @@ export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
       <ProcessingFeed />
       <p className={styles.cardHint}>{messages.processing.reassure}</p>
       <div className={styles.cardActions}>
-        <Button variant="ghost" size="sm">
+        <Button variant="secondary" size="sm">
           {messages.cancel.button}
         </Button>
       </div>

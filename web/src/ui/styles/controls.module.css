@@ -169,13 +169,15 @@
     background-color var(--fast) var(--ease);
 }
 
+/* On: light track, dark thumb. The brand colour is kept for the one primary
+   action and the selected tab (G 10.9). */
 .switchRow[aria-checked="true"] .switchTrack {
-  background: var(--brand);
+  background: var(--text);
 }
 
 .switchRow[aria-checked="true"] .switchThumb {
   translate: var(--sp-4) 0;
-  background: var(--text);
+  background: var(--bg);
 }
 
 /* --- SegmentedControl ----------------------------------------------------- */
@@ -258,7 +260,7 @@
 .range::-webkit-slider-runnable-track {
   height: var(--sp-1);
   border-radius: var(--sp-1);
-  background: linear-gradient(to right, var(--brand) var(--fill, 0%), var(--border) var(--fill, 0%));
+  background: linear-gradient(to right, var(--text-2) var(--fill, 0%), var(--border) var(--fill, 0%));
 }
 
 .range::-webkit-slider-thumb {
@@ -281,7 +283,7 @@
 .range::-moz-range-progress {
   height: var(--sp-1);
   border-radius: var(--sp-1);
-  background: var(--brand);
+  background: var(--text-2);
 }
 
 .range::-moz-range-thumb {
