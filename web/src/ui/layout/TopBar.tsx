@@ -1,15 +1,19 @@
 // The editor's top bar (v4implementation D-178): the product's mark and the
 // clip's length on the left; on the right the save state, undo and redo, a
-// way to start over, and Export, the one primary action. Undo and redo stay
-// disabled until Prompt 114 gives them a history; the save state is the
-// interface store's, "saved" until edits write to the device.
+// way to start over, and Export, the one primary action. Undo and redo are
+// enabled by the history (D-184) while the clip is ready and no export has
+// the preview; the save state is the interface store's, "Saving…" while an
+// edit is written to the device.
 
 import { messages } from "../../copy/messages";
 import { type BlockerCode, forImport } from "../../state/blockers";
 import { useClipStore } from "../../state/clip-store";
 import { useExportStore } from "../../state/export-store";
+import { useHistoryStore } from "../../state/history";
+import { usePreviewStore } from "../../state/preview-store";
 import { useUiStore } from "../../state/ui-store";
 import { dismissClip } from "../../usecases/import-clip";
+import { redo, undo } from "../../usecases/undo-redo";
 import { ExportButton } from "../components/ExportButton";
 import { Check, Redo, Undo } from "../icons";
 import { Button } from "../primitives/Button";
@@ -47,6 +51,39 @@ function StartOver() {
   );
 }
 
+/** Undo and redo (D-184): each enabled when the history has a step and the clip can take a change. */
+function UndoRedo({ ready }: { ready: boolean }) {
+  const canUndo = useHistoryStore((state) => state.canUndo);
+  const canRedo = useHistoryStore((state) => state.canRedo);
+  const locked = usePreviewStore((state) => state.status === "locked");
+  const usable = ready && !locked;
+  const reason = locked ? { disabledReason: messages.editor.availableAfterExport } : {};
+  return (
+    <span className={styles.group}>
+      <IconButton
+        icon={<Undo />}
+        label={messages.editor.undo}
+        disabled={!usable || !canUndo}
+        {...reason}
+        onClick={() => {
+          void undo();
+        }}
+        data-testid="undo"
+      />
+      <IconButton
+        icon={<Redo />}
+        label={messages.editor.redo}
+        disabled={!usable || !canRedo}
+        {...reason}
+        onClick={() => {
+          void redo();
+        }}
+        data-testid="redo"
+      />
+    </span>
+  );
+}
+
 function SaveState() {
   const save = useUiStore((state) => state.save);
   return (
@@ -73,12 +110,7 @@ export function TopBar({ view }: { view: StageView }) {
       )}
       <span className={styles.spacer} />
       {ready ? <SaveState /> : null}
-      {working ? (
-        <span className={styles.group}>
-          <IconButton icon={<Undo />} label={messages.editor.undo} disabled />
-          <IconButton icon={<Redo />} label={messages.editor.redo} disabled />
-        </span>
-      ) : null}
+      {working ? <UndoRedo ready={ready} /> : null}
       {ready ? <StartOver /> : null}
       <ExportButton />
     </header>

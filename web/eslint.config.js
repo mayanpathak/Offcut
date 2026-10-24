@@ -156,12 +156,12 @@ const layerPolicies = [
   },
 
   // The review's edges V4 adds (v4implementation §4, D-147): every review
-  // change goes through the one update rule, which holds the queue of one
-  // and the optimistic edit; the rule pauses the preview around a change and
-  // plays it again after (TS §12.4). The two drags of the preview (D-183)
-  // are its first callers.
+  // change goes through the one update rule, which holds the queue of one,
+  // the optimistic edit and the history (D-184); the rule pauses the preview
+  // around a change and plays it again after (TS §12.4).
   {
-    from: fromFile("usecases", "set-caption-position.ts", "set-crop-offset.ts"),
+    from: fromFile("usecases", "edit-word.ts", "replace-all.ts", "toggle-event.ts", "set-style.ts",
+      "set-highlight-numbers.ts", "set-caption-position.ts", "set-crop-offset.ts", "undo-redo.ts"),
     allow: { to: to("usecases", "review-update.ts") },
   },
   {
@@ -241,7 +241,7 @@ const NO_SWALLOWED_ERROR = [
 
 const restrictedSyntax = (...groups) => ["error", ...groups.flat()];
 
-// Nine files of the main thread turn a raw browser value into a unit or an
+// Eleven files of the main thread turn a raw value into a unit or an
 // id (v2implementation D-59). Each may hold one cast, to one type, in one
 // named place: the last `return` of its minting helper or, in model-store.ts,
 // the constant that is the zero of the initial state. Every other cast in
@@ -258,6 +258,9 @@ const MINTING = [
   { file: "src/usecases/control-preview.ts", brand: "OutMs", helper: "toOutMs" },
   { file: "src/usecases/run-pipeline.ts", brand: "TimeMs", helper: "recordingTime" },
   { file: "src/persistence/clips-repo.ts", brand: "Bytes", helper: "toBytes" },
+  // The review names a sentence and a word by its place in the transcript (D-146, D-175).
+  { file: "src/usecases/review-update.ts", brand: "SentenceIdx", helper: "sentenceAt" },
+  { file: "src/usecases/replace-all.ts", brand: "WordIdx", helper: "wordAt" },
 ];
 
 /** The brand-cast rule for a minting file: NO_BRAND_CAST, less its one named cast. */

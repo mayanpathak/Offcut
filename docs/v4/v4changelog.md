@@ -37,7 +37,7 @@
 | 11 | **REOPENED CONTRACT** `web/src/workers/protocol.ts`: `rulesPlan`, `setScene(plan)` → `SceneReport`, `previewSeek(OutMs)`, `ClockSync(OutMs)`, `assemble`, `release`, `hitTest`, `styleThumbnails`, `PreviewStats` (D-124, D-126, D-127, D-128, D-174, D-186). P99's part done in Entry 9: `rulesPlan`, `setScene` → `SceneReport`, `ClockSync` and `previewSeek` on `OutMs`, `previewPlay` → `PreviewStats`; P100's in Entry 10: `assemble`, `release`. `hitTest` and `styleThumbnails` remain | `web/src/workers` | P99, P100, P113, P116 |
 | 12 | ~~**REOPENED CONTRACT** `AudioWorkerApi`: `assemble`, `release` (D-127, D-128; known issue 1)~~ Closed in Entry 10 | `audio.worker.ts`, `protocol.ts` | P100 |
 | 13 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `control-preview.ts` mints `OutMs` (D-126)~~ Closed in Entry 9 (and `run-pipeline.ts` mints the identity map's `TimeMs`) | `web/eslint.config.js` | P99 |
-| 14 | **REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4). Two edges in Entry 24 (the two drags → `review-update.ts`, `review-update.ts` → `control-preview.ts`) | `web/eslint.config.js` | P114 |
+| 14 | ~~**REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4). Two edges in Entry 24 (the two drags → `review-update.ts`, `review-update.ts` → `control-preview.ts`)~~ Closed in Entry 25: the eight edges with their reason | `web/eslint.config.js` | P114 |
 | 15 | **REOPENED CONTRACT** `offcut-api-types/src/analytics.rs` `ReviewActionKind`: five members (§13); the server rebuilds | `offcut-api-types`, `web/src/gen` | P120 |
 | 16 | TS §9 (the review call chain: "ReviewPanel shows …", `<EventToggleList …>`) and the TS §13 component table still name `ReviewPanel` and `EventToggleList`, which TS §5 now replaces with `SidePanel` and `PlanItemList` (Entry 2) | TS §9, §13 | P127 (copy-back) |
 | 17 | ~~Record "identity reference frozen at <SHA of Prompt 93's commit>" (the SHA is not known inside its own commit, Entry 3); from then on `git diff --stat <SHA> -- crates/offcut-scene/tests/snapshots/v3_reference` must print nothing until Prompt 101 deletes the files~~ Closed in Entry 4: frozen at `09b1085` | `docs/v4/v4changelog.md` | P94 |
@@ -52,6 +52,7 @@
 | 26 | **Two files at their line limit.** `web/src/copy/messages.ts` is 397 lines (Entry 24) (TS §5 marks it `[ONLY]`, so it is not split) and Prompt 119 adds the 14 error copies (about 50 lines); `web/src/ui/styles/components.module.css` is 398. Prompt 119 decides before writing: shorter entries, or a sibling copy file that `messages.ts` re-exports (which changes TS §5 and `check-copy-codes.mjs`, which reads `messages.ts` alone) | `web/src/copy/messages.ts`, `components.module.css` | P119 |
 | 27 | Copy back to `v4implementation.md` what Entry 20 changed: §17.2's rejected card keeps "Start over" (the frozen suites press it); §17.5's `editor.export` is `export.button`; §4's tree: `preview.module.css` from S10; D-172's badge is shown unless the cached token's plan is Creator (Entry 24; it was always shown before); `DropZone` has a `landing` and a `stage` variant | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx` | `docs/v4/v4implementation.md` | P127 (copy-back) |
+| 29 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `review-update.ts` mints `SentenceIdx` (`sentenceAt`), `replace-all.ts` mints `WordIdx` (`wordAt`), D-59's rule~~ Opened and closed in Entry 25 | `web/eslint.config.js` | P114 |
 
 ---
 
@@ -2136,3 +2137,68 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - `hit::hit` finds words by their layout boxes, not by the boxes as drawn after a word's pop and the line's reflow (D-170). On the readings here they agree (each drawn centre is inside its layout box, `tests/hit.rs`); a popped word in Bold could make the two differ by a few logical pixels at its edges.
 
 **Open.** Known issue 27 corrected (the badge is no longer always shown); known issue 28 opened (copy back §14.1's `Hit` and `captionMirror`, the pause's still frame in §16.2, `PreviewGestures.tsx`). Known issues 11 and 14 stay open; open items 1-5 unchanged. Next: Prompt 114 (the update rule, undo and redo, word edits, "Change all").
+
+## Entry 25 - 2026-10-24 - P114 (S12): update rule, undo and redo, word edits, change all
+
+**What.** Prompt 114 (G 13.1, G 13.2 rows 1-3; D-146, D-147, D-175, D-184; §15.1, §16.1, §16.2, Appendix C.2): one rule for every review change, with undo and redo; a word is fixed one at a time, with its sentence's events and the rules plan found again, or everywhere at once in one step.
+
+**1. The update rule** (`usecases/review-update.ts`, Appendix C.2, completing Entry 24's minimal one):
+1. Only a clip that is `ready`, with its transcript, plan and time map, takes a change, and none while an export has the preview locked (TS §12.4; the clip stays `ready` during an export, so the lock is what refuses).
+2. `previous`; `next = change(previous)`; `editStarted(next)` (`ready → updating`, the optimistic edit).
+3. A preview that plays is paused (`controlPreview.pause()`), and remembered.
+4. Mode `plan`: the events of `next` (below), then `rulesPlan`.
+5. `setScene` with `next` (the paused frame is drawn again, D-173). In mode `plan`, `setEvents` and `setPlan` once the scene is built.
+6. `ui-store.setSave("saving")`, `editsRepo.put`, `setSave("saved")`.
+7. `editDone()`; the play goes on if it was playing.
+- Then `history.push(previous)` (not for an undo or a redo, which move along the history themselves), and `review_action` for the actions the server's list holds (Entry 24's `SENT` table).
+- **A failure in 4 to 6:** `editFailed(previous, failure)`, `client_error { error_code, stage }`, the scene not rebuilt, the preview on its last good frame. In mode `plan` the worker is given back the events of `previous` (a `detect` with its edits), since `redetectSentence` keeps what it found for the next edit. A fault of the file is thrown. "Undo this change" in `ErrorPanel` is Prompt 119's: the failure shows where V3 shows one.
+- **The events of mode `plan`:** the words whose edits differ between `previous` and `next`; when they are in one sentence, `redetectSentence({ sentence, wordEdits })`; when in several (a replace-all, an undo of one), `detect` over the whole transcript with the edits (D-175).
+- **One queue of one** (D-147): `update` runs after the change in flight; `settled()` resolves when none is.
+- `ReviewAction` gains `replace_all`, `undo`, `redo` (not sent until Prompt 120 widens the server's list).
+
+**2. The history** (`state/history.ts`, D-184): `past` (the edit before each change, oldest first, at most `HISTORY_MAX` = 50) and `future` (the edits undone); `push(edit)` drops the redo branch; `undo(current)` and `redo(current)` move one edit across and return the target; `canUndo`, `canRedo` in the store for the top bar; `clear()` by `clip-store`'s `begin` and `reset` (a new clip, or none).
+
+**3. Undo and redo** (`usecases/undo-redo.ts`): after `settled()`, the target from the history, applied through `update` in mode `plan` when its word edits differ from the clip's (`sameWords`), else `scene`. When the change did not apply (refused, or failed and restored), the history steps back.
+
+**4. Words:**
+- **The worker** (`render.worker.ts`, §15.1): `redetectSentence({ sentence, wordEdits })` runs `RenderApi.redetectSentence` on the transcript, prosody and last events that `detect` kept, and keeps the new events (`NoDetection` when there are none). `detect` takes optional `wordEdits` (a replace-all). The `notYet` stub is gone; `load-render.ts`'s V3 sentence ("Nothing calls it in V3") says who calls it now. **REOPENED V1 CONTRACT** (`detect`'s optional `wordEdits`).
+- **`edit-word.ts`** (D-146): `editWord(word, text)`, mode `plan`; an empty text hides the word; the text it was heard as removes the edit (the word is restored); a text it already shows changes nothing.
+- **`replace-all.ts`** (D-175): `replaceAllCandidates(fromWord)`, the words heard as the same word (letters and digits, case-folded, whole) and not yet edited, `fromWord` left out (the toast's count, Prompt 115); `replaceAll(fromWord, to)` gives each `to` with its own punctuation kept (an empty `to` hides them) in one change, mode `plan`, and resolves with the number changed (0 when nothing changed or the change failed).
+- **Two minting helpers** (v2implementation D-59): `review-update.ts`'s `sentenceAt` (a place in `transcript.sentences` as `SentenceIdx`) and `replace-all.ts`'s `wordAt` (a place in `transcript.words` as `WordIdx`). No page code minted either before; the protocol's `redetectSentence` takes a `SentenceIdx`. **REOPENED V2 CONTRACT (`MINTING`)**, two rows.
+
+**5. The page:** `TopBar.tsx`'s undo and redo are enabled by the history while the clip is ready and no export has the preview (tooltip "Available when the export finishes" then); the save state already read `ui-store`.
+
+**6. `eslint.config.js`** (§4): the use-case edge list is complete: `edit-word.ts`, `replace-all.ts`, `toggle-event.ts`, `set-style.ts`, `set-highlight-numbers.ts`, `set-caption-position.ts`, `set-crop-offset.ts`, `undo-redo.ts` → `review-update.ts`, with the reason; `review-update.ts` → `control-preview.ts` since Entry 24. **REOPENED V2 CONTRACT (use-case edges)**; known issue 14 closed. The file is 398 lines.
+
+**7. Looked at in Chrome** (a temporary `zz-` spec on the dev server driving the use-cases from the page, the 60 s portrait clip; deleted):
+
+| Check | Reading |
+|---|---|
+| Word 55 "90" edited to "9" | 18 ms from the call to `setScene`'s answer with the frame redrawn; the from-to's event reads "9 minutes" (was "90 minutes"); two plan items still; one history step; "Saved on this device" |
+| Caption position 0.15, then Undo, Undo (top bar) | 1.0 again, then the word edit gone and the from-to back to "90 minutes"; Undo disabled |
+| Redo | The word edit back ("9 minutes"); one step left to redo |
+| Replace all ("almost", words 3 and 12) | Word 3 edited; `replaceAllCandidates(3)` = [12]; `replaceAll` → 1; both edited; **one** Undo restores word 12 and leaves word 3's own edit |
+| An edit while playing | `playing → paused → playing` |
+| The session closed (from the page), then an edit | The clip `ready` with the edit before, the failure `E_INTERNAL` shown under the player, the history unchanged |
+| 60 pushes | 50 kept (the temporary check of the limit) |
+
+**Differs from the prompt or the plan.**
+- **The events and the plan are set on the clip after `setScene` succeeds**, not before it (Appendix C.2 step 4): a failed scene leaves the clip's plan the one its restored edit was built with.
+- **A failed word edit gives the worker back the previous events** (a `detect` with the previous edits), so the next sentence edit starts from what the clip shows.
+- **`history.undo(current)` and `redo(current)` take the clip's edit:** a history of snapshots needs the state it leaves to give it back (§16.1 writes `undo()`).
+- **Mode `plan` re-detects the whole transcript when the changed words span several sentences** (a replace-all, or an undo of one), and the one sentence otherwise.
+- **`update` refuses a change while an export runs**, by the preview's lock.
+- **`replaceAllCandidates`** is exported for Prompt 115's toast.
+- **Two `MINTING` rows**, above.
+
+**REOPENED CONTRACT** lines: `web/src/workers/protocol.ts` (`detect`'s optional `wordEdits`; known issue 11 stays open for `styleThumbnails`, P116); `web/eslint.config.js` use-case edges (known issue 14, closed here) and `MINTING` (two rows, known issue 29 opened and closed here).
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`.env` loaded). `pnpm test`: **Rust 644 passed, 0 failed, 3 ignored** (unchanged; the whole log reads 648 with the type generator's 4), Vitest 92. `pnpm build` exit 0; **app shell 327.0 kB gzip** (Entry 24: 326.2). `pnpm e2e` 12 passed.
+- `git grep -nE "\bV4\b" -- web/src/workers/render.worker.ts web/src/wasm/load-render.ts`: nothing. No `__offcutDev` or `data-caption-*` in `web/dist`.
+- **`pnpm e2e:media`** on the keyed build: **49 passed, 1 skipped (11.3 min)**, the baseline's count. The build after it has no key.
+- The frozen check lists only the recorded exceptions. No private path is tracked.
+
+**Found, not fixed.** `web/eslint.config.js` is at 398 of 400 lines: the next rule moves something out first (the `MINTING` table to its own module is the natural cut).
+
+**Open.** Known issue 14 closed; 29 opened and closed (the two `MINTING` rows); 11 stays open; open items 1-5 unchanged. Next: Prompt 115 (the transcript editor, the replace-all toast, the edit-to-preview timing).

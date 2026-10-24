@@ -108,7 +108,7 @@ export type RenderApi = {
   /**
    * The events after an edit in sentence `sentence`: those of `prev` outside
    * its scope are kept, the scope is detected again. A sentence past the last
-   * returns `prev`. Nothing calls it in V3 (V4's review flow).
+   * returns `prev`. The render worker calls it for a word edit (v4implementation D-146).
    */
   redetectSentence(
     transcript: Transcript,

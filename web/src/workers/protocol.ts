@@ -97,7 +97,8 @@ export interface AudioWorkerApi {
 
 export interface RenderWorkerApi {
   openSession(p: { clipId: ClipId; clipInfo: ClipInfo }): Promise<void>;
-  detect(p: { transcript: Transcript; prosody: Prosody }): Promise<DetectedEvent[]>;
+  /** With `wordEdits`, the events of the transcript as edited (a replace-all, D-175). */
+  detect(p: { transcript: Transcript; prosody: Prosody; wordEdits?: Record<number, string> }): Promise<DetectedEvent[]>;
   redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): Promise<DetectedEvent[]>;
   /** The plan of the detector's events (D-124). Stateless. */
   rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan>;

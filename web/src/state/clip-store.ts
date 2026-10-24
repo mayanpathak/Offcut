@@ -18,6 +18,7 @@ import type {
   Transcript,
 } from "../gen/domain";
 import type { AppFailure, FeedLine } from "../workers/protocol";
+import { clear as clearHistory } from "./history";
 import { CLIP_MACHINE, type ClipEvent, type ClipStatus } from "./machines/clip-machine";
 import { transition } from "./machines/transition";
 
@@ -104,6 +105,8 @@ function settled(current: Fields): Fields {
 /** idle → importing */
 export function begin(clipId: ClipId, source: ClipSource): void {
   apply("import", () => ({ ...empty(), clipId, source }));
+  // The history is of one clip (D-184).
+  clearHistory();
 }
 
 /** importing → accepted */
@@ -190,4 +193,5 @@ export function noteFailure(failure: AppFailure): void {
 /** rejected | failed | ready | accepted → idle. Nothing of the clip is kept, its audio neither. */
 export function reset(): void {
   apply("reset", empty);
+  clearHistory();
 }

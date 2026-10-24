@@ -16,6 +16,7 @@ import type {
   EditPlan,
   EditState,
   Prosody,
+  SentenceIdx,
   TimeMap,
   Transcript,
   UnixSecs,
@@ -110,16 +111,41 @@ async function openSession(p: { clipId: ClipId; clipInfo: ClipInfo }): Promise<v
 }
 
 /**
- * The events of a whole transcript, with no word edits. The open clip keeps
- * what they were found in, for `redetectSentence` (D-146): its handler takes
- * no transcript.
+ * The events of a whole transcript, with the user's word edits when there
+ * are any (a replace-all, D-175). The open clip keeps what they were found
+ * in, for `redetectSentence` (D-146): its handler takes no transcript.
  */
-async function detect(p: { transcript: Transcript; prosody: Prosody }): Promise<DetectedEvent[]> {
+async function detect(p: {
+  transcript: Transcript;
+  prosody: Prosody;
+  wordEdits?: Record<number, string>;
+}): Promise<DetectedEvent[]> {
   try {
-    const events = (await loadRender()).detect(p.transcript, p.prosody, {});
+    const events = (await loadRender()).detect(p.transcript, p.prosody, p.wordEdits ?? {});
     if (open !== undefined) {
       open.detection = { transcript: p.transcript, prosody: p.prosody, events };
     }
+    return events;
+  } catch (thrown) {
+    throw staged(thrown, "detect_scene");
+  }
+}
+
+/**
+ * The events after an edit in sentence `sentence` (D-146): those of the last
+ * detection outside its scope are kept, the scope is detected again in the
+ * transcript and the prosody `detect` kept. The result is kept in turn, for
+ * the next edit.
+ */
+function redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): DetectedEvent[] {
+  try {
+    const state = opened();
+    const kept = state.detection;
+    if (kept === undefined) {
+      throw new WorkerFailure("E_INTERNAL", "NoDetection");
+    }
+    const events = state.api.redetectSentence(kept.transcript, kept.prosody, p.wordEdits, p.sentence, kept.events);
+    state.detection = { ...kept, events };
     return events;
   } catch (thrown) {
     throw staged(thrown, "detect_scene");
@@ -198,11 +224,6 @@ function closeSession(): void {
   }
 }
 
-/** A method of the protocol that this worker gets in a later prompt (D-32). */
-function notYet(): never {
-  throw new WorkerFailure("E_INTERNAL", "NotImplemented");
-}
-
 /** This worker's state, as the two job files reach it (v4implementation D-150). */
 const worker: WorkerState = {
   opened,
@@ -218,7 +239,7 @@ const worker: WorkerState = {
 const handlers: Handlers<RenderWorkerApi> = {
   openSession,
   detect,
-  redetectSentence: notYet,
+  redetectSentence: (p: Parameters<typeof redetectSentence>[0]) => Promise.resolve(redetectSentence(p)),
   rulesPlan,
   setScene,
   attachPreview,
