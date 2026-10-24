@@ -17,7 +17,7 @@ import type {
   TimeMap,
   Transcript,
 } from "../gen/domain";
-import type { AppFailure, FeedLine } from "../workers/protocol";
+import type { AppFailure, FeedLine, SceneChunk } from "../workers/protocol";
 import { clear as clearHistory } from "./history";
 import { CLIP_MACHINE, type ClipEvent, type ClipStatus } from "./machines/clip-machine";
 import { transition } from "./machines/transition";
@@ -41,6 +41,8 @@ export type ClipState = {
   plan?: EditPlan;
   /** How the program plays the recording: the identity in V4 (D-164). */
   timeMap?: TimeMap;
+  /** The chunks of the captions the scene shows, for the transcript editor (D-182). */
+  chunks: readonly SceneChunk[];
   /** The user's edits: the default until a review change (D-147). */
   edit: EditState;
   /** The lines of the processing feed, in the order they came. */
@@ -63,6 +65,7 @@ function empty(): Fields {
   return {
     waitingModel: false,
     events: [],
+    chunks: [],
     edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true },
     feed: [],
     prog48: null,
@@ -155,6 +158,11 @@ export function ready(result: {
 /** The plan the scene is built from now. The clip's state does not change. */
 export function setPlan(plan: EditPlan): void {
   useClipStore.setState({ plan });
+}
+
+/** The chunks of the scene built last (D-182). The clip's state does not change. */
+export function setChunks(chunks: readonly SceneChunk[]): void {
+  useClipStore.setState({ chunks });
 }
 
 /** The events found now, after an edit (D-146). The clip's state does not change. */

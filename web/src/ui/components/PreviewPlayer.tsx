@@ -15,6 +15,7 @@ import { useClipStore } from "../../state/clip-store";
 import { type PreviewState, usePreviewStore } from "../../state/preview-store";
 import { attach, detach, pause, play, scrub, seekDone, seekStart } from "../../usecases/control-preview";
 import { cachedPlan } from "../../usecases/start-export";
+import { TRANSCRIPT_ID } from "./CaptionEditor";
 import { Pause, Play } from "../icons";
 import { IconButton } from "../primitives/IconButton";
 import { Slider } from "../primitives/Slider";
@@ -29,6 +30,7 @@ const PREVIEW_HEIGHT = 960;
 const SEEK_SPINNER_MS = 300;
 /** The scrub bar moves one output frame at a time. */
 const FRAME_MS = 1000 / 30;
+const CANVAS_WORDS_ID = "preview-canvas-words";
 
 // An attach and a detach each take a moment, and a player that goes and
 // comes back at once would otherwise have both under way together.
@@ -162,8 +164,14 @@ export function PreviewPlayer() {
         height={PREVIEW_HEIGHT}
         role="img"
         aria-label={messages.preview.canvas}
+        aria-describedby={CANVAS_WORDS_ID}
+        aria-details={TRANSCRIPT_ID}
         data-testid="preview-canvas"
       />
+      {/* The canvas's text alternative is the transcript editor (D-192). */}
+      <span id={CANVAS_WORDS_ID} className={styles.srOnly}>
+        {messages.preview.canvasWords}
+      </span>
       <PreviewGestures />
       {slow ? (
         <span className={styles.seekSpinner} aria-hidden="true">

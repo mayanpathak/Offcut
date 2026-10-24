@@ -2,16 +2,18 @@
 // one runs, then four tabs, Captions · Style · Visuals · Framing, the choice
 // kept in the interface store. While the clip is on its way the tabs are
 // disabled and hold a placeholder. On a ready clip each tab shows what it
-// will edit, read from the clip: the controls are wired by Prompts 113-117
+// will edit, read from the clip. The Captions tab is the transcript editor
+// (Prompt 115); the other tabs' controls are wired by Prompts 116-117
 // (`STATIC` below marks each one), so here they show the clip's values and
 // change nothing.
 
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 
 import { messages } from "../../copy/messages";
-import type { EventKind, StyleId, Word, WordRange } from "../../gen/domain";
+import type { EventKind, StyleId } from "../../gen/domain";
 import { useClipStore } from "../../state/clip-store";
 import { type Tab, useUiStore } from "../../state/ui-store";
+import { CaptionEditor } from "../components/CaptionEditor";
 import { ExportProgress } from "../components/ExportProgress";
 import { ArrowRight, Crop, Hash, List, Palette, Sparkles, Type, Zap } from "../icons";
 import { PanelSection } from "../primitives/PanelSection";
@@ -53,74 +55,6 @@ const KIND_ICON: Record<EventKind, ReactNode> = {
 function assertNever(value: never): never {
   void value;
   throw new Error("a tab this build does not know");
-}
-
-/**
- * The open field of one word (D-182), shown as the transcript editor will
- * show it: the word selected, Enter or Escape closing it. Nothing is
- * committed until Prompt 115; `__offcutDev.openWordField` opens it for the
- * design review's capture.
- */
-function WordField({ text }: { text: string }) {
-  const editWord = useUiStore((state) => state.editWord);
-  const field = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    field.current?.focus();
-    field.current?.select();
-  }, []);
-  return (
-    <input
-      ref={field}
-      className={styles.wordField}
-      defaultValue={text}
-      aria-label={messages.captions.wordField}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === "Escape") {
-          editWord(null);
-        }
-      }}
-      onBlur={() => {
-        editWord(null);
-      }}
-    />
-  );
-}
-
-/** A sentence of the transcript, with the open field if the word being edited is in it. */
-function SentenceText({ words, range, editing }: { words: readonly Word[]; range: WordRange; editing: number | null }) {
-  const text = (from: number, to: number): string =>
-    words
-      .slice(from, to)
-      .map((word) => word.text)
-      .join(" ");
-  const word = editing === null || editing < range.start || editing >= range.end ? undefined : words[editing];
-  if (editing === null || word === undefined) {
-    return <p className={styles.transcript}>{text(range.start, range.end)}</p>;
-  }
-  const before = text(range.start, editing);
-  const after = text(editing + 1, range.end);
-  return (
-    <p className={styles.transcript}>
-      {before === "" ? null : `${before} `}
-      <WordField text={word.text} />
-      {after === "" ? null : ` ${after}`}
-    </p>
-  );
-}
-
-function CaptionsTab() {
-  const follow = useUiStore((state) => state.follow);
-  const setFollow = useUiStore((state) => state.setFollow);
-  const editing = useUiStore((state) => state.editingWord);
-  const transcript = useClipStore((state) => state.transcript);
-  return (
-    <PanelSection title={messages.panel.captions} hint={messages.captions.hint}>
-      <Switch checked={follow} label={messages.captions.follow} hint={messages.captions.followHint} onChange={setFollow} />
-      {transcript?.sentences.map((sentence) => (
-        <SentenceText key={sentence.start_ms} words={transcript.words} range={sentence.words} editing={editing} />
-      ))}
-    </PanelSection>
-  );
 }
 
 function StyleTab() {
@@ -221,7 +155,7 @@ function FramingTab() {
 function TabContent({ tab }: { tab: Tab }) {
   switch (tab) {
     case "captions":
-      return <CaptionsTab />;
+      return <CaptionEditor />;
     case "style":
       return <StyleTab />;
     case "visuals":

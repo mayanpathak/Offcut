@@ -76,8 +76,8 @@ export type RenderSession = Omit<
   ModuleSession,
   "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize" | "hit" | "caption_mirror"
 > & {
-  /** Builds the scene and keeps it in place of the one before; what the plan's validation left out. */
-  set_scene(input: SceneInput): { dropped: Dropped[] };
+  /** Builds the scene and keeps it in place of the one before; what the plan's validation left out, and its chunks. */
+  set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[] };
   /** `null` before a scene is set. */
   summary(): ChangeSummary | null;
   read_video_sample(index: number): VideoSample;

@@ -740,6 +740,7 @@ offcut/
 │   │       │   ├── PreviewPlayer.tsx
 │   │       │   ├── PreviewGestures.tsx    the gestures and their chrome over the preview (v4implementation D-183)
 │   │       │   ├── CaptionEditor.tsx
+│   │       │   ├── CaptionWordControls.tsx  a transcript word's field and menu (v4implementation D-182)
 │   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item
 │   │       │   ├── StylePanel.tsx         the style cards and Highlight numbers
 │   │       │   ├── StylePicker.tsx

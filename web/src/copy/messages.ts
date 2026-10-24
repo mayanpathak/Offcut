@@ -108,7 +108,7 @@ export const messages = {
 
   preview: {
     play: "Play", pause: "Pause", replay: "Play again",
-    canvas: "Preview of your video", seek: "Position",
+    canvas: "Preview of your video", canvasWords: "Its words are in the Captions tab, where each can be fixed.", seek: "Position",
     loadingFrame: "Loading the frame…",
     clock: (ms: number) => clockTime(ms),
     time: (positionMs: number, lengthMs: number) => `${clockTime(positionMs)} / ${clockTime(lengthMs)}`,
@@ -140,7 +140,7 @@ export const messages = {
   },
   panel: { label: "Edit your video", captions: "Captions", style: "Style", visuals: "Visuals", framing: "Framing" },
   captions: {
-    hint: "Click any word to fix it.",
+    hint: "Click any word to fix it.", changeAll: "Change all",
     follow: "Follow playback", followHint: "The text scrolls with the video.",
     hide: "Hide word", restore: "Restore original", show: "Show", wordMenu: "Word options", wordField: "Fix this word",
     replaceAll: (n: number, from: string, to: string) => `Change all ${String(n)} “${from}” to “${to}”?`,

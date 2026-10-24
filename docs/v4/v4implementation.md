@@ -489,6 +489,7 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   ├── src/ui/components/PreviewGestures.tsx  NEW P   the gestures of D-183 and their chrome, split from PreviewPlayer (V4 P113; V6.x: shape, lower third, logo drags)
 │   ├── src/ui/components/ProcessingCard.tsx   NEW F   D-188
 │   ├── src/ui/components/CaptionEditor.tsx    NEW F   the transcript editor (D-182)
+│   ├── src/ui/components/CaptionWordControls.tsx NEW F a word's field and menu, split from CaptionEditor (V4 P115)
 │   ├── src/ui/components/StylePanel.tsx       NEW P   cards and Highlight numbers (V6.5: presets)
 │   ├── src/ui/components/StylePicker.tsx      NEW P   the three cards (V6.5: preset cards)
 │   ├── src/ui/components/PlanItemList.tsx     NEW P   the Visuals tab (V6.x kinds: one label and icon each)

@@ -67,7 +67,7 @@
   border-radius: var(--r-control);
   box-shadow:
     0 0 0 2px var(--brand),
-    0 0 0 3px rgb(0 0 0 / 0.45);
+    0 0 0 3px color-mix(in srgb, var(--bg) 45%, transparent);
 }
 
 /* Where the caption block will be: as wide as the captions' safe area. */
@@ -76,9 +76,9 @@
   right: 7%;
   left: 7%;
   height: var(--height);
-  border: 1px dashed rgb(255 255 255 / 0.8);
+  border: 1px dashed color-mix(in srgb, var(--text) 80%, transparent);
   border-radius: var(--r-card);
-  background: rgb(139 92 246 / 0.12);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 /* The line of the snap point the block is on. */
@@ -88,7 +88,7 @@
   left: 0;
   height: 0;
   border-top: 1px solid var(--brand);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg) 30%, transparent);
 }
 
 /* The 9:16 frame while the video is dragged, and where the frame sits on
@@ -105,7 +105,7 @@
   left: 20%;
   height: var(--sp-2);
   border-radius: var(--sp-1);
-  background: rgb(0 0 0 / 0.55);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
 }
 
 .cropWindow {
@@ -166,4 +166,14 @@
 
 .previewFailure {
   color: var(--danger);
+}
+
+/* Read by assistive technology only. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

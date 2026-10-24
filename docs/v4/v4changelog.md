@@ -51,7 +51,7 @@
 | 25 | Two sentences say the scene's three fonts are the only font files in the repository: TS §19.4 ("`cargo deny` plus a CI grep assert no other font files exist"; no such grep exists in `ci.yml` or `scripts/`) and the first paragraph of `crates/offcut-scene/assets/fonts/LICENSES.md`. Since Entry 19 the interface font `web/src/ui/assets/inter-latin.woff2` is a fourth (D-180, listed in `web/LICENSES.md`). Reword both to "the only fonts the scene embeds" | `docs/technicalspec.md`, `offcut-scene/assets/fonts/LICENSES.md` | P127 (copy-back) |
 | 26 | **Two files at their line limit.** `web/src/copy/messages.ts` is 397 lines (Entry 24) (TS §5 marks it `[ONLY]`, so it is not split) and Prompt 119 adds the 14 error copies (about 50 lines); `web/src/ui/styles/components.module.css` is 398. Prompt 119 decides before writing: shorter entries, or a sibling copy file that `messages.ts` re-exports (which changes TS §5 and `check-copy-codes.mjs`, which reads `messages.ts` alone) | `web/src/copy/messages.ts`, `components.module.css` | P119 |
 | 27 | Copy back to `v4implementation.md` what Entry 20 changed: §17.2's rejected card keeps "Start over" (the frozen suites press it); §17.5's `editor.export` is `export.button`; §4's tree: `preview.module.css` from S10; D-172's badge is shown unless the cached token's plan is Creator (Entry 24; it was always shown before); `DropZone` has a `landing` and a `stage` variant | `docs/v4/v4implementation.md` | P127 (copy-back) |
-| 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx` | `docs/v4/v4implementation.md` | P127 (copy-back) |
+| 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx`; and Entry 26's: §14.1's `SceneReport.chunks` (`SceneChunk`), §16.1's `clip-store.chunks`, §4's `CaptionWordControls.tsx` | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 29 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `review-update.ts` mints `SentenceIdx` (`sentenceAt`), `replace-all.ts` mints `WordIdx` (`wordAt`), D-59's rule~~ Opened and closed in Entry 25 | `web/eslint.config.js` | P114 |
 
 ---
@@ -2202,3 +2202,75 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 **Found, not fixed.** `web/eslint.config.js` is at 398 of 400 lines: the next rule moves something out first (the `MINTING` table to its own module is the natural cut).
 
 **Open.** Known issue 14 closed; 29 opened and closed (the two `MINTING` rows); 11 stays open; open items 1-5 unchanged. Next: Prompt 115 (the transcript editor, the replace-all toast, the edit-to-preview timing).
+
+## Entry 26 - 2026-10-24 - P115 (S12): transcript editor, click a word to fix it
+
+**What.** Prompt 115 (G 13.2 rows 4-5; D-173, D-175, D-182, D-192, D-193; §17.3, §17.4): the Captions tab is the transcript editor. A creator clicks a word, fixes it, and sees the fix on the paused video in tens of milliseconds; "Change all" offers the same fix everywhere it was heard.
+
+**1. The chunks come from the scene** ("Gaps settled" item 6):
+- `Scene::chunk_ranges() -> Vec<(WordRange, OutMs)>` in `offcut-scene/src/lib.rs`: for each chunk `build_scene` made, from its first caption word's transcript word to after its last caption word's first word, and the time it is shown from. A read of what was computed; the page never chunks a second time.
+- `scene_api::set_scene` answers `SceneReport.chunks` (`{ start, end, at }`); `protocol.ts` gains `SceneChunk`, `load-render.ts` types it. **REOPENED V1 CONTRACT** (addition to `SceneReport`).
+- `clip-store.ts` keeps `chunks` (§16.1 does not list the field), set by `run-pipeline.ts` after the first `setScene` and by `review-update.ts` after each.
+- **Test:** an inline case in `lib.rs` (the chunks in time order, one after another, each shown from its time with its first word, a hidden first word starting none); `scene_api.rs`'s inline cases read the new JSON.
+
+**2. `CaptionEditor.tsx`** (D-182), with `CaptionWordControls.tsx` (the field and the menu, split to stay under 400 lines; both added to TS §5 and §4 in this commit):
+- **Blocks:** one row per chunk with the time it is shown from (a button: pause, then seek, §17.4). A block runs from its chunk's first word to the next chunk's, so a number's other words and a hidden word stay with the words they were said with.
+- **Words:** each a button that reads as text. Edited words carry a dotted brand underline; hidden words are struck through, with "Show". The words are one Tab stop (a roving tab index; ← and → move along them).
+- **Click a word:** the field opens with its text selected, the preview pauses and seeks to the word's start (program time is the recording's in V4, D-164).
+- **The field:** Enter commits; Tab commits and opens the next word that is not hidden, Shift+Tab the previous; Escape cancels and returns the focus to the word; an empty commit hides it. **Leaving the field commits nothing** (Appendix A). Leaving is judged a frame later, so a field drawn again by a scene that arrives meanwhile stays open; a field left for another word's closes without taking the focus back.
+- **The ⋯ menu** of the hovered or focused word sits at the row's end, so the text never moves under the pointer; the context-menu key and Shift+F10 open it too. "Hide word" and "Restore original" (the text as heard), each disabled when it does nothing; ↑/↓ move, Escape closes.
+- **Follow playback:** while the preview plays, the spoken word is highlighted, followed every animation frame from the last clock sync (the store's position comes 4 times a second), and kept in view while "Follow playback" is on. A wheel, a touch move, or a scrolling key over the transcript turns it off; turning it on scrolls to the word.
+- **From the preview:** `ui-store.editingWord` (a click on a caption word, Prompt 113) opens that word's field here.
+- **"Change all"** (D-175): after a commit that applied, from the text as heard to a new non-empty text, when `replaceAllCandidates` finds N > 0, the toast "Change all N “a” to “b”?" with "Change all", which runs `replaceAll` (one undo step).
+- **The canvas's text alternative** (D-192): the canvas is described by "Its words are in the Captions tab, where each can be fixed." and points to the editor with `aria-details`.
+- `SidePanel.tsx` loses its V3-era stub field and sentence view; `dev-hooks.ts`'s `openWordField(i)` now opens word `i` itself.
+
+**3. The toast is shown** in the editor's one `aria-live` region (`EditorLayout.tsx`): the oldest of `ui-store`'s queue, one at a time. Prompt 117's `ToastHost` takes it over.
+
+**4. Copy** (`messages.ts`, keys that were missing): `captions.changeAll` "Change all", `preview.canvasWords`. 397 lines.
+
+**5. Colours as tokens.** Entry 24's preview chrome used literal `rgb()` values in `preview.module.css`; they are now `color-mix()` of `--bg`, `--text` and `--brand` (Appendix A: no literal colour in a module), as the editor's spoken highlight is.
+
+**6. Looked at in Chrome** (a temporary `zz-` spec on the dev server, the 60 s portrait clip; deleted):
+
+| Check | Reading |
+|---|---|
+| Blocks | 44 rows for the scene's 44 chunks; 127 word buttons for 127 words |
+| Click "90" | The field focused, "90" selected (0-2 of 2); the preview at 25.08 s |
+| **Edit to preview**, Enter → `setScene`'s answer (the paused frame drawn again) | **five readings: 38, 35, 34, 34, 29 ms**; two more runs of five: 31-42 and 22-36 ms; all under `EDIT_TO_PREVIEW_MAX_MS` = 150 (to the clip `ready` again, after the write to the device: 36-65 ms) |
+| The edited word | Dotted underline, "9"; the focus back on it after Enter |
+| Tab, Shift+Tab, Escape | The next word's field, the previous one's, then the focus on the word; nothing committed |
+| A second word clicked while a field is open | Its field opens; nothing committed |
+| An empty commit | The word hidden, struck through, "Show" restores it; the caption re-chunked ("Last year, I almost") |
+| ⋯ menu (hover), and Shift+F10 | "Hide word" focused; hide, then "Restore original" |
+| "almost" → "nearly" | Toast "Change all 1 “almost” to “nearly”?"; "Change all" → both changed |
+| Play 1.5 s | The spoken word marked ("videos,"); a wheel over the text turns "Follow playback" off |
+| A click on a caption word on the preview | That word's field opens here ("making", 5) |
+| Long tasks over 50 ms from ready to the end of the session | **none** (D-193) |
+| The session closed, then a commit | The word keeps its text; the failure shown; the edits unchanged |
+
+**Found and fixed on the way.**
+- **The ⋯ moved the text under the pointer.** Drawn inline after the hovered word, it shifted the line as the hover moved, and a click meant for a word landed on the ⋯. It now sits at the row's end, out of the line.
+- **A field could close by itself.** A scene arriving while a field was open (the change before it) re-chunked the blocks; with blocks keyed by their first word, the field's block was drawn anew and the field lost its focus, which closed it, and the cancel path took the focus back to the old word even when the user had clicked another. Blocks are now keyed by place, leaving is judged a frame later, and only Escape gives the focus back.
+- **A `div` inside a `p`** (the menu inside a block): the block is a `div`.
+
+**Differs from the prompt or the plan.**
+- **`CaptionWordControls.tsx`** is a new file (above).
+- **`replace-all.ts`'s `wordAt` is exported**: the editor lists every word and needs each as a `WordIdx`; this keeps one minting place for it (Entry 25's `MINTING` row).
+- **The toast's host** is the live region of `EditorLayout.tsx` until Prompt 117.
+- **`clip-store.chunks`** is a field §16.1 does not list.
+- **"Change all" is offered for a fix to a new text only**, not for hiding a word (D-175 speaks of editing `a` to `b`).
+- **The Performance panel reading is taken by the page itself**: Enter's `keydown` time to the moment the new scene's chunks reach the store, which is `setScene`'s answer, after the paused frame is drawn again (D-173). Ten readings, not a DevTools trace.
+
+**REOPENED CONTRACT** line: `web/src/workers/protocol.ts` (`SceneReport.chunks`, `SceneChunk`; known issue 11 stays open for `styleThumbnails`, P116).
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm build:wasm` exit 0 (render wasm 6,361,436 bytes). `pnpm fixtures` up to date. `pnpm check` exit 0 (`.env` loaded). `pnpm test`: **Rust 645 passed, 0 failed, 3 ignored** (Entry 25: 644; +1 `chunk_ranges`; the whole log reads 649), Vitest 92. `pnpm build` exit 0; **app shell 330.0 kB gzip** (Entry 25: 327.0). `pnpm e2e` 12 passed. No `__offcutDev` or `data-caption-*` in `web/dist`.
+- **`pnpm e2e:media`** on the keyed build: **49 passed, 1 skipped (11.6 min)**, the baseline's count. The build after it has no key.
+- The frozen check lists only the recorded exceptions. No private path is tracked.
+
+**Found, not fixed.**
+- The rows are one chunk each (two to four words), so the transcript reads as a column of short lines more than as flowing paragraphs. It is what D-182 asks (blocks by chunk, each with its time); design review 2 may want sentences as paragraphs with the chunk times quieter.
+- The toast sits over the watermark badge while it shows (both bottom centre); it goes after 5 s.
+
+**Open.** Known issue 28 gains §16.1's `chunks` and `SceneReport.chunks` for the copy-back; known issue 11 stays open; open items 1-5 unchanged. Next: Prompt 116 (the Style, Visuals and Framing tabs).

@@ -20,8 +20,12 @@ function fold(text: string): string {
   return partsOf(text).core.toLocaleLowerCase();
 }
 
-/** The one place of this file that makes a place in `transcript.words` a `WordIdx` (v2implementation D-59). */
-function wordAt(i: number): WordIdx {
+/**
+ * The one place of the page that makes a place in `transcript.words` a
+ * `WordIdx` (v2implementation D-59): this file's, and the transcript
+ * editor's, which lists every word.
+ */
+export function wordAt(i: number): WordIdx {
   return i as WordIdx;
 }
 

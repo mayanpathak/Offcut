@@ -136,8 +136,15 @@ export interface RenderWorkerApi {
 /** `epochMs` is `performance.timeOrigin + performance.now()`. `audioMs` is program time (D-126). */
 export type ClockSync = { audioMs: OutMs; epochMs: number };
 
-/** What `setScene` answers: what the plan's validation left out (D-124). */
-export type SceneReport = { dropped: Dropped[] };
+/** What `setScene` answers: what the plan's validation left out (D-124), and the chunks of the captions (D-182). */
+export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };
+
+/**
+ * A chunk of the captions, as the scene made it: the transcript words from
+ * `start` (a number's other words, and words hidden after it, run to the
+ * next chunk's start), and the program time it is shown from.
+ */
+export type SceneChunk = { start: WordIdx; end: WordIdx; at: OutMs };
 
 /** What a play drew, when it ended (D-155). */
 export type PreviewStats = {

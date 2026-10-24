@@ -322,7 +322,8 @@ async function steps(clipId: ClipId, startedAt: number, run: Run): Promise<void>
   const plan = answered(await pool.render.rulesPlan({ transcript, events }), run.stage);
   clipStore.setPlan(plan);
   const timeMap = identityTimeMap(clipInfo.duration);
-  answered(await pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" }), run.stage);
+  const report = answered(await pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" }), run.stage);
+  clipStore.setChunks(report.chunks);
   track({
     name: "stage_timing",
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },

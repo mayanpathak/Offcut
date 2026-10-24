@@ -10,6 +10,7 @@ import type { ErrorCode } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
+import { wordAt } from "../usecases/replace-all";
 
 /** Frames an export of a fake clip "renders"; only their ratio is shown. */
 const FAKE_EXPORT_FRAMES = 1000;
@@ -17,11 +18,7 @@ const FAKE_EXPORT_FRAMES = 1000;
 const FAKE_EXPORT_ELAPSED_MS = 12_000;
 
 export type DevHooks = {
-  /**
-   * Opens a word of the transcript in its field, on the Captions tab. Until
-   * the transcript editor (Prompt 115) gives each word its index, the field
-   * is the first word of the sentence that holds word `i`: word 0 for 0.
-   */
+  /** Opens word `i` of the transcript in its field, on the Captions tab. */
   openWordField(i: number): void;
   /** Ends the clip in `failed` with `code`, from any state, as a failure of the preview. */
   failClip(code: ErrorCode): void;
@@ -38,14 +35,12 @@ declare global {
 export function installDevHooks(): void {
   window.__offcutDev = {
     openWordField: (i) => {
-      const sentences = useClipStore.getState().transcript?.sentences ?? [];
-      const sentence = sentences.find((s) => i >= s.words.start && i < s.words.end) ?? sentences[0];
-      if (sentence === undefined) {
+      if (i < 0 || i >= (useClipStore.getState().transcript?.words.length ?? 0)) {
         return;
       }
       const ui = useUiStore.getState();
       ui.selectTab("captions");
-      ui.editWord(sentence.words.start);
+      ui.editWord(wordAt(i));
     },
     failClip: (code) => {
       // Past the clip machine on purpose: `ready` has no `fail` edge (TS §12.1).

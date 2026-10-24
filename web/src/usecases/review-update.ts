@@ -126,7 +126,8 @@ async function apply(change: (edit: EditState) => EditState, mode: "plan" | "sce
       plan = answered(await pool.render.rulesPlan({ transcript, events: found }));
     }
     // 5. The paused preview is drawn again with the new scene (D-173).
-    answered(await pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" }));
+    const report = answered(await pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" }));
+    clipStore.setChunks(report.chunks);
     if (mode === "plan") {
       clipStore.setEvents(events);
       clipStore.setPlan(plan);

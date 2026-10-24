@@ -12,7 +12,7 @@ use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
 use offcut_render::scene::{FontSet, Hit, Rect, Rgba, Scene, SceneInput, Theme, build_scene};
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
-    ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript,
+    ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript, WordRange,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
@@ -52,10 +52,31 @@ struct SceneInputValue {
     time_map: TimeMap,
 }
 
-/// What `set_scene` answers: the plan's items and fields it left out, and why.
+/// A chunk of the captions as the transcript editor reads it (D-182):
+/// `{ start, end, at }`, its transcript words and the program time it is
+/// shown from.
+#[derive(Debug, PartialEq, Serialize)]
+struct ChunkValue {
+    start: u32,
+    end: u32,
+    at: u32,
+}
+
+/// What `set_scene` answers: the plan's items and fields it left out, and
+/// why, and the chunks of the captions (`Scene::chunk_ranges`).
 #[derive(Serialize)]
 struct SceneReport {
     dropped: Vec<Dropped>,
+    chunks: Vec<ChunkValue>,
+}
+
+fn chunks_of(scene: &Scene) -> Vec<ChunkValue> {
+    let chunk = |(range, at): (WordRange, OutMs)| ChunkValue {
+        start: range.start.get(),
+        end: range.end.get(),
+        at: at.get(),
+    };
+    scene.chunk_ranges().into_iter().map(chunk).collect()
 }
 
 /// Where the main video's source is, as JavaScript reads it:
@@ -211,8 +232,9 @@ impl RenderSession {
         let input: SceneInputValue = from_js(input, "SceneInput")?;
         let (scene, dropped) =
             scene_of(input, &self.clip).map_err(|detail| failure(ErrorCode::Internal, detail))?;
+        let chunks = chunks_of(&scene);
         self.scene = Some(scene);
-        to_js(&SceneReport { dropped })
+        to_js(&SceneReport { dropped, chunks })
     }
 
     /// Where the main video's source is at the program time `t_out_ms`;
@@ -335,8 +357,19 @@ mod tests {
             scene.source_at(OutMs::new(33)),
             SrcPos::At(offcut_types::TimeMs::new(33))
         );
-        let report = serde_json::to_value(SceneReport { dropped }).unwrap();
-        assert_eq!(report, json!({ "dropped": [] }));
+        let chunks = chunks_of(&scene);
+        let report = serde_json::to_value(SceneReport { dropped, chunks }).unwrap();
+        // No words, no chunks.
+        assert_eq!(report, json!({ "dropped": [], "chunks": [] }));
+        let chunk = ChunkValue {
+            start: 3,
+            end: 7,
+            at: 1_250,
+        };
+        assert_eq!(
+            serde_json::to_value(chunk).unwrap(),
+            json!({ "start": 3, "end": 7, "at": 1_250 })
+        );
         let at = serde_json::to_value(SourcePos::At(33)).unwrap();
         assert_eq!(at, json!({ "at": 33 }));
     }
@@ -367,10 +400,14 @@ mod tests {
     fn a_field_v4_does_not_apply_is_dropped_and_reported() {
         let hook = input(|v| v["plan"]["extras"]["hook"] = json!("Watch this"));
         let (_, dropped) = scene_of(hook, &clip()).unwrap();
-        let report = serde_json::to_value(SceneReport { dropped }).unwrap();
+        let report = serde_json::to_value(SceneReport {
+            dropped,
+            chunks: Vec::new(),
+        })
+        .unwrap();
         assert_eq!(
             report,
-            json!({ "dropped": [{ "kind": null, "reason": "not_in_this_build" }] })
+            json!({ "dropped": [{ "kind": null, "reason": "not_in_this_build" }], "chunks": [] })
         );
     }
 

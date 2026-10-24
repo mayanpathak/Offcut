@@ -38,10 +38,125 @@
 
 /* --- Captions -------------------------------------------------------------- */
 
+/* The transcript editor (D-182): flowing text, one paragraph a caption chunk. */
 .transcript {
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
   font-size: var(--fs-14);
-  line-height: var(--lh-body);
+  line-height: 1.9;
+}
+
+/* A row: its time, its words, and at its end the hovered word's ⋯. */
+.block {
+  position: relative;
+  margin: 0;
+  padding-right: var(--sp-6);
+}
+
+/* The chunk's time: a quiet link that seeks there. */
+.blockTime {
+  margin-right: var(--sp-2);
+  padding: 0 var(--sp-1);
+  border: 0;
+  border-radius: var(--sp-1);
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.blockTime:hover {
+  color: var(--text);
+}
+
+/* A word, its "Show" when hidden, its ⋯ and its menu. */
+.wordSlot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-right: 0.12em;
+}
+
+/* The ⋯ of the word under the pointer, at the row's end: it takes no room in the line. */
+.wordMore {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  translate: 0 -50%;
+}
+
+/* A word reads as text and is pressed as a button. */
+.word {
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--sp-1);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: text;
+  transition: background-color var(--fast) ease-out;
+}
+
+.word:hover {
+  background: var(--surface-2);
+}
+
+.wordEdited {
+  composes: word;
+  text-decoration: underline dotted var(--brand);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.wordHidden {
+  composes: word;
+  color: var(--text-2);
+  text-decoration: line-through;
+}
+
+/* The word being said while the preview plays. */
+.spoken {
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+}
+
+.wordMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: calc(var(--sp-7) * 3);
+  padding: var(--sp-1);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1), var(--shadow-2);
+}
+
+.menuItem {
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background: var(--border);
+}
+
+.menuItem:disabled {
+  color: var(--text-2);
+  cursor: default;
 }
 
 /* --- Style ----------------------------------------------------------------- */

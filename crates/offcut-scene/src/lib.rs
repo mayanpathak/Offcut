@@ -28,7 +28,7 @@ pub mod watermark;
 use offcut_plan::ValidPlan;
 use offcut_types::{
     ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
-    Transcript, WordIdx,
+    Transcript, WordIdx, WordRange,
 };
 use thiserror::Error;
 
@@ -208,6 +208,26 @@ impl Scene {
         let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t))?;
         let mut boxes = hit::word_boxes(shown).into_iter();
         boxes.find(|(at, _)| *at == word).map(|(_, r)| r)
+    }
+
+    /// The chunks as the transcript editor shows them (D-182, "Gaps settled"
+    /// item 6), in time order: the transcript words from the first of each
+    /// chunk to after the first word of its last caption word (a number's
+    /// other words follow it), and the program time it is shown from. A read
+    /// of what `build_scene` computed: the page never chunks a second time.
+    pub fn chunk_ranges(&self) -> Vec<(WordRange, OutMs)> {
+        let range = |chunk: &Chunk| {
+            let first = chunk.words.first()?.word;
+            let last = chunk.words.last()?.word;
+            Some((
+                WordRange {
+                    start: first,
+                    end: WordIdx::new(last.get() + 1),
+                },
+                chunk.show.start,
+            ))
+        };
+        self.chunks.iter().filter_map(range).collect()
     }
 
     /// Each word of the chunk shown at `t` as it is drawn, with its fill:
@@ -764,5 +784,40 @@ mod tests {
         .unwrap();
         let result = busy_with(&EditState::default(), &cut);
         assert_eq!(result.err(), Some(SceneError::TimeMap));
+    }
+
+    #[test]
+    fn the_chunk_ranges_are_the_chunks_in_order_and_a_hidden_word_starts_none() {
+        let identity = TimeMap::identity(DurMs::new(10_000));
+        let ranges = busy_with(&EditState::default(), &identity)
+            .unwrap()
+            .chunk_ranges();
+        assert!(ranges.len() >= 3, "{ranges:?}");
+        assert_eq!(ranges[0].0.start, WordIdx::new(0));
+        for pair in ranges.windows(2) {
+            let ((a, at_a), (b, at_b)) = (pair[0], pair[1]);
+            // In time order, one after another, never overlapping.
+            assert!(
+                a.start < a.end && a.end <= b.start && at_a < at_b,
+                "{pair:?}"
+            );
+        }
+        // Each chunk is shown from its time, starting with its first word (a
+        // number shows its display, "$250k" for "$250,000").
+        let scene = busy_with(&EditState::default(), &identity).unwrap();
+        let (transcript, _) = busy();
+        for (range, at) in &ranges {
+            let shown = scene.caption_words(*at);
+            let first = &transcript.words[range.start.get() as usize].text;
+            let same = shown[0].0.eq_ignore_ascii_case(first) || first.starts_with('$');
+            assert!(same, "{shown:?} {first}");
+        }
+        // Hidden, the first word starts no chunk: the next one does.
+        let hidden = EditState {
+            word_edits: [(WordIdx::new(0), String::new())].into_iter().collect(),
+            ..EditState::default()
+        };
+        let ranges = busy_with(&hidden, &identity).unwrap().chunk_ranges();
+        assert_eq!(ranges[0].0.start, WordIdx::new(1));
     }
 }
