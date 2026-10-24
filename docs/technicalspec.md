@@ -738,6 +738,7 @@ offcut/
 │   │       │   ├── ProcessingFeed.tsx
 │   │       │   ├── ProcessingCard.tsx     the processing state's card (v4implementation D-188)
 │   │       │   ├── PreviewPlayer.tsx
+│   │       │   ├── PreviewGestures.tsx    the gestures and their chrome over the preview (v4implementation D-183)
 │   │       │   ├── CaptionEditor.tsx
 │   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item
 │   │       │   ├── StylePanel.tsx         the style cards and Highlight numbers

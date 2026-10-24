@@ -154,6 +154,20 @@ const layerPolicies = [
     from: fromFile("usecases", "start-export.ts"),
     allow: { to: to("usecases", "control-preview.ts") },
   },
+
+  // The review's edges V4 adds (v4implementation §4, D-147): every review
+  // change goes through the one update rule, which holds the queue of one
+  // and the optimistic edit; the rule pauses the preview around a change and
+  // plays it again after (TS §12.4). The two drags of the preview (D-183)
+  // are its first callers.
+  {
+    from: fromFile("usecases", "set-caption-position.ts", "set-crop-offset.ts"),
+    allow: { to: to("usecases", "review-update.ts") },
+  },
+  {
+    from: fromFile("usecases", "review-update.ts"),
+    allow: { to: to("usecases", "control-preview.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------

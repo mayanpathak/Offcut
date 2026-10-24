@@ -24,6 +24,7 @@ import type {
   TimeMs,
   Transcript,
   UnixSecs,
+  WordIdx,
 } from "../gen/domain";
 import initRender, {
   detect,
@@ -55,6 +56,15 @@ export type SceneInput = {
 /** Where the main video's source is at a program time (D-126). */
 export type SourcePos = { at: TimeMs } | { held: TimeMs };
 
+/** A box of the canvas, as fractions of its width and height. */
+type CanvasBox = { x: number; y: number; w: number; h: number };
+
+/** What a point of the canvas is on (D-174): a word with its glyph box, the caption block with its box, or the video. */
+export type SceneHit =
+  | { kind: "word"; word: WordIdx; rect: CanvasBox }
+  | { kind: "captions"; rect: CanvasBox }
+  | { kind: "video" };
+
 /**
  * One clip being drawn. This is the module's own object, with the types of
  * what it takes and gives written out; the method names are the module's.
@@ -64,7 +74,7 @@ export type SourcePos = { at: TimeMs } | { held: TimeMs };
  */
 export type RenderSession = Omit<
   ModuleSession,
-  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize"
+  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize" | "hit" | "caption_mirror"
 > & {
   /** Builds the scene and keeps it in place of the one before; what the plan's validation left out. */
   set_scene(input: SceneInput): { dropped: Dropped[] };
@@ -77,6 +87,10 @@ export type RenderSession = Omit<
   render_frame(frame: VideoFrame, tOut: OutMs): void;
   /** Draws at this size from now on, on the same canvas; the scene is set again at it (v4implementation D-149). */
   resize(width: Px, height: Px): void;
+  /** What the point `(x, y)`, fractions of the canvas, is on at `tOut`; `null` outside it or before a scene is set. */
+  hit(tOut: OutMs, x: number, y: number): SceneHit | null;
+  /** The caption shown at `tOut` as drawn, for development builds' tests (D-155); `null` when none is shown. */
+  caption_mirror(tOut: OutMs): { text: string; colors: string[] } | null;
 };
 
 /** The module's MP4 writer. `finalize()` returns the size of the file in bytes and frees the writer. */

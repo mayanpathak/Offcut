@@ -68,6 +68,22 @@ function planOf(token: string): ExportedAs {
   }
 }
 
+/**
+ * The plan of the token this device holds, read as `planOf` reads it; `free`
+ * without one, or when it cannot be read. The preview's watermark badge
+ * shows for `free` (v4implementation D-172): what an export carries is still
+ * the worker's verification alone.
+ */
+export async function cachedPlan(): Promise<ExportedAs> {
+  try {
+    const record = await entitlementRepo.get();
+    return record === undefined ? "free" : planOf(record.token);
+  } catch {
+    // A device whose storage cannot be read holds no token the badge can trust.
+    return "free";
+  }
+}
+
 /** `offcut-<yyyymmdd-hhmm>.mp4`, in local time. Never derived from the source (TS §21.4). */
 function downloadName(at: Date): string {
   const two = (n: number): string => String(n).padStart(2, "0");

@@ -2,21 +2,25 @@
 // played by the page; `PreviewPlayer` hands the canvas over when it appears
 // and gives the preview up when it goes. It fills the stage's frame, shows a
 // spinner when a seek's frame is slow, and carries the last play's
-// statistics as `data-*` for the tests (D-155). Under the frame,
+// statistics as `data-*` for the tests (D-155). Over the canvas,
+// `PreviewGestures` takes the direct manipulation of D-183. Under the frame,
 // `PreviewTransport` offers play and pause, the time, the scrub bar (D-148)
 // and the watermark badge (v4implementation D-172).
 
 import { useEffect, useRef, useState } from "react";
 
+import { DEV_HOOKS } from "../../config/env";
 import { messages } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
 import { type PreviewState, usePreviewStore } from "../../state/preview-store";
 import { attach, detach, pause, play, scrub, seekDone, seekStart } from "../../usecases/control-preview";
+import { cachedPlan } from "../../usecases/start-export";
 import { Pause, Play } from "../icons";
 import { IconButton } from "../primitives/IconButton";
 import { Slider } from "../primitives/Slider";
 import { Spinner } from "../primitives/Spinner";
 import styles from "../styles/preview.module.css";
+import { PreviewGestures, useCaptionMirror } from "./PreviewGestures";
 
 // The size the preview is drawn at (TS §20.1). The page shows it scaled.
 const PREVIEW_WIDTH = 540;
@@ -85,10 +89,29 @@ function useSlowSeek(): boolean {
   return slow;
 }
 
+/** Whether the device holds a Creator token: the badge is for everyone else (D-172). */
+function useCreator(): boolean {
+  const [creator, setCreator] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void cachedPlan().then((plan) => {
+      if (live) {
+        setCreator(plan === "creator");
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return creator;
+}
+
 export function PreviewPlayer() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const stats = usePreviewStore((state) => state.lastStats);
+  const placement = useClipStore((state) => state.edit.caption_position);
   const slow = useSlowSeek();
+  const mirror = useCaptionMirror();
 
   // The canvas is handed over once, when the player appears: an element
   // gives its drawing away for good. The audio is the clip's, read then.
@@ -123,6 +146,14 @@ export function PreviewPlayer() {
       data-late={stats?.late}
       data-max-drift-ms={stats?.maxDriftMs}
       data-downscaled={stats?.downscaled}
+      // The mirrors of the visible caption, for the tests of development builds only (D-155).
+      {...(DEV_HOOKS
+        ? {
+            "data-caption-text": mirror?.text,
+            "data-caption-colors": mirror?.colors.join(" "),
+            "data-caption-position": placement,
+          }
+        : {})}
     >
       <canvas
         ref={canvas}
@@ -133,6 +164,7 @@ export function PreviewPlayer() {
         aria-label={messages.preview.canvas}
         data-testid="preview-canvas"
       />
+      <PreviewGestures />
       {slow ? (
         <span className={styles.seekSpinner} aria-hidden="true">
           <Spinner />
@@ -145,14 +177,14 @@ export function PreviewPlayer() {
 /**
  * Under the frame: the one button, where the preview is and the program's
  * length, the scrub bar (D-148), and the badge that says Free exports carry
- * the watermark. V4 has no accounts, so every export is Free's and the badge
- * is always shown; V6 hides it for Creator. The program is as long as the
- * clip in V4 (the identity time map).
+ * the watermark, unless the device holds a Creator token (D-172). The
+ * program is as long as the clip in V4 (the identity time map).
  */
 export function PreviewTransport() {
   const preview = usePreviewStore();
   const failure = useClipStore((state) => state.failure);
   const lengthMs = useClipStore((state) => state.clipInfo?.duration) ?? 0;
+  const creator = useCreator();
   const { label, press } = control(preview);
   const locked = preview.status === "locked";
   const position = preview.position ?? 0;
@@ -197,11 +229,13 @@ export function PreviewTransport() {
           />
         </span>
       </div>
-      {failure === undefined ? (
-        <p className={styles.badge}>{messages.preview.watermarkBadge}</p>
-      ) : (
+      {failure !== undefined ? (
         <p className={styles.previewFailure} role="alert">
           {messages.editor.failedStub}
+        </p>
+      ) : creator ? null : (
+        <p className={styles.badge} data-testid="watermark-badge">
+          {messages.preview.watermarkBadge}
         </p>
       )}
     </div>

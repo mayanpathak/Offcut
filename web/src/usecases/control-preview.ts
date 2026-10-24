@@ -108,6 +108,8 @@ export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): P
     playAfterSeek: false,
   };
   previewStore.attached();
+  // The worker drew the first frame: the position is known, for the gestures too (D-183).
+  previewStore.at(toOutMs(0));
 }
 
 /** What a play does when the worker's loop has returned: the clip's end, or a failure. */
@@ -185,8 +187,11 @@ export async function pause(): Promise<void> {
   p.turn += 1;
   stopSound(p);
   try {
-    // Answers when the worker's loop has returned.
+    // Answers when the worker's loop has returned. The canvas then shows the
+    // frame of where the sound stopped, as the time does: what a gesture on
+    // the preview is about (D-183), and where a play goes on from.
     await pool.render.previewPause();
+    await pool.render.previewSeek({ at: toOutMs(p.resumeAtMs) });
   } catch (error) {
     stored(error);
   } finally {

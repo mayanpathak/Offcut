@@ -26,7 +26,9 @@ import { openSource } from "./media/import";
 import type { FailureStage, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
 import {
+  captionMirror,
   drawStill,
+  hitTest,
   previewClock,
   previewForget,
   previewPause,
@@ -224,6 +226,8 @@ const handlers: Handlers<RenderWorkerApi> = {
   previewClock,
   previewPause,
   previewSeek: (p: Parameters<typeof previewSeek>[0]) => previewSeek(p, worker),
+  hitTest: (p: Parameters<typeof hitTest>[0]) => hitTest(p, worker),
+  captionMirror: (p: Parameters<typeof captionMirror>[0]) => captionMirror(p, worker),
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
 };
@@ -231,5 +235,6 @@ const handlers: Handlers<RenderWorkerApi> = {
 serveWorker(handlers, {
   stage: "preview",
   oneWay: ["previewClock"],
-  duringPreview: ["previewClock", "previewPause", "previewSeek"],
+  // A hit test beside a play answers the video at once (D-183).
+  duringPreview: ["previewClock", "previewPause", "previewSeek", "hitTest"],
 });

@@ -1,6 +1,9 @@
 /* The preview player (v4implementation §17.6): its canvas in the stage's
-   frame and its transport under it. The direct-manipulation chrome joins it
-   in Prompt 113. */
+   frame, the chrome of the gestures over it (D-183), and its transport under
+   it. The chrome is page elements above the canvas: nothing of it is ever
+   drawn into a frame. Its pieces are placed by custom properties that the
+   component sets (--left, --top, --width, --height, as percentages of the
+   frame). */
 
 /* The frame's content: the canvas, and over it the spinner of a slow seek. */
 .player {
@@ -23,6 +26,107 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* The transparent layer that takes the pointer. Its cursor says what a
+   press will do (§17.4). */
+.pointerLayer {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.overWord {
+  cursor: text;
+}
+
+.overCaptions {
+  cursor: ns-resize;
+}
+
+.overVideo {
+  cursor: ew-resize;
+}
+
+/* Chrome reads on any picture: a brand line with a dark edge. */
+.wordOutline,
+.blockGhost,
+.snapGuide,
+.frameOutline,
+.cropMap {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* 2 px round the word's glyph box, a little away from the glyphs. */
+.wordOutline {
+  top: calc(var(--top) - 4px);
+  left: calc(var(--left) - 4px);
+  width: calc(var(--width) + 8px);
+  height: calc(var(--height) + 8px);
+  border-radius: var(--r-control);
+  box-shadow:
+    0 0 0 2px var(--brand),
+    0 0 0 3px rgb(0 0 0 / 0.45);
+}
+
+/* Where the caption block will be: as wide as the captions' safe area. */
+.blockGhost {
+  top: var(--top);
+  right: 7%;
+  left: 7%;
+  height: var(--height);
+  border: 1px dashed rgb(255 255 255 / 0.8);
+  border-radius: var(--r-card);
+  background: rgb(139 92 246 / 0.12);
+}
+
+/* The line of the snap point the block is on. */
+.snapGuide {
+  top: var(--top);
+  right: 0;
+  left: 0;
+  height: 0;
+  border-top: 1px solid var(--brand);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
+}
+
+/* The 9:16 frame while the video is dragged, and where the frame sits on
+   the wide source, under the picture. */
+.frameOutline {
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+.cropMap {
+  right: 20%;
+  bottom: var(--sp-4);
+  left: 20%;
+  height: var(--sp-2);
+  border-radius: var(--sp-1);
+  background: rgb(0 0 0 / 0.55);
+}
+
+.cropWindow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--left);
+  width: var(--width);
+  border-radius: var(--sp-1);
+  background: var(--brand);
+}
+
+/* The caption block for the keyboard: seen only when it has the focus. */
+.captionHandle {
+  position: absolute;
+  top: var(--top);
+  right: 7%;
+  left: 7%;
+  height: var(--height);
+  border-radius: var(--r-card);
+  pointer-events: none;
 }
 
 .transport {

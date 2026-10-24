@@ -486,6 +486,7 @@ Marks: **NEW** = created in V4. **F** = final in V4 (later versions add rows or 
 │   ├── src/ui/layout/Stage.tsx         NEW F    the state's card or the player
 │   ├── src/ui/layout/SidePanel.tsx     NEW P    the four tabs (V6.x: Cuts, Music, Brand tabs or sections)
 │   ├── src/ui/components/PreviewPlayer.tsx    CHANGED  9:16 frame, transport, scrub bar, direct manipulation, watermark badge, data-* statistics
+│   ├── src/ui/components/PreviewGestures.tsx  NEW P   the gestures of D-183 and their chrome, split from PreviewPlayer (V4 P113; V6.x: shape, lower third, logo drags)
 │   ├── src/ui/components/ProcessingCard.tsx   NEW F   D-188
 │   ├── src/ui/components/CaptionEditor.tsx    NEW F   the transcript editor (D-182)
 │   ├── src/ui/components/StylePanel.tsx       NEW P   cards and Highlight numbers (V6.5: presets)

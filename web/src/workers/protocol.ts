@@ -26,6 +26,7 @@ import type {
   TimeMap,
   Transcript,
   Word,
+  WordIdx,
 } from "../gen/domain";
 
 export type { FailureStage } from "../gen/domain";
@@ -115,6 +116,14 @@ export interface RenderWorkerApi {
   previewClock(p: { clock: ClockSync }): void;
   previewPause(): Promise<void>;
   previewSeek(p: { at: OutMs }): Promise<void>;
+  /**
+   * What the point `(x, y)`, fractions of the canvas, is on at `at` (D-174).
+   * While the preview plays, `{ kind: "video" }` at once: direct manipulation
+   * is for a paused preview (D-183).
+   */
+  hitTest(p: { at: OutMs; x: number; y: number }): Promise<Hit>;
+  /** The caption shown at `at` as drawn; asked by development and test builds only (D-155). */
+  captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;
   exportClip(p: {
     exportId: ExportId;
     entitlementToken: string;
@@ -140,5 +149,17 @@ export type PreviewStats = {
   /** The preview was drawn at 360 x 640 (D-149). Always `false` before V4 Prompt 112. */
   downscaled: boolean;
 };
+
+/** A box of the canvas, as fractions of its width and height. */
+export type CanvasBox = { x: number; y: number; w: number; h: number };
+
+/** What a point of the canvas is on: a word with its glyph box, the caption block with its box, or the video (D-174). */
+export type Hit =
+  | { kind: "word"; word: WordIdx; rect: CanvasBox }
+  | { kind: "captions"; rect: CanvasBox }
+  | { kind: "video" };
+
+/** The caption shown at a time: its words joined by spaces, and each word's fill as `#rrggbbaa` (D-155). */
+export type CaptionMirror = { text: string; colors: string[] };
 
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };

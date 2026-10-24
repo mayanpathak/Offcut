@@ -28,7 +28,7 @@ pub mod watermark;
 use offcut_plan::ValidPlan;
 use offcut_types::{
     ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
-    Transcript,
+    Transcript, WordIdx,
 };
 use thiserror::Error;
 
@@ -199,6 +199,28 @@ impl Scene {
     pub fn hit(&self, t: OutMs, x: f32, y: f32) -> Option<Hit> {
         let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t));
         hit::hit(shown, self.caption_block, x, y)
+    }
+
+    /// The glyph box of `word` in the chunk shown at `t`, in logical pixels:
+    /// the box `hit` finds it by, which the page outlines (D-183). `None`
+    /// when no chunk shown then holds it.
+    pub fn word_box(&self, t: OutMs, word: WordIdx) -> Option<Rect> {
+        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t))?;
+        let mut boxes = hit::word_boxes(shown).into_iter();
+        boxes.find(|(at, _)| *at == word).map(|(_, r)| r)
+    }
+
+    /// Each word of the chunk shown at `t` as it is drawn, with its fill:
+    /// what development builds of the page mirror for the tests (D-155).
+    pub fn caption_words(&self, t: OutMs) -> Vec<(String, Rgba)> {
+        let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) else {
+            return Vec::new();
+        };
+        let drawn = captions_draw::lay_out(chunk, t, &self.style, &self.theme, &self.emphasis);
+        let text = |word: &captions_draw::Drawn<'_>| {
+            word.runs.iter().map(|(run, _)| run.text.as_str()).collect()
+        };
+        drawn.iter().map(|word| (text(word), word.fill)).collect()
     }
 
     /// Where the main video's source is at `t`.

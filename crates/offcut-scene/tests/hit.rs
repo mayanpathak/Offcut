@@ -211,3 +211,36 @@ fn while_no_chunk_is_shown_nothing_but_the_video_is_hit_and_outside_the_canvas_n
         }
     }
 }
+
+#[test]
+fn the_box_of_a_hit_word_holds_its_centre_and_the_shown_words_are_mirrored_in_order() {
+    let t = transcript();
+    let scene = scene(&t);
+    let at = OutMs::new(600);
+    // The box the page outlines is the box the word is hit by: its centre is
+    // inside it, and a word that is not shown has none.
+    for (text, x, y) in centres(&scene, 600) {
+        let Some(Hit::Word(word)) = scene.hit(at, x, y) else {
+            panic!("{text} is not hit");
+        };
+        let r = scene.word_box(at, word).unwrap();
+        assert!(
+            r.x <= x && x <= r.x + r.w && r.y <= y && y <= r.y + r.h,
+            "{text}"
+        );
+    }
+    assert_eq!(scene.word_box(at, WordIdx::new(8)), None);
+    assert_eq!(scene.word_box(OutMs::new(9_500), WordIdx::new(0)), None);
+
+    // The mirror holds each word of the chunk once, in reading order, with
+    // the fill it is drawn in; nothing while no chunk is shown.
+    let words: Vec<String> = scene.caption_words(at).into_iter().map(|w| w.0).collect();
+    assert_eq!(words.first().map(String::as_str), Some("We"));
+    assert!(words.len() >= 2 && words.len() <= 7, "{words:?}");
+    let drawn: Vec<String> = centres(&scene, 600).into_iter().map(|c| c.0).collect();
+    assert!(
+        words.iter().all(|w| drawn.contains(w)),
+        "{words:?} {drawn:?}"
+    );
+    assert_eq!(scene.caption_words(OutMs::new(9_500)), []);
+}

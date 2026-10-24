@@ -7,7 +7,7 @@
 // never imports the worker.
 
 import { type ExportProfile, LIMITS, type OutMs, type Px } from "../../gen/domain";
-import type { ClockSync, PreviewStats } from "../protocol";
+import type { CaptionMirror, ClockSync, Hit, PreviewStats } from "../protocol";
 import { WorkerFailure } from "../rpc-worker";
 import type { Session, WorkerState } from "./export-job";
 import { recorded, runPreview } from "./preview-loop";
@@ -184,6 +184,26 @@ export async function previewSeek(p: { at: OutMs }, w: WorkerState): Promise<voi
   }
   position = frameTime(state, p.at);
   await drawStill(w);
+}
+
+/**
+ * What the point `(x, y)`, fractions of the canvas, is on at `at` (D-174): at
+ * the output frame that shows `at`, the frame a still of `at` draws. While
+ * the loop runs, the video, without work: the page manipulates a paused
+ * preview only (D-183), and the loop has the session.
+ */
+export async function hitTest(p: { at: OutMs; x: number; y: number }, w: WorkerState): Promise<Hit> {
+  const state = w.open();
+  if (previewLoop !== undefined || state === undefined) {
+    return Promise.resolve({ kind: "video" });
+  }
+  return Promise.resolve(state.session.hit(frameTime(state, p.at), p.x, p.y) ?? { kind: "video" });
+}
+
+/** The caption of the frame that shows `at`, as it is drawn: what development builds of the page mirror (D-155). */
+export async function captionMirror(p: { at: OutMs }, w: WorkerState): Promise<CaptionMirror | null> {
+  const state = w.open();
+  return Promise.resolve(state === undefined ? null : state.session.caption_mirror(frameTime(state, p.at)));
 }
 
 /** What `closeSession` does to the preview: the loop is told to stop, and the clock and the position are forgotten. */

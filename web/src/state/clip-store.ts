@@ -40,7 +40,7 @@ export type ClipState = {
   plan?: EditPlan;
   /** How the program plays the recording: the identity in V4 (D-164). */
   timeMap?: TimeMap;
-  /** The user's edits. V2 has none: this is the default and never changes. */
+  /** The user's edits: the default until a review change (D-147). */
   edit: EditState;
   /** The lines of the processing feed, in the order they came. */
   feed: readonly FeedLine[];
@@ -69,6 +69,15 @@ function empty(): Fields {
 }
 
 export const useClipStore = create<ClipState>(() => ({ status: "idle", ...empty() }));
+
+/**
+ * Whether the crop offset moves the picture: a frame wider than 9:16 loses
+ * its sides, and the offset says which (D-131). A narrower one ignores it.
+ * The rule is `crop_rect`'s, in `offcut-scene/src/framing.rs`.
+ */
+export function cropMoves(info: ClipInfo): boolean {
+  return info.display_width * 16 > info.display_height * 9;
+}
 
 /**
  * Applies `event`. `next` gives what the state holds with its new status,
@@ -148,6 +157,21 @@ export function setPlan(plan: EditPlan): void {
 /** The events found now, after an edit (D-146). The clip's state does not change. */
 export function setEvents(events: readonly DetectedEvent[]): void {
   useClipStore.setState({ events });
+}
+
+/** ready → updating, holding the edit asked for before the worker answers (D-147: edits are optimistic). */
+export function editStarted(edit: EditState): void {
+  apply("edit_start", (current) => ({ ...current, edit }));
+}
+
+/** updating → ready: the scene shows the edit. */
+export function editDone(): void {
+  apply("edit_done", (current) => current);
+}
+
+/** updating → ready with the edit before, and why the change did not apply (D-147). */
+export function editFailed(previous: EditState, failure: AppFailure): void {
+  apply("edit_done", (current) => ({ ...current, edit: previous, failure }));
 }
 
 /** processing → rejected: fewer words were heard than a clip needs. */

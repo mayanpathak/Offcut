@@ -113,6 +113,7 @@ export const messages = {
     clock: (ms: number) => clockTime(ms),
     time: (positionMs: number, lengthMs: number) => `${clockTime(positionMs)} / ${clockTime(lengthMs)}`,
     watermarkBadge: "Free exports include a small watermark",
+    captionHandle: "Caption position", captionAt: (percent: number) => `${String(percent)}% of the way down`,
   },
 
   // `button` is the top bar's Export (v4implementation §17.5's `editor.export`).

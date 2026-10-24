@@ -37,7 +37,7 @@
 | 11 | **REOPENED CONTRACT** `web/src/workers/protocol.ts`: `rulesPlan`, `setScene(plan)` → `SceneReport`, `previewSeek(OutMs)`, `ClockSync(OutMs)`, `assemble`, `release`, `hitTest`, `styleThumbnails`, `PreviewStats` (D-124, D-126, D-127, D-128, D-174, D-186). P99's part done in Entry 9: `rulesPlan`, `setScene` → `SceneReport`, `ClockSync` and `previewSeek` on `OutMs`, `previewPlay` → `PreviewStats`; P100's in Entry 10: `assemble`, `release`. `hitTest` and `styleThumbnails` remain | `web/src/workers` | P99, P100, P113, P116 |
 | 12 | ~~**REOPENED CONTRACT** `AudioWorkerApi`: `assemble`, `release` (D-127, D-128; known issue 1)~~ Closed in Entry 10 | `audio.worker.ts`, `protocol.ts` | P100 |
 | 13 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `control-preview.ts` mints `OutMs` (D-126)~~ Closed in Entry 9 (and `run-pipeline.ts` mints the identity map's `TimeMs`) | `web/eslint.config.js` | P99 |
-| 14 | **REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4) | `web/eslint.config.js` | P114 |
+| 14 | **REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4). Two edges in Entry 24 (the two drags → `review-update.ts`, `review-update.ts` → `control-preview.ts`) | `web/eslint.config.js` | P114 |
 | 15 | **REOPENED CONTRACT** `offcut-api-types/src/analytics.rs` `ReviewActionKind`: five members (§13); the server rebuilds | `offcut-api-types`, `web/src/gen` | P120 |
 | 16 | TS §9 (the review call chain: "ReviewPanel shows …", `<EventToggleList …>`) and the TS §13 component table still name `ReviewPanel` and `EventToggleList`, which TS §5 now replaces with `SidePanel` and `PlanItemList` (Entry 2) | TS §9, §13 | P127 (copy-back) |
 | 17 | ~~Record "identity reference frozen at <SHA of Prompt 93's commit>" (the SHA is not known inside its own commit, Entry 3); from then on `git diff --stat <SHA> -- crates/offcut-scene/tests/snapshots/v3_reference` must print nothing until Prompt 101 deletes the files~~ Closed in Entry 4: frozen at `09b1085` | `docs/v4/v4changelog.md` | P94 |
@@ -49,8 +49,9 @@
 | 23 | Copy back to `v4implementation.md` what Entry 17 changed: D-143's baseline (the watermark's box on the safe area's bottom, about 10.2 lp, not 6); D-171's `CAPTION_BOTTOM` (`SAFE_AREA` bottom - `WATERMARK_BAND` 56 - 140 = 1,304, the founder's choice); D-140's fit (whenever the lines do not fit the 320 lp zone, width included); §8.10's `ok_portrait_3x4` (a 3:4 frame loses its sides); D-163 (`FontRole::Body` is the watermark's font) | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 24 | Copy back to `v4implementation.md` what Entry 19 changed: §4's tree and §17.6 gain `ui/styles/controls.module.css` (Tabs, Switch, SegmentedControl, Slider); D-181: the primary button is filled with `--brand-hover` (open item 8), tabs share the list's width with the icon above the label, a control disabled with a reason is `aria-disabled` and focusable, a toast has no live region of its own (the host puts it in D-192's region); §17.5: the `keys` group (`modMac`, `modOther`) of `messages.ts` | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 25 | Two sentences say the scene's three fonts are the only font files in the repository: TS §19.4 ("`cargo deny` plus a CI grep assert no other font files exist"; no such grep exists in `ci.yml` or `scripts/`) and the first paragraph of `crates/offcut-scene/assets/fonts/LICENSES.md`. Since Entry 19 the interface font `web/src/ui/assets/inter-latin.woff2` is a fourth (D-180, listed in `web/LICENSES.md`). Reword both to "the only fonts the scene embeds" | `docs/technicalspec.md`, `offcut-scene/assets/fonts/LICENSES.md` | P127 (copy-back) |
-| 26 | **Two files at their line limit.** `web/src/copy/messages.ts` is 396 lines (TS §5 marks it `[ONLY]`, so it is not split) and Prompt 119 adds the 14 error copies (about 50 lines); `web/src/ui/styles/components.module.css` is 398. Prompt 119 decides before writing: shorter entries, or a sibling copy file that `messages.ts` re-exports (which changes TS §5 and `check-copy-codes.mjs`, which reads `messages.ts` alone) | `web/src/copy/messages.ts`, `components.module.css` | P119 |
-| 27 | Copy back to `v4implementation.md` what Entry 20 changed: §17.2's rejected card keeps "Start over" (the frozen suites press it); §17.5's `editor.export` is `export.button`; §4's tree: `preview.module.css` from S10; D-172's badge is always shown in V4 (no plan on the page before V6); `DropZone` has a `landing` and a `stage` variant | `docs/v4/v4implementation.md` | P127 (copy-back) |
+| 26 | **Two files at their line limit.** `web/src/copy/messages.ts` is 397 lines (Entry 24) (TS §5 marks it `[ONLY]`, so it is not split) and Prompt 119 adds the 14 error copies (about 50 lines); `web/src/ui/styles/components.module.css` is 398. Prompt 119 decides before writing: shorter entries, or a sibling copy file that `messages.ts` re-exports (which changes TS §5 and `check-copy-codes.mjs`, which reads `messages.ts` alone) | `web/src/copy/messages.ts`, `components.module.css` | P119 |
+| 27 | Copy back to `v4implementation.md` what Entry 20 changed: §17.2's rejected card keeps "Start over" (the frozen suites press it); §17.5's `editor.export` is `export.button`; §4's tree: `preview.module.css` from S10; D-172's badge is shown unless the cached token's plan is Creator (Entry 24; it was always shown before); `DropZone` has a `landing` and a `stage` variant | `docs/v4/v4implementation.md` | P127 (copy-back) |
+| 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx` | `docs/v4/v4implementation.md` | P127 (copy-back) |
 
 ---
 
@@ -2055,3 +2056,83 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
 
 **Open.** Known issues 23-27 unchanged; open items 1-5 unchanged. Next: Prompt 113 (hit testing, the gestures on the preview).
+
+## Entry 24 - 2026-10-24 - P113 (S11): hit testing, caption and video drags, direct manipulation
+
+**What.** Prompt 113 (G 12.3, G 12.4, M-12; D-142, D-155, D-171 to D-174, D-183; §14.1, §15.1, §16.2, §17.4): the preview is directly editable while it is paused or stopped. The cursor says what a press will do; a click on a caption word opens the Captions tab on that word; the caption block drags up and down and snaps at Top, Middle and Bottom; the video of a wide clip drags sideways. Each drag commits once, on release, through a first, minimal `review-update.ts`. The chrome is page elements above the canvas, never part of a frame. The badge shows unless a Creator token is cached.
+
+**1. The scene and the binding** (`offcut-scene/src/lib.rs`, `captions_draw.rs`, `offcut-wasm-render/src/scene_api.rs`):
+- **`Scene::word_box(t, word)`**: the glyph box of a word in the chunk shown at `t`, the box `hit` finds it by (`hit::word_boxes`); `None` when no chunk shown then holds it.
+- **`Scene::caption_words(t)`**: each word of the chunk shown at `t` as `captions_draw::lay_out` draws it (its runs' text, its fill), in reading order. `lay_out`, `Drawn` and two of its fields become `pub(crate)`; `captions_draw.rs` gains no line (393 above its tests).
+- **`hit`'s answer gains `rect`**: `{ kind: "word", word, rect }` with the word's glyph box, `{ kind: "captions", rect }` with the caption block, as fractions of the canvas (`CanvasBox`). The page outlines the word and drags the block from it.
+- **`caption_mirror(t)`**: `{ text, colors }` of the caption shown at `t` (words joined by spaces, each fill as `#rrggbbaa`), `null` when none is shown. Only development and test builds of the page ask for it (D-155).
+- **Tests:** `tests/hit.rs` gains one case (the box of each hit word holds the word's drawn centre; a word not shown has none; the mirror lists the chunk's words once, in order, and nothing while no chunk is shown). `scene_api.rs`'s inline case reads the new JSON shapes. Render wasm 6,360,662 bytes.
+
+**2. The worker** (`workers/protocol.ts`, `render.worker.ts`, `render/preview-job.ts`, `wasm/load-render.ts`):
+- **`hitTest({ at, x, y }) → Hit`** (D-174): answered at the output frame that shows `at`, the frame a still of `at` draws. While the loop runs it answers `{ kind: "video" }` at once, without work; it is listed in `duringPreview`, so it is never refused beside a play. `null` from the binding (off the canvas) is `{ kind: "video" }`.
+- **`captionMirror({ at })`**: the binding's mirror at the same frame time.
+- **Measured** (`d1`, dev server, the 60 s portrait clip paused at 2.5 s, 100 calls from the page through `pool.render.hitTest`): **mean 0.07 ms, median 0.05 ms, worst 0.66 to 1.22 ms over three runs**, against §21.1's 16 ms.
+
+**3. The use-cases:**
+- **`preview-interact.ts`** (§16.2):
+  - `hoverAt(x, y, show)`: at most one hit test per animation frame and one in flight; a newer point replaces one that waits; `hoverEnd()` drops it.
+  - `clickAt(x, y)`: on a word, `ui-store.selectTab("captions")` and `editWord(word)`.
+  - `hitAt(x, y)`: `null` unless `interactive()` (clip `ready` or `updating`, preview `paused` or `stopped`, no seek drawing). A refusal of the worker while it draws a frame is `null`, not a failure.
+  - `dragCaptions(fromY, y, heightPx)`: the block's centre follows the pointer along its track and lands on a snap within `SNAP_DISTANCE_PX` = 16 screen pixels.
+  - `dragVideo(fromX, x)`: the picture follows the pointer; the 9:16 window moves the other way by `2w / (1 - w)` of the offset per canvas width, `w` the window's share of the source width (`crop_rect`'s geometry).
+  - **`CAPTION_SNAPS`** (0.15, 0.55, 1.0) mirrored once from `placement.rs` with its home named ("Gaps settled" item 8), and beside it the track `CAPTION_TRACK` (`CAPTION_TOP` 390, `CAPTION_BOTTOM` 1,304, `CAPTION_BLOCK_HEIGHT` 280 of 1,920 lp), which the drag needs to turn a pointer into a placement. `placement.rs`'s test asserts the first two.
+- **`review-update.ts`** (minimal, Appendix C.2 steps 1, 2, 5 to 8): one queue of one; returns unless the clip is `ready` with its transcript, plan and time map; `editStarted(next)`; `setScene`; `editsRepo.put`; `editDone()`; `review_action`. A failure of the worker or of storage: `editFailed(previous, failure)`, the failure shown where V3 shows one; a fault of the file is thrown. Prompt 114 adds the pause and restore, mode `plan`, the save state, the history and `client_error`.
+- **`review_action`:** `crop_offset` is sent. `caption_position` is not yet on the server's list (Prompt 120, §13): `review-update.ts` sends only the actions of the generated `ReviewActionKind`, from a table typed `satisfies Record<ReviewActionKind, true>`, so the build fails until a member the list gains is named. (The analytics client takes only the generated union; a value off it does not type-check, so "the client drops it" is this table.)
+- **`set-caption-position.ts`**, **`set-crop-offset.ts`**: held to 0..1 and -1..1; a value the clip already has, or an offset on a clip that is not wider than 9:16, changes nothing.
+- **`clip-store.ts`**: `editStarted(edit)`, `editDone()`, `editFailed(previous, failure)` (§16.1), and `cropMoves(info)`, the "wider than 9:16" rule of `framing.rs` that both use-cases read.
+- **`start-export.ts`**: `cachedPlan()`, the plan of the cached token read as `planOf` reads it, `free` without one; the badge reads it.
+- **`control-preview.ts`**: `attach` sets the position to 0 (the worker draws the first frame there); **a pause ends with a `previewSeek` to where the sound stopped** (below).
+
+**4. The page** (`PreviewPlayer.tsx`, the new `PreviewGestures.tsx`, `preview.module.css`, `messages.ts`):
+- **`PreviewGestures`**: a transparent pointer layer over the canvas. Cursor by hit: `text` over a word, `ns-resize` over the block, `ew-resize` over the video of a wide clip, the default otherwise. A press takes the hover's hit (what the cursor said); one that moves more than 4 px is a drag, of the captions from a word or the block, else of the video; one that does not, on a word, is a click. Release commits once (`setCaptionPosition`, `setCropOffset`).
+- **Chrome**, placed by custom properties set from refs (the CSP allows no inline style): the 2 px word outline (brand with a dark edge); during a caption drag, the block's dashed outline and, on a snap, the guide line; during a video drag, the 9:16 frame outline and a strip showing where the window sits on the wide source. A hover is dropped when the edit or the position changes, and while playing.
+- **The keyboard's way**: the caption block is a `role="slider"` handle reached by Tab (named "Caption position", value "Top", "Middle", "Bottom" or "N% of the way down"); the arrow keys move it by 0.05 and it commits on keyup.
+- **Dev and test builds only**: `data-caption-text`, `data-caption-colors`, `data-caption-position` on the player root, from `captionMirror` after each change of position, edit or state while paused (asked again up to five times, 100 ms apart, when the worker was busy). Under `DEV_HOOKS`, so the production build has none.
+- **The badge** (`data-testid="watermark-badge"`) is hidden when the cached token's plan is Creator.
+- `messages.ts` gains one line (`preview.captionHandle`, `preview.captionAt`): 397 lines.
+
+**5. Looked at in Chrome** (G 12.4; a temporary `zz-` spec on the dev server, deleted):
+
+| Check | Reading |
+|---|---|
+| Hover a caption word (paused) | `text` cursor; the outline sits on the word as drawn |
+| Click it (Style tab open) | The Captions tab opens and the word's field shows (`editingWord` set) |
+| Drag the captions to the top | The guide line shows near Top; on release `data-caption-position` 0.15; the stored edit has `caption_position` 0.15 |
+| The visuals after the snap | At 11 s the number visual ("561 hours" counting to 3,000) is drawn below the captions |
+| Caption handle: Tab, 8 x ArrowDown | 0.55 (Middle) on keyup |
+| A drag while playing | Nothing: the placement unchanged, no hit |
+| Hover the landscape clip's video | `ew-resize`; on the portrait clip the default |
+| Drag it 120 px right | The frame outline and the strip during; on release the frame is redrawn and the stored `crop_offset` is -0.32 |
+| Badge (no token) | Shown |
+
+**Found and fixed on the way: the paused frame and the paused time disagreed.** The first look put the outline a word to the left of the word under the pointer, and the mirror read "making videos," while the canvas showed "I almost quit". After a pause the page keeps the audio's position, and the worker's canvas keeps the last frame its loop drew, a few milliseconds before; a caption boundary between the two splits them. Two changes make the paused frame the frame of the paused time:
+- `pause()` ends with `previewSeek(resumeAt)`: the canvas shows the frame of where the sound stopped, which is what the time says, where the next play starts, and what a gesture or a style thumbnail (Prompt 116) is about. One still frame, decoded from the prefetch.
+- `hitTest` and `captionMirror` read the output frame time of `at` (`frameTime`), as `previewSeek` draws it.
+
+**Differs from the prompt or the plan.**
+- **`Hit` carries a box.** §14.1's `Hit` has no geometry, and the outline and the drag need the word's box and the block's. `rect` is added to the word and captions variants (fractions of the canvas). **REOPENED V1 CONTRACT (addition).**
+- **`captionMirror` is a new worker method.** D-155's mirrors are "from the scene's visible chunk", which only the worker has. The worker serves it in every build (it reads nothing the page lacks); only development and test builds call it. **REOPENED V1 CONTRACT (addition).**
+- **`PreviewGestures.tsx` is a new file.** `PreviewPlayer.tsx` reached 528 lines with the gestures; they moved to their own file, added to TS §5 and §4 in this commit. The player keeps the canvas, its lifecycle, the mirrors' attributes and the transport.
+- **`CAPTION_TRACK`** is mirrored beside `CAPTION_SNAPS`: the snaps alone cannot turn a pointer into a placement.
+- **`clickAt` does not pause**: a click while playing is not on a word (the worker answers `video`), and direct manipulation is paused-only (D-183).
+- **A pause now draws one still frame** (above); P112's pause kept the loop's last frame.
+- **`interactive()` includes `updating`**: a hover during a commit is answered `null` by the busy worker and asked again on the next move; a second drag waits in `review-update.ts`'s queue (D-147).
+- **Two of the use-case edges of known issue 14** are added now (`set-caption-position.ts`, `set-crop-offset.ts` → `review-update.ts`; `review-update.ts` → `control-preview.ts`), with their reason. **REOPENED V2 CONTRACT (use-case edges).** Prompt 114 adds the others and closes the row.
+
+**REOPENED CONTRACT** lines: `web/src/workers/protocol.ts` (`hitTest`, `Hit.rect`, `captionMirror`; known issue 11 stays open for `styleThumbnails`, P116); `web/eslint.config.js` use-case edges (known issue 14, two of six edges).
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file (the temporary spec, its config and the temporary print in `tests/hit.rs` deleted); no test key in the environment. `pnpm build:wasm` exit 0. `pnpm fixtures` up to date. `pnpm check` exit 0 (with `.env` loaded for the server's tests). `pnpm test`: **Rust 644 passed, 0 failed, 3 ignored** (Entry 23: 643; +1 in `tests/hit.rs`; the whole log reads 648 with the type generator's 4), Vitest 92. `pnpm build` exit 0; **app shell 326.2 kB gzip** (Entry 23: 323.3). `pnpm e2e` 12 passed.
+- `pnpm build && grep -rlE "__offcutDev|data-caption-(text|colors|position)" web/dist`: **clean**.
+- **`pnpm e2e:media`** on the keyed build: **49 passed, 1 skipped (11.5 min)**, the baseline's count. The build after it has no key: the key's value is in no file of `web/dist`.
+- The frozen check lists only the seven recorded one-line exceptions of Entry 4 and `offcut-dsp/tests/program_identity.rs`. No private path is tracked.
+
+**Found, not fixed.**
+- `hit::hit` finds words by their layout boxes, not by the boxes as drawn after a word's pop and the line's reflow (D-170). On the readings here they agree (each drawn centre is inside its layout box, `tests/hit.rs`); a popped word in Bold could make the two differ by a few logical pixels at its edges.
+
+**Open.** Known issue 27 corrected (the badge is no longer always shown); known issue 28 opened (copy back §14.1's `Hit` and `captionMirror`, the pause's still frame in §16.2, `PreviewGestures.tsx`). Known issues 11 and 14 stay open; open items 1-5 unchanged. Next: Prompt 114 (the update rule, undo and redo, word edits, "Change all").

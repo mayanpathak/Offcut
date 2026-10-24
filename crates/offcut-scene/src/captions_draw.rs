@@ -130,15 +130,15 @@ fn panel_rect(chunk: &Chunk, style: &StyleSpec, panel: &PanelSpec) -> Option<Rec
 }
 
 /// A word of the chunk as it is drawn at a time.
-struct Drawn<'a> {
+pub(crate) struct Drawn<'a> {
     /// Its place in the chunk's `words`.
     index: usize,
     /// Its glyph box, at the size it is drawn.
     rect: Rect,
     /// The line's scale times the word's own.
     scale: f32,
-    runs: Vec<(&'a ShapedRun, Affine)>,
-    fill: Rgba,
+    pub(crate) runs: Vec<(&'a ShapedRun, Affine)>,
+    pub(crate) fill: Rgba,
     /// Its fill were it not spoken: the spoken word's look off the pill.
     quiet: Rgba,
     active: bool,
@@ -147,7 +147,7 @@ struct Drawn<'a> {
 /// Each word of `chunk` as it is drawn at `t`, in the order of its words:
 /// a word that grows scales about its centre on the baseline, and its line
 /// widens around it (`reflow`).
-fn lay_out<'a>(
+pub(crate) fn lay_out<'a>(
     chunk: &'a Chunk,
     t: OutMs,
     style: &StyleSpec,

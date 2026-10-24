@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
-use offcut_render::scene::{FontSet, Hit, Scene, SceneInput, Theme, build_scene};
+use offcut_render::scene::{FontSet, Hit, Rect, Rgba, Scene, SceneInput, Theme, build_scene};
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
     ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript,
@@ -67,14 +67,35 @@ enum SourcePos {
     Held(u32),
 }
 
+/// A box of the canvas, as fractions of its width and height.
+#[derive(Debug, PartialEq, Serialize)]
+struct CanvasBox {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+impl CanvasBox {
+    fn of(r: Rect) -> Self {
+        Self {
+            x: r.x / CANVAS_WIDTH,
+            y: r.y / CANVAS_HEIGHT,
+            w: r.w / CANVAS_WIDTH,
+            h: r.h / CANVAS_HEIGHT,
+        }
+    }
+}
+
 /// What a point of the canvas is on, as JavaScript reads it (D-174):
-/// `{ kind: "word", word: number }`, `{ kind: "captions" }` or
-/// `{ kind: "video" }`.
+/// `{ kind: "word", word: number, rect }`, `{ kind: "captions", rect }` or
+/// `{ kind: "video" }`. `rect` is the word's glyph box or the caption
+/// block, which the page outlines and drags (D-183).
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum HitValue {
-    Word { word: u32 },
-    Captions,
+    Word { word: u32, rect: CanvasBox },
+    Captions { rect: CanvasBox },
     Video,
 }
 
@@ -83,9 +104,39 @@ enum HitValue {
 fn hit_of(scene: &Scene, t_out_ms: u32, x: f32, y: f32) -> Option<HitValue> {
     let at = OutMs::new(t_out_ms);
     Some(match scene.hit(at, x * CANVAS_WIDTH, y * CANVAS_HEIGHT)? {
-        Hit::Word(word) => HitValue::Word { word: word.get() },
-        Hit::Captions => HitValue::Captions,
+        Hit::Word(word) => HitValue::Word {
+            word: word.get(),
+            rect: CanvasBox::of(scene.word_box(at, word)?),
+        },
+        Hit::Captions => HitValue::Captions {
+            rect: CanvasBox::of(scene.caption_block()),
+        },
         Hit::Video => HitValue::Video,
+    })
+}
+
+/// The caption shown at a time as it is drawn, for the tests of development
+/// builds (D-155): its words joined by spaces, and each word's fill as
+/// `#rrggbbaa`.
+#[derive(Debug, PartialEq, Serialize)]
+struct CaptionMirror {
+    text: String,
+    colors: Vec<String>,
+}
+
+fn mirror_of(scene: &Scene, t_out_ms: u32) -> Option<CaptionMirror> {
+    let words = scene.caption_words(OutMs::new(t_out_ms));
+    if words.is_empty() {
+        return None;
+    }
+    let hex = |c: Rgba| format!("#{:02x}{:02x}{:02x}{:02x}", c.r, c.g, c.b, c.a);
+    Some(CaptionMirror {
+        text: words
+            .iter()
+            .map(|(text, _)| text.as_str())
+            .collect::<Vec<_>>()
+            .join(" "),
+        colors: words.iter().map(|(_, fill)| hex(*fill)).collect(),
     })
 }
 
@@ -181,16 +232,30 @@ impl RenderSession {
 
     /// What the point `(x, y)` of the canvas is on at the program time
     /// `t_out_ms` (D-174), `x` and `y` fractions of its width and height:
-    /// `{ kind: "word", word }`, `{ kind: "captions" }`, `{ kind: "video" }`;
-    /// `null` outside the canvas or before a scene is set. Wired to the
-    /// worker's `hitTest` in V4 Prompt 113.
+    /// `{ kind: "word", word, rect }`, `{ kind: "captions", rect }`,
+    /// `{ kind: "video" }`; `null` outside the canvas or before a scene is
+    /// set. The worker's `hitTest`.
     pub fn hit(&self, t_out_ms: u32, x: f32, y: f32) -> JsValue {
         let hit = self
             .scene
             .as_ref()
             .and_then(|scene| hit_of(scene, t_out_ms, x, y));
-        // A tag and at most one number always serialize.
+        // A tag, a number and four more always serialize.
         hit.and_then(|hit| to_plain(&hit).ok())
+            .unwrap_or(JsValue::NULL)
+    }
+
+    /// `{ text, colors }` of the caption shown at `t_out_ms`; `null` when
+    /// none is shown or before a scene is set. Only development and test
+    /// builds of the page ask (D-155).
+    pub fn caption_mirror(&self, t_out_ms: u32) -> JsValue {
+        let mirror = self
+            .scene
+            .as_ref()
+            .and_then(|scene| mirror_of(scene, t_out_ms));
+        // A string and a list of strings always serialize.
+        mirror
+            .and_then(|mirror| to_plain(&mirror).ok())
             .unwrap_or(JsValue::NULL)
     }
 
@@ -312,17 +377,40 @@ mod tests {
     #[test]
     fn a_point_is_read_as_fractions_of_the_canvas_and_answered_as_a_tagged_object() {
         let (scene, _) = scene_of(input(|_| {}), &clip()).unwrap();
-        // No words: the caption block's middle is the video; off the canvas,
-        // nothing.
+        // No words: the caption block's middle is the video, and no caption
+        // is mirrored; off the canvas, nothing.
         assert_eq!(hit_of(&scene, 0, 0.5, 0.5), Some(HitValue::Video));
         assert_eq!(hit_of(&scene, 0, 1.01, 0.5), None);
         assert_eq!(hit_of(&scene, 0, 0.5, -0.01), None);
+        assert_eq!(mirror_of(&scene, 0), None);
         let as_json = |hit: HitValue| serde_json::to_value(hit).unwrap();
+        let half = || {
+            CanvasBox::of(Rect {
+                x: 540.0,
+                y: 960.0,
+                w: 540.0,
+                h: 960.0,
+            })
+        };
         assert_eq!(
-            as_json(HitValue::Word { word: 7 }),
-            json!({ "kind": "word", "word": 7 })
+            as_json(HitValue::Word {
+                word: 7,
+                rect: half()
+            }),
+            json!({ "kind": "word", "word": 7, "rect": { "x": 0.5, "y": 0.5, "w": 0.5, "h": 0.5 } })
         );
-        assert_eq!(as_json(HitValue::Captions), json!({ "kind": "captions" }));
+        assert_eq!(
+            as_json(HitValue::Captions { rect: half() }),
+            json!({ "kind": "captions", "rect": { "x": 0.5, "y": 0.5, "w": 0.5, "h": 0.5 } })
+        );
         assert_eq!(as_json(HitValue::Video), json!({ "kind": "video" }));
+        let mirror = CaptionMirror {
+            text: "WE MADE IT".to_owned(),
+            colors: vec!["#ffffffff".to_owned()],
+        };
+        assert_eq!(
+            serde_json::to_value(mirror).unwrap(),
+            json!({ "text": "WE MADE IT", "colors": ["#ffffffff"] })
+        );
     }
 }
