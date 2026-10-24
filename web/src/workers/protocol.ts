@@ -123,6 +123,12 @@ export interface RenderWorkerApi {
    * is for a paused preview (D-183).
    */
   hitTest(p: { at: OutMs; x: number; y: number }): Promise<Hit>;
+  /**
+   * Three frames of `at` in Clean, Bold and Mono with the current edits, at
+   * `width` x `height`; transferred (D-186). While paused only; the preview
+   * is as it was when it answers.
+   */
+  styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
   /** The caption shown at `at` as drawn; asked by development and test builds only (D-155). */
   captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;
   exportClip(p: {

@@ -6,7 +6,7 @@
 // the worker's state reaches it through one argument, `WorkerState`, and it
 // never imports the worker.
 
-import { type ExportProfile, LIMITS, type OutMs, type Px } from "../../gen/domain";
+import { type ExportProfile, LIMITS, type OutMs, type Px, type StyleId } from "../../gen/domain";
 import type { CaptionMirror, ClockSync, Hit, PreviewStats } from "../protocol";
 import { WorkerFailure } from "../rpc-worker";
 import type { Session, WorkerState } from "./export-job";
@@ -204,6 +204,58 @@ export async function hitTest(p: { at: OutMs; x: number; y: number }, w: WorkerS
 export async function captionMirror(p: { at: OutMs }, w: WorkerState): Promise<CaptionMirror | null> {
   const state = w.open();
   return Promise.resolve(state === undefined ? null : state.session.caption_mirror(frameTime(state, p.at)));
+}
+
+/** The three styles of the cards, in their order on the page (D-186). */
+const THUMBNAIL_STYLES: readonly StyleId[] = ["clean", "bold", "tech"];
+
+/**
+ * Three frames of `at` in Clean, Bold and Mono with the current edits
+ * (D-186): one canvas of `width` by `height`, the scene built at that size
+ * for each style, an `ImageBitmap` taken after each render. The preview's
+ * scene and canvas are given back before this answers and its frame is drawn
+ * again, so the next frame is the one before the call. Paused only: the
+ * worker refuses it beside a play.
+ */
+export async function styleThumbnails(
+  p: { at: OutMs; width: number; height: number },
+  w: WorkerState,
+): Promise<ImageBitmap[]> {
+  const state = w.opened();
+  const scene = w.scene();
+  const previewCanvas = w.previewCanvas();
+  if (scene === undefined || previewCanvas === undefined) {
+    throw new WorkerFailure("E_INTERNAL", scene === undefined ? "NoScene" : "NoCanvas");
+  }
+  const t = frameTime(state, p.at);
+  const pos = state.session.source_at(t);
+  if (pos === null) {
+    throw new WorkerFailure("E_INTERNAL", "NoScene");
+  }
+  const frame = await state.source.frameAtBlocking(recorded(pos));
+  const profile = { ...previewProfile(state), width: p.width as Px, height: p.height as Px };
+  const canvas = new OffscreenCanvas(p.width, p.height);
+  const bitmaps: ImageBitmap[] = [];
+  try {
+    await state.session.attach_canvas(canvas, profile.width, profile.height);
+    for (const style of THUMBNAIL_STYLES) {
+      state.session.set_scene({ ...scene, edit: { ...scene.edit, style }, profile });
+      state.session.render_frame(frame, t);
+      bitmaps.push(canvas.transferToImageBitmap());
+    }
+  } catch (thrown) {
+    for (const bitmap of bitmaps) {
+      bitmap.close();
+    }
+    throw thrown;
+  } finally {
+    // The preview as it was: its scene, its canvas, its frame (as the export's switch back).
+    const back = previewProfile(state);
+    state.session.set_scene({ ...scene, profile: back });
+    await state.session.attach_canvas(previewCanvas, back.width, back.height);
+    await drawStill(w);
+  }
+  return bitmaps;
 }
 
 /** What `closeSession` does to the preview: the loop is told to stop, and the clock and the position are forgotten. */

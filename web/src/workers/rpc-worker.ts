@@ -55,7 +55,7 @@ function transferablesOf(result: unknown): Transferable[] {
     if (value instanceof Float32Array && value.buffer instanceof ArrayBuffer) {
       return [value.buffer];
     }
-    return value instanceof OffscreenCanvas ? [value] : [];
+    return value instanceof OffscreenCanvas || value instanceof ImageBitmap ? [value] : [];
   });
 }
 

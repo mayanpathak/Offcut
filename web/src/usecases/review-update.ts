@@ -9,7 +9,7 @@
 
 import { track } from "../analytics/client";
 import type { ReviewActionKind } from "../gen/api";
-import type { DetectedEvent, EditPlan, EditState, SentenceIdx, Transcript } from "../gen/domain";
+import type { DetectedEvent, EditPlan, EditState, EventKind, SentenceIdx, Transcript } from "../gen/domain";
 import * as editsRepo from "../persistence/edits-repo";
 import { OpfsError } from "../persistence/opfs";
 import * as clipStore from "../state/clip-store";
@@ -21,10 +21,13 @@ import type { AppFailure } from "../workers/protocol";
 import { pause, play } from "./control-preview";
 
 /**
- * What `review_action` names a change. The last four join the server's list
+ * What `review_action` names a change. The last five join the server's list
  * in V4 Prompt 120 (§13); until then they are not sent.
  */
-export type ReviewAction = ReviewActionKind | "caption_position" | "replace_all" | "undo" | "redo";
+export type ReviewAction = ReviewActionKind | "caption_position" | "replace_all" | "undo" | "redo" | "highlight_numbers";
+
+/** What a toggle's `review_action` says beside its name: the kind of the visual and whether it is on (enums only, INV-18). */
+export type ReviewDetail = { event_kind: EventKind; enabled: boolean };
 
 /**
  * The actions the server's list holds now: the others are not sent, as the
@@ -97,7 +100,12 @@ async function eventsFor(transcript: Transcript, previous: EditState, next: Edit
 /** The change in flight, settled however it ended: the next one starts after it (D-147). */
 let inFlight: Promise<void> = Promise.resolve();
 
-async function apply(change: (edit: EditState) => EditState, mode: "plan" | "scene", action: ReviewAction): Promise<void> {
+async function apply(
+  change: (edit: EditState) => EditState,
+  mode: "plan" | "scene",
+  action: ReviewAction,
+  detail: ReviewDetail | undefined,
+): Promise<void> {
   // 1. Only a clip that is ready takes a change, and none while an export
   //    has the preview locked (TS §12.4): the controls are disabled then.
   const clip = clipStore.useClipStore.getState();
@@ -170,7 +178,7 @@ async function apply(change: (edit: EditState) => EditState, mode: "plan" | "sce
   }
   // 8.
   if (sent(action)) {
-    track({ name: "review_action", props: { action } });
+    track({ name: "review_action", props: { action, ...detail } });
   }
 }
 
@@ -181,8 +189,13 @@ async function apply(change: (edit: EditState) => EditState, mode: "plan" | "sce
  * change is shown or has failed: a failure is stored on the clip, not
  * thrown; a fault of this file is thrown.
  */
-export function update(change: (edit: EditState) => EditState, mode: "plan" | "scene", action: ReviewAction): Promise<void> {
-  const run = inFlight.then(() => apply(change, mode, action));
+export function update(
+  change: (edit: EditState) => EditState,
+  mode: "plan" | "scene",
+  action: ReviewAction,
+  detail?: ReviewDetail,
+): Promise<void> {
+  const run = inFlight.then(() => apply(change, mode, action, detail));
   inFlight = run.catch(() => undefined);
   return run;
 }

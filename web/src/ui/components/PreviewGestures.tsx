@@ -91,6 +91,7 @@ function placementText(p: number): string {
 export function useCaptionMirror(): CaptionMirror | null | undefined {
   const position = usePreviewStore((state) => state.position);
   const status = usePreviewStore((state) => state.status);
+  const seekBusy = usePreviewStore((state) => state.seekBusy);
   const edit = useClipStore((state) => state.edit);
   const clip = useClipStore((state) => state.status);
   const [mirror, setMirror] = useState<CaptionMirror | null | undefined>(undefined);
@@ -105,8 +106,8 @@ export function useCaptionMirror(): CaptionMirror | null | undefined {
         if (!live) {
           return;
         }
-        // The worker was drawing a frame: ask again shortly.
-        if (answer === undefined && tries > 1 && interactive()) {
+        // The worker was drawing a frame, or a seek was: ask again shortly (and once more when the seek ends).
+        if (answer === undefined && tries > 1 && usePreviewStore.getState().status !== "playing") {
           timer = setTimeout(() => {
             ask(tries - 1);
           }, MIRROR_RETRY_MS);
@@ -120,7 +121,7 @@ export function useCaptionMirror(): CaptionMirror | null | undefined {
       live = false;
       clearTimeout(timer);
     };
-  }, [position, status, edit, clip]);
+  }, [position, status, seekBusy, edit, clip]);
   return mirror;
 }
 

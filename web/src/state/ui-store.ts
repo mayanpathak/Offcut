@@ -27,6 +27,8 @@ export type UiState = {
   toasts: readonly ToastItem[];
   /** Whether an edit is still being written to the device (D-184). */
   save: "saved" | "saving";
+  /** The Style tab's three frames, Clean, Bold, Mono (D-186); `null` until drawn. */
+  thumbnails: readonly ImageBitmap[] | null;
   // Arrow-typed, so a component may take one out of the store and call it alone.
   selectTab: (tab: Tab) => void;
   setFollow: (on: boolean) => void;
@@ -34,6 +36,8 @@ export type UiState = {
   pushToast: (toast: ToastItem) => void;
   dismissToast: (id: string) => void;
   setSave: (save: "saved" | "saving") => void;
+  /** Replaces the thumbnails; the ones they replace are closed (they hold GPU memory). */
+  setThumbnails: (thumbnails: readonly ImageBitmap[] | null) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -42,6 +46,7 @@ export const useUiStore = create<UiState>((set) => ({
   editingWord: null,
   toasts: [],
   save: "saved",
+  thumbnails: null,
   selectTab: (tab) => {
     set({ tab });
   },
@@ -60,5 +65,15 @@ export const useUiStore = create<UiState>((set) => ({
   },
   setSave: (save) => {
     set({ save });
+  },
+  setThumbnails: (thumbnails) => {
+    set((state) => {
+      for (const old of state.thumbnails ?? []) {
+        if (!thumbnails?.includes(old)) {
+          old.close();
+        }
+      }
+      return { thumbnails };
+    });
   },
 }));

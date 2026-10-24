@@ -36,6 +36,7 @@ import {
   previewPlay,
   previewProfile,
   previewSeek,
+  styleThumbnails,
 } from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
 import { toAppFailure } from "./rpc";
@@ -249,6 +250,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   previewSeek: (p: Parameters<typeof previewSeek>[0]) => previewSeek(p, worker),
   hitTest: (p: Parameters<typeof hitTest>[0]) => hitTest(p, worker),
   captionMirror: (p: Parameters<typeof captionMirror>[0]) => captionMirror(p, worker),
+  styleThumbnails: (p: Parameters<typeof styleThumbnails>[0]) => styleThumbnails(p, worker),
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
 };

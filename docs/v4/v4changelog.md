@@ -34,7 +34,7 @@
 | 8 | ~~**REOPENED CONTRACT** `offcut-scene/src/display_list.rs`: `FontId` becomes `FontKey`; `DrawCmd` gains `Video` and `Image` (D-130, D-132)~~ Closed in Entry 8 | `offcut-scene` | P98 |
 | 9 | ~~**REOPENED CONTRACT** `offcut-scene/src/styles.rs`: style colours become theme roles, `CaptionMotion` (D-136)~~ Closed in Entry 8 | `offcut-scene` | P98 |
 | 10 | ~~**REOPENED CONTRACT** `Renderer::render(sources, list, fonts)` (D-133)~~ Closed in Entry 8 | `offcut-render` | P98 |
-| 11 | **REOPENED CONTRACT** `web/src/workers/protocol.ts`: `rulesPlan`, `setScene(plan)` → `SceneReport`, `previewSeek(OutMs)`, `ClockSync(OutMs)`, `assemble`, `release`, `hitTest`, `styleThumbnails`, `PreviewStats` (D-124, D-126, D-127, D-128, D-174, D-186). P99's part done in Entry 9: `rulesPlan`, `setScene` → `SceneReport`, `ClockSync` and `previewSeek` on `OutMs`, `previewPlay` → `PreviewStats`; P100's in Entry 10: `assemble`, `release`. `hitTest` and `styleThumbnails` remain | `web/src/workers` | P99, P100, P113, P116 |
+| 11 | ~~**REOPENED CONTRACT** `web/src/workers/protocol.ts`: `rulesPlan`, `setScene(plan)` → `SceneReport`, `previewSeek(OutMs)`, `ClockSync(OutMs)`, `assemble`, `release`, `hitTest`, `styleThumbnails`, `PreviewStats` (D-124, D-126, D-127, D-128, D-174, D-186). P99's part done in Entry 9: `rulesPlan`, `setScene` → `SceneReport`, `ClockSync` and `previewSeek` on `OutMs`, `previewPlay` → `PreviewStats`; P100's in Entry 10: `assemble`, `release`. `hitTest` and `styleThumbnails` remain~~ Closed in Entry 27: `styleThumbnails` was the last (with `hitTest`, `captionMirror`, `Hit.rect`, `SceneReport.chunks`, `detect`'s `wordEdits` of Entries 24-26) | `web/src/workers` | P99, P100, P113, P116 |
 | 12 | ~~**REOPENED CONTRACT** `AudioWorkerApi`: `assemble`, `release` (D-127, D-128; known issue 1)~~ Closed in Entry 10 | `audio.worker.ts`, `protocol.ts` | P100 |
 | 13 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `control-preview.ts` mints `OutMs` (D-126)~~ Closed in Entry 9 (and `run-pipeline.ts` mints the identity map's `TimeMs`) | `web/eslint.config.js` | P99 |
 | 14 | ~~**REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4). Two edges in Entry 24 (the two drags → `review-update.ts`, `review-update.ts` → `control-preview.ts`)~~ Closed in Entry 25: the eight edges with their reason | `web/eslint.config.js` | P114 |
@@ -51,8 +51,9 @@
 | 25 | Two sentences say the scene's three fonts are the only font files in the repository: TS §19.4 ("`cargo deny` plus a CI grep assert no other font files exist"; no such grep exists in `ci.yml` or `scripts/`) and the first paragraph of `crates/offcut-scene/assets/fonts/LICENSES.md`. Since Entry 19 the interface font `web/src/ui/assets/inter-latin.woff2` is a fourth (D-180, listed in `web/LICENSES.md`). Reword both to "the only fonts the scene embeds" | `docs/technicalspec.md`, `offcut-scene/assets/fonts/LICENSES.md` | P127 (copy-back) |
 | 26 | **Two files at their line limit.** `web/src/copy/messages.ts` is 397 lines (Entry 24) (TS §5 marks it `[ONLY]`, so it is not split) and Prompt 119 adds the 14 error copies (about 50 lines); `web/src/ui/styles/components.module.css` is 398. Prompt 119 decides before writing: shorter entries, or a sibling copy file that `messages.ts` re-exports (which changes TS §5 and `check-copy-codes.mjs`, which reads `messages.ts` alone) | `web/src/copy/messages.ts`, `components.module.css` | P119 |
 | 27 | Copy back to `v4implementation.md` what Entry 20 changed: §17.2's rejected card keeps "Start over" (the frozen suites press it); §17.5's `editor.export` is `export.button`; §4's tree: `preview.module.css` from S10; D-172's badge is shown unless the cached token's plan is Creator (Entry 24; it was always shown before); `DropZone` has a `landing` and a `stage` variant | `docs/v4/v4implementation.md` | P127 (copy-back) |
-| 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx`; and Entry 26's: §14.1's `SceneReport.chunks` (`SceneChunk`), §16.1's `clip-store.chunks`, §4's `CaptionWordControls.tsx` | `docs/v4/v4implementation.md` | P127 (copy-back) |
+| 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx`; and Entry 26's: §14.1's `SceneReport.chunks` (`SceneChunk`), §16.1's `clip-store.chunks`, §4's `CaptionWordControls.tsx`; and Entry 27's: §15.1's `styleThumbnails` at the preview profile, §16.2's first thumbnail call not debounced, `update`'s `ReviewDetail` | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 29 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `review-update.ts` mints `SentenceIdx` (`sentenceAt`), `replace-all.ts` mints `WordIdx` (`wordAt`), D-59's rule~~ Opened and closed in Entry 25 | `web/eslint.config.js` | P114 |
+| 30 | `Dropped` (`offcut-plan`) carries no item id, so the Visuals tab cannot leave out an item the validation dropped (Entry 27). A rules plan validates clean; a model's plan (V6.1) can be dropped from, and needs the item's id in `Dropped` | `offcut-plan`, `PlanItemList.tsx` | V6.1 |
 
 ---
 
@@ -2274,3 +2275,60 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - The toast sits over the watermark badge while it shows (both bottom centre); it goes after 5 s.
 
 **Open.** Known issue 28 gains §16.1's `chunks` and `SceneReport.chunks` for the copy-back; known issue 11 stays open; open items 1-5 unchanged. Next: Prompt 116 (the Style, Visuals and Framing tabs).
+
+## Entry 27 - 2026-10-24 - P116 (S12): style cards, visuals and framing tabs
+
+**What.** Prompt 116 (G 13.3; D-142, D-145, D-154, D-169, D-171, D-186, D-187; §15.1, §16.2, §17.3): the side panel's four tabs all work. Style shows three cards drawn from the clip itself; Visuals lists the suggested visuals with a switch each; Framing places the captions and, on a wide clip, the crop.
+
+**1. The thumbnails** (`render/preview-job.ts`, `render.worker.ts`, `protocol.ts`, `rpc-worker.ts`):
+- **`styleThumbnails({ at, width, height }) → ImageBitmap[]`** (D-186, §15.1): the frame of `at` decoded once; one `OffscreenCanvas` of 216 x 384 attached to the session; the scene set three times at the preview profile at that size with the current edits and each style (Clean, Bold, Mono, the order of the cards), drawn, and taken with `transferToImageBitmap`. Then the preview's scene and canvas are given back and its frame drawn again before the call answers (as the export's switch back). On a failure the bitmaps taken are closed and the preview is still given back. **REOPENED V1 CONTRACT** (addition); known issue 11 closed.
+- `rpc-worker.ts`'s `transferablesOf` moves an `ImageBitmap` as it moves a canvas.
+
+**2. The use-cases:**
+- **`style-thumbnails.ts`**: `refreshThumbnails(now)`, at once when the tab opens (so the first cards are not 300 ms late), otherwise `THUMB_DEBOUNCE_MS` = 300 after the last change; the latest call wins; an answer of an older call, or one that comes after the tab closed, is closed and dropped; drawn only while the clip is ready and the preview paused or stopped (a call meanwhile is asked again by the panel when the state allows). `forgetThumbnails()` when the tab closes. A refusal or a failure of the worker leaves what the cards show.
+- **`set-style.ts`**, **`set-highlight-numbers.ts`**, **`toggle-event.ts`**: through the update rule, mode `scene`; a value the clip already has changes nothing. `toggleEvent(id, on)` writes `event_overrides[id]` and sends `review_action { action: "event_toggle", event_kind, enabled }`: `update` takes an optional `ReviewDetail` (enums and a boolean, INV-18). `highlight_numbers` joins `ReviewAction` (sent from Prompt 120).
+- **`ui-store.ts`** keeps the three frames (`thumbnails`); `setThumbnails` closes the ones it replaces.
+
+**3. The panels:**
+- **`StylePanel.tsx`**, **`StylePicker.tsx`** (D-186): three cards (the frame on a 9:16 canvas, a `Skeleton` until it comes; the name; one line; a ring and `aria-pressed` on the chosen one), the Highlight numbers `Switch`. The cards are drawn when the tab opens and again when the position, the words, the placement, the framing, the visuals or the highlight change, or when a paused, ready clip can be drawn again.
+- **`PlanItemList.tsx`** (D-187, D-154): the plan's items in time order, each with its kind's icon, its label ("Big number", "List", "Before → after", "Emphasis"), its figure and its time (a button: pause and seek), and a `Switch`; "N of M visuals on". The figure is the detector's display text (`Quantity.display`, the list's header, the emphasised word), never parsed (INV-22); a plan item of a model (V6.1) shows its words. With no item: `noEventsFound` and `whatWeLookFor`.
+- **`FramingPanel.tsx`**, **`CropOffsetControl.tsx`** (D-187): Top · Middle · Bottom from `CAPTION_SNAPS` (the nearest shown when dragged between snaps) and its hint; the crop `Slider` (-1 to 1, step 0.01, committed on release) only when `cropMoves` (landscape and square), with its hint.
+- **`CutsSection.tsx`**: renders nothing (V4 plans no cut, D-164); placed under the visuals for V6.2.
+- **While an export runs** every control of the three tabs is disabled with "Available when the export finishes" (TS §12.4).
+- **`SidePanel.tsx`** keeps only the tabs: its placeholder Style, Visuals and Framing views and `STATIC` are gone. Copy: `visuals.goTo`, `visuals.fromTo`, `visuals.points` (398 lines).
+- **`panel.module.css`**: the cards are buttons; the card frame, the row's time and switch; three unused classes removed.
+
+**4. Looked at in Chrome** (temporary `zz-` specs on the dev server; deleted):
+
+| Check | Reading (`d1`) |
+|---|---|
+| **The Style tab opened ten times: the click to three images** | **117, 87, 96, 58, 57, 70, 74, 75, 88, 84 ms** (against 400, §21.1) |
+| The preview's frame after a `styleThumbnails` call | **Identical**: 0 of 2,073,600 channels differ (read through a 2D canvas). An element screenshot first read "not equal"; the pixels say they are |
+| Open and close the tab five times quickly | The frames held before are closed (width 0), none left in the store after closing; on reopening, three new frames |
+| Bold | Applied (`aria-pressed`); the caption reads "3,000 HOURS EDITING" |
+| Highlight numbers off | "3,000 hours" (not the spoken word) goes from `#ffd60a` to white at 10.3, 10.6, 10.9 s; the spoken word keeps its style's colour |
+| Visuals | 2 rows for the plan's 2 items: "Big number · 3,000 hours" (0:10), "Before → after · 90 minutes → 10 minutes" (0:25); one switched off → "1 of 2 visuals on" and its override stored; a row's time seeks to 25.08 s |
+| Framing, portrait | Top → 0.15; no crop slider |
+| Framing, landscape | The slider; ten steps right → 0.1 ("10% right") |
+| The clip with no visual (`speech_20s_noevents.mp4`) | The J7 sentence and what Offcut looks for |
+
+**Found and fixed on the way.**
+- **The development mirror gave up during a seek** (Entry 24's `useCaptionMirror`): asked while the preview was seeking, it stopped retrying (the gestures' "interactive" check is false then) and was not asked again when the seek ended, so `data-caption-*` could stay empty after a seek. It now retries unless the preview plays and is asked again when the seek ends; after a seek the page's mirror equals the worker's at every reading.
+- `composes` inside a grouped selector stops Vite's CSS modules (the selected card's hover): written as two rules.
+
+**Differs from the prompt or the plan.**
+- **"The plan's items minus the dropped ones":** `Dropped` carries no item id, so a dropped item cannot be matched to its row. The list is the plan's items; a rules plan validates clean (`validate_rules_plans.rs`), so nothing is dropped from one in V4. Recorded for V6.1, whose model plans can be dropped from (known issue 30).
+- **The first draw of the cards is not debounced** (the 400 ms of §21.1 would not hold after 300 ms of debounce); changes after it are.
+- **The cards are drawn at the preview profile** (no watermark), the preview's own look; the Free watermark is announced by the badge (D-172).
+- **`TS §5` gains `set-highlight-numbers.ts`**, which §4 lists and the tree did not.
+
+**REOPENED CONTRACT** line: `web/src/workers/protocol.ts` `styleThumbnails` (known issue 11 closed: every V4 addition to the protocol is in).
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`.env` loaded). `pnpm test`: **Rust 645 passed, 0 failed, 3 ignored** (unchanged; the whole log reads 649), Vitest 92. `pnpm build` exit 0; **app shell 331.3 kB gzip** (Entry 26: 330.0). `pnpm e2e` 12 passed. No `__offcutDev` or `data-caption-*` in `web/dist`.
+- **`pnpm e2e:media`** on the keyed build: **49 passed, 1 skipped (14.2 min)**, the baseline's count. The build after it has no key.
+- The frozen check lists only the recorded exceptions. No private path is tracked.
+
+**Found, not fixed.** The three cards differ in more than the captions: a visual's motion is the style's (D-137), so a number counting up stands at a different count in each card at the same time. That is what each export would show; design review 2 may prefer the cards taken at a moment without a visual in motion.
+
+**Open.** Known issue 11 closed; 30 opened (`Dropped` without an item id); 28 gains §15.1's `styleThumbnails` at the preview profile and the debounce's first call; open items 1-5 unchanged. Next: Prompt 117 (shortcuts, the shortcuts sheet, the toast host; the creator walk-through).

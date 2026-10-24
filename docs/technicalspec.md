@@ -627,7 +627,8 @@ offcut/
 │   │   │   ├── set-style.ts
 │   │   │   ├── set-crop-offset.ts
 │   │   │   ├── set-caption-position.ts  (V4) the caption block's position (v4implementation D-171)
-│   │   │   ├── set-highlight-numbers.ts (V4) numbers in the accent colour on or off (D-169)
+│   │   │   ├── set-highlight-numbers.ts  (V4) numbers in the accent colour, on or off (v4implementation D-169)
+│   │   │   ├── set-highlight-numbers.ts  (V4) numbers in the accent colour on or off (D-169)
 │   │   │   ├── replace-all.ts         (V4) "Change all N" for a repeated mis-hearing (D-175)
 │   │   │   ├── undo-redo.ts           (V4) D-184
 │   │   │   ├── review-update.ts       (V4) the shared update rule of an edit: pause, queue, setScene, restore, undo (D-147)
