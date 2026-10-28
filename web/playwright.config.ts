@@ -8,8 +8,19 @@ const PREVIEW_URL = "http://localhost:4173";
 
 // The media suites take a clip through the pipeline in a real Chrome. They
 // need a build made with the test key (v2implementation D-24), and the model
-// in `fixtures/.cache/`, which `media-setup` puts there.
-const MEDIA_SUITES = ["model-download.spec.ts", "pipeline-preview.spec.ts", "export-creator.spec.ts", "rejections.spec.ts"];
+// in `fixtures/.cache/`, which `media-setup` puts there. On D1 the build is
+// `pnpm build:e2e` (the key in the environment): a production bundle made in
+// the `test` mode, which keeps the player's caption mirrors and the
+// development hooks the editor's suites read
+// (v4implementation D-155, §20.4). CI's Windows job runs the `@no-gpu` cases
+// on the production build of the ci job.
+const MEDIA_SUITES = [
+  "model-download.spec.ts",
+  "pipeline-preview.spec.ts",
+  "export-creator.spec.ts",
+  "rejections.spec.ts",
+  "preview-sync.spec.ts",
+];
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).
 const TIMEOUT_SCALE = Number(process.env.E2E_TIMEOUT_SCALE ?? "1");

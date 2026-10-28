@@ -339,7 +339,7 @@ test.describe("one clip, exported", () => {
     expect(first.equals(await canvas(page).screenshot())).toBe(false);
     await button(page, messages.preview.pause).click();
     await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
   });
 
   test("Free-plan token: the file is 720 by 1280, as the token says", async () => {

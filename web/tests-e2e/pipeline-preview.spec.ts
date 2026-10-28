@@ -396,10 +396,10 @@ test.describe("one clip, from the drop to the preview", () => {
     const [movingOne, movingTwo] = await twoPictures(canvas(page), page, 1_000);
     expect(movingOne.equals(movingTwo)).toBe(false);
     // A frame that was not given back fails the pause, and the page would say so (D-45).
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
     await button(page, messages.preview.pause).click();
     await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
   });
 
   // V3 (D-91): four stages, the chain's beside the recognizer's, and the
@@ -472,7 +472,7 @@ test.describe("one clip, from the drop to the preview", () => {
     await expect.poll(() => opfsList(page, "clips"), { timeout: 30_000 }).toEqual([]);
     // The page is on the editor still, ready for the next clip.
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
   });
 });
 

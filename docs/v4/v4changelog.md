@@ -2601,3 +2601,42 @@ A mutation check: with the pipeline's `release` call removed, 8 of the 18 pipeli
 - **CI** on `2b15489` (it also carries Entry 31's commit, whose own run the push cancelled): `ci` green in 19m34s, with the server tests on the wider enum; `e2e-media` red on its first attempt (two `model-download.spec.ts` cases, known issue 33), **green on the re-run** of the same commit (10 min).
 
 **Open.** Known issue 33 opened (the runner's flake). Open items 1-5 unchanged. Next: Prompt 122 (the E2E helpers and `preview-sync.spec.ts`).
+
+## Entry 33 - 2026-10-29 - P122 (S15): E2E helpers, preview-sync suite
+
+**What.** Prompt 122 (G 16.1, 16.2; D-148, D-155, D-173; §20.4, §21.1): the editor's helpers for the end-to-end suites, and `preview-sync.spec.ts`, which proves the preview's timing in Chrome on D1. Committed with Prompt 123 (Entry 34), at the founder's request, so CI runs once for both.
+
+**1. The helpers** (`web/tests-e2e/helpers/fixtures.ts`, G 16.1): `previewStats(page)` (the player's `data-frames`, `data-late`, `data-max-drift-ms`, `data-downscaled`), `seekTo(page, ms)` (the scrub bar's value set, then its `input` and `change`, as a drag that ends there), `editWord(page, index, text)` (the word's button, its field, Enter), `toggleItem(page, label, on)` (a Visuals row's switch), `setStyle(page, name)` (a style card), `dragCaptions(page, to)` and `dragVideo(page, dx)` (mouse drags on the preview, started once the hover's hit test has said what is under the pointer, `data-hit`), `axe(page)` (`@axe-core/playwright`, serious and critical only). Beside them: `captionMirror`, `transcriptWords` (opens the Captions tab), `openWord`, `openTab`, `wordButton`, `wordField`, `previewAt`, `hoverPreview`, `expectTestBuild`, and the PNG reader `pngPixels` / `meanBrightness` (decoded and unfiltered; V3's `pngData` kept the filter bytes).
+
+**2. A change's end is a save, counted** (`trackSaves`, `saves`, `settled(page, since)`). The first run's edit case read its time before the change had begun: right after Enter the top bar still says "Saved on this device", from the change before, so waiting for "Saved" returns at once. A page-side counter of "Saving…" (the update rule shows it once the change is drawn, D-184) gives each change's end: a save begun after the count read before it, and none in progress. Every helper that changes the clip waits that way.
+
+**3. `preview-sync.spec.ts`** (G 16.2): one 60 s portrait clip, four cases in order (as `pipeline-preview`). Readings on `d1`, the two runs in a row on the final code (run A: the two new suites; run B: the whole media project):
+
+| Case | Run A | Run B | Target |
+|---|---|---|---|
+| First frame after `ready` | 420 ms | 326 ms | ≤ 500 ms |
+| Seek to 55.0 s (the white frame), paused | 86 ms, mean brightness 235 | 64 ms, 235 | ≤ 300 ms, > 200 |
+| Edit to preview, 20 commits | p90 27 ms (median 24, max 31) | p90 24 ms (median 21, max 26) | ≤ 150 ms (`EDIT_TO_PREVIEW_MAX_MS`) |
+| Drift over the whole clip | max 27.7 ms; 0 of 1,800 frames late; not downscaled | max 23.2 ms; 0 of 1,800 late; not downscaled | ≤ 80 ms; ≤ 5% |
+
+An earlier full pass, before the last helper change (`transcriptWords` opening its tab): 422 ms, 69 ms, p90 28 ms, 17.9 ms.
+
+How each is read (all from the page, D-155):
+- **First frame**: from the canvas's insertion (the clip `ready`) to the play button's enabling, which follows `attachPreview`'s answer, which the worker gives once the first frame is drawn (`drawStill`); then one screenshot proves a frame of the clip is on the canvas (a fifth of its pixels or more not dark), which a paused preview does not draw again. **Found on the first run**: screenshots of the canvas element take 150 ms to over a second on D1 and slowed the worker's first draw from 70 ms to 705 ms (a temporary timing log in `attach` and `attachPreview`, removed): the time is read from the page, and a picture is a 120 px page screenshot of the canvas's middle (about 60 ms). Of a first frame of about 420 ms, about 280 ms is the page's side (the `AudioContext`, the program's audio, the canvas's transfer) and about 140 ms the worker's (`attach_canvas` 60-70 ms, the first frame 70 ms).
+- **Seek**: the scrub bar set to 55,000 ms; middle-of-canvas screenshots until the mean brightness passes 200; the page's time once the bright picture is taken, from just before the seek. The white frame is frame 1,650 (`fixtures/gen_fixtures.sh`), `floor(55,000 × 30 / 1000)`.
+- **Edit to preview** (§21.1): Enter's `keydown` to "Saving…". `setScene` answers after the worker has drawn the paused frame again (D-173), and the update rule shows "Saving…" when it has: the time covers the redraw. **Differs from the prompt**: it names "the redraw's `data-frames` tick", but `data-frames` is the last play's count (D-155) and does not move on a paused redraw; P115 and P117 read the same signal as here.
+- **INV-11, the live-frame counter**: a play ends by closing every decoded frame, and one left open fails that play with `E_INTERNAL` (`FrameLeak`, D-45), which the page shows. The seek case plays, pauses, seeks, plays and pauses twice more: no failure. The counter is the worker's; the page reads its verdict.
+
+**4. Leak checks of the older suites.** `pipeline-preview.spec.ts` (two cases) and `export-creator.spec.ts` asserted no `editor.failedStub` text after a play; since Entry 30 a failure of the preview is the error card (`preview-failed`), whose `E_INTERNAL` title is not that text, so those checks could no longer see a leak. They now count either.
+
+**5. The test build** (`pnpm build:e2e`, root `package.json`): `pnpm gen:types`, `pnpm build:wasm`, `vite build --mode test`. A production bundle (minified, `NODE_ENV` production, the production headers under `vite preview`) whose mode keeps `DEV_HOOKS` and `__OFFCUT_DEV_FAULTS__` on: the player's caption mirrors and `__offcutDev`, which §20.4 says the suites use "behind `import.meta.env.DEV || MODE === "test"`". `check-hosts.mjs` is not run on it (it carries the test key, as the keyed builds always did). On D1 the media suites run on it; CI's Windows job runs the `@no-gpu` cases on the ci job's production build, unchanged, and none of the new cases is `@no-gpu`. `playwright.config.ts`: `MEDIA_SUITES` gains `preview-sync.spec.ts` (and `review-edit.spec.ts`, Entry 34), its comment says which build.
+
+**Differs from the prompt or the plan.**
+- One clip for the four cases, in order (the prompt asks no self-contained cases here; Prompt 123 does).
+- The first frame is timed from the page and proved by a picture (item 3), not timed by pictures.
+- Edit to preview ends at "Saving…", not a `data-frames` tick (item 3).
+- The helpers have `toggleItem(page, label, on)` (the state to reach) and `dragVideo(page, dx)` (a fraction of the preview's width).
+
+**How it was checked.** With Prompt 123's work, in one push (Entry 34's "How it was checked" covers the tree of both commits).
+
+**Open.** Open items 1-5 unchanged. Next: Prompt 123 (`review-edit.spec.ts`).
