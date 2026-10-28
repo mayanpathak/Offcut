@@ -90,6 +90,7 @@ async function apply(
   mode: "plan" | "scene",
   action: ReviewAction,
   detail: ReviewDetail | undefined,
+  joinsLastStep: ((previous: EditState) => boolean) | undefined,
 ): Promise<void> {
   // 1. Only a clip that is ready takes a change, and none while an export
   //    has the preview locked (TS §12.4): the controls are disabled then.
@@ -159,8 +160,9 @@ async function apply(
   if (resume) {
     await play();
   }
-  // An undo or a redo moves along the history itself (undo-redo.ts).
-  if (action !== "undo" && action !== "redo") {
+  // An undo or a redo moves along the history itself (undo-redo.ts); a
+  // change that joins the step before it is undone with it (D-175).
+  if (action !== "undo" && action !== "redo" && joinsLastStep?.(previous) !== true) {
     history.push(previous);
   }
   // 8.
@@ -172,15 +174,18 @@ async function apply(
  * the events and the plan again before the scene is built; mode `scene` (a
  * toggle, the style, the framing) builds the scene only. Resolves when the
  * change is shown or has failed: a failure is stored on the clip, not
- * thrown; a fault of this file is thrown.
+ * thrown; a fault of this file is thrown. `joinsLastStep`, given the edit
+ * before the change, says whether the change belongs to the history's last
+ * step: then no step of its own is pushed, and one undo takes both back.
  */
 export function update(
   change: (edit: EditState) => EditState,
   mode: "plan" | "scene",
   action: ReviewAction,
   detail?: ReviewDetail,
+  joinsLastStep?: (previous: EditState) => boolean,
 ): Promise<void> {
-  const run = inFlight.then(() => apply(change, mode, action, detail));
+  const run = inFlight.then(() => apply(change, mode, action, detail, joinsLastStep));
   inFlight = run.catch(() => undefined);
   return run;
 }

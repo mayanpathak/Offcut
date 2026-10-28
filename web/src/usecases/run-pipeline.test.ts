@@ -11,7 +11,9 @@ import * as clipStore from "../state/clip-store";
 import * as history from "../state/history";
 import { useModelStore } from "../state/model-store";
 import { cancelJob } from "./cancel-job";
+import { replaceAll } from "./replace-all";
 import { update } from "./review-update";
+import { undo } from "./undo-redo";
 import { runPipeline } from "./run-pipeline";
 
 type Deferred = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: unknown): void; kind: string };
@@ -387,5 +389,43 @@ describe("review-update (D-147)", () => {
     fail("render.setScene", "E_INTERNAL", "preview");
     await update((edit) => ({ ...edit, style: "tech" }), "scene", "style");
     expect(history.useHistoryStore.getState().past).toHaveLength(1);
+  });
+
+  describe("Change all (D-175)", () => {
+    const REPEATED = {
+      ...TRANSCRIPT,
+      words: [
+        { text: "Jhon", start_ms: 0, end_ms: 300, confidence: 0.9 },
+        { text: "met", start_ms: 300, end_ms: 600, confidence: 0.9 },
+        { text: "Jhon", start_ms: 600, end_ms: 900, confidence: 0.9 },
+        { text: "and", start_ms: 900, end_ms: 1200, confidence: 0.9 },
+        { text: "Jhon", start_ms: 1200, end_ms: 1500, confidence: 0.9 },
+      ],
+      sentences: [{ words: { start: 0, end: 5 }, start_ms: 0, end_ms: 1500 }],
+    } as unknown as Transcript;
+    const fromWord = 0 as unknown as Parameters<typeof replaceAll>[0];
+
+    beforeEach(() => {
+      clipStore.useClipStore.setState({ transcript: REPEATED });
+    });
+
+    it("right after the word it was offered for, it joins that word's step: one undo gives all three back", async () => {
+      await update((edit) => ({ ...edit, word_edits: words({ 0: "John" }) }), "plan", "word_edit");
+      expect(await replaceAll(fromWord, "John")).toBe(2);
+      expect(clip().edit.word_edits).toEqual({ 0: "John", 2: "John", 4: "John" });
+      expect(history.useHistoryStore.getState().past).toHaveLength(1);
+      await undo();
+      expect(clip().edit.word_edits).toEqual({});
+      expect(named("review_action").map((e) => (e.props as { action: string }).action)).toEqual(["word_edit", "replace_all", "undo"]);
+    });
+
+    it("after another change between, it is a step of its own", async () => {
+      await update((edit) => ({ ...edit, word_edits: words({ 0: "John" }) }), "plan", "word_edit");
+      await update((edit) => ({ ...edit, style: "bold" }), "scene", "style");
+      expect(await replaceAll(fromWord, "John")).toBe(2);
+      expect(history.useHistoryStore.getState().past).toHaveLength(3);
+      await undo();
+      expect(clip().edit.word_edits).toEqual({ 0: "John" });
+    });
   });
 });

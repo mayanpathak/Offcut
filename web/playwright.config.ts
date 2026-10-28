@@ -11,7 +11,7 @@ const PREVIEW_URL = "http://localhost:4173";
 // in `fixtures/.cache/`, which `media-setup` puts there. On D1 the build is
 // `pnpm build:e2e` (the key in the environment): a production bundle made in
 // the `test` mode, which keeps the player's caption mirrors and the
-// development hooks the editor's suites read
+// development hooks that `preview-sync` and `review-edit` read
 // (v4implementation D-155, §20.4). CI's Windows job runs the `@no-gpu` cases
 // on the production build of the ci job.
 const MEDIA_SUITES = [
@@ -20,6 +20,7 @@ const MEDIA_SUITES = [
   "export-creator.spec.ts",
   "rejections.spec.ts",
   "preview-sync.spec.ts",
+  "review-edit.spec.ts",
 ];
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).

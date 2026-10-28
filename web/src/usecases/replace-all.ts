@@ -4,8 +4,9 @@
 // Words are compared by their letters and digits, case-folded, whole: the
 // punctuation around a word is its own and stays.
 
-import type { WordIdx } from "../gen/domain";
+import type { EditState, WordIdx } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
+import { useHistoryStore } from "../state/history";
 import { update } from "./review-update";
 
 /** The punctuation before a word, its letters and digits, and the punctuation after. */
@@ -50,11 +51,43 @@ export function replaceAllCandidates(fromWord: WordIdx): WordIdx[] {
   return found;
 }
 
+/** Whether two edits hold the same record, word edits and overrides compared by their entries. */
+function sameRecord<V>(a: Readonly<Record<string, V>>, b: Readonly<Record<string, V>>, leaveOut?: string): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)].filter((key) => key !== leaveOut));
+  return [...keys].every((key) => a[key] === b[key]);
+}
+
+/**
+ * Whether the history's last step is the edit of `fromWord` to `to` that the
+ * toast was offered for: the step holds the edit before `previous`, and the
+ * two differ in `fromWord`'s text alone. "Change all" then joins that step
+ * (D-175: "Fix it everywhere" is one change), so one undo gives all of the
+ * words back (v4implementation §20.4); after any other change it is a step
+ * of its own.
+ */
+function joinsTheFix(fromWord: WordIdx, to: string): (previous: EditState) => boolean {
+  return (previous) => {
+    const top = useHistoryStore.getState().past.at(-1);
+    if (top === undefined || previous.word_edits[fromWord] !== to || top.word_edits[fromWord] === to) {
+      return false;
+    }
+    const others =
+      top.style === previous.style &&
+      top.crop_offset === previous.crop_offset &&
+      top.caption_position === previous.caption_position &&
+      top.highlight_numbers === previous.highlight_numbers &&
+      sameRecord(top.event_overrides, previous.event_overrides);
+    return others && sameRecord(top.word_edits, previous.word_edits, String(fromWord));
+  };
+}
+
 /**
  * Gives every candidate of `fromWord` the text `to`, each keeping its own
  * punctuation; an empty `to` hides them. The events are found again over the
- * whole transcript (D-175). Resolves with how many words changed, `fromWord`
- * not counted: 0 when there was nothing to change or the change failed.
+ * whole transcript (D-175). Right after the edit of `fromWord` it offers to
+ * repeat, it is one undo step with that edit. Resolves with how many words
+ * changed, `fromWord` not counted: 0 when there was nothing to change or the
+ * change failed.
  */
 export async function replaceAll(fromWord: WordIdx, to: string): Promise<number> {
   const words = replaceAllCandidates(fromWord);
@@ -77,6 +110,8 @@ export async function replaceAll(fromWord: WordIdx, to: string): Promise<number>
     },
     "plan",
     "replace_all",
+    undefined,
+    joinsTheFix(fromWord, to),
   );
   return useClipStore.getState().edit === made ? words.length : 0;
 }

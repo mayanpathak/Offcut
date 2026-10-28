@@ -57,6 +57,7 @@
 | 31 | ~~**The render worker refuses a second call as "Busy"** (one job at a time, `rpc-worker.ts`) and V4 gave it several callers that do not wait for each other. Entry 28 makes the calls that must not fail wait with `pool.ts`'s `whenFree` (asked again every 16 ms, for up to 2 s); the calls that can be dropped (hit test, style cards, the development mirror) still take the refusal. Prompt 118 (the RPC layer) keeps this, or replaces it with a queue in the page's client, and says which~~ Closed in Entry 29: kept | `web/src/workers/pool.ts`, `rpc.ts` | P118 |
 | 32 | Copy back to `v4implementation.md` what Entry 30 changed: §16.2's `cancel-job.ts` also keeps the shown failures (`failureShown`, the one `client_error` per failure); `export-store.ts` being unchanged, the export's `cancel` and `cancel_done` are taken in `start-export.ts` through the machine's table, and a cancelled import goes `importing → failed → idle` in one moment (the clip machine has no `importing → idle`); §16.1's `clip-store.cancelled`, `failureDuring`, `cancelledRun`, `retried`, `cancelledImport`, `clearFailure`, `preview-store.canvas`; §14.3's `whenReleased` (a worker just ended still holds its files a moment); §17.3: the failed export's card is in the side panel with "Try again" and "Close" (not "Start over"), the success state sits beside the Export button, the pill's "on your computer" line is the bar's description; §19.2: `vite.config.ts`'s `define` `__OFFCUT_DEV_FAULTS__`, the dev faults' worker halves in `rpc-worker.ts` (not `render.worker.ts`), `usecases/dev-faults.ts` (in TS §5's tree since Entry 30); G 14.5: the panel after a render crash says `E_WORKER_CRASH`'s words ("Part of Offcut stopped working"), not `E_GPU_LOST`'s | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 | 33 | **A flake of the hosted Windows runner's media job.** On `2b15489` (Entry 32) two `@no-gpu` cases of `model-download.spec.ts` ("first run …" and "a second session …") failed twice each: after `flushAnalytics` no batch reached the fake API within the 5 s poll, while the page was processing on the CPU as it should (the report's snapshot: "Transcribing…", no failure). The same commit passed on D1 (the spec, 10 of 10) and on the job's re-run. P113's run flaked on a third case of the same file. If it comes back, the poll's 5 s is the first thing to widen with `patient` (the runner's `E2E_TIMEOUT_SCALE` does not reach `expect.poll`'s default) | `web/tests-e2e/model-download.spec.ts` | P125 (the e2e suites) |
+| 34 | Copy back to `v4implementation.md` and the build guide what Entries 33-34 changed: §19.2 / §20.4 / G 16.7: the media suites run on D1 on `pnpm build:e2e` (a `--mode test` production bundle with the test key), the only build that has the caption mirrors and `__offcutDev` that `preview-sync` and `review-edit` read; §21.1's edit-to-preview ends at "Saving…" (after `setScene`'s answer, which follows the redraw), not a `data-frames` tick, which a paused redraw does not move; G 16.1's helpers as written (`toggleItem(page, label, on)`, `dragVideo(page, dx)`, `trackSaves`/`settled(page, since)`, `captionMirror`, `transcriptWords`); D-175 / §16.2: "Change all" right after the edit it was offered for joins that edit's undo step (`update`'s `joinsLastStep`); §20.4: the reference clip is wider than 9:16 (the portrait fixture is case 6's clip) | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 
 ---
 
@@ -2640,3 +2641,48 @@ How each is read (all from the page, D-155):
 **How it was checked.** With Prompt 123's work, in one push (Entry 34's "How it was checked" covers the tree of both commits).
 
 **Open.** Open items 1-5 unchanged. Next: Prompt 123 (`review-edit.spec.ts`).
+
+## Entry 34 - 2026-10-29 - P123 (S15): review-edit suite with axe
+
+**What.** Prompt 123 (G 16.3; §20.4; D-145 to D-147, D-169 to D-187, D-192): `review-edit.spec.ts`, sixteen self-contained cases (each its own clip load through the cached model), on D1. `MEDIA_SUITES` gains it. The media project lists **70 tests** (48 before, 4 and 16 new, 2 setup); `--grep @no-gpu` lists 25, as before.
+
+| # | Case | Read through |
+|---|---|---|
+| 1 | Edit a number: the word "90" of the reference clip fixed to "9"; the from-to's row reads "9 minutes" (and not "90 minutes"); one `review_action { action: "word_edit" }` | The row (`li[data-kind="from_to"]`), the fake API |
+| 2 | Hide a word: an empty commit takes it out of the caption; the transcript strikes it through | `data-caption-text`; the word button's computed `text-decoration-line` |
+| 3 | Toggle a visual: the list off changes the frame at its time and reads "3 of 4 visuals on"; a word edit elsewhere (near the clip's end) leaves it off; on again draws it again | The switch's `aria-checked`, the count, two canvas screenshots at the list's time plus a second |
+| 4 | Style: Bold writes the caption in capitals, the same words | `data-caption-text` |
+| 5 | Crop on `speech_60s_landscape.mp4`: the control exists; the video dragged to the right edge (the window at 1.0) is one `review_action { action: "crop_offset" }` | The crop slider's value, the fake API |
+| 6 | No crop on a portrait clip: no control | `crop-offset` absent. **The reference clip is wider than 9:16** and has the control: the 60 s portrait fixture is used |
+| 7 | Pause and restore: Bold chosen while playing: the transport goes Play, then Pause; the position moves on | A recorder of the button's label |
+| 8 | Undo after a failed edit: `failNextSetScene()`, a word committed: the card "Something went wrong in Offcut" with "Undo this change"; after it the card is gone, the word and the caption as before; the next edit applies | The card, the word button, `data-caption-text` |
+| 9 | Click a word in the transcript while playing: paused, at or after its block's time; the field holds its text, all selected; Tab commits it and opens the next word; Escape leaves the next unchanged, the focus on its button | The transport, the scrub bar, the field's selection |
+| 10 | Click a caption word on the preview (from the Style tab): the Captions tab opens on that word | `data-hit`, the selected tab, the field's word among the caption's |
+| 11 | Replace all: a word heard three times in the reference clip (its own transcript, no lent clip, no dev hook) fixed once; the toast offers "Change all 2"; all three change; one Ctrl/⌘+Z gives all three back | The toast, the three word buttons |
+| 12 | Undo and redo with Ctrl/⌘+Z and Shift+Ctrl/⌘+Z across a word edit, Bold and the list off, three each way, each state checked | The word button, the Bold card, the list's switch |
+| 13 | Drag the captions to the top: they snap at Top (placement 0.15), "Top" checked in Framing; one `review_action { action: "caption_position" }` | `data-caption-position`, the fake API |
+| 14 | Style cards: three images 62 and 56 ms (runs A, B) after the tab's click (≤ 400 ms); Highlight numbers off takes a colour off the caption that shows "90"; Bold applies | The cards' canvases (timed in the page), `data-caption-colors`, `data-caption-text` |
+| 15 | Shortcuts: Space plays and pauses outside a field and types a space inside one (the preview stays paused); → steps one frame and ← back, paused | The transport, the field's value, the scrub bar |
+| 16 | Accessibility: axe on the ready and the editing state: **no serious or critical violation**; on each of the four tabs every Tab stop of the page (each control with `tabIndex ≥ 0`, a roving group counting as its one stop) reached by Tab, each with a visible focus ring | `axe(page)`, a Tab walk; a ring is read from the computed `outline` / `box-shadow`, or, where the computed style cannot show it (the range inputs, whose thumb draws it), from the pixels around the control focused and not |
+
+**A behaviour the suite made right** (D-175, §20.4: "one undo restores all three"). "Change all" was a history step of its own after the edit of the word it was offered for, so one undo gave back the two other words and left the first one changed. **`review-update.ts`'s `update` takes an optional `joinsLastStep(previous)`**: when it holds, the change joins the history's last step instead of pushing one. **`replace-all.ts`** passes one that holds when the last step is exactly the edit of `fromWord` to the same text (the step's edit and the edit before differ in that word alone): "Fix it everywhere" is then one change with that edit, and one undo gives all three back. After any other change between, it is a step of its own. Two cases join `run-pipeline.test.ts`'s update-rule block (no new test file, SAB rule 6): **Vitest 173 → 175**.
+
+**What the cases found in the suite itself, fixed there** (none of them a fault of the app):
+- `transcriptWords` read the transcript while another tab was open, where the transcript is not mounted: it opens the Captions tab first.
+- A word's button is replaced by its field when it opens: the block's time is read before the click.
+- The scrub bar's value is on the frame grid (step 1000 / 30), and a word's time can fall inside a frame, so a first → that lands on the next frame's start reads the same: the case steps once to the grid, then times one frame.
+
+**Stability.** Run twice in a row on the final code: run A (`preview-sync` and `review-edit`) **22 passed** (with the 2 setup cases) in 22.4 min; run B (`pnpm e2e:media`, the whole media project) **69 passed, 1 skipped** (D-78's `REJECT_DECODE_UNSUPPORTED` `fixme`), 0 failed, in 34.1 min. No case was retried.
+
+**Differs from the prompt or the plan.**
+- Case 3's "the next frame at its time has no list" is two screenshots of the canvas at the list's time (a frame's pixels, not words, §24 item 13); there is no mirror of the overlays.
+- Case 13's "the visuals' zone below them" has nothing on the page to read it by; the placement and the snap are checked.
+- Case 11 uses the reference clip's own transcript: no fixture text and no dev hook was needed (the prompt's choice "record which").
+- `@axe-core/playwright` 4.14.0 was already a dev dependency (D-192).
+
+**How it was checked** (for Entries 33 and 34; the tree of both commits).
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`check-file-tree` 393 files, the two new specs in TS §5's tree; copy codes as Entry 30). `pnpm test`: Rust **650 passed, 0 failed, 3 ignored** (unchanged), **Vitest 175 passed**. `pnpm build` exit 0 (the production build, `check-hosts.mjs` included); app shell 337.2 kB gzip. `pnpm e2e` **12 passed**. `web/dist` has no `__offcutDev`, `data-caption-*`, dev fault or test key.
+- **The media project** on `pnpm build:e2e` with the test key: run B above, **69 passed, 1 skipped**, the 48 cases of before and the 20 new.
+- The frozen check lists only the recorded exceptions. No private path is tracked. Temporary timing logs (Entry 33, item 3) and the temporary diagnosis specs were removed; `git diff` of `web/src` holds only `review-update.ts` and `replace-all.ts` (and the test file).
+
+**Open.** Open items 1-5 unchanged. Known issue 34 opened: copy back what Entries 33-34 changed. Next: Prompt 124 (`cancel.spec.ts`, `pipeline-preview.spec.ts` complete, no dev hook in production).
