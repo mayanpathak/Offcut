@@ -153,8 +153,7 @@
   min-width: 0;
 }
 
-.badge,
-.previewFailure {
+.badge {
   align-self: center;
   margin: 0;
   padding: var(--sp-1) var(--sp-3);
@@ -162,10 +161,6 @@
   background: var(--surface-2);
   color: var(--text-2);
   font-size: var(--fs-12);
-}
-
-.previewFailure {
-  color: var(--danger);
 }
 
 /* Read by assistive technology only. */

@@ -190,7 +190,6 @@ export function PreviewPlayer() {
  */
 export function PreviewTransport() {
   const preview = usePreviewStore();
-  const failure = useClipStore((state) => state.failure);
   const lengthMs = useClipStore((state) => state.clipInfo?.duration) ?? 0;
   const creator = useCreator();
   const { label, press } = control(preview);
@@ -238,11 +237,7 @@ export function PreviewTransport() {
           />
         </span>
       </div>
-      {failure !== undefined ? (
-        <p className={styles.previewFailure} role="alert">
-          {messages.editor.failedStub}
-        </p>
-      ) : creator ? null : (
+      {creator ? null : (
         <p className={styles.badge} data-testid="watermark-badge">
           {messages.preview.watermarkBadge}
         </p>

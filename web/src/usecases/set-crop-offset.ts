@@ -1,7 +1,7 @@
 // Which part of a wide frame the 9:16 picture shows (v4implementation D-142):
 // from the far left (-1) through the centre (0) to the far right (1). The
 // drag of the video on the preview commits here once, on release (D-183);
-// the Framing tab's slider will too (V4 Prompt 116). A frame that is not
+// so does the Framing tab's slider (Prompt 116). A frame that is not
 // wider than 9:16 has no offset to set.
 
 import { cropMoves, useClipStore } from "../state/clip-store";

@@ -638,6 +638,7 @@ offcut/
 │   │   │   ├── start-export.ts
 │   │   │   ├── start-export.test.ts
 │   │   │   ├── cancel-job.ts
+│   │   │   ├── dev-faults.ts          (V4) development builds only: crash, hang, fail a call on purpose (v4implementation D-155, G 14.5)
 │   │   │   ├── restore-clip.ts
 │   │   │   ├── request-magic-link.ts
 │   │   │   ├── complete-sign-in.ts

@@ -2,7 +2,8 @@
 // downloaded and why, how far it is, and what went wrong if it failed. It
 // fills the stage's frame like the processing card (v4implementation D-188),
 // its bar in the brand colour. It only reads the model store; nothing is
-// started from here, and Cancel is wired in Prompt 119.
+// started from here. Cancel stops the download, keeping what has arrived for
+// the next run, and the run that waits for it (D-152).
 
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -10,8 +11,8 @@ import manifest from "../../config/model-manifest.json";
 import { messages } from "../../copy/messages";
 import type { ErrorCode } from "../../gen/domain";
 import { useModelStore } from "../../state/model-store";
-import { Button } from "../primitives/Button";
 import styles from "../styles/components.module.css";
+import { CancelButton } from "./ProcessingCard";
 
 const BYTES_PER_MB = 1_000_000;
 /** The size is said to the nearest 10 MB (TS §16.1). */
@@ -100,9 +101,7 @@ export function ModelDownloadPanel() {
         </div>
       )}
       <div className={styles.cardActions}>
-        <Button variant="secondary" size="sm">
-          {messages.cancel.button}
-        </Button>
+        <CancelButton scope="model" />
       </div>
     </section>
   );

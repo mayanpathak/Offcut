@@ -11,7 +11,7 @@ import { update } from "./review-update";
 export function toggleEvent(id: EventId, on: boolean): Promise<void> {
   const { plan, edit } = useClipStore.getState();
   const item = plan?.items.find((candidate) => candidate.id === id);
-  // Every V4 item is shown until the user says otherwise (D-145).
+  // Every item of a rules plan is shown until the user says otherwise (D-145).
   if (item === undefined || (edit.event_overrides[id] ?? true) === on) {
     return Promise.resolve();
   }

@@ -2,12 +2,17 @@
 // four steps in plain words (done ones ticked, the running ones turning, the
 // rest muted), the moments found so far, the line that says where the work
 // happens, and Cancel. The voice is cleaned while the captions are written,
-// so two steps can run at once. Cancel and the cancelled card's two actions
-// are wired in Prompt 119.
+// so two steps can run at once. Cancel stops the import or the run (D-152);
+// the cancelled card offers "Process again" and "Start over".
+
+import { useState } from "react";
 
 import { messages } from "../../copy/messages";
 import type { PipelineStage } from "../../gen/domain";
 import { type ClipState, useClipStore } from "../../state/clip-store";
+import { cancelJob } from "../../usecases/cancel-job";
+import { dismissClip } from "../../usecases/import-clip";
+import { runPipeline } from "../../usecases/run-pipeline";
 import { Check } from "../icons";
 import { Button } from "../primitives/Button";
 import { Spinner } from "../primitives/Spinner";
@@ -46,20 +51,60 @@ function StepMark({ state }: { state: StepState }) {
 }
 
 function Cancelled() {
+  const clipId = useClipStore((state) => state.clipId);
   return (
     <section className={styles.card} data-testid="clip-cancelled">
       <h2 className={styles.cardTitle}>{messages.cancel.cancelled}</h2>
       <div className={styles.cardActions}>
-        <Button variant="primary">{messages.cancel.processAgain}</Button>
-        <Button variant="secondary">{messages.editor.startOver}</Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            if (clipId !== undefined) {
+              void runPipeline(clipId);
+            }
+          }}
+        >
+          {messages.cancel.processAgain}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void dismissClip();
+          }}
+        >
+          {messages.editor.startOver}
+        </Button>
       </div>
     </section>
+  );
+}
+
+/** Cancel (D-152): the import while the file is brought in, the run after; busy until the job has stopped. */
+export function CancelButton({ scope }: { scope: "import" | "pipeline" | "model" }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      busy={busy}
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void cancelJob(scope).finally(() => {
+          setBusy(false);
+        });
+      }}
+      data-testid="cancel-job"
+    >
+      {messages.cancel.button}
+    </Button>
   );
 }
 
 export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
   const stage = useClipStore((state) => state.stage);
   const feed = useClipStore((state) => state.feed);
+  const importing = useClipStore((state) => state.status === "importing");
   if (cancelled) {
     return <Cancelled />;
   }
@@ -78,9 +123,7 @@ export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
       <ProcessingFeed />
       <p className={styles.cardHint}>{messages.processing.reassure}</p>
       <div className={styles.cardActions}>
-        <Button variant="secondary" size="sm">
-          {messages.cancel.button}
-        </Button>
+        <CancelButton scope={importing ? "import" : "pipeline"} />
       </div>
     </section>
   );

@@ -2,7 +2,7 @@
 // or the one undone last, applied through the update rule, in mode `plan`
 // when its word edits differ from the clip's (the events and the plan are
 // found again) and in mode `scene` otherwise. The top bar's two buttons and,
-// from V4 Prompt 117, Ctrl/⌘+Z and Shift+Ctrl/⌘+Z call these.
+// since Prompt 117, Ctrl/⌘+Z and Shift+Ctrl/⌘+Z call these.
 
 import { useClipStore } from "../state/clip-store";
 import * as history from "../state/history";

@@ -1,7 +1,8 @@
 // The editor's top bar (v4implementation D-178): the product's mark and the
 // clip's length on the left; on the right the save state, undo and redo, a
 // way to start over, the shortcuts sheet's button, and Export, the one
-// primary action. Undo and redo are enabled by the history (D-184) while the
+// primary action, which turns into the export's progress pill while an
+// export runs and offers "Download again" after it (D-189). Undo and redo are enabled by the history (D-184) while the
 // clip is ready and no export has the preview; their tooltips name their
 // shortcuts (D-185). The save state is the interface store's, "Saving…"
 // while an edit is written to the device.
@@ -15,6 +16,7 @@ import { usePreviewStore } from "../../state/preview-store";
 import { useUiStore } from "../../state/ui-store";
 import { dismissClip } from "../../usecases/import-clip";
 import { ExportButton } from "../components/ExportButton";
+import { ExportDone, ExportProgress, exportRunning } from "../components/ExportProgress";
 import { stepHistory } from "../components/ToastHost";
 import { Check, Keyboard, Redo, Undo } from "../icons";
 import { Button } from "../primitives/Button";
@@ -87,6 +89,20 @@ function UndoRedo({ ready }: { ready: boolean }) {
   );
 }
 
+/** Export, the pill while an export runs, and the success state beside Export once one is done. */
+function ExportControl() {
+  const status = useExportStore((state) => state.status);
+  if (exportRunning(status)) {
+    return <ExportProgress />;
+  }
+  return (
+    <>
+      {status === "done" ? <ExportDone /> : null}
+      <ExportButton />
+    </>
+  );
+}
+
 function SaveState() {
   const save = useUiStore((state) => state.save);
   return (
@@ -125,7 +141,7 @@ export function TopBar({ view }: { view: StageView }) {
         }}
         data-testid="shortcuts-open"
       />
-      <ExportButton />
+      <ExportControl />
     </header>
   );
 }

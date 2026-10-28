@@ -11,8 +11,10 @@ import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type Unsuppo
 type EventName = AnalyticsEvent["name"];
 type ErrorCopy = { title: string; body: string; action: string };
 /**
- * The error codes that can reach a person: the six of V1 and, since V2, the
- * three of the model download. The others get copy with the flows they belong to.
+ * The error codes that can reach a person: the six of V1, the three of the
+ * model download (V2), and the twelve more a person can meet on this device
+ * since v4implementation D-159. The account, billing and entitlement codes
+ * get copy with their flows (V6).
  */
 type ErrorCodeWithCopy = Extract<
   ErrorCode,
@@ -25,6 +27,18 @@ type ErrorCodeWithCopy = Extract<
   | "E_MODEL_DOWNLOAD"
   | "E_MODEL_HASH"
   | "E_MODEL_STORAGE"
+  | "E_STORAGE_QUOTA"
+  | "E_STORAGE_IO"
+  | "E_DECODE_AUDIO"
+  | "E_DECODE_VIDEO"
+  | "E_ASR_RUNTIME"
+  | "E_ASR_OOM"
+  | "E_DSP"
+  | "E_GPU_INIT"
+  | "E_GPU_LOST"
+  | "E_ENCODE_VIDEO"
+  | "E_ENCODE_AUDIO"
+  | "E_MUX"
 >;
 
 const MS_PER_SECOND = 1000;
@@ -121,11 +135,18 @@ export const messages = {
     button: "Export",
     unavailable: "Exporting needs an account, and accounts are not open yet.",
     stage: { rendering: "Rendering video", muxing: "Finishing file", saving: "Saving" },
-    elapsed: (seconds: number) => `${String(seconds)} ${seconds === 1 ? "second" : "seconds"} so far.`,
     renderingLocally: "Everything is rendering on your computer.",
-    done: "Your video is ready. Your browser has downloaded it.",
+    done: "Your video is downloaded.",
     percent: (percent: number) => `${String(percent)}%`,
     timeLeft: (seconds: number) => `About ${waitText(seconds)} left`, downloadAgain: "Download again",
+    // The pill's name for assistive technology (D-189).
+    label: "Export",
+  },
+
+  // The one action of an error card, chosen by where the failure happened (D-190).
+  recovery: {
+    tryAgain: "Try again", reloadPreview: "Reload preview", undoChange: "Undo this change", close: "Close",
+    details: "Details",
   },
 
   // The editor's top bar and side panel (v4implementation D-178, D-184, §17.5).
@@ -297,15 +318,77 @@ export const messages = {
       body: "You have sent this several times in a short while.",
       action: "Wait a little and try again.",
     },
+    // The fourteen of D-159 below, in the words of D-190: what happened in
+    // one sentence, then what to do. The card's button is the action itself.
     E_INTERNAL: {
       title: "Something went wrong in Offcut",
       body: "This is a fault in Offcut, not in your clip or your browser.",
-      action: "Reload the page.",
+      action: "If it happens again, reload the page.",
     },
     E_WORKER_CRASH: {
       title: "Part of Offcut stopped working",
-      body: "A background task could not start, or stopped unexpectedly.",
-      action: "Reload the page and try again.",
+      body: "A task running in the background stopped unexpectedly.",
+      action: "If it happens again, reload the page.",
+    },
+    E_STORAGE_QUOTA: {
+      title: "Your browser is out of space",
+      body: "Offcut keeps your clip on this device, and the browser has no room left for it.",
+      action: "Free some disk space, then try again.",
+    },
+    E_STORAGE_IO: {
+      title: "Offcut could not save on this device",
+      body: "Your browser did not let Offcut read or write its files just now.",
+      action: "If it happens again, reload the page.",
+    },
+    E_DECODE_AUDIO: {
+      title: "The sound of this clip could not be read",
+      body: "Part of the audio in this file could not be played back in this browser.",
+      action: "If it happens again, export the clip again from your editor and drop the new file.",
+    },
+    E_DECODE_VIDEO: {
+      title: "The picture of this clip could not be read",
+      body: "Part of the video in this file could not be played back in this browser.",
+      action: "If it happens again, export the clip again from your editor and drop the new file.",
+    },
+    E_ASR_RUNTIME: {
+      title: "The captions could not be written",
+      body: "The speech model stopped while it was listening to your clip.",
+      action: "If it happens again, reload the page.",
+    },
+    E_ASR_OOM: {
+      title: "Your computer ran out of memory",
+      body: "Writing the captions needed more memory than the browser could give.",
+      action: "Close other tabs and apps, then try again.",
+    },
+    E_DSP: {
+      title: "Your voice could not be cleaned",
+      body: "Something went wrong while the sound of your clip was being prepared.",
+      action: "If it happens again, reload the page.",
+    },
+    E_GPU_INIT: {
+      title: "The preview could not start",
+      body: "Offcut could not use your graphics card to draw the video.",
+      action: "Close other apps that show video or games, then try again.",
+    },
+    E_GPU_LOST: {
+      title: "The preview stopped",
+      body: "Your graphics card was reset, which can happen when another app uses it.",
+      action: "Reload preview",
+    },
+    E_ENCODE_VIDEO: {
+      title: "The video file could not be made",
+      body: "Your browser stopped while it was turning your edit into a video.",
+      action: "Close other tabs, then try again.",
+    },
+    E_ENCODE_AUDIO: {
+      title: "The sound could not be added to the file",
+      body: "Your browser stopped while it was writing the audio of your video.",
+      action: "If it happens again, reload the page.",
+    },
+    E_MUX: {
+      title: "The video file could not be finished",
+      body: "The picture and the sound were ready, but joining them into one file failed.",
+      action: "If it happens again, reload the page.",
     },
     E_MODEL_DOWNLOAD: {
       title: "The speech model could not be downloaded",

@@ -23,7 +23,7 @@ import { pause, play } from "./control-preview";
 
 /**
  * What `review_action` names a change. The last five join the server's list
- * in V4 Prompt 120 (§13); until then they are not sent.
+ * in Prompt 120 (§13); until then they are not sent.
  */
 export type ReviewAction = ReviewActionKind | "caption_position" | "replace_all" | "undo" | "redo" | "highlight_numbers";
 
@@ -153,12 +153,10 @@ async function apply(
       ui.setSave("saved");
     }
   } catch (error) {
-    // The clip goes back to the edit before; the preview keeps its last good frame.
+    // The clip goes back to the edit before; the preview keeps its last good
+    // frame. The card that shows the failure sends `client_error` (D-153).
     const failure = failureOf(error);
     clipStore.editFailed(previous, failure ?? { code: "E_INTERNAL", stage: "preview", retryable: false });
-    if (failure !== null) {
-      track({ name: "client_error", props: { error_code: failure.code, stage: failure.stage } });
-    }
     if (mode === "plan") {
       // The worker kept the events it found for the next edit: give it back those of the edit before.
       const { prosody } = clipStore.useClipStore.getState();
@@ -202,6 +200,38 @@ export function update(
   detail?: ReviewDetail,
 ): Promise<void> {
   const run = inFlight.then(() => apply(change, mode, action, detail));
+  inFlight = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * "Undo this change" (D-190), after a change failed: the clip holds the edit
+ * before it already (`editFailed`), and the scene is built from that edit
+ * again, so the preview shows what the clip holds. It waits for a change in
+ * flight, as a change does. Another failure is stored as the first was.
+ */
+export function undoFailedChange(): Promise<void> {
+  const run = inFlight.then(async () => {
+    const clip = clipStore.useClipStore.getState();
+    const { transcript, plan, timeMap, edit } = clip;
+    if (clip.status !== "ready" || transcript === undefined || plan === undefined || timeMap === undefined) {
+      return;
+    }
+    try {
+      const report = answered(
+        await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
+      );
+      clipStore.setChunks(report.chunks);
+    } catch (error) {
+      const failure = failureOf(error);
+      if (failure === null) {
+        throw error;
+      }
+      clipStore.noteFailure(failure, "edit");
+      return;
+    }
+    clipStore.clearFailure();
+  });
   inFlight = run.catch(() => undefined);
   return run;
 }

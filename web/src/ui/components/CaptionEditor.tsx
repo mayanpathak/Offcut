@@ -211,6 +211,10 @@ export function CaptionEditor() {
 
   const actions = useRef<Actions>({
     open: (word) => {
+      // While an export runs, the words wait for it, as every review control does (TS §12.4).
+      if (usePreviewStore.getState().status === "locked") {
+        return;
+      }
       const ui = useUiStore.getState();
       ui.editWord(word);
       setMenu(null);
@@ -287,7 +291,10 @@ export function CaptionEditor() {
   };
 
   return (
-    <PanelSection title={messages.panel.captions} hint={messages.captions.hint}>
+    <PanelSection
+      title={messages.panel.captions}
+      hint={status === "locked" ? messages.editor.availableAfterExport : messages.captions.hint}
+    >
       <Switch
         checked={follow}
         label={messages.captions.follow}

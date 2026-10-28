@@ -232,10 +232,34 @@
 .cardTitle,
 .cardText,
 .cardHint,
-.exportStage,
-.exportDone,
-.exportFailed {
+.pillLine {
   margin: 0;
+}
+
+/* An error card in the side panel or over the preview (D-190): its own
+   edge and background, the content's height, smaller type. */
+.cardCompact {
+  composes: card;
+  flex: none;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-1);
+}
+
+.cardCompact .cardTitle {
+  font-size: var(--fs-16);
+}
+
+/* Development builds only: what the failure was, collapsed (D-190). */
+.cardDetails {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+
+.cardDetails summary {
+  cursor: pointer;
 }
 
 .cardTitle {
@@ -362,7 +386,7 @@
   color: var(--text);
 }
 
-/* --- The export: the top bar's button, the panel's progress ------------------- */
+/* --- The export: the top bar's button, its pill and its done state (D-189) ------- */
 
 .exportPanel {
   display: flex;
@@ -379,20 +403,63 @@
   text-align: right;
 }
 
-.exportProgress {
+.pill {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--sp-2);
+  width: calc(var(--sp-7) * 7);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--topbar-h) / 2);
+  background: var(--surface-2);
 }
 
-.exportStage {
+.pillBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.pillLine {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.pillStage {
   font-weight: var(--fw-600);
 }
 
-.exportDone {
-  color: var(--ok);
+.pillPercent,
+.pillLeft {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
 
-.exportFailed {
-  color: var(--danger);
+.pillLeft {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exportDone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ok);
+  font-size: var(--fs-13);
+  white-space: nowrap;
+}
+
+/* Read by assistive technology only. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

@@ -23,6 +23,11 @@ export type PreviewState = {
   seekBusy: boolean;
   /** What the last play drew (D-155). */
   lastStats: PreviewStats | undefined;
+  /**
+   * Goes up when the preview is reloaded (v4implementation D-153): the player
+   * then draws a new canvas, since an element gives its drawing away once.
+   */
+  canvas: number;
 };
 
 type PreviewEvent =
@@ -55,6 +60,7 @@ export const usePreviewStore = create<PreviewState>(() => ({
   position: undefined,
   seekBusy: false,
   lastStats: undefined,
+  canvas: 0,
 }));
 
 /** Applies `event`; `change` is stored only if the transition led to another state. */
@@ -126,4 +132,9 @@ export function seekBusy(busy: boolean): void {
 /** What the last play drew. */
 export function played(stats: PreviewStats): void {
   usePreviewStore.setState({ lastStats: stats });
+}
+
+/** A new canvas for the preview, which the player hands over when it draws it (D-153). Not a change of state. */
+export function newCanvas(): void {
+  usePreviewStore.setState((state) => ({ canvas: state.canvas + 1 }));
 }

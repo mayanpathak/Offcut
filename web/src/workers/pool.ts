@@ -208,6 +208,40 @@ export async function whenFree<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+/** How long a worker that was ended may still hold its files, and how often a call that met one is made again. */
+const RELEASE_WAIT_MS = 3000;
+const RELEASE_RETRY_MS = 100;
+
+/** Whether `error` is a file still locked by another context: a worker's call, or the page's own (its cause). */
+function locked(error: unknown): boolean {
+  const named = (value: unknown): boolean => value instanceof DOMException && value.name === "NoModificationAllowedError";
+  if (error instanceof WorkerCallError) {
+    return error.failure.detail === "NoModificationAllowedError";
+  }
+  return named(error) || (error instanceof Error && named(error.cause));
+}
+
+/**
+ * Runs `call`, asked again while a file it needs is still locked: a worker
+ * that was just ended (`restartWorker`, a cancel that timed out, D-152)
+ * gives its files' handles back a moment after (found by V4 Prompt 119's
+ * break-it run). Any other failure, or a file still locked after
+ * `RELEASE_WAIT_MS`, is the call's failure.
+ */
+export async function whenReleased<T>(call: () => Promise<T>): Promise<T> {
+  const until = performance.now() + RELEASE_WAIT_MS;
+  for (;;) {
+    try {
+      return await call();
+    } catch (error) {
+      if (!locked(error) || performance.now() >= until) {
+        throw error;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, RELEASE_RETRY_MS));
+  }
+}
+
 let scriptsPreloaded = false;
 
 /** One `modulepreload` link per worker script, so each is in the HTTP cache before its worker is created. */

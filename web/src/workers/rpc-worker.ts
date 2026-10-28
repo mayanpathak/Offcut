@@ -2,7 +2,9 @@
 // the job context a handler gets, and what a handler throws or returns when
 // it fails or is cancelled. Moved from `rpc.ts` (v4implementation D-150).
 // Progress is throttled here (D-151): at most 10 messages a second per job,
-// and never a feed line dropped.
+// and never a feed line dropped. A development build's worker also takes the
+// three faults of the page's development hooks (D-155, G 14.5); a production
+// build has none of them (`__OFFCUT_DEV_FAULTS__`, vite.config.ts).
 
 import type { ErrorCode, JobId } from "../gen/domain";
 import type { Cancel, FailureStage, Progress, Req, Res } from "./protocol";
@@ -116,6 +118,47 @@ function throttledProgress(jobId: JobId, send: (p: Progress) => void): {
   };
 }
 
+
+// Set by vite.config.ts from the build's mode, as `DEV_HOOKS` of config/env.ts
+// is; absent where no bundler ran (the e2e suites import worker files in Node).
+declare const __OFFCUT_DEV_FAULTS__: boolean | undefined;
+/** The faults exist in development builds only: a production build folds this to `false` and drops them. */
+const DEV_FAULTS = typeof __OFFCUT_DEV_FAULTS__ !== "undefined" && __OFFCUT_DEV_FAULTS__;
+
+/** Blocks the worker's thread for good: only a restart ends it (`pool.restartWorker`). */
+function hang(): never {
+  for (;;) {
+    // Nothing: the thread never takes the next message.
+  }
+}
+
+/**
+ * The development faults, one-way messages of any worker (`ui/dev-hooks.ts`):
+ * `devCrash` throws where nothing catches it, which the page sees as the
+ * worker's crash; `devHang` blocks the thread; `devFailNext` makes the next
+ * call of `params.method` fail. `true` when `method` was one of them.
+ */
+function devFault(method: string, params: unknown, failNext: Set<string>): boolean {
+  switch (method) {
+    case "devCrash":
+      setTimeout(() => {
+        throw new Error("devCrash");
+      }, 0);
+      return true;
+    case "devHang":
+      return hang();
+    case "devFailNext": {
+      const target = typeof params === "object" && params !== null && "method" in params ? params.method : undefined;
+      if (typeof target === "string") {
+        failNext.add(target);
+      }
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
 /**
  * Serves the methods of one worker. One job at a time: a second request
  * while one is pending is refused, unless it is listed in `duringPreview`
@@ -130,6 +173,7 @@ export function serveWorker<Api>(
   const table: Partial<Record<string, (params: never, ctx: JobContext) => Promise<unknown> | void>> = handlers;
   const running = new Map<JobId, Job>();
   let main: Job | undefined;
+  const failNext = new Set<string>();
 
   const post = (message: Res<unknown> | Progress, transfer: Transferable[] = []): void => {
     scope.postMessage(message, { transfer });
@@ -149,6 +193,13 @@ export function serveWorker<Api>(
     }
 
     const { jobId, method, params } = message;
+    if (DEV_FAULTS && devFault(method, params, failNext)) {
+      return;
+    }
+    if (DEV_FAULTS && failNext.delete(method)) {
+      refuse(jobId, "DevFailure");
+      return;
+    }
     const oneWay = o.oneWay.includes(method);
     const handler = table[method];
     const beside = main?.method === "previewPlay" && o.duringPreview.includes(method);

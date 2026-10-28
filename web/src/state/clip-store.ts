@@ -50,6 +50,13 @@ export type ClipState = {
   reject?: RejectReason;
   failure?: AppFailure;
   /**
+   * Where a failure of a clip that stays `ready` happened: in a review
+   * change, or in the preview. The error card's action follows it (D-190).
+   */
+  failureDuring?: "edit" | "preview";
+  /** The run of the pipeline was cancelled: an `accepted` clip shows the cancelled card (D-152). */
+  cancelled: boolean;
+  /**
    * The program's audio at 48 kHz, for the preview, while the clip is
    * `ready` (D-127). The export reads the cleaned voice from the device,
    * `out48.f32` (v2implementation D-51, D-129).
@@ -69,6 +76,7 @@ function empty(): Fields {
     edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true },
     feed: [],
     prog48: null,
+    cancelled: false,
   };
 }
 
@@ -124,7 +132,26 @@ export function rejected(reason: RejectReason): void {
 
 /** importing | processing → failed */
 export function failed(failure: AppFailure): void {
-  apply("fail", (current) => ({ ...settled(current), failure }));
+  apply("fail", (current) => {
+    const rest = settled(current);
+    delete rest.failureDuring;
+    return { ...rest, failure };
+  });
+}
+
+/**
+ * What an accepted clip holds: its file's facts and the user's edits. A run
+ * that starts again starts from here, with nothing of the run before.
+ */
+function acceptedFields(current: Fields): Fields {
+  const { clipId, source, clipInfo } = current;
+  return {
+    ...empty(),
+    ...(clipId === undefined ? {} : { clipId }),
+    ...(source === undefined ? {} : { source }),
+    ...(clipInfo === undefined ? {} : { clipInfo }),
+    edit: current.edit,
+  };
 }
 
 /**
@@ -135,8 +162,30 @@ export function processing(stage: PipelineStage, waitingModel: boolean): void {
   if (useClipStore.getState().status === "processing") {
     useClipStore.setState({ stage, waitingModel });
   } else {
-    apply("run", (current) => ({ ...current, stage, waitingModel }));
+    apply("run", (current) => ({ ...acceptedFields(current), stage, waitingModel }));
   }
+}
+
+/** failed → processing (D-153): the pipeline runs again from its first step. */
+export function retried(): void {
+  apply("retry", (current) => ({ ...acceptedFields(current), stage: "probe_audio", waitingModel: false }));
+}
+
+/** processing → accepted (D-152): the run was cancelled; "Process again" runs it from the start. */
+export function cancelledRun(): void {
+  apply("cancel", (current) => ({ ...acceptedFields(current), cancelled: true }));
+}
+
+/**
+ * importing → idle (D-152). The clip machine has no edge from `importing`
+ * to `idle` (its table is unchanged in V4, §4): a cancelled import goes
+ * through `failed`, and on to `idle` in the same moment, so no failure is
+ * ever drawn or reported.
+ */
+export function cancelledImport(): void {
+  const failure: AppFailure = { code: "E_INTERNAL", stage: "import", retryable: false, detail: "Cancelled" };
+  apply("fail", (current) => ({ ...settled(current), failure }));
+  reset();
 }
 
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */
@@ -182,7 +231,7 @@ export function editDone(): void {
 
 /** updating → ready with the edit before, and why the change did not apply (D-147). */
 export function editFailed(previous: EditState, failure: AppFailure): void {
-  apply("edit_done", (current) => ({ ...current, edit: previous, failure }));
+  apply("edit_done", (current) => ({ ...current, edit: previous, failure, failureDuring: "edit" }));
 }
 
 /** processing → rejected: fewer words were heard than a clip needs. */
@@ -194,8 +243,16 @@ export function noSpeech(): void {
  * A failure that does not change the clip's state: the preview's, with the
  * clip still `ready`. The clip machine has no way from `ready` to `failed`.
  */
-export function noteFailure(failure: AppFailure): void {
-  useClipStore.setState({ failure });
+export function noteFailure(failure: AppFailure, during: "edit" | "preview" = "preview"): void {
+  useClipStore.setState({ failure, failureDuring: during });
+}
+
+/** The failure of a `ready` clip is over: the preview was reloaded, or the change undone (D-153, D-190). */
+export function clearFailure(): void {
+  const next = { ...useClipStore.getState() };
+  delete next.failure;
+  delete next.failureDuring;
+  useClipStore.setState(next, true);
 }
 
 /** rejected | failed | ready | accepted → idle. Nothing of the clip is kept, its audio neither. */

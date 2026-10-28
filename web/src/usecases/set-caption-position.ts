@@ -1,7 +1,7 @@
 // Where the caption block sits (v4implementation D-171): one placement per
 // clip, from 0 (the top of its track) to 1 (the bottom, the default). The
 // drag on the preview and the arrow keys commit here once, on release
-// (D-183); the Framing tab's control will too (V4 Prompt 116).
+// (D-183); so does the Framing tab's control (Prompt 116).
 
 import { useClipStore } from "../state/clip-store";
 import { update } from "./review-update";

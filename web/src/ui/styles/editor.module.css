@@ -131,6 +131,16 @@
   box-shadow: none;
 }
 
+/* A failure's card over the preview (§17.2): the frame dimmed under it. */
+.frameOver {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: var(--sp-3);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+
 /* The player's transport under the frame; kept empty in the other states so
    the frame stays where it is. */
 .below {

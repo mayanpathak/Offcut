@@ -73,8 +73,11 @@ function copyOrt(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), copyOrt()],
+  // Whether the workers take the development hooks' faults (workers/rpc-worker.ts):
+  // the workers may not read `import.meta.env`, and a production build folds this to `false`.
+  define: { __OFFCUT_DEV_FAULTS__: JSON.stringify(mode !== "production") },
   resolve: {
     // ONNX Runtime has a build that holds no reference to its own `.wasm`
     // file. Without this condition the bundler follows that reference and
@@ -103,4 +106,4 @@ export default defineConfig({
     assetsInlineLimit: 0,
   },
   worker: { format: "es" },
-});
+}));

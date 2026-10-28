@@ -31,7 +31,7 @@ export function wordAt(i: number): WordIdx {
 
 /**
  * The words that would change with `fromWord`: heard as the same word, not
- * edited yet, `fromWord` itself left out. The toast's count (V4 Prompt 115).
+ * edited yet, `fromWord` itself left out. The toast's count (Prompt 115).
  */
 export function replaceAllCandidates(fromWord: WordIdx): WordIdx[] {
   const { transcript, edit } = useClipStore.getState();

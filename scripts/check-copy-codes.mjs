@@ -25,20 +25,9 @@ const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
  * removed in the change that writes its copy.
  */
 const COPY_PENDING = [
-  // Every error but the six a person can meet in V1 and the three of the
-  // model download, written in V2: due by V7.
-  "E_STORAGE_QUOTA",
-  "E_STORAGE_IO",
-  "E_DECODE_AUDIO",
-  "E_DECODE_VIDEO",
-  "E_ASR_RUNTIME",
-  "E_ASR_OOM",
-  "E_DSP",
-  "E_GPU_INIT",
-  "E_GPU_LOST",
-  "E_ENCODE_VIDEO",
-  "E_ENCODE_AUDIO",
-  "E_MUX",
+  // The account, billing and entitlement errors: due with their flows in V6.
+  // The fourteen a person can meet on this device have copy since V4
+  // (v4implementation D-159).
   "E_AUTH_LINK_INVALID",
   "E_AUTH_LINK_EXPIRED",
   "E_AUTH_SESSION_EXPIRED",

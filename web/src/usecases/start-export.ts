@@ -1,7 +1,9 @@
 // C-9, C-10: the clip becomes an MP4, and the MP4 is downloaded. The render
 // worker draws, encodes and writes the file; its size and its watermark come
 // from the entitlement token, which the worker verifies (INV-9). This file
-// starts the export, follows it in the export store and hands the file over.
+// starts the export, follows it in the export store and hands the file over,
+// again when asked. An export can be cancelled (v4implementation D-152): it
+// ends `idle`, with no file of it on this device.
 //
 // V2 has no gate: the token is the one this device holds, and without one no
 // export can be made (v2implementation D-23). Nothing here calls the API.
@@ -14,9 +16,12 @@ import * as opfs from "../persistence/opfs";
 import { forExport } from "../state/blockers";
 import { useClipStore } from "../state/clip-store";
 import * as exportStore from "../state/export-store";
-import { pool, WorkerCallError } from "../workers/pool";
+import { EXPORT_MACHINE } from "../state/machines/export-machine";
+import { transition } from "../state/machines/transition";
+import { pool, WorkerCallError, whenReleased } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
-import { lockForExport, unlockAfterExport } from "./control-preview";
+import { signalFor } from "./cancel-job";
+import { lockForExport, reloadPreview, unlockAfterExport } from "./control-preview";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -117,15 +122,44 @@ function failureOf(error: unknown): AppFailure | null {
   return null;
 }
 
-/** Steps 6 to 10 of v2implementation §19.5. A failure is thrown; `startExport` stores it. */
-async function renderAndDeliver(clipId: ClipId, exportId: ExportId, entitlementToken: string): Promise<void> {
+/** What an export throws when it sees its signal aborted: it is not a failure. */
+class ExportCancelled extends Error {
+  constructor() {
+    super("The export was cancelled.");
+    this.name = "ExportCancelled";
+  }
+}
+
+/** Stops the export here if it was cancelled: read after every step that waited. */
+function goOn(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw new ExportCancelled();
+  }
+}
+
+/** The file the last export delivered, for "Download again" (D-189). One export is kept (D-40). */
+let delivered: { clipId: ClipId; path: string } | undefined;
+
+/**
+ * Steps 6 to 10 of v2implementation §19.5. A failure is thrown; `startExport`
+ * stores it. A cancel is thrown as `ExportCancelled`: the worker stopped,
+ * or its file was finished and is not delivered.
+ */
+async function renderAndDeliver(
+  clipId: ClipId,
+  exportId: ExportId,
+  entitlementToken: string,
+  signal: AbortSignal,
+): Promise<void> {
   // 6. V7: `quota.ensureFree` takes this sweep's place (v2implementation §25).
   //    Until then one export is kept (D-40). A failure is ignored.
   await opfs.remove(opfs.paths.exportsRoot()).catch(() => undefined);
+  delivered = undefined;
 
   // 7. The export reads its own copy of the audio: a buffer that is handed
   //    to a worker is gone from this thread, and the preview keeps its own (D-51).
   const out48 = await opfs.readAudio(clipId);
+  goOn(signal);
 
   // 8.
   const result = await pool.render.exportClip(
@@ -133,6 +167,9 @@ async function renderAndDeliver(clipId: ClipId, exportId: ExportId, entitlementT
     {
       transfer: [out48.buffer],
       onProgress: (p) => {
+        if (signal.aborted) {
+          return;
+        }
         if (p.stage !== "mux") {
           exportStore.progress(p.done, p.total);
         } else if (exportStore.useExportStore.getState().status === "rendering") {
@@ -141,8 +178,9 @@ async function renderAndDeliver(clipId: ClipId, exportId: ExportId, entitlementT
       },
     },
   );
+  goOn(signal);
   if ("cancelled" in result) {
-    // Nothing sends a cancel before V4.
+    // Only this export's signal asks for a cancel: one that comes otherwise has gone wrong.
     throw new WorkerCallError({ code: "E_INTERNAL", stage: "render_encode", retryable: false, detail: "Cancelled" });
   }
 
@@ -157,12 +195,39 @@ async function renderAndDeliver(clipId: ClipId, exportId: ExportId, entitlementT
 
   // 10.
   deliver(await opfs.getFile(result.opfsPath));
+  delivered = { clipId, path: result.opfsPath };
+}
+
+/**
+ * rendering | muxing → cancelled → idle: the export machine's two events
+ * (TS §12.2). `export-store.ts` is unchanged in this version (§4) and has no action
+ * for them, so the transitions are taken here, through the same table.
+ */
+function exportCancelled(): void {
+  const { status, unavailable } = exportStore.useExportStore.getState();
+  const stopped = transition("export", EXPORT_MACHINE, status, "cancel");
+  if (stopped === status) {
+    return;
+  }
+  exportStore.useExportStore.setState({ status: stopped });
+  const idle = transition("export", EXPORT_MACHINE, stopped, "cancel_done");
+  exportStore.useExportStore.setState({ status: idle, done: 0, total: 0, unavailable }, true);
+}
+
+/**
+ * Whether the render worker was ended under the export: it crashed, or the
+ * cancel restarted it (Prompt 118). Its preview session went with it.
+ */
+function renderWorkerGone(error: unknown): boolean {
+  return error instanceof WorkerCallError && error.failure.code === "E_WORKER_CRASH";
 }
 
 /**
  * Exports the clip and downloads the file: the eleven steps of
  * v2implementation §19.5. Resolves when the export is over, however it
- * ended; a failure is in the export store.
+ * ended; a failure is in the export store, and the card that shows it sends
+ * `client_error` (cancel-job.ts). A cancelled export ends `idle`, with
+ * neither its partial nor its finished file left (D-152).
  */
 export async function startExport(clipId: ClipId): Promise<void> {
   // 1. The component shows the words of the blocker.
@@ -190,6 +255,7 @@ export async function startExport(clipId: ClipId): Promise<void> {
   const exportId = newExportId();
   exportStore.start(exportId);
   exportStore.clear();
+  const signal = signalFor("export");
   const startedAt = performance.now();
 
   // 4.
@@ -200,13 +266,30 @@ export async function startExport(clipId: ClipId): Promise<void> {
   await lockForExport();
 
   try {
-    await renderAndDeliver(clipId, exportId, record.token);
+    goOn(signal);
+    await renderAndDeliver(clipId, exportId, record.token, signal);
   } catch (error) {
+    if (signal.aborted) {
+      // The worker removes its partial file when it stops; one that was
+      // restarted could not, and holds it a moment after. Neither file of
+      // this export is kept.
+      await whenReleased(() => opfs.remove(opfs.paths.exportTmp(exportId))).catch(() => undefined);
+      await whenReleased(() => opfs.remove(opfs.paths.exportFinal(exportId))).catch(() => undefined);
+      exportCancelled();
+      unlockAfterExport();
+      if (renderWorkerGone(error)) {
+        await reloadPreview();
+      }
+      return;
+    }
     const known = failureOf(error);
     const failure = known ?? { code: "E_INTERNAL", stage: "render_encode", retryable: false };
     exportStore.fail(failure);
     track({ name: "export_failed", props: { error_code: failure.code, stage: failure.stage } });
     unlockAfterExport();
+    if (renderWorkerGone(error)) {
+      await reloadPreview();
+    }
     if (known === null) {
       // A fault of this file. The export is shown as failed, and the fault is not hidden behind that.
       throw error;
@@ -231,4 +314,33 @@ export async function startExport(clipId: ClipId): Promise<void> {
       from_cache: false,
     },
   });
+}
+
+/**
+ * "Download again" (D-189): hands the last export's file over once more. A
+ * file that is no longer on this device ends the done state: the clip can be
+ * exported again.
+ */
+export async function downloadAgain(): Promise<void> {
+  const file = delivered;
+  const done = exportStore.useExportStore.getState().status === "done";
+  if (file === undefined || !done || file.clipId !== useClipStore.getState().clipId) {
+    return;
+  }
+  try {
+    deliver(await opfs.getFile(file.path));
+  } catch (error) {
+    if (!(error instanceof opfs.OpfsError)) {
+      throw error;
+    }
+    delivered = undefined;
+    exportStore.reset();
+  }
+}
+
+/** "Close" on a failed export's card (D-190): back to the editor, the Export button ready again. */
+export function dismissExport(): void {
+  if (exportStore.useExportStore.getState().status === "failed") {
+    exportStore.reset();
+  }
 }

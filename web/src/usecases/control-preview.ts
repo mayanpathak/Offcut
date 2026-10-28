@@ -1,12 +1,13 @@
 // C-5: the preview player. The page plays the clip's audio; the render worker
 // draws the frame that belongs to the audio's time (TS §20). This file owns
-// the one `AudioContext` and tells the worker the time four times a second.
+// the one `AudioContext` and tells the worker the time four times a second,
+// and brings a preview that stopped back (`reloadPreview`, D-153).
 
 import { track } from "../analytics/client";
 import { LIMITS, type OutMs } from "../gen/domain";
-import { noteFailure } from "../state/clip-store";
+import { clearFailure, noteFailure, setChunks, useClipStore } from "../state/clip-store";
 import * as previewStore from "../state/preview-store";
-import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool";
+import { type Cancelled, pool, WorkerCallError, whenFree, whenReleased } from "../workers/pool";
 import type { ClockSync, PreviewStats } from "../workers/protocol";
 
 /** How often the worker is told the audio's time (TS §20.2). */
@@ -70,12 +71,39 @@ function stopSound(p: Player): void {
   }
 }
 
-/** A failure of the worker is stored where the page shows it. Anything else is a fault of this file. */
+/**
+ * A failure of the worker is stored where the page shows it; while one is
+ * shown it stays, so the card says the first thing that went wrong. Anything
+ * else is a fault of this file.
+ */
 function stored(error: unknown): void {
   if (!(error instanceof WorkerCallError)) {
     throw error;
   }
-  noteFailure(error.failure);
+  if (useClipStore.getState().failure === undefined) {
+    noteFailure(error.failure);
+  }
+}
+
+let crashWatched = false;
+
+/**
+ * A render worker that crashes while nothing waits for it, the preview
+ * paused, is shown as a call's failure would be (D-153): its session is
+ * gone, and "Reload preview" brings it back. A change in flight shows its
+ * own failure, and an export handles its own worker (start-export.ts).
+ */
+function watchCrash(): void {
+  if (crashWatched) {
+    return;
+  }
+  crashWatched = true;
+  pool.render.onCrash((failure) => {
+    const clip = useClipStore.getState();
+    if (clip.status === "ready" && clip.failure === undefined && status() !== "locked") {
+      noteFailure(failure);
+    }
+  });
 }
 
 /**
@@ -83,6 +111,7 @@ function stored(error: unknown): void {
  * ready to play. A preview that is attached already is detached first.
  */
 export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): Promise<void> {
+  watchCrash();
   await detach();
   const context = new AudioContext();
   const buffer = context.createBuffer(1, prog48.length, AUDIO_RATE);
@@ -358,4 +387,59 @@ export function unlockAfterExport(): void {
   if (player === undefined) {
     previewStore.detached();
   }
+}
+
+/** A worker's answer to a call nothing cancels: one that says it was cancelled has gone wrong. */
+function answered<T>(result: T | Cancelled): T {
+  if (typeof result === "object" && result !== null && "cancelled" in result) {
+    throw new WorkerCallError({ code: "E_INTERNAL", stage: "preview", retryable: false, detail: "Cancelled" });
+  }
+  return result;
+}
+
+let reloading: Promise<void> | undefined;
+
+async function reload(): Promise<void> {
+  const clip = useClipStore.getState();
+  const { clipId, clipInfo, transcript, prosody, plan, timeMap, edit } = clip;
+  if (clip.status !== "ready" || clipId === undefined || clipInfo === undefined) {
+    return;
+  }
+  if (transcript === undefined || prosody === undefined || plan === undefined || timeMap === undefined) {
+    return;
+  }
+  await detach();
+  // A fresh worker: a crashed one is gone already, and a lost graphics device is not used again.
+  pool.restartWorker("render");
+  try {
+    // The worker before may still hold the clip's file a moment (D-152).
+    answered(await whenReleased(() => pool.render.openSession({ clipId, clipInfo })));
+    // The worker keeps what the events were found in, for the next word edit (D-146).
+    answered(await pool.render.detect({ transcript, prosody, wordEdits: edit.word_edits }));
+    const report = answered(await pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" }));
+    setChunks(report.chunks);
+  } catch (error) {
+    // The reload's own failure is the one to show now.
+    clearFailure();
+    stored(error);
+    return;
+  }
+  clearFailure();
+  // The player draws a new canvas and hands it over, as it does when it first appears.
+  previewStore.newCanvas();
+}
+
+/**
+ * "Reload preview" (D-153): a preview that stopped, because the graphics
+ * device was lost or the render worker crashed, comes back with the clip's
+ * edits and without processing again. A fresh render worker opens the
+ * clip's session and sets its scene; the page then attaches a new canvas.
+ * A second call while one runs gets the same promise; a failure is stored
+ * where the page shows it, as any failure of the preview is.
+ */
+export function reloadPreview(): Promise<void> {
+  reloading ??= reload().finally(() => {
+    reloading = undefined;
+  });
+  return reloading;
 }

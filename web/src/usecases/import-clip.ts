@@ -1,7 +1,9 @@
 // C-2: a clip arrives. A dropped file, or the sample clip from the asset
 // host, is copied to this device, probed and validated in the media worker;
-// an accepted clip goes on to the pipeline. The name of a dropped file is
-// never read, stored or sent (TS §25.1 P-11).
+// an accepted clip goes on to the pipeline. An import can be cancelled
+// (v4implementation D-152): it ends with no clip and nothing of it on this
+// device. The name of a dropped file is never read, stored or sent (TS
+// §25.1 P-11).
 
 import { track } from "../analytics/client";
 import type { ClipSource, DurationBucket } from "../gen/api";
@@ -14,8 +16,9 @@ import * as transcriptRepo from "../persistence/transcript-repo";
 import { forImport } from "../state/blockers";
 import * as clipStore from "../state/clip-store";
 import * as exportStore from "../state/export-store";
-import { pool, WorkerCallError } from "../workers/pool";
+import { pool, WorkerCallError, whenReleased } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
+import { signalFor } from "./cancel-job";
 import { runPipeline, startTimer } from "./run-pipeline";
 
 // Where a clip's length falls, for `clip_accepted`.
@@ -93,6 +96,19 @@ async function importFailed(clipId: ClipId, failure: AppFailure): Promise<void> 
 }
 
 /**
+ * The import was cancelled (D-152): what was copied and written of the clip
+ * goes first, then the clip, so that nothing of it is left once the page
+ * shows the drop zone again. A failure to remove is ignored: the next
+ * import sweeps the clips' directory.
+ */
+async function importCancelled(clipId: ClipId): Promise<void> {
+  // A media worker restarted by the cancel may hold the copy a moment (D-152).
+  await whenReleased(() => opfs.remove(opfs.paths.clipDir(clipId))).catch(() => undefined);
+  await clipsRepo.clear().catch(() => undefined);
+  clipStore.cancelledImport();
+}
+
+/**
  * Brings a clip in: the steps of v3implementation §15.1. Resolves when the
  * clip is accepted, rejected or failed; the pipeline of an accepted clip runs
  * on after that.
@@ -114,6 +130,7 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
   // 3.
   const clipId = newClipId();
   clipStore.begin(clipId, source);
+  const signal = signalFor("import");
 
   // 4. V7: `quota.ensureFree` takes this sweep's place (v2implementation §25).
   //    Until then one clip is kept (D-40), and so are its records: those of the
@@ -137,12 +154,21 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
     await importFailed(clipId, { code: "E_STORAGE_IO", stage: "import", retryable: true });
     return;
   }
+  if (signal.aborted) {
+    await importCancelled(clipId);
+    return;
+  }
 
-  // 7.
+  // 7. A cancel stops the copy (D-152); a media worker restarted because the
+  //    copy did not stop in time fails the call as a crash, which is the cancel too.
   let probed: Awaited<ReturnType<typeof pool.media.importAndProbe>>;
   try {
     probed = await pool.media.importAndProbe({ clipId, file });
   } catch (error) {
+    if (signal.aborted) {
+      await importCancelled(clipId);
+      return;
+    }
     if (!(error instanceof WorkerCallError)) {
       await importFailed(clipId, { code: "E_INTERNAL", stage: "import", retryable: false });
       throw error;
@@ -150,8 +176,12 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
     await importFailed(clipId, error.failure);
     return;
   }
+  if (signal.aborted) {
+    await importCancelled(clipId);
+    return;
+  }
   if ("cancelled" in probed) {
-    // Nothing sends a cancel before V4.
+    // Only this import's signal asks for a cancel: one that comes otherwise has gone wrong.
     await importFailed(clipId, { code: "E_INTERNAL", stage: "import", retryable: false, detail: "Cancelled" });
     return;
   }
@@ -182,6 +212,10 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
     await importFailed(clipId, { code: quota ? "E_STORAGE_QUOTA" : "E_STORAGE_IO", stage: "storage", retryable: true });
     return;
   }
+  if (signal.aborted) {
+    await importCancelled(clipId);
+    return;
+  }
 
   // 10.
   clipStore.accepted(probed.ok);
@@ -194,10 +228,14 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
   void runPipeline(clipId);
 }
 
-/** The sample clip as a file, or why it could not be fetched. */
-async function fetchSample(): Promise<File | { offline: boolean }> {
-  // The signal is never aborted in V2: the cancel arrives in V4.
-  const result = await fetchAsset(SAMPLE_CLIP_PATH, { signal: new AbortController().signal });
+/** The sample clip as a file, or why it could not be fetched; `null` when the fetch was cancelled. */
+async function fetchSample(): Promise<File | { offline: boolean } | null> {
+  // The import's signal: no clip is shown while the sample is fetched, so
+  // nothing offers its cancel yet, and an aborted fetch leaves the page as it is.
+  const result = await fetchAsset(SAMPLE_CLIP_PATH, { signal: signalFor("import") });
+  if (!result.ok && result.cause === "aborted") {
+    return null;
+  }
   if (!result.ok) {
     return { offline: result.cause === "offline" };
   }
@@ -217,6 +255,9 @@ async function runSampleImport(): Promise<void> {
     return;
   }
   const sample = await fetchSample();
+  if (sample === null) {
+    return;
+  }
   if (sample instanceof File) {
     await importClip(sample, "sample");
     return;
