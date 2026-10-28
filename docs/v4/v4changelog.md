@@ -54,7 +54,7 @@
 | 28 | Copy back to `v4implementation.md` what Entry 24 changed: §14.1's `Hit` carries `rect` (the word's glyph box, the caption block) and `RenderWorkerApi` gains `captionMirror` (dev and test builds call it); §16.2: a pause ends with a still frame of the paused time, `review-update.ts`'s queue of one, `cropMoves` in `clip-store.ts`, `cachedPlan` in `start-export.ts`; Appendix D: `CAPTION_TRACK` beside `CAPTION_SNAPS`; §4 and §17.3: `PreviewGestures.tsx`; and Entry 26's: §14.1's `SceneReport.chunks` (`SceneChunk`), §16.1's `clip-store.chunks`, §4's `CaptionWordControls.tsx`; and Entry 27's: §15.1's `styleThumbnails` at the preview profile, §16.2's first thumbnail call not debounced, `update`'s `ReviewDetail`; and Entry 28's: §14.3 or §16.2: `pool.ts`'s `whenFree` (a render call that must not fail waits while the worker refuses it as busy), used by the update rule, the seek, the play and the pause; §16.1: `ui-store.shortcuts`, a queued toast's `key`; §17.3: `ToastHost` shows a stack of up to three, the hide toast and the undo toast (`stepHistory`), the top bar's shortcuts button; §16.2: `control-preview`'s `togglePlay`, `stepFrame` (a frame's time rounded up), `stepSecond` | `docs/v4/v4implementation.md` | P127 (copy-back) |
 | 29 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `review-update.ts` mints `SentenceIdx` (`sentenceAt`), `replace-all.ts` mints `WordIdx` (`wordAt`), D-59's rule~~ Opened and closed in Entry 25 | `web/eslint.config.js` | P114 |
 | 30 | `Dropped` (`offcut-plan`) carries no item id, so the Visuals tab cannot leave out an item the validation dropped (Entry 27). A rules plan validates clean; a model's plan (V6.1) can be dropped from, and needs the item's id in `Dropped` | `offcut-plan`, `PlanItemList.tsx` | V6.1 |
-| 31 | **The render worker refuses a second call as "Busy"** (one job at a time, `rpc-worker.ts`) and V4 gave it several callers that do not wait for each other. Entry 28 makes the calls that must not fail wait with `pool.ts`'s `whenFree` (asked again every 16 ms, for up to 2 s); the calls that can be dropped (hit test, style cards, the development mirror) still take the refusal. Prompt 118 (the RPC layer) keeps this, or replaces it with a queue in the page's client, and says which | `web/src/workers/pool.ts`, `rpc.ts` | P118 |
+| 31 | ~~**The render worker refuses a second call as "Busy"** (one job at a time, `rpc-worker.ts`) and V4 gave it several callers that do not wait for each other. Entry 28 makes the calls that must not fail wait with `pool.ts`'s `whenFree` (asked again every 16 ms, for up to 2 s); the calls that can be dropped (hit test, style cards, the development mirror) still take the refusal. Prompt 118 (the RPC layer) keeps this, or replaces it with a queue in the page's client, and says which~~ Closed in Entry 29: kept | `web/src/workers/pool.ts`, `rpc.ts` | P118 |
 
 ---
 
@@ -2415,3 +2415,65 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - Known issue 31: whether Prompt 118's RPC layer keeps `whenFree` or queues calls in the page's client.
 
 **Open.** Known issue 26 closed; 28 gains this entry's copy-back items; 31 opened (P118); open items 1-5 unchanged. S12 is complete. Next: Prompt 118 (the RPC layer: progress throttle, cancel, crash, the pool).
+
+## Entry 29 - 2026-10-28 - P118 (S13): progress throttle, cancel, crash handling, pool restart
+
+**What.** Prompt 118 (G 14.1; D-151, D-152, D-153; §14.2, §14.3; TS §14.3): the worker layer can be cancelled, survives a crash, and never floods the page with progress. Nothing calls `pool.cancel` yet: `cancel-job.ts` and the use-cases are Prompt 119's.
+
+**1. The progress throttle** (`rpc-worker.ts`, D-151). `PROGRESS_MIN_INTERVAL_MS = 100` (its home, Appendix D). Each job's progress goes through `throttledProgress`:
+- the first progress, and one 100 ms or more after the last sent, is sent at once;
+- one inside 100 ms is held, replaced by the next, and sent by the job's one timer when the interval is over;
+- **a progress with a feed line is sent at once** (TS §14.3: feed lines are never dropped). It carries its own `done` and `total`, newer than a held one, so a held progress is dropped then rather than sent after it;
+- when the job ends, `done()` flushes what is held **before** the `res` (or the failure, or the cancelled answer) is posted, clears the timer, and the job sends no more progress.
+- The page reads a progress's `feed`, `done` and `total` only (`run-pipeline.ts`, `start-export.ts`), never its stage on its own, so a held progress replaced by one of the next stage loses nothing.
+
+**2. The client** (`rpc.ts`, §14.2, D-153). `createClient` returns a `WorkerClient`:
+- `cancel(jobId)` posts `{ type: "cancel", jobId }` (V3's), now only for a pending job of a living worker;
+- `onCrash(cb)`: told the failure once when the worker crashes; not when it is disposed;
+- `isDead()`: after an `error` or `messageerror` event, or `dispose()`. A crash rejects every pending call with `E_WORKER_CRASH` and the row's stage (V3 did this much) and now marks the client dead; a call to a dead client is rejected at once, a `notify` dropped;
+- `pendingJobs()` and `ended(jobId)` (resolves when the job has ended, `true` if it answered as cancelled): what `pool.cancel` waits on. Every way a call ends goes through one `settle`, which takes it out of the pending table first: the table is the single record of what waits. A late answer for an unknown job is still dropped (TS §14.4).
+- The transfer check after `postMessage` stays as it was (every build, TS §14.3).
+
+**3. The pool** (`pool.ts`, §14.3, D-152, D-153):
+- **`CANCEL_TIMEOUT_MS = 2000`** (its one home; assumption, M1.5).
+- **`pool.cancel(kind)`** → `"idle"` when the worker does not exist, is dead, or has no pending call; otherwise a cancel is posted for each pending call and it resolves `"cancelled"` when they have all ended within the timeout, or `"restarted"` after `restartWorker(kind)` when they have not. Only the worker that was asked is restarted, not one made meanwhile.
+- **`pool.restartWorker(kind)`** terminates the worker; its pending calls are rejected with `E_WORKER_CRASH`; the next call creates a fresh one. A restarted render worker has no session.
+- **A dead client is replaced on the next call**, and the dead worker is terminated first: at most four workers exist (TS §31), and an `error` event does not end a worker by itself.
+- Each row has `onCrash(cb)` (kept across the workers the row makes) and `isDead()`. `lazyClient` became `lazyRow`, which keeps the client, the current worker and its restart.
+- `whenFree` (Entry 28) stays here.
+
+**4. Known issue 31 decided: the retry stays.** A queue in the page's client would make the calls that may be dropped (a hit test, the style cards, the development mirror) wait their turn and answer stale, and would hide the worker's one-job rule that TS §14.3 states. The calls that must not fail ask again while refused as "Busy" (`whenFree`); the others take the refusal.
+
+**5. Checked with a temporary `zz-rpc.test.ts`** (Vitest, fake timers, a fake worker scope and a fake `Worker`; deleted, `rpc.test.ts` is Prompt 121's):
+
+| Case | Result |
+|---|---|
+| Progress 1 at 0 ms, 2 at 10, 3 at 20, then at 105 ms: 4, 5 with a feed line, 6, then the result | Sent: 1, 3 (by the timer at 100 ms), 5 with its feed line at once (4 dropped), 6 flushed, then `res`; nothing posted in the next second |
+| A flood: 1,000 progresses in 1 s, four of them with a feed line | **13 sent** (9 throttled, the 4 feed lines), the last `done` 999, `res` last |
+| A crash (`error`, then `messageerror`) with two calls pending | Both rejected with `E_WORKER_CRASH`, stage `preview`; `onCrash` told once; `isDead()`; the table empty; the next call rejected at once; a late answer ignored |
+| `ended()` | `true` for a job answered as cancelled; `false` at once for an unknown job |
+| `pool.cancel("audio")` | `"idle"` with no worker; `"cancelled"` when the job answers the cancel (the call resolves `{ cancelled: true }`), then `"idle"`; with a job that never answers, still pending at 1,999 ms, **`"restarted"` at 2,000 ms**, the call rejected with `E_WORKER_CRASH`, the worker terminated; the next call made a second worker |
+| A crash, then a call | `onCrash` told, `isDead()`; the call made a third worker and terminated the second |
+| `restartWorker` with nothing pending, then a call | The worker terminated; a fourth made |
+
+**6. The failure path in Chrome** (`d1`, a development build, the sample clip, a temporary `zz-` spec). The prompt's "terminate the render worker from DevTools" cannot be done from a test (a worker ended from outside fires no event on the page's `Worker`); an uncaught error thrown in the render worker is a real crash and fires `error`:
+- **While playing** (`previewPlay` pending all along): the pending call rejected with **`E_WORKER_CRASH`, stage `preview`**; the preview stopped and the failure showed. The next call made a fresh render worker and the crashed one was terminated (Playwright saw it close).
+- **While paused** the worker is idle: the error marked the client dead, and the next call (a seek) went to a fresh worker, which answers `NoSession` until the session is opened again. "Reload preview" (D-153) is Prompt 119's.
+- A first try blocked the worker and threw while a seek waited: the worker answered the seek before its timer threw, so nothing was pending. A temporary log line in `control-preview.ts`'s failure path read the codes; removed.
+
+**Differs from the prompt or the plan.**
+- **`"cancelled"` also when the job ends without seeing the flag** (it finished, or failed, inside the timeout): the worker is free either way, and the three answers of §14.3 have no fourth. The use-case reads the call's own result for what happened.
+- **`pool.cancel` cancels every pending call of the worker**, not one: during a preview a seek can be pending beside `previewPlay`.
+- **`WorkerClient` has `pendingJobs()` and `ended()`** beside the four names of the prompt's interface: `pool.cancel` needs them. `PoolClient` has `onCrash` and `isDead` (and `notify`), not `cancel(jobId)`: `pool.cancel(kind)` is the pool's way.
+- **No restart budget** (D-153 over TS §14.3's "at most 2 automatic restarts"): V7.
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`.env` loaded). `pnpm test`: **Rust 645 passed, 0 failed, 3 ignored** (unchanged), **Vitest 92** (unchanged; the temporary test is deleted). `pnpm build` exit 0; **app shell 334.2 kB gzip** (Entry 28: 333.2). `pnpm e2e` **12 passed**. No `__offcutDev`, `data-caption-*` or test key in `web/dist`.
+- **`pnpm e2e:media`** on the keyed production build: **49 passed, 1 skipped (11.7 min)**, the baseline's count; the feed cases ("Cleaning voice" and "Transcribing…" first, the "Found:" lines in time order, the README's lines) pass through the throttle. The gate's build after it has no key.
+- The frozen check lists only the recorded exceptions. No private path is tracked.
+
+**Found, not fixed.**
+- A crash of the render worker while the clip is ready leaves the preview with "Something went wrong on this device." and every later preview call answering `NoSession` until Prompt 119's "Reload preview" reopens the session (D-153).
+- The throttle's held progress is replaced across stages; harmless while the page reads no stage on its own (item 1), to be kept in mind if one starts to.
+
+**Open.** Known issue 31 closed. Open items 1-5 unchanged. Next: Prompt 119 (cancel everywhere, errors in plain words, the export pill).

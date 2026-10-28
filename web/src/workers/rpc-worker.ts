@@ -1,6 +1,8 @@
 // The worker's side of the plumbing of `rpc.ts` (TS §14): `serveWorker`,
 // the job context a handler gets, and what a handler throws or returns when
 // it fails or is cancelled. Moved from `rpc.ts` (v4implementation D-150).
+// Progress is throttled here (D-151): at most 10 messages a second per job,
+// and never a feed line dropped.
 
 import type { ErrorCode, JobId } from "../gen/domain";
 import type { Cancel, FailureStage, Progress, Req, Res } from "./protocol";
@@ -38,6 +40,8 @@ export class WorkerFailure extends Error {
 /** A handler returns this after it has seen its cancel flag set. */
 export const CANCELLED: unique symbol = Symbol("cancelled");
 
+/** A progress without a feed line is sent at most this often per job (D-151, TS §14.3). */
+export const PROGRESS_MIN_INTERVAL_MS = 100;
 
 // What a worker's global scope offers this file. `self` is typed as a
 // window, because the app is compiled with both libraries.
@@ -57,6 +61,59 @@ function transferablesOf(result: unknown): Transferable[] {
     }
     return value instanceof OffscreenCanvas || value instanceof ImageBitmap ? [value] : [];
   });
+}
+
+/**
+ * The progress of one job, throttled (D-151). A progress with a feed line is
+ * sent at once; one without, inside `PROGRESS_MIN_INTERVAL_MS` of the last
+ * one sent, is held, replaced by the next, and sent when the interval is
+ * over, by the one timer of the job. `flush` sends what is held before the
+ * job's answer; after it the job sends no more progress.
+ */
+function throttledProgress(jobId: JobId, send: (p: Progress) => void): {
+  progress: JobContext["progress"];
+  flush(): void;
+} {
+  let lastSent: number | undefined;
+  let held: Progress | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let over = false;
+  const sendNow = (p: Progress): void => {
+    clearTimeout(timer);
+    timer = undefined;
+    held = undefined;
+    lastSent = performance.now();
+    send(p);
+  };
+  return {
+    progress: (p) => {
+      if (over) {
+        return;
+      }
+      const message: Progress = { type: "progress", jobId, ...p };
+      const now = performance.now();
+      // A feed line is never held: the newer done and total it carries replace a held progress.
+      if (p.feed !== undefined || lastSent === undefined || now - lastSent >= PROGRESS_MIN_INTERVAL_MS) {
+        sendNow(message);
+        return;
+      }
+      held = message;
+      timer ??= setTimeout(() => {
+        timer = undefined;
+        if (held !== undefined) {
+          sendNow(held);
+        }
+      }, lastSent + PROGRESS_MIN_INTERVAL_MS - now);
+    },
+    flush: () => {
+      over = true;
+      if (held !== undefined) {
+        sendNow(held);
+      }
+      clearTimeout(timer);
+      timer = undefined;
+    },
+  };
 }
 
 /**
@@ -109,14 +166,13 @@ export function serveWorker<Api>(
     if (occupies) {
       main = job;
     }
-    const ctx: JobContext = {
-      jobId,
-      isCancelled: () => job.cancelled,
-      progress: (p) => {
-        post({ type: "progress", jobId, ...p });
-      },
-    };
+    const throttle = throttledProgress(jobId, (p) => {
+      post(p);
+    });
+    const ctx: JobContext = { jobId, isCancelled: () => job.cancelled, progress: throttle.progress };
+    // The job is over: its held progress goes first, then its answer.
     const done = (): void => {
+      throttle.flush();
       running.delete(jobId);
       if (occupies) {
         main = undefined;
