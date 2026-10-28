@@ -28,7 +28,7 @@ import * as clipStore from "../state/clip-store";
 import { useModelStore } from "../state/model-store";
 import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
-import { signalFor } from "./cancel-job";
+import { failureShown, signalFor } from "./cancel-job";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -269,6 +269,7 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     await chain;
     releaseAudio(run);
     clipStore.failed(modelFailure);
+    failureShown(modelFailure);
     return;
   }
 
@@ -408,9 +409,9 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
  * Takes the accepted clip to `ready`, or to `failed` or `rejected`. A clip
  * that failed goes through the same steps again (`retry`, D-153), and so does
  * one whose run was cancelled. A failure of a worker, of the model or of the
- * storage is stored on the clip, and the card that shows it sends
- * `client_error` (cancel-job.ts). A cancelled run ends with the clip
- * `accepted` (D-152).
+ * storage is stored on the clip and sends `client_error` once (D-153,
+ * `failureShown`; the card that shows it reports the same failure, which
+ * is not sent again). A cancelled run ends with the clip `accepted` (D-152).
  */
 export async function runPipeline(clipId: ClipId): Promise<void> {
   const clip = clipStore.useClipStore.getState();
@@ -448,7 +449,10 @@ export async function runPipeline(clipId: ClipId): Promise<void> {
       return;
     }
     const failure = failureOf(error);
-    clipStore.failed(failure ?? { code: "E_INTERNAL", stage: run.stage, retryable: false });
+    const shown = failure ?? { code: "E_INTERNAL", stage: run.stage, retryable: false };
+    clipStore.failed(shown);
+    // The stage shows every failure of a clip: it is reported now, once (the card's report is the same failure).
+    failureShown(shown);
     if (failure === null) {
       // A fault of this file. The clip is shown as failed, and the fault is not hidden behind that.
       throw error;
