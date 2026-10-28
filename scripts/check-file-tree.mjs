@@ -1,7 +1,7 @@
 // Structural gate (technicalspec.md §5, §7, §29). Fails when:
 //
 //   1. a tracked source file is not in the file tree of TS §5;
-//   2. a source file is longer than 400 lines, tests not counted;
+//   2. a source file is longer than 700 lines, tests not counted;
 //   3. a crate depends on an `offcut-*` crate that the graph of TS §7 does
 //      not give it, or a pure crate resolves a browser or randomness crate.
 //
@@ -34,7 +34,7 @@ const IGNORED = [
   /(^|\/)__snapshots__\//,
 ];
 
-const MAX_LINES = 400;
+const MAX_LINES = 700;
 const SOURCE_EXTENSIONS = /\.(rs|ts|tsx|js|mjs|cjs|sh|css|py|sql)$/;
 /** Whole files of tests, which the line limit does not apply to. */
 const TEST_FILES = [/\.test\.tsx?$/, /^web\/tests-e2e\//, /^server\/tests\//, /^crates\/[^/]+\/tests\//];

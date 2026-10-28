@@ -1,9 +1,10 @@
 // The editor's top bar (v4implementation D-178): the product's mark and the
 // clip's length on the left; on the right the save state, undo and redo, a
-// way to start over, and Export, the one primary action. Undo and redo are
-// enabled by the history (D-184) while the clip is ready and no export has
-// the preview; the save state is the interface store's, "Saving…" while an
-// edit is written to the device.
+// way to start over, the shortcuts sheet's button, and Export, the one
+// primary action. Undo and redo are enabled by the history (D-184) while the
+// clip is ready and no export has the preview; their tooltips name their
+// shortcuts (D-185). The save state is the interface store's, "Saving…"
+// while an edit is written to the device.
 
 import { messages } from "../../copy/messages";
 import { type BlockerCode, forImport } from "../../state/blockers";
@@ -13,9 +14,9 @@ import { useHistoryStore } from "../../state/history";
 import { usePreviewStore } from "../../state/preview-store";
 import { useUiStore } from "../../state/ui-store";
 import { dismissClip } from "../../usecases/import-clip";
-import { redo, undo } from "../../usecases/undo-redo";
 import { ExportButton } from "../components/ExportButton";
-import { Check, Redo, Undo } from "../icons";
+import { stepHistory } from "../components/ToastHost";
+import { Check, Keyboard, Redo, Undo } from "../icons";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import { Spinner } from "../primitives/Spinner";
@@ -65,8 +66,9 @@ function UndoRedo({ ready }: { ready: boolean }) {
         label={messages.editor.undo}
         disabled={!usable || !canUndo}
         {...reason}
+        shortcut={{ keys: [messages.keys.z], mod: true }}
         onClick={() => {
-          void undo();
+          void stepHistory("undo");
         }}
         data-testid="undo"
       />
@@ -75,8 +77,9 @@ function UndoRedo({ ready }: { ready: boolean }) {
         label={messages.editor.redo}
         disabled={!usable || !canRedo}
         {...reason}
+        shortcut={{ keys: [messages.keys.shift, messages.keys.z], mod: true }}
         onClick={() => {
-          void redo();
+          void stepHistory("redo");
         }}
         data-testid="redo"
       />
@@ -96,6 +99,7 @@ function SaveState() {
 
 export function TopBar({ view }: { view: StageView }) {
   const lengthMs = useClipStore((state) => state.clipInfo?.duration);
+  const showShortcuts = useUiStore((state) => state.showShortcuts);
   const ready = view === "ready";
   // A clip is on its way or ready: the controls that act on it are shown, disabled until they can.
   const working = ready || view === "processing" || view === "download" || view === "cancelled";
@@ -112,6 +116,15 @@ export function TopBar({ view }: { view: StageView }) {
       {ready ? <SaveState /> : null}
       {working ? <UndoRedo ready={ready} /> : null}
       {ready ? <StartOver /> : null}
+      <IconButton
+        icon={<Keyboard />}
+        label={messages.shortcuts.open}
+        shortcut={{ keys: [messages.keys.question] }}
+        onClick={() => {
+          showShortcuts(true);
+        }}
+        data-testid="shortcuts-open"
+      />
       <ExportButton />
     </header>
   );

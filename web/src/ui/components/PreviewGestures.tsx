@@ -96,7 +96,8 @@ export function useCaptionMirror(): CaptionMirror | null | undefined {
   const clip = useClipStore((state) => state.status);
   const [mirror, setMirror] = useState<CaptionMirror | null | undefined>(undefined);
   useEffect(() => {
-    if (!DEV_HOOKS) {
+    // Not during a change: its calls come first, and the mirror asks again when the clip is ready.
+    if (!DEV_HOOKS || clip === "updating") {
       return undefined;
     }
     let live = true;

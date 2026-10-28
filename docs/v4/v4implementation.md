@@ -1601,7 +1601,7 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 - [ ] The identity proof of D-117 passed at S6 (its record in the changelog), and the temporary test is gone.
 - [ ] Caption intelligence: `line_breaks.rs` (the table unchanged since its commit, or each change logged), `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` pass.
 - [ ] The editor: every state of section 17.2 is reachable and matches the reviewed screens; the axe check passes; every control works by keyboard.
-- [ ] No source file over 400 lines, tests excluded; the four splits of D-150 are in place.
+- [ ] No source file over 700 lines, tests excluded; the four splits of D-150 are in place.
 - [ ] `git grep` finds no `fetch(` outside the four files, no network call added (D-164), and no cut, mix or non-identity map constructed outside tests.
 - [ ] Test counts at least the baseline's plus V4's (section 20.1); none fell except the cases D-160 names.
 

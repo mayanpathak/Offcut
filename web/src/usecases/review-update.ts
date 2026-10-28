@@ -4,8 +4,9 @@
 // (edits are optimistic and local, TS §13.4); a word edit finds the events
 // and the plan again (mode `plan`), every change builds the scene again; the
 // edit is written to the device, the change can be undone (D-184), and it is
-// counted. A second change waits for the one in flight. Nothing here awaits
-// the network.
+// counted. A second change waits for the one in flight, and each of its
+// calls waits for the render worker to be free. Nothing here awaits the
+// network.
 
 import { track } from "../analytics/client";
 import type { ReviewActionKind } from "../gen/api";
@@ -16,7 +17,7 @@ import * as clipStore from "../state/clip-store";
 import * as history from "../state/history";
 import { usePreviewStore } from "../state/preview-store";
 import { useUiStore } from "../state/ui-store";
-import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
+import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { pause, play } from "./control-preview";
 
@@ -88,13 +89,14 @@ async function eventsFor(transcript: Transcript, previous: EditState, next: Edit
   );
   const [only] = sentences;
   if (sentences.size === 1 && only !== undefined && only >= 0) {
-    return answered(await pool.render.redetectSentence({ sentence: sentenceAt(only), wordEdits: next.word_edits }));
+    const sentence = sentenceAt(only);
+    return answered(await whenFree(() => pool.render.redetectSentence({ sentence, wordEdits: next.word_edits })));
   }
   const { prosody } = clipStore.useClipStore.getState();
   if (prosody === undefined) {
     throw new Error("review-update: a ready clip has no prosody");
   }
-  return answered(await pool.render.detect({ transcript, prosody, wordEdits: next.word_edits }));
+  return answered(await whenFree(() => pool.render.detect({ transcript, prosody, wordEdits: next.word_edits })));
 }
 
 /** The change in flight, settled however it ended: the next one starts after it (D-147). */
@@ -131,10 +133,12 @@ async function apply(
     if (mode === "plan") {
       const found = await eventsFor(transcript, previous, next);
       events = found;
-      plan = answered(await pool.render.rulesPlan({ transcript, events: found }));
+      plan = answered(await whenFree(() => pool.render.rulesPlan({ transcript, events: found })));
     }
     // 5. The paused preview is drawn again with the new scene (D-173).
-    const report = answered(await pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" }));
+    const report = answered(
+      await whenFree(() => pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" })),
+    );
     clipStore.setChunks(report.chunks);
     if (mode === "plan") {
       clipStore.setEvents(events);
@@ -159,7 +163,9 @@ async function apply(
       // The worker kept the events it found for the next edit: give it back those of the edit before.
       const { prosody } = clipStore.useClipStore.getState();
       if (prosody !== undefined) {
-        await pool.render.detect({ transcript, prosody, wordEdits: previous.word_edits }).catch(() => undefined);
+        await whenFree(() => pool.render.detect({ transcript, prosody, wordEdits: previous.word_edits })).catch(
+          () => undefined,
+        );
       }
     }
     if (failure === null) {

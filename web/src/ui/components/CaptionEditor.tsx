@@ -6,7 +6,8 @@
 // hand turns it off. A click on a word seeks to it, pauses, and opens it as
 // a field with its text selected: Enter or Tab commits (Tab opens the next
 // word), Escape cancels, an empty commit hides the word, and leaving the
-// field commits nothing. After a fix, "Change all" may be offered (D-175).
+// field commits nothing. After a fix, "Change all" may be offered (D-175);
+// after a word is hidden, a toast offers to undo it.
 // No timeline (PS). It is the canvas's text alternative (D-192).
 
 import { type KeyboardEvent, memo, useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +21,7 @@ import { pause, scrub, seek } from "../../usecases/control-preview";
 import { editWord as fixWord } from "../../usecases/edit-word";
 import { replaceAll, replaceAllCandidates, wordAt } from "../../usecases/replace-all";
 import { MoreHorizontal } from "../icons";
+import { stepHistory } from "./ToastHost";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import { PanelSection } from "../primitives/PanelSection";
@@ -233,8 +235,10 @@ export function CaptionEditor() {
         requestAnimationFrame(() => wordButton(root.current, word)?.focus());
       }
       const heard = all[word]?.text ?? "";
+      const before = shown[word] ?? heard;
       void fixWord(word, text).then(() => {
         offerChangeAll(word, heard, text);
+        offerUndoHide(word, heard, before);
       });
     },
     cancel: (word, refocus) => {
@@ -250,7 +254,11 @@ export function CaptionEditor() {
       }
     },
     set: (word, text) => {
-      void fixWord(word, text);
+      const heard = useClipStore.getState().transcript?.words[word]?.text ?? "";
+      const before = useClipStore.getState().edit.word_edits[word] ?? heard;
+      void fixWord(word, text).then(() => {
+        offerUndoHide(word, heard, before);
+      });
     },
     menu: (word) => {
       setMenu(word);
@@ -343,6 +351,32 @@ function offerChangeAll(word: WordIdx, heard: string, text: string): void {
       label: messages.captions.changeAll,
       run: () => {
         void replaceAll(word, text);
+      },
+    },
+  });
+}
+
+/**
+ * After word `word` was hidden (an empty commit, or "Hide word"): "“…” hidden."
+ * with "Undo" (§17.3). Undo is the history's step while nothing has changed
+ * since; after another change, it gives the word back the text it had.
+ */
+function offerUndoHide(word: WordIdx, heard: string, before: string): void {
+  const after = useClipStore.getState().edit;
+  if (before === "" || after.word_edits[word] !== "") {
+    return;
+  }
+  useUiStore.getState().pushToast({
+    id: "hide",
+    message: messages.captions.hidden(heard),
+    action: {
+      label: messages.editor.undo,
+      run: () => {
+        if (useClipStore.getState().edit === after) {
+          void stepHistory("undo");
+        } else {
+          void fixWord(word, before);
+        }
       },
     },
   });

@@ -9,7 +9,8 @@ import styles from "../styles/primitives.module.css";
 type NavigatorHints = Navigator & { userAgentData?: { platform?: string } };
 
 const hints = (): NavigatorHints => navigator;
-const isMac = (): boolean => hints().userAgentData?.platform === "macOS";
+/** The platform is macOS: its modifier is ⌘, and Ctrl+Y is not its redo. */
+export const isMac = (): boolean => hints().userAgentData?.platform === "macOS";
 
 export type KbdProps = {
   keys: readonly string[];

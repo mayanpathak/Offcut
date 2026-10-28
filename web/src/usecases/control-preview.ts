@@ -3,10 +3,10 @@
 // the one `AudioContext` and tells the worker the time four times a second.
 
 import { track } from "../analytics/client";
-import type { OutMs } from "../gen/domain";
+import { LIMITS, type OutMs } from "../gen/domain";
 import { noteFailure } from "../state/clip-store";
 import * as previewStore from "../state/preview-store";
-import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
+import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool";
 import type { ClockSync, PreviewStats } from "../workers/protocol";
 
 /** How often the worker is told the audio's time (TS §20.2). */
@@ -149,7 +149,15 @@ function startPlaying(p: Player): void {
     pool.render.notify("previewClock", { clock });
     previewStore.at(clock.audioMs);
   }, CLOCK_SYNC_INTERVAL_MS);
-  void afterPlay(p, p.turn, pool.render.previewPlay({ clock: clockNow(p) }));
+  // The worker may be drawing the style cards: the play waits for it, and its
+  // clock is read when it starts. Paused meanwhile, it does not start at all.
+  const turn = p.turn;
+  const loop = whenFree(() =>
+    player === p && p.turn === turn
+      ? pool.render.previewPlay({ clock: clockNow(p) })
+      : Promise.resolve<Cancelled>({ cancelled: true }),
+  );
+  void afterPlay(p, turn, loop);
 }
 
 /**
@@ -190,8 +198,9 @@ export async function pause(): Promise<void> {
     // Answers when the worker's loop has returned. The canvas then shows the
     // frame of where the sound stopped, as the time does: what a gesture on
     // the preview is about (D-183), and where a play goes on from.
-    await pool.render.previewPause();
-    await pool.render.previewSeek({ at: toOutMs(p.resumeAtMs) });
+    await whenFree(() => pool.render.previewPause());
+    const at = toOutMs(p.resumeAtMs);
+    await whenFree(() => pool.render.previewSeek({ at }));
   } catch (error) {
     stored(error);
   } finally {
@@ -241,7 +250,9 @@ export async function seek(at: OutMs): Promise<void> {
     let target: OutMs | undefined = at;
     while (target !== undefined) {
       seekPending = undefined;
-      await pool.render.previewSeek({ at: target });
+      // The worker may be drawing the style cards or answering a change: the seek waits for it.
+      const frame: OutMs = target;
+      await whenFree(() => pool.render.previewSeek({ at: frame }));
       target = seekPending;
     }
   })();
@@ -266,6 +277,43 @@ export async function scrub(ms: number): Promise<void> {
     return;
   }
   await seek(toOutMs(ms));
+}
+
+/** Space (D-185): plays a paused or stopped preview, pauses one that plays. */
+export function togglePlay(): Promise<void> {
+  return status() === "playing" ? pause() : play();
+}
+
+/** The program's length, in milliseconds: as long as its audio. */
+function lengthMs(p: Player): number {
+  return (p.buffer.length / AUDIO_RATE) * 1000;
+}
+
+/**
+ * ← and → (D-185): one output frame back or forward, while the preview is
+ * paused or stopped. Frame n is shown from n * 1000 / 30 ms; the time is
+ * rounded up, because the worker takes the frame of a time rounded down.
+ */
+export async function stepFrame(direction: -1 | 1): Promise<void> {
+  const p = player;
+  if (p === undefined || (status() !== "paused" && status() !== "stopped")) {
+    return;
+  }
+  const now = Math.floor(((previewStore.usePreviewStore.getState().position ?? 0) * LIMITS.OUTPUT_FPS) / 1000);
+  const ms = Math.ceil((Math.max(0, now + direction) * 1000) / LIMITS.OUTPUT_FPS);
+  if (ms <= lengthMs(p)) {
+    await seek(toOutMs(ms));
+  }
+}
+
+/** Shift+← and Shift+→ (D-185): one second back or forward. A preview that plays goes on playing from there. */
+export async function stepSecond(direction: -1 | 1): Promise<void> {
+  const p = player;
+  if (p === undefined || status() === "seeking") {
+    return;
+  }
+  const now = status() === "playing" ? positionMs(p) : (previewStore.usePreviewStore.getState().position ?? 0);
+  await scrub(Math.min(Math.max(now + direction * 1000, 0), lengthMs(p)));
 }
 
 /** The scrub bar is let go: once its last frame is drawn, the preview plays on if it played before. */

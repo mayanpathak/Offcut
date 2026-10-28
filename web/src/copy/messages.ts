@@ -136,6 +136,8 @@ export const messages = {
     lengthLabel: (ms: number) => `Video length ${clockTime(ms)}`,
     saved: "Saved on this device", saving: "Saving…",
     undo: "Undo", redo: "Redo",
+    // The toast after an undo or a redo (D-184), with the other one as its action.
+    undone: "Change undone.", redone: "Change redone.",
     availableAfterExport: "Available when the export finishes",
   },
   panel: { label: "Edit your video", captions: "Captions", style: "Style", visuals: "Visuals", framing: "Framing" },
@@ -144,6 +146,7 @@ export const messages = {
     follow: "Follow playback", followHint: "The text scrolls with the video.",
     hide: "Hide word", restore: "Restore original", show: "Show", wordMenu: "Word options", wordField: "Fix this word",
     replaceAll: (n: number, from: string, to: string) => `Change all ${String(n)} “${from}” to “${to}”?`,
+    hidden: (word: string) => `“${word}” hidden.`,
   },
   style: {
     clean: "Clean", bold: "Bold", mono: "Mono",
@@ -175,12 +178,12 @@ export const messages = {
   shortcuts: {
     title: "Keyboard shortcuts", open: "Show keyboard shortcuts",
     playPause: "Play or pause", stepFrame: "One frame back or forward", stepSecond: "One second back or forward",
-    close: "Close a field or a menu", help: "Show this list",
+    close: "Close a field or a menu", help: "Show this list", dismiss: "Close",
   },
   // How a shortcut names its keys (`Kbd`, v4implementation D-181).
   keys: {
     modMac: "⌘", modOther: "Ctrl", shift: "Shift", space: "Space", escape: "Esc",
-    left: "←", right: "→", z: "Z", y: "Y", question: "?",
+    left: "←", right: "→", z: "Z", y: "Y", question: "?", or: "or",
   },
 
   capability: { checking: "Checking your browser…", supported: "Your browser can do this." },

@@ -19,7 +19,7 @@ import type {
   RenderWorkerApi,
 } from "./protocol";
 import renderWorkerUrl from "./render.worker.ts?worker&url";
-import { type Client, createClient } from "./rpc";
+import { type Client, createClient, WorkerCallError } from "./rpc";
 
 // A use-case may import this file only, of all the workers' files (D-32).
 export { type Cancelled, WorkerCallError } from "./rpc";
@@ -74,6 +74,35 @@ export const pool: {
   audio: lazyClient<AudioWorkerApi>(WORKERS.audio),
   render: lazyClient<RenderWorkerApi>(WORKERS.render),
 };
+
+/** How often a call a worker refused as busy is asked again, and for how long at most. */
+const BUSY_RETRY_MS = 16;
+const BUSY_WAIT_MS = 2000;
+
+/**
+ * Runs `call`, asked again while its worker refuses it as busy: a worker
+ * takes one job at a time (`rpc-worker.ts`). The render worker has several
+ * callers that do not wait for each other (a change, a seek, a play, a hit
+ * test, the style cards, a development build's caption mirror), and a call
+ * that must not fail waits for the others this way (found by V4 Prompt
+ * 117's walk-through). Any other failure, or a worker still busy after
+ * `BUSY_WAIT_MS`, is the call's failure. A call that can be dropped, like a
+ * hit test, is made without it.
+ */
+export async function whenFree<T>(call: () => Promise<T>): Promise<T> {
+  const until = performance.now() + BUSY_WAIT_MS;
+  for (;;) {
+    try {
+      return await call();
+    } catch (error) {
+      const busy = error instanceof WorkerCallError && error.failure.detail === "Busy";
+      if (!busy || performance.now() >= until) {
+        throw error;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, BUSY_RETRY_MS));
+  }
+}
 
 let scriptsPreloaded = false;
 

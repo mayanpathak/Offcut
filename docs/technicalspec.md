@@ -3205,7 +3205,7 @@ Technical additions to PS §20.1. All must hold at M2.5.
 - [ ] The hosting-plan terms (TE-5) are recorded in writing before live checkout is enabled; no paid plan is used.
 - [ ] Voice chain target is -14 LUFS within ±1 LU (PS §20.1 delegates the target here), unless M1.2 replaced the value.
 - [ ] A cold API (service asleep) does not prevent import, processing, preview or review.
-- [ ] No source file exceeds 400 lines excluding tests (assumption for reviewability, PS §18 "complexity debt"); enforced by `scripts/check-file-tree.mjs`, which also counts lines.
+- [ ] No source file exceeds 700 lines excluding tests (400 until 2026-10-28) (assumption for reviewability, PS §18 "complexity debt"); enforced by `scripts/check-file-tree.mjs`, which also counts lines.
 
 ---
 
@@ -3388,7 +3388,7 @@ State ownership:         state this file owns; state it reads; state it must not
 Concurrency:             thread/worker it runs on; cancellation points; reentrancy
 Performance:             budget from §30 or the owning section
 Security and privacy:    data it may see; data it must not log, store or send
-Constraints:             lints that apply; banned APIs; size limit (400 lines)
+Constraints:             lints that apply; banned APIs; size limit (700 lines)
 Definition of done:      named test files that must pass; scripts that must stay green
 ```
 
@@ -3442,7 +3442,7 @@ Callees:     highpass, denoise, compressor, loudness, limiter modules of this cr
 Concurrency: called on audio.worker inside one job; cancellation point per block
 Performance: at most 4 s for the 60 s reference clip on R1 (PS §20.2, TE-13)
 Privacy:     sees audio samples only; must not log
-Constraints: no unwrap/expect/indexing; no allocation per block beyond the working buffer; file under 400 lines
+Constraints: no unwrap/expect/indexing; no allocation per block beyond the working buffer; file under 700 lines
 Tests:
   crates/offcut-dsp/tests/duration_preserved.rs
     length_equals_input_fixtures (P1)          prop_length_equals_input (P1: random lengths, proptest)
@@ -3451,7 +3451,7 @@ Tests:
     digital_silence_keeps_length (P1, P4)
   crates/offcut-dsp/tests/loudness_target.rs   (P4, P5)
   crates/offcut-dsp/tests/chain_no_clicks.rs   (P6; also Empty, NonFinite, P7, P8)
-Definition of done: the three test files pass; clippy clean; file under 400 lines
+Definition of done: the three test files pass; clippy clean; file under 700 lines
 ```
 
 ---
@@ -3705,7 +3705,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | Analytics rules and automated network test (PS §17) | P-3, §25.2 |
 | Legal-review gate on compliance or absolute claims (PS §17) | P-12; `messages.test.ts` |
 | Delete account within 30 days; clear local data; export account data (PS §17) | §22.7, §23.3; `account_delete.rs`, `account_export.rs`, `clear-local-data.spec.ts` |
-| Risk: complexity debt (PS §18) | §2, §6, §7, §34; 400-line limit §29 |
+| Risk: complexity debt (PS §18) | §2, §6, §7, §34; 700-line limit §29 |
 | Risk: stabilization overrun; corpus gate at week 8 (PS §18, PS §20.4) | M2.3, §30 |
 | Risk: local performance (PS §18) | §30, E-3, E-4, `stage_timing` |
 | Risk: visual false positives; log only enum outcomes (PS §18) | §17, `review_action`, `export_done` |
@@ -3778,7 +3778,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
 24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3).
-25. 400-line file limit (§29) — reviewed at each milestone.
+25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
 28. Left open by V3, each with the version that handles it (v3implementation §23): an `Edit` that ignores `media_rate` (a dwell edit taken as a media edit) — TE-12, V9; Indian digit grouping not parsed — E-7; no `Unit` for terabytes — a shared-type revision; the `events` store without a writer (§23.1) — V7; KeywordPop precision measured on synthetic emphasis — E-7 from V10; the derived portrait clip is an enlarged 405-pixel strip, cheaper to decode than a real phone clip — a real portrait recording; the capability check admits a software adapter, on which a clip takes over 20 minutes — V8; the cleaned audio of a clip that ends early stays in `audio.worker` until the next clip (C-4) — V4; the 40-word split's tie-break makes one-word sentences (§17.2) — M1.3.

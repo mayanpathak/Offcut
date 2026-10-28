@@ -217,10 +217,8 @@
 
 /* --- Toast ---------------------------------------------------------------- */
 
+/* Placed by the host's stack (ToastHost), bottom centre. */
 .toast {
-  position: fixed;
-  bottom: var(--sp-5);
-  left: 50%;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -230,14 +228,14 @@
   background: var(--surface-2);
   color: var(--text);
   box-shadow: var(--shadow-1), var(--shadow-2);
-  translate: -50% 0;
+  pointer-events: auto;
   transition:
     opacity var(--base) var(--ease),
     translate var(--base) var(--ease);
 
   @starting-style {
     opacity: 0;
-    translate: -50% var(--sp-2);
+    translate: 0 var(--sp-2);
   }
 }
 
@@ -329,7 +327,7 @@
 
   .toast {
     @starting-style {
-      translate: -50% 0;
+      translate: 0;
     }
   }
 }

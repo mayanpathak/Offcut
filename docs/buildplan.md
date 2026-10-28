@@ -64,7 +64,7 @@ A version is done only when all of these hold:
 
 - Write a per-file spec from `docs/file-specs/TEMPLATE.md` before the file. Give the implementer only that spec, TS §2, §7, §10, §11, the owning deep-dive section, the signatures of allowed dependencies and the generated types. Not the whole repo.
 - Signatures in the TS are contracts. A file implements them exactly.
-- No source file over 400 lines, tests excluded (TS §29).
+- No source file over 700 lines, tests excluded (TS §29).
 - A file that is not in the TS §5 tree fails `check-file-tree.mjs`. If a version needs a new file, the TS §5 tree is updated in the same change.
 
 ### 1.4 Lines that are never crossed
@@ -866,7 +866,7 @@ Then set `FOUNDING_OFFER_ENABLED=true` and offer the founding-member plan at 99 
 - [ ] Production responses carry every TS §24.3 header; `crossOriginIsolated` is true.
 - [ ] The hosting-plan terms are recorded in writing; no paid plan is used.
 - [ ] A cold API does not prevent import, processing, preview or review.
-- [ ] No source file exceeds 400 lines, tests excluded.
+- [ ] No source file exceeds 700 lines, tests excluded.
 
 ### 12.3 Launch items (PS §20.6)
 

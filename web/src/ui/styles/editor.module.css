@@ -166,3 +166,104 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* --- Toasts (ToastHost) ---------------------------------------------------- */
+
+/* One stack at the bottom centre, oldest on top (D-181). Only the toasts take the pointer. */
+.toasts {
+  position: fixed;
+  bottom: var(--sp-5);
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+/* --- The shortcuts sheet (D-185) ------------------------------------------- */
+
+.sheet {
+  width: min(calc(100vw - 2 * var(--sp-5)), calc(var(--sp-7) * 9));
+  padding: 0;
+  border: none;
+  border-radius: var(--r-panel);
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--shadow-1), var(--shadow-2);
+  transition:
+    opacity var(--base) var(--ease),
+    translate var(--base) var(--ease);
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 var(--sp-2);
+  }
+}
+
+/* The dialog takes the focus when it opens; its controls show the ring, it
+   keeps its own shadow (the element raises it over the theme's ring). */
+dialog.sheet:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-1), var(--shadow-2);
+}
+
+.sheet::backdrop {
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5) var(--sp-5);
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: var(--fs-16);
+  font-weight: var(--fw-600);
+  line-height: var(--lh-tight);
+}
+
+.sheetList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding-right: var(--sp-1);
+}
+
+.sheetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.sheetKeys {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.sheetOr {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    @starting-style {
+      translate: 0;
+    }
+  }
+}

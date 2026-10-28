@@ -203,6 +203,7 @@ export function PreviewTransport() {
         <IconButton
           icon={preview.status === "playing" ? <Pause /> : <Play />}
           label={label}
+          shortcut={{ keys: [messages.keys.space] }}
           disabled={press === null}
           {...(locked ? { disabledReason: messages.editor.availableAfterExport } : {})}
           onClick={() => {
