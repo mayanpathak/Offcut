@@ -38,7 +38,7 @@
 | 12 | ~~**REOPENED CONTRACT** `AudioWorkerApi`: `assemble`, `release` (D-127, D-128; known issue 1)~~ Closed in Entry 10 | `audio.worker.ts`, `protocol.ts` | P100 |
 | 13 | ~~**REOPENED CONTRACT** `web/eslint.config.js` `MINTING`: `control-preview.ts` mints `OutMs` (D-126)~~ Closed in Entry 9 (and `run-pipeline.ts` mints the identity map's `TimeMs`) | `web/eslint.config.js` | P99 |
 | 14 | ~~**REOPENED CONTRACT** `web/eslint.config.js` use-case edges: the four edit use-cases → `review-update.ts`, `review-update.ts` → `control-preview.ts` (§4). Two edges in Entry 24 (the two drags → `review-update.ts`, `review-update.ts` → `control-preview.ts`)~~ Closed in Entry 25: the eight edges with their reason | `web/eslint.config.js` | P114 |
-| 15 | **REOPENED CONTRACT** `offcut-api-types/src/analytics.rs` `ReviewActionKind`: five members (§13); the server rebuilds | `offcut-api-types`, `web/src/gen` | P120 |
+| 15 | ~~**REOPENED CONTRACT** `offcut-api-types/src/analytics.rs` `ReviewActionKind`: five members (§13); the server rebuilds~~ Closed in Entry 31: the five members, a round-trip case for each, `gen/api.ts` regenerated; the server's tests pass with them (the image rebuilds at the merge) | `offcut-api-types`, `web/src/gen` | P120 |
 | 16 | TS §9 (the review call chain: "ReviewPanel shows …", `<EventToggleList …>`) and the TS §13 component table still name `ReviewPanel` and `EventToggleList`, which TS §5 now replaces with `SidePanel` and `PlanItemList` (Entry 2) | TS §9, §13 | P127 (copy-back) |
 | 17 | ~~Record "identity reference frozen at <SHA of Prompt 93's commit>" (the SHA is not known inside its own commit, Entry 3); from then on `git diff --stat <SHA> -- crates/offcut-scene/tests/snapshots/v3_reference` must print nothing until Prompt 101 deletes the files~~ Closed in Entry 4: frozen at `09b1085` | `docs/v4/v4changelog.md` | P94 |
 | 18 | ~~§12 lists `DropReason` and `Dropped` among the generated TypeScript types; they live in `offcut-plan`, which the generator in `offcut-types` cannot name, and nothing on the page reads them in V4. Not generated (Entry 6); generate them when a page or analytics consumer exists, or correct §12 in the copy-back~~ Closed in Entry 9: `Dropped` and `DropReason` moved to `offcut-types/src/plan.rs` (re-exported by `offcut-plan`) and generated, the page's `SceneReport` being their first reader | `web/src/gen`, plan §12 | P127 (copy-back) or V6.1 |
@@ -2539,3 +2539,36 @@ The landing page shows the first two too (the same `DropZone`); nothing else of 
 - TS §5's tree gains `usecases/dev-faults.ts` (`check-file-tree` asks for it in the same change).
 
 **Open.** Known issue 32 opened (Entry 30's copy-back). Open items 1-5 unchanged. Next: Prompt 120 (the analytics enum, the break-it session).
+
+## Entry 31 - 2026-10-29 - P120 (S13): analytics review actions; robustness checked
+
+**What.** Prompt 120 (G 14.4, 14.5, M-14; §13, D-152, D-153): the server's analytics allowlist takes V4's review actions, and the robustness work of Prompts 118-119 is tried against G 14.5's six rows. S13 is closed.
+
+**1. `ReviewActionKind`** (`crates/offcut-api-types/src/analytics.rs`, §13). **REOPENED CONTRACT** (known issue 15, closed here): `caption_position`, `highlight_numbers`, `replace_all`, `undo`, `redo` after V3's four (serde `snake_case`, as the others). The inline tests: `the_review_actions_of_v4_round_trip` (one case per member: `{"name":"review_action","props":{"action":"<member>"}}` reads and writes back the same text) and `prop_enums_have_exactly_the_values_of_the_spec`'s row for `ReviewActionKind` with the nine values. `server/tests/analytics_allowlist.rs` is unchanged (it proves the route takes `review_action` through the shared type). The note on the reopened enum is above the `prop_enums!` table, not inside it: `lib.rs`'s `typescript_declares_every_type_once` reads that table line by line, and a comment line inside it counted as a fortieth type (found on the first run, fixed before the commit). `ANALYTICS_EVENT_DOCS` is unchanged (no event is added).
+
+**2. `pnpm gen:types`**: `web/src/gen/api.ts`'s `ReviewActionKind` has the nine values; `check-gen-clean.sh` exit 0 with the file staged. **`review-update.ts`** sends every review action now: `ReviewAction` is the generated `ReviewActionKind`, and the `SENT` filter (which held back the five until the server took them) is gone; the build failed on it at once, as its comment said it would.
+
+**3. Server tests** (`d1`; Docker running, local Postgres on port 9000): `cargo test -p offcut-api-types -p offcut-api`: `offcut-api-types` 29 passed, 1 ignored (28 before, the new round trip); `offcut-api` 57 unit, `analytics_allowlist.rs` 14, `notify_me.rs` 9, all passed.
+
+**4. G 14.5, row by row** (`d1`; a development build with the test key; the reference clip; a temporary `zz-break.spec.ts`, deleted):
+
+| Action | Expected (G 14.5) | Observed |
+|---|---|---|
+| Cancel during transcription | Stage card "Cancelled."; "Process again" runs it from the start | "Cancelled." with "Process again" and "Start over" 2.4 s after the click; "Process again" took the clip to ready; `job_cancelled { stage: "asr" }` |
+| Cancel the first-run model download at 30% | Partial bytes kept; the next run resumes | Cancelled at 31%: `config.json` and the decoder's `.part` kept; "Process again" asked from `bytes=75497472-`, `model_download { outcome: "ok", resumed: true }`; `job_cancelled { stage: "model" }` |
+| Cancel an export at 50% | Back to the editor; no file under `exports/tmp/` | The pill read "Rendering video 50% About 25 seconds left"; Export back, `exports/tmp/` empty, the preview plays; `job_cancelled { stage: "render_encode" }` |
+| `__offcutDev.crash("render")` while paused | `ErrorPanel` "The preview stopped", "Reload preview" brings it back with the edits | After choosing Bold: the card over the preview says `E_WORKER_CRASH`'s words, "Part of Offcut stopped working" (known issue 32: the guide's title is `E_GPU_LOST`'s), with "Reload preview"; after it the same frame pixel for pixel, Bold still chosen, the preview plays; one `client_error { E_WORKER_CRASH, preview }` |
+| Same during processing | "Try again" runs the pipeline again | The render worker killed during transcription: no failure (nothing was waiting on it; the run's next render call made a fresh worker), the clip reached ready and plays, no `client_error`. The speech worker killed during transcription: the failed card with "Try again", which took the clip to ready; one `client_error { E_WORKER_CRASH, asr }` |
+| A failed edit (`__offcutDev.failNextSetScene()`) | "Undo this change" restores the previous state | "Something went wrong in Offcut" with "Undo this change"; after it the card gone, Clean still chosen, the next change (Mono) applied and the top bar's Undo took it back; `review_action` sent as `style` and then `undo` (the new values reach the page's batch); one `client_error { E_INTERNAL, preview }` |
+
+**Differs from the prompt or the plan.**
+- `review-update.ts` changes in this prompt (item 2): the page sends what the server now takes. The prompt names only `analytics.rs`, `gen/api.ts` and this file.
+- "Same during processing" is read twice (item 4): a render worker killed while the run does not use it is replaced silently, as D-153's "the next call creates a new worker" says; the speech worker, which holds the job then, shows "Try again".
+
+**How it was checked.**
+- **The SAB gate** (`d1`): branch `v4-build`; no `zz` file; no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`gen clean`). `pnpm test`: Rust **650 passed, 0 failed, 3 ignored** by the sum over the `pnpm test` log (Entry 30: 649 the same way; one new test), **Vitest 92**. `pnpm build` exit 0; app shell 337.1 kB gzip (unchanged). `pnpm e2e` **12 passed**. `web/dist` has no `__offcutDev`, `data-caption-*`, dev fault or test key.
+- **`pnpm e2e:media`** on the keyed production build: **49 passed, 1 skipped (12.0 min)**, the baseline's count. The gate's build after it has no key.
+- The frozen check lists only the recorded exceptions. No private path is tracked.
+- **G M-14**: `pnpm check` (the 14 have copy, Entry 30), `pnpm test`, `pnpm e2e:media`, the frozen check with `analytics.rs` allowed; CI below.
+
+**Open.** Known issue 15 closed. Open items 1-5 unchanged. S13 is closed. Next: Prompt 121 (Vitest: RPC, the two machines, the pipeline with fake workers, the history).

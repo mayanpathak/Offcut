@@ -25,6 +25,9 @@ macro_rules! prop_enums {
     )+};
 }
 
+// One line per enum: `lib.rs`'s tests read this table line by line, so no
+// comment goes inside it. `ReviewActionKind` is REOPENED in V4
+// (v4implementation §13): its last five members are V4's review controls.
 prop_enums! {
     HeroVariant: Outcome, Privacy;
     CheckResult: Pass, Fail;
@@ -35,7 +38,7 @@ prop_enums! {
     ClipSource: User, Sample;
     DownloadOutcome: Ok, Failed, HashMismatch;
     AsrBackend: Webgpu, Wasm;
-    ReviewActionKind: WordEdit, EventToggle, Style, CropOffset;
+    ReviewActionKind: WordEdit, EventToggle, Style, CropOffset, CaptionPosition, HighlightNumbers, ReplaceAll, Undo, Redo;
     ExportedAs: Free, Creator;
     PostExportAnswer: Yes, SmallEdits, No;
     PromptPlacement: AfterExport, LimitReached;
@@ -321,6 +324,23 @@ mod tests {
     }
 
     #[test]
+    fn the_review_actions_of_v4_round_trip() {
+        // v4implementation §13: one case per member V4 adds.
+        for action in [
+            "caption_position",
+            "highlight_numbers",
+            "replace_all",
+            "undo",
+            "redo",
+        ] {
+            let sample = format!(r#"{{"name":"review_action","props":{{"action":"{action}"}}}}"#);
+            let event = parse(&sample).unwrap();
+            assert_eq!(event.name(), "review_action");
+            assert_eq!(serde_json::to_string(&event).unwrap(), sample);
+        }
+    }
+
+    #[test]
     fn prop_enums_have_exactly_the_values_of_the_spec() {
         let cfg = ts_rs::Config::default();
         // v1implementation §7.2, row for row.
@@ -335,7 +355,7 @@ mod tests {
             (ClipSource::inline(&cfg), "user, sample"),
             (DownloadOutcome::inline(&cfg), "ok, failed, hash_mismatch"),
             (AsrBackend::inline(&cfg), "webgpu, wasm"),
-            (ReviewActionKind::inline(&cfg), "word_edit, event_toggle, style, crop_offset"),
+            (ReviewActionKind::inline(&cfg), "word_edit, event_toggle, style, crop_offset, caption_position, highlight_numbers, replace_all, undo, redo"),
             (ExportedAs::inline(&cfg), "free, creator"),
             (PostExportAnswer::inline(&cfg), "yes, small_edits, no"),
             (PromptPlacement::inline(&cfg), "after_export, limit_reached"),

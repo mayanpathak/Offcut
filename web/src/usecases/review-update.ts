@@ -21,28 +21,11 @@ import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool
 import type { AppFailure } from "../workers/protocol";
 import { pause, play } from "./control-preview";
 
-/**
- * What `review_action` names a change. The last five join the server's list
- * in Prompt 120 (§13); until then they are not sent.
- */
-export type ReviewAction = ReviewActionKind | "caption_position" | "replace_all" | "undo" | "redo" | "highlight_numbers";
+/** What `review_action` names a change: one of the server's list, which holds every review control since Prompt 120 (§13). */
+export type ReviewAction = ReviewActionKind;
 
 /** What a toggle's `review_action` says beside its name: the kind of the visual and whether it is on (enums only, INV-18). */
 export type ReviewDetail = { event_kind: EventKind; enabled: boolean };
-
-/**
- * The actions the server's list holds now: the others are not sent, as the
- * allowlist would drop them. Typed against the generated list, so a member
- * it gains fails the build until it is named here.
- */
-const SENT = { word_edit: true, event_toggle: true, style: true, crop_offset: true } satisfies Record<
-  ReviewActionKind,
-  true
->;
-
-function sent(action: ReviewAction): action is ReviewActionKind {
-  return action in SENT;
-}
 
 /** The one place of this file that makes a place in `transcript.sentences` a `SentenceIdx` (v2implementation D-59). */
 function sentenceAt(i: number): SentenceIdx {
@@ -181,9 +164,7 @@ async function apply(
     history.push(previous);
   }
   // 8.
-  if (sent(action)) {
-    track({ name: "review_action", props: { action, ...detail } });
-  }
+  track({ name: "review_action", props: { action, ...detail } });
 }
 
 /**

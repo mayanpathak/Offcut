@@ -79,7 +79,7 @@ export type DownloadOutcome = "ok" | "failed" | "hash_mismatch";
 
 export type AsrBackend = "webgpu" | "wasm";
 
-export type ReviewActionKind = "word_edit" | "event_toggle" | "style" | "crop_offset";
+export type ReviewActionKind = "word_edit" | "event_toggle" | "style" | "crop_offset" | "caption_position" | "highlight_numbers" | "replace_all" | "undo" | "redo";
 
 export type ExportedAs = "free" | "creator";
 
