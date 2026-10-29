@@ -17,7 +17,6 @@ const AUDIO_RATE = 48_000;
 
 /** What is attached: the audio of one clip, and where its playing is. */
 type Player = {
-  context: AudioContext;
   buffer: AudioBuffer;
   /** The node that sounds, while the preview plays. */
   node: AudioBufferSourceNode | undefined;
@@ -51,7 +50,7 @@ function status(): previewStore.PreviewStatus {
 
 /** The place in the program that is sounding now, in milliseconds. */
 function positionMs(p: Player): number {
-  return (p.context.currentTime - p.startedAt) * 1000 + p.startOffsetMs;
+  return (audioContext().currentTime - p.startedAt) * 1000 + p.startOffsetMs;
 }
 
 /** The audio's time, with the moment it was read at: what the worker's clock runs on from. */
@@ -109,24 +108,20 @@ function watchCrash(): void {
 let shared: AudioContext | undefined;
 
 /**
- * The page's one `AudioContext`, made the first time it is asked for and
- * kept: every clip's preview plays through it. Chrome's first context in a
- * page takes about 250 ms of the main thread to make (D1, Prompt 124), and
- * one made while another lives takes almost none. A context made for each
- * clip at `ready` held the main thread that long at the end of every run
- * (v4implementation D-156); the editor makes this one when it opens
- * (`warmAudio`), before a clip is dropped.
+ * The page's one `AudioContext`, made at the first play and kept: every
+ * clip's preview plays through it. Chrome's first context in a page takes
+ * about 250 ms of the main thread to make (D1, Prompt 124), and one made
+ * while another lives takes almost none. A context made for each clip at
+ * `ready` held the main thread that long at the end of every run
+ * (v4implementation D-156); one made when the editor opened slowed every
+ * page of a machine with no sound device (CI's Windows runner). The first
+ * play follows a click, the moment a browser lets a page sound anyway.
  */
 function audioContext(): AudioContext {
   if (shared === undefined || shared.state === "closed") {
     shared = new AudioContext();
   }
   return shared;
-}
-
-/** Makes the page's `AudioContext` now, while nothing is being processed (D-156). */
-export function warmAudio(): void {
-  audioContext();
 }
 
 /**
@@ -136,8 +131,8 @@ export function warmAudio(): void {
 export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): Promise<void> {
   watchCrash();
   await detach();
-  const context = audioContext();
-  const buffer = context.createBuffer(1, prog48.length, AUDIO_RATE);
+  // A buffer needs no context: none is made before the first play.
+  const buffer = new AudioBuffer({ numberOfChannels: 1, length: prog48.length, sampleRate: AUDIO_RATE });
   buffer.getChannelData(0).set(prog48);
   const offscreen = canvas.transferControlToOffscreen();
   try {
@@ -147,7 +142,6 @@ export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): P
     return;
   }
   player = {
-    context,
     buffer,
     node: undefined,
     startedAt: 0,
@@ -187,12 +181,13 @@ async function afterPlay(p: Player, turn: number, loop: Promise<PreviewStats | C
 /** The sound from `resumeAtMs`, the worker's loop after it, and the clock four times a second. */
 function startPlaying(p: Player): void {
   const offsetMs = p.resumeAtMs;
-  const node = p.context.createBufferSource();
+  const context = audioContext();
+  const node = context.createBufferSource();
   node.buffer = p.buffer;
-  node.connect(p.context.destination);
+  node.connect(context.destination);
   node.start(0, offsetMs / 1000);
   p.node = node;
-  p.startedAt = p.context.currentTime;
+  p.startedAt = context.currentTime;
   p.startOffsetMs = offsetMs;
   p.turn += 1;
   p.syncTimer = setInterval(() => {
@@ -221,7 +216,7 @@ export async function play(): Promise<void> {
   if (p === undefined || (status() !== "stopped" && status() !== "paused")) {
     return;
   }
-  await p.context.resume();
+  await audioContext().resume();
   // The wait may have been long: the preview may be gone, or playing already.
   if (player !== p || (status() !== "stopped" && status() !== "paused")) {
     return;
@@ -392,7 +387,7 @@ export async function detach(): Promise<void> {
     await pause();
     player = undefined;
     stopSound(p);
-    await p.context.suspend();
+    await shared?.suspend();
   }
   previewStore.detached();
 }

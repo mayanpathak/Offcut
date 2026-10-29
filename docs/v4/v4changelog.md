@@ -58,7 +58,7 @@
 | 32 | Copy back to `v4implementation.md` what Entry 30 changed: §16.2's `cancel-job.ts` also keeps the shown failures (`failureShown`, the one `client_error` per failure); `export-store.ts` being unchanged, the export's `cancel` and `cancel_done` are taken in `start-export.ts` through the machine's table, and a cancelled import goes `importing → failed → idle` in one moment (the clip machine has no `importing → idle`); §16.1's `clip-store.cancelled`, `failureDuring`, `cancelledRun`, `retried`, `cancelledImport`, `clearFailure`, `preview-store.canvas`; §14.3's `whenReleased` (a worker just ended still holds its files a moment); §17.3: the failed export's card is in the side panel with "Try again" and "Close" (not "Start over"), the success state sits beside the Export button, the pill's "on your computer" line is the bar's description; §19.2: `vite.config.ts`'s `define` `__OFFCUT_DEV_FAULTS__`, the dev faults' worker halves in `rpc-worker.ts` (not `render.worker.ts`), `usecases/dev-faults.ts` (in TS §5's tree since Entry 30); G 14.5: the panel after a render crash says `E_WORKER_CRASH`'s words ("Part of Offcut stopped working"), not `E_GPU_LOST`'s | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 | 33 | **A flake of the hosted Windows runner's media job.** On `2b15489` (Entry 32) two `@no-gpu` cases of `model-download.spec.ts` ("first run …" and "a second session …") failed twice each: after `flushAnalytics` no batch reached the fake API within the 5 s poll, while the page was processing on the CPU as it should (the report's snapshot: "Transcribing…", no failure). The same commit passed on D1 (the spec, 10 of 10) and on the job's re-run. P113's run flaked on a third case of the same file. If it comes back, the poll's 5 s is the first thing to widen with `patient` (the runner's `E2E_TIMEOUT_SCALE` does not reach `expect.poll`'s default) | `web/tests-e2e/model-download.spec.ts` | P125 (the e2e suites) |
 | 34 | Copy back to `v4implementation.md` and the build guide what Entries 33-34 changed: §19.2 / §20.4 / G 16.7: the media suites run on D1 on `pnpm build:e2e` (a `--mode test` production bundle with the test key), the only build that has the caption mirrors and `__offcutDev` that `preview-sync` and `review-edit` read; §21.1's edit-to-preview ends at "Saving…" (after `setScene`'s answer, which follows the redraw), not a `data-frames` tick, which a paused redraw does not move; G 16.1's helpers as written (`toggleItem(page, label, on)`, `dragVideo(page, dx)`, `trackSaves`/`settled(page, since)`, `captionMirror`, `transcriptWords`); D-175 / §16.2: "Change all" right after the edit it was offered for joins that edit's undo step (`update`'s `joinsLastStep`); §20.4: the reference clip is wider than 9:16 (the portrait fixture is case 6's clip) | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
-| 35 | Copy back to `v4implementation.md` and the build guide what Entries 35-36 changed: §16.2: `control-preview.ts` keeps the page's one `AudioContext` (`warmAudio`, made when the editor opens; `detach` suspends it), §15.3 / §16.2: the render worker's `drawStill` prefetches the frame when the scene is set before a canvas; §20.4 / G 16.4: INV-11 after a cancel is read through the page (no `client_error`, a play and a pause draw), the cancel timeout by its time and the restarted worker's run; G 16.1: `routeAssets`'s `holdAfterBytes`; §19.4 / G 16.6: `check-hosts.mjs`'s third check (the four markers); G 16.7: "78 passed" is 77 passed and the D-78 skip; §19.1 / §19.3: `ci.yml`'s "No native GPU backend outside the tests" step; G 17.3: the drills may be run locally (the founder's choice of Entry 36), the Mesa one in an `ubuntu:24.04` container; §20.2 and G 17.2: `golden_frames` has 19 tests, 17 of them on the adapter; V3 §17.1 / D-94: BtbN keeps a daily build about two weeks and a month's last build about two years | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
+| 35 | Copy back to `v4implementation.md` and the build guide what Entries 35-36 changed: §16.2: `control-preview.ts` keeps the page's one `AudioContext`, made at the page's first play (Entry 37; the clip's buffer is a context-free `AudioBuffer`; `detach` suspends it), §15.3 / §16.2: the render worker's `drawStill` prefetches the frame when the scene is set before a canvas; §20.4 / G 16.4: INV-11 after a cancel is read through the page (no `client_error`, a play and a pause draw), the cancel timeout by its time and the restarted worker's run; G 16.1: `routeAssets`'s `holdAfterBytes`; §19.4 / G 16.6: `check-hosts.mjs`'s third check (the four markers); G 16.7: "78 passed" is 77 passed and the D-78 skip; §19.1 / §19.3: `ci.yml`'s "No native GPU backend outside the tests" step; G 17.3: the drills may be run locally (the founder's choice of Entry 36), the Mesa one in an `ubuntu:24.04` container; §20.2 and G 17.2: `golden_frames` has 19 tests, 17 of them on the adapter; V3 §17.1 / D-94: BtbN keeps a daily build about two weeks and a month's last build about two years | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 
 ---
 
@@ -2802,3 +2802,47 @@ The guard that refuses a build with a development hook (`check-hosts.mjs`, Entry
 **How it was checked.** The SAB gate of Entry 35 (the same tree, no further source change): `pnpm check` exit 0, Rust 646 / 0 / 3, Vitest 175, `pnpm build` exit 0, `pnpm e2e` 12. `node scripts/check-external-facts.mjs` prints the new D-94 row. The new step's script, run on D1 as written in `ci.yml`: exit 0 on the tree, exit 1 under drill 4.
 
 **Open.** Open item 5 and known issue 5 closed. Known issue 33 unchanged (it did not come back on D1). Known issue 35 (Entry 35) also takes this entry's copy-back.
+
+## Entry 37 - 2026-10-29 - P124 fix (S15): the audio context is made at the first play (outside a prompt)
+
+**What CI found.** The one run of Entries 35 and 36 (`f59a610`, run 40844706822): the `ci` job **passed** (16 min). The Windows `e2e-media` job was **cancelled at its 30-minute limit** (09:03:33 to 09:33:39), 8 s after Playwright had ended: **24 passed, 2 flaky, 1 skipped in 24.5 min**. All 25 `@no-gpu` cases passed in the end, the two new cancels at the first attempt (25 s and 1.3 min). On `3583424` the same job took 14 min, its Playwright step 8.7 min.
+- The two flaky cases (`model-download` "first run" and "a download that keeps failing") failed their first attempt in `openEditor`: after `page.goto("/app")` the drop zone was not visible within 30 s. Not known issue 33 (that one is a poll after `flushAnalytics`).
+- Every `model-download` case was slower than on `3583424`: "first run" 57 s → 3.4 min (and 2.5 min on its retry), "requests" → 3.5 min, "a wrong hash" 56 s → 1.4 min, "a second session" 3.1 → 4.3 min, "keeps failing" 6.7 s → 3.6 min.
+
+**G 17.2, read in the `ci` job's log of that run** (Entry 36 left these to the run):
+
+| Line | Read |
+|---|---|
+| `mesa-vulkan-drivers` | **25.2.8-0ubuntu0.24.04.4** (the version of Entry 36's container drill) |
+| `golden_frames` | **19 passed**, in `cargo test` and again in the `--nocapture` step; every case on `llvmpipe (LLVM 20.1.2, 256 bits) (Vulkan)` (e.g. `clean_number` 0.9995, `parity clean from_to` 0.9994): the 17 adapter cases at or above 0.98 |
+| `catalog_snapshot`, `display_list_snapshots` | Passed (3 and 6); no "pending snapshot", no `.snap.new` in the log |
+| `analytics_allowlist` (server) | Passed |
+| The new step | "wasm32-unknown-unknown: no native GPU backend in the normal tree of offcut-render", the same for "host" |
+| The moved ffmpeg | `ffmpeg version n9.0.2-17-g2a571b6068-20260930`; `pnpm fixtures` and every test that reads the fixtures passed |
+
+**The cause: Entry 35's `warmAudio`.** It made the page's `AudioContext` when the editor opened, so every `/app` page made one. The hosted Windows runner has no sound device, and there it slowed every editor page and twice kept the first render from coming within 30 s. Before Entry 35 a context was made only at `attach`, which no `@no-gpu` case reaches.
+
+**The fix** (`web/src/usecases/control-preview.ts`; `web/src/ui/pages/EditorPage.tsx` back as it was at `3583424`):
+- `attach` makes the clip's buffer with `new AudioBuffer({ numberOfChannels: 1, length, sampleRate: 48000 })`, which needs no context.
+- The page's one context (`audioContext()`) is made at the **first play**, inside the click (or the Space key) that lets a page sound anyway, and kept; `detach` suspends it, `play` resumes it. `Player` no longer holds it. `warmAudio` is gone.
+- So no context exists while a clip is processed or edited, or on any page that never plays: none of the `@no-gpu` cases plays. The one-time cost of Chrome's first context (about 250 ms on D1) moves from every clip's `ready` to the page's first play, which is in no window of D-156 or D-193 (the play button shows its pressed state first).
+- `preview-job.ts`'s prefetch of Entry 35 is unchanged.
+
+**How it was checked.**
+- `pnpm check` exit 0 (`.env` loaded; 394 files). Vitest 175 passed. Rust not changed (646 / 0 / 3 of Entry 35). `pnpm build` exit 0; `web/dist` without the four markers or the test key. `pnpm e2e`: the first attempt after the build failed and its output was not kept; the three attempts after it passed 12 of 12 (44.9, 33.5 and 26.8 s).
+- The two full media runs again, on `pnpm build:e2e` with the test key (D1, one after the other, nothing retried):
+
+| Reading | Run 1 | Run 2 | Target |
+|---|---|---|---|
+| Result | **77 passed, 1 skipped, 0 failed** in 43.6 min | **77 passed, 1 skipped, 0 failed** in 46.4 min | All 78 listed |
+| Longest main-thread task, drop to `ready`; word edit, Bold, caption drag | none of 50 ms or more | none of 50 ms or more | ≤ 100 ms; ≤ 50 ms |
+| First frame after `ready` | 50 ms | 62 ms | ≤ 500 ms |
+| Seek to the white frame at 55.0 s | 60 ms | 88 ms | ≤ 300 ms |
+| Edit to preview, 90th percentile of 20 | 27 ms | 25 ms | ≤ 150 ms |
+| Drift over 60 s (the context made at that page's first play) | 25.2 ms, 0 of 1,800 late | 19.0 ms, 0 of 1,800 late | ≤ 80 ms, ≤ 5% |
+| The 5 s play | 152 frames, 0 late, drift 12 ms | 153 frames, 0 late, drift 13 ms | > 100 frames |
+| The hung worker's cancel | 2,396 ms | 2,532 ms | ≥ 2,000 ms |
+
+**Differs from Entry 35.** Entry 35's `warmAudio` and the `EditorPage.tsx` change are undone; the shared context and the prefetch stay. CI ran a second time, for this commit (Entries 35-36 were meant to need one run).
+
+**Open.** Known issue 35 now reads "made at the first play" for the context. Known issue 33 unchanged.
