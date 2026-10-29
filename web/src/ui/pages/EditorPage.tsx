@@ -4,7 +4,10 @@
 // (v4implementation D-178). From the preview and from a clip that ended badly
 // there is a way to start over (J2 to J10).
 
+import { useEffect } from "react";
+
 import { DEV_HOOKS } from "../../config/env";
+import { warmAudio } from "../../usecases/control-preview";
 import { installDevHooks } from "../dev-hooks";
 import { EditorLayout } from "../layout/EditorLayout";
 import { useStageView } from "../layout/Stage";
@@ -17,5 +20,9 @@ if (DEV_HOOKS) {
 
 export function EditorPage() {
   const view = useStageView();
+  // The audio's context is made once, now, and not when a clip is ready (D-156).
+  useEffect(() => {
+    warmAudio();
+  }, []);
   return <EditorLayout view={view} />;
 }

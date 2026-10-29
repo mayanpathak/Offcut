@@ -13,7 +13,8 @@ const PREVIEW_URL = "http://localhost:4173";
 // the `test` mode, which keeps the player's caption mirrors and the
 // development hooks that `preview-sync` and `review-edit` read
 // (v4implementation D-155, §20.4). CI's Windows job runs the `@no-gpu` cases
-// on the production build of the ci job.
+// on the production build of the ci job: of V4's suites, the import and the
+// model-download cancels of `cancel.spec.ts` (§19.4).
 const MEDIA_SUITES = [
   "model-download.spec.ts",
   "pipeline-preview.spec.ts",
@@ -21,6 +22,7 @@ const MEDIA_SUITES = [
   "rejections.spec.ts",
   "preview-sync.spec.ts",
   "review-edit.spec.ts",
+  "cancel.spec.ts",
 ];
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).

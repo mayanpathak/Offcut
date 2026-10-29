@@ -5,7 +5,10 @@
 // Fails when:
 //   - web/dist contains an http:// or https:// literal whose host is not the
 //     asset host and that is not on the short list below;
-//   - the hosts in the CSP of web/vercel.json are not exactly the asset host.
+//   - the hosts in the CSP of web/vercel.json are not exactly the asset host;
+//   - web/dist contains a marker of the development hooks or of the caption
+//     mirrors, which only a development or test build may have
+//     (v4implementation §20.4, G 16.6).
 //
 // It also prints the gzip size of the app shell.
 //
@@ -151,6 +154,28 @@ if (cspHosts.length !== 1 || cspHosts[0] !== assetOrigin) {
     `web/vercel.json: the CSP names ${cspHosts.length === 0 ? "no host" : cspHosts.join(", ")}, ` +
       `but VITE_ASSET_BASE_URL is on ${assetOrigin}. They must be the same one host.`,
   );
+}
+
+// --- 3. No development hook ---------------------------------------------------------
+
+// The hooks of ui/dev-hooks.ts and the player's caption mirrors are behind
+// `DEV_HOOKS` (config/env.ts), which a production build compiles out. One of
+// these strings in web/dist means a hook reached the production bundle.
+const DEV_MARKERS = ["__offcutDev", "data-caption-text", "data-caption-colors", "data-caption-position"];
+const devProblems = [];
+for (const file of files) {
+  const text = readFileSync(file, "latin1");
+  for (const marker of DEV_MARKERS.filter((entry) => text.includes(entry))) {
+    devProblems.push(`${relative(ROOT, file).replaceAll("\\", "/")}: ${marker}`);
+  }
+}
+if (devProblems.length > 0) {
+  console.error(`check-hosts: ${devProblems.length} development marker${devProblems.length === 1 ? "" : "s"} in web/dist`);
+  console.error("  A production build has no development hook or caption mirror (v4implementation §20.4). Build without --mode test.");
+  for (const problem of devProblems) {
+    console.error(`  ${problem}`);
+  }
+  process.exit(1);
 }
 
 // --- Result ------------------------------------------------------------------------

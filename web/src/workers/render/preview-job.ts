@@ -98,11 +98,18 @@ function frameTime(state: Session, at: OutMs): OutMs {
  */
 export async function drawStill(w: WorkerState): Promise<void> {
   const state = w.open();
-  if (previewLoop !== undefined || state === undefined || w.scene() === undefined || w.previewCanvas() === undefined) {
+  if (previewLoop !== undefined || state === undefined || w.scene() === undefined) {
     return;
   }
   const pos = state.session.source_at(position);
   if (pos === null) {
+    return;
+  }
+  if (w.previewCanvas() === undefined) {
+    // The scene is set before the page has a canvas: its frame is decoded
+    // now, so that the first still finds it (§15.3). Decoded only when the
+    // canvas came, it took 600 ms of the first frame on D1 (Prompt 124).
+    state.source.prefetch(recorded(pos));
     return;
   }
   const frame = await state.source.frameAtBlocking(recorded(pos));

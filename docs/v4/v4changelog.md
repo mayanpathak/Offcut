@@ -58,6 +58,7 @@
 | 32 | Copy back to `v4implementation.md` what Entry 30 changed: §16.2's `cancel-job.ts` also keeps the shown failures (`failureShown`, the one `client_error` per failure); `export-store.ts` being unchanged, the export's `cancel` and `cancel_done` are taken in `start-export.ts` through the machine's table, and a cancelled import goes `importing → failed → idle` in one moment (the clip machine has no `importing → idle`); §16.1's `clip-store.cancelled`, `failureDuring`, `cancelledRun`, `retried`, `cancelledImport`, `clearFailure`, `preview-store.canvas`; §14.3's `whenReleased` (a worker just ended still holds its files a moment); §17.3: the failed export's card is in the side panel with "Try again" and "Close" (not "Start over"), the success state sits beside the Export button, the pill's "on your computer" line is the bar's description; §19.2: `vite.config.ts`'s `define` `__OFFCUT_DEV_FAULTS__`, the dev faults' worker halves in `rpc-worker.ts` (not `render.worker.ts`), `usecases/dev-faults.ts` (in TS §5's tree since Entry 30); G 14.5: the panel after a render crash says `E_WORKER_CRASH`'s words ("Part of Offcut stopped working"), not `E_GPU_LOST`'s | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 | 33 | **A flake of the hosted Windows runner's media job.** On `2b15489` (Entry 32) two `@no-gpu` cases of `model-download.spec.ts` ("first run …" and "a second session …") failed twice each: after `flushAnalytics` no batch reached the fake API within the 5 s poll, while the page was processing on the CPU as it should (the report's snapshot: "Transcribing…", no failure). The same commit passed on D1 (the spec, 10 of 10) and on the job's re-run. P113's run flaked on a third case of the same file. If it comes back, the poll's 5 s is the first thing to widen with `patient` (the runner's `E2E_TIMEOUT_SCALE` does not reach `expect.poll`'s default) | `web/tests-e2e/model-download.spec.ts` | P125 (the e2e suites) |
 | 34 | Copy back to `v4implementation.md` and the build guide what Entries 33-34 changed: §19.2 / §20.4 / G 16.7: the media suites run on D1 on `pnpm build:e2e` (a `--mode test` production bundle with the test key), the only build that has the caption mirrors and `__offcutDev` that `preview-sync` and `review-edit` read; §21.1's edit-to-preview ends at "Saving…" (after `setScene`'s answer, which follows the redraw), not a `data-frames` tick, which a paused redraw does not move; G 16.1's helpers as written (`toggleItem(page, label, on)`, `dragVideo(page, dx)`, `trackSaves`/`settled(page, since)`, `captionMirror`, `transcriptWords`); D-175 / §16.2: "Change all" right after the edit it was offered for joins that edit's undo step (`update`'s `joinsLastStep`); §20.4: the reference clip is wider than 9:16 (the portrait fixture is case 6's clip) | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
+| 35 | Copy back to `v4implementation.md` and the build guide what Entries 35-36 changed: §16.2: `control-preview.ts` keeps the page's one `AudioContext` (`warmAudio`, made when the editor opens; `detach` suspends it), §15.3 / §16.2: the render worker's `drawStill` prefetches the frame when the scene is set before a canvas; §20.4 / G 16.4: INV-11 after a cancel is read through the page (no `client_error`, a play and a pause draw), the cancel timeout by its time and the restarted worker's run; G 16.1: `routeAssets`'s `holdAfterBytes`; §19.4 / G 16.6: `check-hosts.mjs`'s third check (the four markers); G 16.7: "78 passed" is 77 passed and the D-78 skip; §19.1 / §19.3: `ci.yml`'s "No native GPU backend outside the tests" step; G 17.3: the drills may be run locally (the founder's choice of Entry 36), the Mesa one in an `ubuntu:24.04` container; §20.2 and G 17.2: `golden_frames` has 19 tests, 17 of them on the adapter; V3 §17.1 / D-94: BtbN keeps a daily build about two weeks and a month's last build about two years | `docs/v4/v4implementation.md`, `v4buildguide.md` | P127 (copy-back) |
 
 ---
 
@@ -2686,3 +2687,81 @@ How each is read (all from the page, D-155):
 - The frozen check lists only the recorded exceptions. No private path is tracked. Temporary timing logs (Entry 33, item 3) and the temporary diagnosis specs were removed; `git diff` of `web/src` holds only `review-update.ts` and `replace-all.ts` (and the test file).
 
 **Open.** Open items 1-5 unchanged. Known issue 34 opened: copy back what Entries 33-34 changed. Next: Prompt 124 (`cancel.spec.ts`, `pipeline-preview.spec.ts` complete, no dev hook in production).
+
+## Entry 35 - 2026-10-29 - P124 (S15): cancel suite, pipeline-preview complete, no dev hook in production
+
+**What.** Prompt 124 (G 16.4-16.7; §19.4, §20.1, §20.4; D-152, D-154, D-156, D-160, D-193). The founder asked for Prompts 124 and 125 to be built and tested together and pushed once, so CI runs one time for both (Entry 36 is Prompt 125, in the commit after this one, pushed with it).
+
+**`web/tests-e2e/cancel.spec.ts`** (new), five cases. Each ends in its scope's state and sends one `job_cancelled { stage }` (read from the fake API), and after each **INV-11** is read through the page (D-155: no worker is reached): a frame left open fails the next call that closes the frames (`FrameLeak`, `render.worker.ts` `closeFrames`), which shows a failure and sends `client_error`; so no `client_error` was sent within the analytics interval, and where there is a preview a play and a pause draw (`data-frames` > 0) with no failure card.
+
+| # | Case | Tag | What it reads |
+|---|---|---|---|
+| 1 | **Import cancel**: `ok_90s_exact.mp4` (the largest `ok_*` fixture, 5.3 MB) dropped; an observer installed before the page loads presses Cancel the moment it comes onto the page | `@no-gpu` | The drop zone again, no processing or cancelled card; `clips/` empty in OPFS; `job_cancelled` = `["import"]`; no `clip_accepted` |
+| 2 | **Model cancel**: no model on the device; the asset route holds the request once 20 MiB have arrived (the second file's fourth part); Cancel on the download panel | `@no-gpu` | The cancelled card (the run is cancelled with the download); `<file>.part` kept, exactly 3 parts (25,165,824 bytes); `job_cancelled` = `["model"]`; "Process again" with every request answered: the first model request is that file from byte 25,165,824; the download ends; `model_download` = one `{ outcome: "ok", resumed: true }` (a cancelled download is not reported) |
+| 3 | **Pipeline cancel during ASR**: the reference clip; Cancel once the "captions" step turns | D1 | The cancelled card "Cancelled."; `job_cancelled` = `["asr"]`; no `pipeline_done`; "Process again" → the preview, one `pipeline_done` |
+| 4 | **Export cancel**: a Creator token; Cancel once the bar reads 3% or more | D1 | The pill gone, no failure, no "Downloaded", Export enabled; no download; `exports/tmp/` empty and no file in `exports/`; the render cache (IndexedDB `renderCache`) has no record; stages now `["asr", "render_encode"]`; no `export_done` |
+| 5 | **Cancel timeout**: Start over; `__offcutDev.hangWorker("render")`; the clip dropped; Cancel once the "visuals" step turns (the run's first render call, `openSession`, is never answered) | D1 | The cancelled card after **at least 2,000 ms and under 10,000 ms** (the restart of D-152); stages `[…, "detect_scene"]`; "Process again" → the restarted worker takes the clip to its preview |
+
+The three D1 cases share one clip in the order written (as `pipeline-preview` does). The cancel of the hung worker took **2,464 ms** in the trial run, and 2,451 and 2,435 ms in the two full runs.
+
+**`web/tests-e2e/helpers/fixtures.ts`**: `routeAssets` gains `holdAfterBytes` (a model request after that many bytes is never answered; the page's abort ends it, the context's close ends the handler) and the answer `"held"`.
+
+**`web/tests-e2e/pipeline-preview.spec.ts`** (complete; V3's cases keep their expectations):
+- **The D-160 rewrites.** "Preview plays" (`preview before sign-in`): before the first play the player carries no statistics (`data-frames` absent); after its play it is paused, `data-frames` > 0 and `data-late`, `data-max-drift-ms` are numbers, and it plays on (so the next case starts as before). "Events": after V3's assertions, unchanged, the Visuals tab's rows are the counted moments: 2 `number_reveal`, 1 `list_reveal`, 1 `from_to`, and at most `n_keyword` `keyword_pop` (a KeywordPop may be dropped by the validator; `pipeline_done` counts the detector's events).
+- **Statistics** (new, after "pause and resume"): from 0, a 5 s play, paused: `data-frames` > 100 and `data-max-drift-ms` present. The trials read 153 and 152 frames, 0 late, the worst drift 17 and 12 ms.
+- **Long tasks** (new, after "event shape", because an edit sends its own events): `PerformanceObserver("longtask")` from the drop to `ready` **≤ 100 ms each** (D-156); then **≤ 50 ms each** during a word edit, Bold and a caption drag to Top (D-193). The only exclusion (Implementation Requirement 2): a task that overlaps the first `WebAssembly.instantiate` or `instantiateStreaming` of a bundle on the main thread, recorded by wrapping both in the page before it loads. The reference clip on a device that has the model makes **none** (`offcut_core` is instantiated on the main thread only to hash a model download). V3's "long tasks … written down" case stays as it was.
+- **Zero events** (new, its own clip): `speech_20s_noevents.mp4` reaches `ready`; the Visuals tab shows `noEventsFound`'s sentence (`no-events-found`), no `plan-items` list and no row; `pipeline_done` counts 0, 0, 0, 0.
+- The group's page now calls `trackSaves` before it loads (the editing helpers need it).
+
+**A bug the long-task case found, fixed** (D-156: by removing the work from the task, never by raising the limit). The first trial failed: **one main-thread task of 331 ms** while processing, with no WASM instantiation to excuse it. A temporary diagnosis spec (Long Animation Frames, then `performance.measure` around the steps, both deleted) put it in one `IDBTransaction.oncomplete` task at the end of the run: `clipStore.ready` took 0 ms; the player's `attach` took 296 ms in **`new AudioContext()`**, with `createBuffer` 1 ms and the copy of `prog48` 6 ms. Timed in a fresh page: Chrome's first `AudioContext` takes 220-250 ms of the main thread; a second one made while the first lives takes 0-14 ms; once all are closed the next one takes 248 ms again. Making the context with no output device (`sinkId: { type: "none" }`) still took 244 ms, so it is not the device. The player made a context at every `attach` and closed it at every `detach`, so every clip paid it at `ready`.
+- **`web/src/usecases/control-preview.ts`**: the page's one `AudioContext` (`audioContext()`), made the first time it is asked for and kept; `detach` suspends it instead of closing it (`play` resumes it, as before); `warmAudio()` makes it.
+- **`web/src/ui/pages/EditorPage.tsx`**: calls `warmAudio()` once when the editor mounts, before a clip can be dropped.
+- After the fix: **no task of 50 ms or more** from the drop to `ready`, nor in any of the three editing interactions. The page's load has two: the existing 97 ms IndexedDB task and an 80 ms one where the context is now made (neither in a window of D-156 or D-193).
+
+**A second bug, which the first fix uncovered: the first frame.** The first full run after that fix failed `preview-sync`'s "first frame" case: **697 ms** after `ready`, over the 500 ms target. The two runs were stopped, and the orphaned `vite preview` and Playwright processes ended. The time was split with temporary marks in `attach` and timing logs in the render worker (all deleted), over three loads of the portrait clip in fresh pages:
+
+| Build | Page's side (ready → `attachPreview` posted) | Worker (posted → answered) | First frame after `ready` |
+|---|---|---|---|
+| `3583424` (a context per clip) | 227-283 ms (the context) | 86-111 ms | 316-396 ms |
+| The shared context alone | 8-9 ms | 110, 681, 685 ms | 120, 692, 696 ms |
+| The shared context and the prefetch | 9-13 ms | 42-192 ms | **53, 87, 210 ms** |
+
+In the worker, `attach_canvas` took 30-57 ms and rendering the frame 12-15 ms; the rest was `VideoSource.frameAtBlocking` for the frame at 0, **620 ms** in two of the three loads (40 ms in the third). Nothing decoded the clip's video before the canvas came: the decoder was configured and the first keyframe decoded inside `attachPreview`. Posted 250 ms after `ready`, as before, that cold start took 40-90 ms; posted at `ready` it mostly took 620 ms. Whatever the page or the GPU does at that moment, the decode is the worker's own wait, and §15.3 already says how to avoid it: decode ahead so that the still finds its frame.
+- **`web/src/workers/render/preview-job.ts`** `drawStill`: when the scene is set and no canvas is attached yet (the pipeline's `setScene` in `detect_scene`, seconds before `ready`; a reload's), it calls `state.source.prefetch` at the preview's position instead of returning. The frames it decodes are the source's: `closeFrames` closes them with the rest, so INV-11's count is unchanged.
+- After it, `frameAtBlocking` finds the frame decoded (0 ms) in each load.
+
+**`web/playwright.config.ts`**: `MEDIA_SUITES` gains `cancel.spec.ts` (with `preview-sync` and `review-edit`, the three of §19.4).
+
+**`scripts/check-hosts.mjs`** (G 16.6, G (b) 9): a third check, after the hosts and the CSP, fails the build when a file of `web/dist` holds `__offcutDev`, `data-caption-text`, `data-caption-colors` or `data-caption-position`, and names each file and marker. Seen to fire: on the keyed `pnpm build:e2e` bundle it exits 1 with the four markers in `assets/index-*.js`; on `pnpm build` it passes.
+
+**Counts** (Implementation Requirement 1). `playwright test --project=media --list`: **78 tests in 8 files** (76 cases and the 2 setup cases: 48 of V3, `preview-sync` 4, `review-edit` 16, `cancel` 5, `pipeline-preview` 3 new). `--grep @no-gpu`: **27** (25 cases and the 2 setup: V3's 23 and the 2 cancels).
+
+**The two full runs** (G 16.7, `pnpm build:e2e` with the test key, D1, one after the other, nothing retried):
+
+| Reading | Run 1 | Run 2 | Target |
+|---|---|---|---|
+| Result | **77 passed, 1 skipped, 0 failed** in 45.5 min | **77 passed, 1 skipped, 0 failed** in 41.8 min | All 78 listed |
+| Longest main-thread task, drop to `ready` | 51 ms (1 task of 50 ms or more) | none | ≤ 100 ms |
+| Word edit, Bold, caption drag | no task of 50 ms or more | no task of 50 ms or more | ≤ 50 ms |
+| First frame after `ready` | 170 ms | 55 ms | ≤ 500 ms |
+| Seek to the white frame at 55.0 s | 85 ms | 83 ms | ≤ 300 ms |
+| Edit to preview, 90th percentile of 20 | 27 ms | 27 ms | ≤ 150 ms |
+| Drift over 60 s | 27.1 ms, 0 of 1,800 late | 21.8 ms, 0 of 1,800 late | ≤ 80 ms, ≤ 5% |
+| The 5 s play | 153 frames, 0 late, drift 19 ms | 153 frames, 0 late, drift 23 ms | > 100 frames |
+| The hung worker's cancel | 2,451 ms | 2,435 ms | ≥ 2,000 ms |
+
+The 78 listed are 76 cases and 2 setup cases; the skipped one is D-78's `REJECT_DECODE_UNSUPPORTED` `fixme`, which is one of the 76. G 16.7's "78 passed, 1 skipped" counts it twice: P123's runs read 69 passed and 1 skipped of 70 listed the same way. axe: `review-edit` case 16 passed in both runs (no serious or critical violation).
+
+**Differs from the prompt or the plan.**
+- The cancel timeout reads the restart by its time (≥ 2 s from Cancel to the cancelled card) and by the restarted worker processing the clip, not from the worker.
+- INV-11 is read through the page as described above (D-155), not as a counter.
+- `pipeline-preview` gains three cases and keeps V3's "written down" long-task case, so the count is +3 as §20.1 says.
+- §20.4's "a large `ok_*` file": the fixtures have none larger than 5.3 MB, so the cancel is pressed the moment it shows rather than timed against a slow copy.
+- Source changes outside the files named (allowed for bugs found): `control-preview.ts`, `EditorPage.tsx` and `preview-job.ts` (above).
+
+**How it was checked.**
+- **The SAB gate** (`d1`, on the final tree, after both fixes): branch `v4-build`; no `zz` file and no temporary mark or log (the two diagnosis specs, their config and every `ZZ-TEMP` line deleted); no test key in the environment. `pnpm fixtures` up to date. `pnpm check` exit 0 (`.env` loaded; `check-file-tree` **394 files**, `cancel.spec.ts` in TS §5's tree). `pnpm test` (`.env` loaded): **Rust 646 passed, 0 failed, 3 ignored**, **Vitest 175 passed**. `pnpm build` exit 0 (`check-hosts.mjs` with the marker check); app shell 337.2 kB gzip. `pnpm e2e` **12 passed**. `web/dist` holds none of the four markers and not the test key.
+- **Reading the Rust count.** Entries 31-34 recorded 650. That figure counted the type generator's own two `cargo test` runs (in `pnpm check` and in `pnpm build`, 4 tests, Entry 19) in a log of the whole gate. Over `cargo test --workspace` alone it is 646: Entry 29's 645 plus Entry 31's new test. No test went away.
+- The first `pnpm test` of this prompt failed 14 server tests with "DATABASE_URL is not set": it ran without `.env`. With `.env` loaded they pass.
+
+**Open.** Open items 1-5 unchanged (item 5 is Entry 36's). Known issue 35 opened: copy back what this entry changed.

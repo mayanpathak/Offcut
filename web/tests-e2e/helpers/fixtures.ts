@@ -254,8 +254,8 @@ export type AssetRequest = {
   /** Every header as the browser sent it, a repeated one twice. Names are in lower case. */
   headers: { name: string; value: string }[];
   hasBody: boolean;
-  /** What came back: a status with the bytes of its body, a broken connection, or the real host's answer. */
-  answer: { status: number; bytes: number } | "aborted" | "network";
+  /** What came back: a status with the bytes of its body, a broken connection, no answer yet, or the real host's answer. */
+  answer: { status: number; bytes: number } | "aborted" | "held" | "network";
 };
 
 export type AssetLog = {
@@ -275,6 +275,12 @@ export type AssetOptions = {
   failAfterBytes?: number;
   /** Without `failAfterBytes`: every model request is answered with this status. */
   status?: number;
+  /**
+   * Once this many bytes of the model were served, a model request is never
+   * answered: the download waits on it until the page gives it up, as a
+   * cancel does (D-152). A later `routeAssets` serves the requests after it.
+   */
+  holdAfterBytes?: number;
 };
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -387,6 +393,11 @@ export async function routeAssets(page: Page, o: AssetOptions = {}): Promise<Ass
       return;
     }
     if (isModel(assetPath)) {
+      if (o.holdAfterBytes !== undefined && served >= o.holdAfterBytes) {
+        entry.answer = "held";
+        // Never settles: the page's abort ends the request, and the context's close ends this handler.
+        await new Promise<never>(() => undefined);
+      }
       const failing = o.failAfterBytes === undefined ? o.status !== undefined : served >= o.failAfterBytes;
       if (failing && o.status !== undefined) {
         entry.answer = { status: o.status, bytes: 0 };

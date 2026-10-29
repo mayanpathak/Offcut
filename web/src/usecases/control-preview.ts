@@ -106,6 +106,29 @@ function watchCrash(): void {
   });
 }
 
+let shared: AudioContext | undefined;
+
+/**
+ * The page's one `AudioContext`, made the first time it is asked for and
+ * kept: every clip's preview plays through it. Chrome's first context in a
+ * page takes about 250 ms of the main thread to make (D1, Prompt 124), and
+ * one made while another lives takes almost none. A context made for each
+ * clip at `ready` held the main thread that long at the end of every run
+ * (v4implementation D-156); the editor makes this one when it opens
+ * (`warmAudio`), before a clip is dropped.
+ */
+function audioContext(): AudioContext {
+  if (shared === undefined || shared.state === "closed") {
+    shared = new AudioContext();
+  }
+  return shared;
+}
+
+/** Makes the page's `AudioContext` now, while nothing is being processed (D-156). */
+export function warmAudio(): void {
+  audioContext();
+}
+
 /**
  * Hands the page's canvas to the render worker and makes the clip's audio
  * ready to play. A preview that is attached already is detached first.
@@ -113,14 +136,13 @@ function watchCrash(): void {
 export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): Promise<void> {
   watchCrash();
   await detach();
-  const context = new AudioContext();
+  const context = audioContext();
   const buffer = context.createBuffer(1, prog48.length, AUDIO_RATE);
   buffer.getChannelData(0).set(prog48);
   const offscreen = canvas.transferControlToOffscreen();
   try {
     await pool.render.attachPreview({ canvas: offscreen }, { transfer: [offscreen] });
   } catch (error) {
-    await context.close();
     stored(error);
     return;
   }
@@ -363,14 +385,14 @@ export async function seekDone(): Promise<void> {
   }
 }
 
-/** Gives up the preview: the sound stops and the audio is let go. */
+/** Gives up the preview: the sound stops and the audio is let go; the page's context waits, suspended, for the next clip. */
 export async function detach(): Promise<void> {
   const p = player;
   if (p !== undefined) {
     await pause();
     player = undefined;
     stopSound(p);
-    await p.context.close();
+    await p.context.suspend();
   }
   previewStore.detached();
 }
