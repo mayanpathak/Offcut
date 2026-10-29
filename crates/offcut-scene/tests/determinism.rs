@@ -66,6 +66,38 @@ fn a_frame_asked_out_of_order_is_the_frame_asked_in_order() {
     }
 }
 
+/// D-166's budget, measured natively in release, and ignored by default:
+/// `cargo test -p offcut-scene --release --test determinism -- --ignored scene_timing --nocapture`.
+/// The reference clip's labeled transcript (`a01-scriptA`), of which the 60 s
+/// portrait fixture is the start, detected and validated as the pipeline
+/// does; `build_scene` at most 1 s, `frame_at` at most 2 ms on average over
+/// every frame. The other five scenes are printed beside it. The one clock
+/// of this crate's tests; the crate itself reads no clock (TS §7).
+#[test]
+#[ignore = "a timing, release only: D-166"]
+#[allow(clippy::disallowed_methods)]
+fn scene_timing() {
+    for case in labeled::six() {
+        let started = std::time::Instant::now();
+        let scene = scenes::build(&case, 1080);
+        let build_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let frames = scene.frame_count();
+        let started = std::time::Instant::now();
+        for frame in 0..frames {
+            std::hint::black_box(scene.frame_at(FrameIdx::new(frame).to_out_ms()));
+        }
+        let mean_ms = started.elapsed().as_secs_f64() * 1000.0 / f64::from(frames);
+        println!(
+            "scene_timing {}: build_scene {build_ms:.1} ms, frame_at mean {mean_ms:.3} ms over {frames} frames",
+            case.name
+        );
+        if case.name == "a01-scriptA" {
+            assert!(build_ms <= 1_000.0, "build_scene {build_ms:.1} ms");
+            assert!(mean_ms <= 2.0, "frame_at mean {mean_ms:.3} ms");
+        }
+    }
+}
+
 fn gcd(a: u32, b: u32) -> u32 {
     if b == 0 { a } else { gcd(b, a % b) }
 }
