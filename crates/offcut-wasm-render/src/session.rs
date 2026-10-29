@@ -1,28 +1,23 @@
 //! One clip being drawn: its source file, its scene and the renderer
 //! (TS §19.6). The session reads video samples for the decoder, builds the
-//! scene and draws frames. It closes no `VideoFrame`: the caller does.
-
-use std::collections::BTreeMap;
+//! scene and draws frames. It closes no `VideoFrame`: the caller does. The
+//! scene's exports are in `scene_api.rs` (v4implementation D-150).
 
 use js_sys::{Object, Reflect, Uint8Array};
 use offcut_mp4::demux::Demuxer;
 use offcut_mp4::reader::RandomAccess;
 use offcut_mp4::{ContainerError, IoError};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
-use offcut_render::scene::{Scene, SceneError, SceneInput, build_scene};
-use offcut_render::{RenderError, Renderer};
-use offcut_types::{
-    Bytes, ClipInfo, CropOffset, DetectedEvent, EditState, ErrorCode, EventId, ExportProfile, Px,
-    StyleId, TimeMs, Transcript,
-};
-use serde::Deserialize;
+use offcut_render::scene::{Scene, SceneError};
+use offcut_render::{RenderError, Renderer, VideoSources};
+use offcut_types::{Bytes, ClipInfo, ErrorCode, OutMs, Px, TimeMs};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::{
     FileSystemReadWriteOptions, FileSystemSyncAccessHandle, OffscreenCanvas, VideoFrame,
 };
 
-use crate::{failure, from_js, to_plain, word_edits};
+use crate::{failure, from_js};
 
 /// How much of the file one call into the browser fetches for a small read.
 /// A call costs about 0.4 ms whatever its size (measured in Prompt 37), and a
@@ -132,13 +127,15 @@ fn render_failure(error: RenderError) -> (ErrorCode, &'static str) {
         RenderError::DeviceLost => (ErrorCode::GpuLost, "DeviceLost"),
         RenderError::FrameImport => (ErrorCode::Internal, "FrameImport"),
         RenderError::Overlay => (ErrorCode::Internal, "Overlay"),
+        RenderError::Unsupported => (ErrorCode::Internal, "Unsupported"),
     }
 }
 
-fn scene_error_name(error: SceneError) -> &'static str {
+pub(crate) fn scene_error_name(error: SceneError) -> &'static str {
     match error {
         SceneError::Font => "Font",
         SceneError::Layout => "Layout",
+        SceneError::TimeMap => "TimeMap",
     }
 }
 
@@ -147,33 +144,14 @@ fn render_error(error: RenderError) -> JsValue {
     failure(code, detail)
 }
 
-/// The user's choices as JavaScript holds them: the keys of `word_edits` are
-/// strings there.
-#[derive(Deserialize)]
-struct EditInput {
-    word_edits: BTreeMap<String, String>,
-    event_overrides: BTreeMap<EventId, bool>,
-    style: StyleId,
-    crop_offset: CropOffset,
-}
-
-/// A `SceneInput` by value: everything but the clip, which the session has.
-#[derive(Deserialize)]
-struct SceneInputValue {
-    transcript: Transcript,
-    events: Vec<DetectedEvent>,
-    edit: EditInput,
-    profile: ExportProfile,
-}
-
 #[wasm_bindgen]
 pub struct RenderSession {
-    clip: ClipInfo,
-    demuxer: Demuxer<JsRandomAccess>,
+    pub(crate) clip: ClipInfo,
+    pub(crate) demuxer: Demuxer<JsRandomAccess>,
     /// The bytes of the last sample read, kept so that each read does not allocate.
-    sample: Vec<u8>,
-    scene: Option<Scene>,
-    renderer: Option<Renderer>,
+    pub(crate) sample: Vec<u8>,
+    pub(crate) scene: Option<Scene>,
+    pub(crate) renderer: Option<Renderer>,
 }
 
 impl RenderSession {
@@ -219,31 +197,6 @@ pub async fn open_session(
 
 #[wasm_bindgen]
 impl RenderSession {
-    /// `input` is `{ transcript, events, edit, profile }`; the clip is the
-    /// one the session was opened with. Builds the scene and keeps it in
-    /// place of the one before. The renderer is not touched.
-    pub fn set_scene(&mut self, input: JsValue) -> Result<(), JsValue> {
-        let input: SceneInputValue = from_js(input, "SceneInput")?;
-        let word_edits = word_edits(input.edit.word_edits)
-            .ok_or_else(|| failure(ErrorCode::Internal, "SceneInput"))?;
-        let edit = EditState {
-            word_edits,
-            event_overrides: input.edit.event_overrides,
-            style: input.edit.style,
-            crop_offset: input.edit.crop_offset,
-        };
-        let scene = build_scene(SceneInput {
-            transcript: &input.transcript,
-            events: &input.events,
-            edit: &edit,
-            clip: &self.clip,
-            profile: &input.profile,
-        })
-        .map_err(|error| failure(ErrorCode::Internal, scene_error_name(error)))?;
-        self.scene = Some(scene);
-        Ok(())
-    }
-
     /// Draws to `canvas` from now on, at `width` by `height`. The first call
     /// makes the renderer; a later one gives it the new canvas, on the same
     /// device. JavaScript gets a promise.
@@ -268,33 +221,40 @@ impl RenderSession {
         }
     }
 
-    /// Draws `frame` with what the scene shows at `t_ms` over it. The frame
-    /// stays the caller's.
-    pub fn render_frame(&mut self, frame: &VideoFrame, t_ms: u32) -> Result<(), JsValue> {
+    /// Draws at `width` by `height` from now on, on the canvas it has: the
+    /// preview's 360 x 640 fallback (v4implementation D-149). The scene is
+    /// the caller's to set again at that size.
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), JsValue> {
+        let Some(renderer) = self.renderer.as_mut() else {
+            return Err(failure(ErrorCode::Internal, "NoCanvas"));
+        };
+        renderer
+            .resize(Px::new(width), Px::new(height))
+            .map_err(render_error)
+    }
+
+    /// Draws what the scene shows at the program time `t_out_ms`, with
+    /// `frame` as its main video: the frame of the source time `source_at`
+    /// gives. The frame stays the caller's.
+    pub fn render_frame(&mut self, frame: &VideoFrame, t_out_ms: u32) -> Result<(), JsValue> {
         let Some(scene) = self.scene.as_ref() else {
             return Err(failure(ErrorCode::Internal, "NoScene"));
         };
         let Some(renderer) = self.renderer.as_mut() else {
             return Err(failure(ErrorCode::Internal, "NoCanvas"));
         };
-        let list = scene.frame_at(TimeMs::new(t_ms));
+        let list = scene.frame_at(OutMs::new(t_out_ms));
+        let sources = VideoSources {
+            main: (frame, self.clip.rotation),
+        };
         renderer
-            .render(frame, scene.crop(), self.clip.rotation, &list)
+            .render(&sources, &list, scene.fonts())
             .map_err(render_error)
     }
 
     /// The number of output frames of the scene; 0 before a scene is set.
     pub fn frame_count(&self) -> u32 {
         self.scene.as_ref().map_or(0, Scene::frame_count)
-    }
-
-    /// The `ChangeSummary` of the scene; `null` before a scene is set.
-    pub fn summary(&self) -> JsValue {
-        let summary = self.scene.as_ref().map(Scene::summary);
-        // Three plain fields always serialize.
-        summary
-            .and_then(|summary| to_plain(&summary).ok())
-            .unwrap_or(JsValue::NULL)
     }
 
     // The four calls a video decoder is fed through (D-30).
@@ -365,6 +325,7 @@ mod tests {
             (RenderError::DeviceLost, ErrorCode::GpuLost, "DeviceLost"),
             (RenderError::FrameImport, ErrorCode::Internal, "FrameImport"),
             (RenderError::Overlay, ErrorCode::Internal, "Overlay"),
+            (RenderError::Unsupported, ErrorCode::Internal, "Unsupported"),
         ];
         for (error, code, name) in cases {
             assert_eq!(render_failure(error), (code, name));
@@ -377,5 +338,6 @@ mod tests {
         assert_eq!(container_name(ContainerError::Io(IoError::Read)), "Read");
         assert_eq!(scene_error_name(SceneError::Font), "Font");
         assert_eq!(scene_error_name(SceneError::Layout), "Layout");
+        assert_eq!(scene_error_name(SceneError::TimeMap), "TimeMap");
     }
 }

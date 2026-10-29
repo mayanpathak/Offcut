@@ -9,9 +9,10 @@
 // took 2.8 times as long and wrote full-range brightness into a stream that
 // does not say so. The choice is this file's alone.
 
-import { type Bytes, type ExportProfile, LIMITS, type TimeMs } from "../../gen/domain";
+import { type Bytes, type ExportProfile, LIMITS, type OutMs, type TimeMs } from "../../gen/domain";
 import { loadRender, type Mp4MuxerHandle, type RenderSession } from "../../wasm/load-render";
-import { toAppFailure, WorkerFailure } from "../rpc";
+import { toAppFailure } from "../rpc";
+import { WorkerFailure } from "../rpc-worker";
 import {
   AAC_ENCODE_CONFIG,
   AAC_PRIMING_SAMPLES,
@@ -345,13 +346,15 @@ export async function runExport(a: {
         return { cancelled: true };
       }
       watch.check();
-      // Output frame n shows the clip at n x 1000 / 30 ms, in whole
-      // milliseconds; its own timestamp is the same in microseconds.
-      const t = Math.floor((n * 1000) / LIMITS.OUTPUT_FPS) as TimeMs;
+      // Output frame n is the program at n x 1000 / 30 ms, in whole
+      // milliseconds; its own timestamp is the same in microseconds. V4's
+      // map is the identity, so it shows the recording at the same time
+      // (D-129; V5 reads it from `source_at`).
+      const t = Math.floor((n * 1000) / LIMITS.OUTPUT_FPS);
       const timestamp = Math.floor((n * MICROS_PER_SEC) / LIMITS.OUTPUT_FPS);
       // The frame stays the source's: it is not closed here.
-      const frame = await a.source.frameAtBlocking(t);
-      a.session.render_frame(frame, t);
+      const frame = await a.source.frameAtBlocking(t as TimeMs);
+      a.session.render_frame(frame, t as OutMs);
       const vf = encoding("E_ENCODE_VIDEO", () => new VideoFrame(a.canvas, { timestamp, duration: FRAME_DURATION_US }));
       liveFrames.count += 1;
       try {

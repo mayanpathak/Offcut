@@ -7,6 +7,7 @@
 mod detect_api;
 mod mux_api;
 mod profile_api;
+mod scene_api;
 mod session;
 
 use std::collections::BTreeMap;

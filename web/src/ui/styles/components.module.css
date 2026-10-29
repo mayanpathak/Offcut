@@ -93,97 +93,11 @@
   color: var(--color-problem);
 }
 
-/* --- ModelDownloadPanel --------------------------------------------------- */
-
-.modelPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-.progressTrack {
-  height: var(--space-2);
-  border-radius: var(--radius);
-  background: var(--color-border);
-  overflow: hidden;
-}
-
-/* The component sets --progress on the bar; no style attribute is written. */
-.progressBar {
-  width: var(--progress, 0%);
-  height: 100%;
-  background: var(--color-accent);
-  transition: width 0.3s linear;
-}
-
 /* --- Something that waits: the sample button while the clip is fetched ---- */
 
 .pending {
   opacity: 0.6;
   cursor: progress;
-}
-
-/* --- ProcessingFeed ------------------------------------------------------- */
-
-.feed {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-height: var(--space-5);
-}
-
-.feedLine {
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid var(--color-accent);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-/* --- PreviewPlayer -------------------------------------------------------- */
-
-.player {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-/* The canvas is drawn at its own size and shown at the width there is. */
-.previewCanvas {
-  width: min(100%, 20rem);
-  height: auto;
-  aspect-ratio: 9 / 16;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-.playerControls {
-  display: flex;
-  gap: var(--space-2);
-}
-
-/* --- ExportButton, ExportProgress ----------------------------------------- */
-
-.exportPanel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: center;
-}
-
-.exportProgress {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 /* --- WhatLeavesTable ------------------------------------------------------ */
@@ -229,22 +143,323 @@
   color: var(--color-muted);
 }
 
-/* A clip Offcut cannot use: the limit and what to do (v3implementation §16.4). */
-.rejection {
-  composes: stub from "./pages.module.css";
+/* === The editor (v4implementation §17.2, §17.6): on [data-theme="dark"]'s tokens === */
+
+/* --- The empty stage (DropZone, variant "stage") ---------------------------- */
+
+.dropStage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  border: 2px dashed var(--border);
+  border-radius: var(--r-panel);
+  text-align: center;
+  transition:
+    border-color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
 }
 
-.rejectionTitle {
-  margin: 0;
-  font-size: var(--text-lg);
-  color: var(--color-problem);
+.dropStageOver {
+  composes: dropStage;
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, var(--bg));
 }
 
-.rejectionBody {
+.dropTargetStage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--r-card);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-500);
+  line-height: var(--lh-tight);
+  cursor: pointer;
+}
+
+/* The round icon above a card's words, and the drop zone's arrow. */
+.dropIcon,
+.cardIconWarn,
+.cardIconDanger {
+  display: grid;
+  place-items: center;
+  width: var(--sp-7);
+  height: var(--sp-7);
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.dropIcon {
+  color: var(--text-2);
+  transition: color var(--fast) var(--ease);
+}
+
+.dropTargetStage:hover .dropIcon {
+  color: var(--text);
+}
+
+.dropOr,
+.dropBrowsers,
+.dropLine {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+}
+
+.dropBrowsers {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-12);
+}
+
+/* --- The cards in the stage's frame ------------------------------------------ */
+
+.card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-5);
+  overflow-y: auto;
+}
+
+.cardTitle,
+.cardText,
+.cardHint,
+.pillLine {
   margin: 0;
 }
 
-.rejectionAction {
+/* An error card in the side panel or over the preview (D-190): its own
+   edge and background, the content's height, smaller type. */
+.cardCompact {
+  composes: card;
+  flex: none;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-1);
+}
+
+.cardCompact .cardTitle {
+  font-size: var(--fs-16);
+}
+
+/* Development builds only: what the failure was, collapsed (D-190). */
+.cardDetails {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+
+.cardDetails summary {
+  cursor: pointer;
+}
+
+.cardTitle {
+  font-size: var(--fs-20);
+  font-weight: var(--fw-600);
+  line-height: var(--lh-tight);
+}
+
+.cardHint {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.cardFailure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+
+.cardIconWarn {
+  color: var(--warn);
+}
+
+.cardIconDanger {
+  color: var(--danger);
+}
+
+/* A bar in the brand colour (G 10.6), set through --progress (no style attribute); it glides to each new value over 1 s, never past it (design review 1). */
+.meter {
+  height: var(--sp-1);
+  overflow: hidden;
+  border-radius: var(--sp-1);
+  background: var(--border);
+}
+
+.meterBar {
+  width: var(--progress, 0%);
+  height: 100%;
+  background: var(--brand);
+  transition: width calc(var(--base) * 5) var(--ease);
+}
+
+/* --- The processing card: its steps and the feed's chips ---------------------- */
+
+.steps,
+.chips {
+  display: flex;
   margin: 0;
-  color: var(--color-muted);
+  padding: 0;
+  list-style: none;
+}
+
+.steps {
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--text-2);
+}
+
+.stepRunning {
+  composes: step;
+  color: var(--text);
+  font-weight: var(--fw-500);
+}
+
+.stepDone {
+  composes: step;
+  color: var(--text);
+}
+
+.stepMark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--sp-5);
+  height: var(--sp-5);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.stepDone .stepMark,
+.stepRunning .stepMark {
+  box-shadow: none;
+}
+
+.stepDone .stepMark {
+  background: var(--surface-2);
+  color: var(--ok);
+}
+
+.chips {
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-13);
+}
+
+.chipFound {
+  composes: chip;
+  color: var(--text);
+}
+
+/* --- The export: the top bar's button, its pill and its done state (D-189) ------- */
+
+.exportPanel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.exportStatus {
+  max-width: calc(var(--sp-7) * 5);
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-tight);
+  text-align: right;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: calc(var(--sp-7) * 7);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--topbar-h) / 2);
+  background: var(--surface-2);
+}
+
+.pillBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.pillLine {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.pillStage {
+  font-weight: var(--fw-600);
+}
+
+.pillPercent,
+.pillLeft {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.pillLeft {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exportDone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--ok);
+  font-size: var(--fs-13);
+  white-space: nowrap;
+}
+
+/* Read by assistive technology only. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

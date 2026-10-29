@@ -9,13 +9,16 @@ import type {
   ClipId,
   ClipInfo,
   DetectedEvent,
+  EditPlan,
   EditState,
   PipelineStage,
   Prosody,
   RejectReason,
+  TimeMap,
   Transcript,
 } from "../gen/domain";
-import type { AppFailure, FeedLine } from "../workers/protocol";
+import type { AppFailure, FeedLine, SceneChunk } from "../workers/protocol";
+import { clear as clearHistory } from "./history";
 import { CLIP_MACHINE, type ClipEvent, type ClipStatus } from "./machines/clip-machine";
 import { transition } from "./machines/transition";
 
@@ -31,17 +34,34 @@ export type ClipState = {
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
-  /** The user's edits. V2 has none: this is the default and never changes. */
+  /**
+   * The plan the scene is built from: the rules plan of `events` in V4
+   * (D-124). In memory only; a restored clip makes it again (D-82).
+   */
+  plan?: EditPlan;
+  /** How the program plays the recording: the identity in V4 (D-164). */
+  timeMap?: TimeMap;
+  /** The chunks of the captions the scene shows, for the transcript editor (D-182). */
+  chunks: readonly SceneChunk[];
+  /** The user's edits: the default until a review change (D-147). */
   edit: EditState;
   /** The lines of the processing feed, in the order they came. */
   feed: readonly FeedLine[];
   reject?: RejectReason;
   failure?: AppFailure;
   /**
-   * The clip's audio at 48 kHz, for the preview, while the clip is `ready`
-   * (v2implementation D-51). The export reads its own copy from the device.
+   * Where a failure of a clip that stays `ready` happened: in a review
+   * change, or in the preview. The error card's action follows it (D-190).
    */
-  out48: Float32Array | null;
+  failureDuring?: "edit" | "preview";
+  /** The run of the pipeline was cancelled: an `accepted` clip shows the cancelled card (D-152). */
+  cancelled: boolean;
+  /**
+   * The program's audio at 48 kHz, for the preview, while the clip is
+   * `ready` (D-127). The export reads the cleaned voice from the device,
+   * `out48.f32` (v2implementation D-51, D-129).
+   */
+  prog48: Float32Array | null;
 };
 
 /** What a state holds beside its status. */
@@ -52,13 +72,24 @@ function empty(): Fields {
   return {
     waitingModel: false,
     events: [],
-    edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0 },
+    chunks: [],
+    edit: { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true },
     feed: [],
-    out48: null,
+    prog48: null,
+    cancelled: false,
   };
 }
 
 export const useClipStore = create<ClipState>(() => ({ status: "idle", ...empty() }));
+
+/**
+ * Whether the crop offset moves the picture: a frame wider than 9:16 loses
+ * its sides, and the offset says which (D-131). A narrower one ignores it.
+ * The rule is `crop_rect`'s, in `offcut-scene/src/framing.rs`.
+ */
+export function cropMoves(info: ClipInfo): boolean {
+  return info.display_width * 16 > info.display_height * 9;
+}
 
 /**
  * Applies `event`. `next` gives what the state holds with its new status,
@@ -85,6 +116,8 @@ function settled(current: Fields): Fields {
 /** idle → importing */
 export function begin(clipId: ClipId, source: ClipSource): void {
   apply("import", () => ({ ...empty(), clipId, source }));
+  // The history is of one clip (D-184).
+  clearHistory();
 }
 
 /** importing → accepted */
@@ -99,7 +132,26 @@ export function rejected(reason: RejectReason): void {
 
 /** importing | processing → failed */
 export function failed(failure: AppFailure): void {
-  apply("fail", (current) => ({ ...settled(current), failure }));
+  apply("fail", (current) => {
+    const rest = settled(current);
+    delete rest.failureDuring;
+    return { ...rest, failure };
+  });
+}
+
+/**
+ * What an accepted clip holds: its file's facts and the user's edits. A run
+ * that starts again starts from here, with nothing of the run before.
+ */
+function acceptedFields(current: Fields): Fields {
+  const { clipId, source, clipInfo } = current;
+  return {
+    ...empty(),
+    ...(clipId === undefined ? {} : { clipId }),
+    ...(source === undefined ? {} : { source }),
+    ...(clipInfo === undefined ? {} : { clipInfo }),
+    edit: current.edit,
+  };
 }
 
 /**
@@ -110,8 +162,30 @@ export function processing(stage: PipelineStage, waitingModel: boolean): void {
   if (useClipStore.getState().status === "processing") {
     useClipStore.setState({ stage, waitingModel });
   } else {
-    apply("run", (current) => ({ ...current, stage, waitingModel }));
+    apply("run", (current) => ({ ...acceptedFields(current), stage, waitingModel }));
   }
+}
+
+/** failed → processing (D-153): the pipeline runs again from its first step. */
+export function retried(): void {
+  apply("retry", (current) => ({ ...acceptedFields(current), stage: "probe_audio", waitingModel: false }));
+}
+
+/** processing → accepted (D-152): the run was cancelled; "Process again" runs it from the start. */
+export function cancelledRun(): void {
+  apply("cancel", (current) => ({ ...acceptedFields(current), cancelled: true }));
+}
+
+/**
+ * importing → idle (D-152). The clip machine has no edge from `importing`
+ * to `idle` (its table is unchanged in V4, §4): a cancelled import goes
+ * through `failed`, and on to `idle` in the same moment, so no failure is
+ * ever drawn or reported.
+ */
+export function cancelledImport(): void {
+  const failure: AppFailure = { code: "E_INTERNAL", stage: "import", retryable: false, detail: "Cancelled" };
+  apply("fail", (current) => ({ ...settled(current), failure }));
+  reset();
 }
 
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */
@@ -124,9 +198,40 @@ export function ready(result: {
   transcript: Transcript;
   prosody: Prosody;
   events: readonly DetectedEvent[];
-  out48: Float32Array;
+  timeMap: TimeMap;
+  prog48: Float32Array;
 }): void {
   apply("done", (current) => ({ ...settled(current), ...result }));
+}
+
+/** The plan the scene is built from now. The clip's state does not change. */
+export function setPlan(plan: EditPlan): void {
+  useClipStore.setState({ plan });
+}
+
+/** The chunks of the scene built last (D-182). The clip's state does not change. */
+export function setChunks(chunks: readonly SceneChunk[]): void {
+  useClipStore.setState({ chunks });
+}
+
+/** The events found now, after an edit (D-146). The clip's state does not change. */
+export function setEvents(events: readonly DetectedEvent[]): void {
+  useClipStore.setState({ events });
+}
+
+/** ready → updating, holding the edit asked for before the worker answers (D-147: edits are optimistic). */
+export function editStarted(edit: EditState): void {
+  apply("edit_start", (current) => ({ ...current, edit }));
+}
+
+/** updating → ready: the scene shows the edit. */
+export function editDone(): void {
+  apply("edit_done", (current) => current);
+}
+
+/** updating → ready with the edit before, and why the change did not apply (D-147). */
+export function editFailed(previous: EditState, failure: AppFailure): void {
+  apply("edit_done", (current) => ({ ...current, edit: previous, failure, failureDuring: "edit" }));
 }
 
 /** processing → rejected: fewer words were heard than a clip needs. */
@@ -138,11 +243,20 @@ export function noSpeech(): void {
  * A failure that does not change the clip's state: the preview's, with the
  * clip still `ready`. The clip machine has no way from `ready` to `failed`.
  */
-export function noteFailure(failure: AppFailure): void {
-  useClipStore.setState({ failure });
+export function noteFailure(failure: AppFailure, during: "edit" | "preview" = "preview"): void {
+  useClipStore.setState({ failure, failureDuring: during });
+}
+
+/** The failure of a `ready` clip is over: the preview was reloaded, or the change undone (D-153, D-190). */
+export function clearFailure(): void {
+  const next = { ...useClipStore.getState() };
+  delete next.failure;
+  delete next.failureDuring;
+  useClipStore.setState(next, true);
 }
 
 /** rejected | failed | ready | accepted → idle. Nothing of the clip is kept, its audio neither. */
 export function reset(): void {
   apply("reset", empty);
+  clearHistory();
 }

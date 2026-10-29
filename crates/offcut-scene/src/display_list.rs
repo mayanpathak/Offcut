@@ -1,5 +1,7 @@
-//! What one frame draws, as a list any backend can read (TS §19.2, D-29).
-//! Every length is in pixels of the output canvas.
+//! What one frame draws, as a list any backend can read (TS §19.2, D-29,
+//! D-130). Every length is in pixels of the output canvas. The order of the
+//! variants of `DrawCmd` is part of the display-list snapshots: a new one is
+//! appended.
 
 use serde::Serialize;
 
@@ -53,15 +55,30 @@ pub struct Affine {
     pub m: [f32; 6],
 }
 
-/// A font file at one weight. Closed, and the order is part of the snapshots
-/// of V4: a member is never moved or removed.
+/// A face of the `FontSet` a list is drawn with: its index there (D-132).
+/// Keys 0 to 3 are V2's fonts in V2's order; a new face takes the next key.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub enum FontId {
-    Inter700,
-    Inter900,
-    JetBrainsMono700,
-    NotoEmoji,
+pub struct FontKey(pub u16);
+
+/// A part of the source frame, in source display pixels: of the frame as it
+/// is shown, after its rotation.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct CropRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
+
+/// Which video a `Video` command draws. V4 has one (D-130).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum VideoSlot {
+    Main,
+}
+
+/// An image the renderer holds. No V4 list names one (D-163).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+pub struct ImageKey(pub u16);
 
 /// The Canvas2D seam: a backend that cannot draw glyphs by id draws `text`.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -84,7 +101,7 @@ pub enum DrawCmd {
     /// stroke that lies outside each glyph is what shows. `text` is kept for
     /// the Canvas2D seam.
     GlyphRun {
-        font: FontId,
+        font: FontKey,
         size: f32,
         glyphs: Vec<PositionedGlyph>,
         fill: Rgba,
@@ -97,6 +114,21 @@ pub enum DrawCmd {
         clip: Option<Rect>,
     },
     PopLayer,
+    /// The part `src` of a video, drawn into `dst`. `dst` is in output pixels
+    /// already: scaling a list leaves it alone. `mask` (V6.5) clips it to a
+    /// shape.
+    Video {
+        slot: VideoSlot,
+        src: CropRect,
+        dst: Rect,
+        opacity: f32,
+        mask: Option<Vec<PathEl>>,
+    },
+    Image {
+        image: ImageKey,
+        rect: Rect,
+        opacity: f32,
+    },
 }
 
 impl Affine {
@@ -145,7 +177,8 @@ impl PathEl {
 impl DrawCmd {
     /// The command on a canvas `k` times the size: every length is multiplied,
     /// the translation of a transform too. An opacity, and the scale and
-    /// rotation of a transform, are not lengths and stay.
+    /// rotation of a transform, are not lengths and stay. A `Video` command
+    /// is in output pixels already and stays as it is.
     pub(crate) fn scale(&mut self, k: f32) {
         match self {
             DrawCmd::FillRect { rect, radius, .. } => {
@@ -179,6 +212,11 @@ impl DrawCmd {
                 *clip = clip.map(|rect| rect.scaled(k));
             }
             DrawCmd::PopLayer => {}
+            // Placed on the output canvas when the list is made (D-130).
+            DrawCmd::Video { .. } => {}
+            DrawCmd::Image { rect, .. } => {
+                *rect = rect.scaled(k);
+            }
         }
     }
 }

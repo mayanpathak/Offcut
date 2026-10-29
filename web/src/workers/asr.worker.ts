@@ -7,7 +7,7 @@ import { LIMITS, type Transcript } from "../gen/domain";
 import { loadCore } from "../wasm/load-core";
 import { loadModel, transcribe as hear, unloadModel } from "./asr/whisper-runtime";
 import type { AsrWorkerApi } from "./protocol";
-import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc";
+import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The model that is loaded. It is also the transcript's `model_version` (D-50).
 let loaded: string | undefined;

@@ -231,7 +231,8 @@ test.describe("one clip, exported", () => {
   test("a token signed with another key: the export fails and leaves no file", async () => {
     await seedEntitlement(page, mintEntitlementToken({ seed: OTHER_SEED }));
     await exportButton(page).click();
-    await expect(page.getByTestId("export-failed")).toHaveText(messages.editor.failedStub, { timeout: 60_000 });
+    // The card of a code with no words yet (V6) says the general sentence (D-190).
+    await expect(page.getByTestId("export-failed")).toContainText(messages.editor.failedStub, { timeout: 60_000 });
     await expect.poll(() => api.eventsOf("export_failed"), { timeout: FLUSH_WAIT_MS }).toEqual([
       { name: "export_failed", props: { error_code: "E_ENTITLEMENT_INVALID", stage: "render_encode" } },
     ]);
@@ -338,7 +339,7 @@ test.describe("one clip, exported", () => {
     expect(first.equals(await canvas(page).screenshot())).toBe(false);
     await button(page, messages.preview.pause).click();
     await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
   });
 
   test("Free-plan token: the file is 720 by 1280, as the token says", async () => {

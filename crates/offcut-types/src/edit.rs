@@ -42,6 +42,44 @@ impl<'de> Deserialize<'de> for CropOffset {
     }
 }
 
+/// Where the caption block's centre sits: 0.0 at the top of the band captions
+/// may use, 1.0 at its bottom (v4implementation D-171). Checked in `new` and
+/// when deserializing.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, TS)]
+pub struct CaptionPlacement(f32);
+
+impl CaptionPlacement {
+    /// `None` when `v` is not finite or is outside `0.0..=1.0`.
+    pub fn new(v: f32) -> Option<Self> {
+        (0.0..=1.0).contains(&v).then_some(Self(v))
+    }
+
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+
+    /// The default: the bottom of the band, V3's caption zone.
+    pub const fn bottom() -> Self {
+        Self(1.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for CaptionPlacement {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let v = f32::deserialize(deserializer)?;
+        Self::new(v).ok_or_else(|| {
+            D::Error::custom("a caption placement must be a finite number in 0.0..=1.0")
+        })
+    }
+}
+
+/// The serde default of `highlight_numbers`.
+fn yes() -> bool {
+    true
+}
+
+/// REOPENED in V4 (D-169, D-171): the last two fields. Their serde defaults
+/// make a record V3 wrote read as V4's default.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 pub struct EditState {
     /// Replacement text; "" hides the word; timing never changes.
@@ -50,16 +88,24 @@ pub struct EditState {
     pub event_overrides: BTreeMap<EventId, bool>,
     pub style: StyleId,
     pub crop_offset: CropOffset,
+    #[serde(default = "CaptionPlacement::bottom")]
+    pub caption_position: CaptionPlacement,
+    /// Numbers in the captions in the accent colour (D-169).
+    #[serde(default = "yes")]
+    pub highlight_numbers: bool,
 }
 
 impl Default for EditState {
-    /// No edits, no overrides, `StyleId::Clean`, offset `0.0`.
+    /// No edits, no overrides, `StyleId::Clean`, offset `0.0`, captions at
+    /// the bottom, numbers highlighted.
     fn default() -> Self {
         Self {
             word_edits: BTreeMap::new(),
             event_overrides: BTreeMap::new(),
             style: StyleId::Clean,
             crop_offset: CropOffset(0.0),
+            caption_position: CaptionPlacement::bottom(),
+            highlight_numbers: true,
         }
     }
 }
@@ -118,7 +164,7 @@ mod tests {
         assert_eq!(state.crop_offset.get(), 0.0);
         assert_eq!(
             serde_json::to_string(&state).unwrap(),
-            r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0.0}"#
+            r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0.0,"caption_position":1.0,"highlight_numbers":true}"#
         );
     }
 
@@ -141,9 +187,63 @@ mod tests {
                 "event_overrides": { "18446744073709551615": false },
                 "style": "tech",
                 "crop_offset": 0.25,
+                "caption_position": 1.0,
+                "highlight_numbers": true,
             })
         );
         assert_eq!(serde_json::from_value::<EditState>(value).unwrap(), state);
+    }
+
+    #[test]
+    fn a_v3_record_reads_with_the_two_v4_defaults() {
+        let v3 = r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0}"#;
+        let state: EditState = serde_json::from_str(v3).unwrap();
+        assert_eq!(state.caption_position.get(), 1.0);
+        assert!(state.highlight_numbers);
+        assert_eq!(state, EditState::default());
+    }
+
+    #[test]
+    fn caption_placement_accepts_only_zero_to_one() {
+        for ok in [0.0, 0.15, 0.55, 1.0] {
+            assert_eq!(
+                CaptionPlacement::new(ok).map(CaptionPlacement::get),
+                Some(ok)
+            );
+        }
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.01, 1.01] {
+            assert_eq!(CaptionPlacement::new(bad), None, "{bad} was accepted");
+        }
+        assert_eq!(CaptionPlacement::bottom().get(), 1.0);
+    }
+
+    #[test]
+    fn caption_placement_deserializes_through_new() {
+        let at = CaptionPlacement::new(0.55).unwrap();
+        assert_eq!(serde_json::to_string(&at).unwrap(), "0.55");
+        assert_eq!(
+            serde_json::from_str::<CaptionPlacement>("0.55").unwrap(),
+            at
+        );
+        // JSON has no NaN or infinity; the nearest a record can come is a
+        // number outside the range, or a value that is not a number.
+        for bad in ["-0.01", "1.01", "1e39", "null", "\"1\""] {
+            assert!(
+                serde_json::from_str::<CaptionPlacement>(bad).is_err(),
+                "{bad}"
+            );
+        }
+        let json = r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0,"caption_position":1.5}"#;
+        let error = serde_json::from_str::<EditState>(json)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("caption placement"), "{error}");
+        let off = r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0,"caption_position":0.15,"highlight_numbers":false}"#;
+        let state: EditState = serde_json::from_str(off).unwrap();
+        assert_eq!(
+            (state.caption_position.get(), state.highlight_numbers),
+            (0.15, false)
+        );
     }
 
     #[test]

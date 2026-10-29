@@ -2,7 +2,10 @@
 //! the only file that holds these numbers. All layout is in logical pixels
 //! (lp); the insets are (assumption, E-2).
 
+use offcut_types::CaptionPlacement;
+
 use crate::display_list::Rect;
+use crate::placement;
 
 pub const CANVAS_WIDTH: f32 = 1080.0;
 pub const CANVAS_HEIGHT: f32 = 1920.0;
@@ -20,21 +23,46 @@ pub const SAFE_AREA: Rect = Rect {
     h: CANVAS_HEIGHT - INSET_TOP - INSET_BOTTOM,
 };
 
-/// y 860 to 1180, as wide as the safe area.
-pub const EVENT_ZONE: Rect = Rect {
-    x: SAFE_AREA.x,
-    y: 860.0,
-    w: SAFE_AREA.w,
-    h: 320.0,
-};
+/// A part of the safe area a visual is placed in (D-138). Later releases
+/// append rows (`Top`, `LowerThird`, …).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ZoneId {
+    /// 320 lp tall, on the free side of the captions (D-171): y 804 to 1124
+    /// at the default placement.
+    Event,
+    /// The caption block, 280 lp tall: y 1164 to 1444 at the default
+    /// placement, above the watermark's band.
+    Caption,
+    /// The safe area.
+    Full,
+}
 
-/// y 1220 to 1500, as wide as the safe area.
-pub const CAPTION_ZONE: Rect = Rect {
-    x: SAFE_AREA.x,
-    y: 1220.0,
-    w: SAFE_AREA.w,
-    h: 280.0,
-};
+/// The zone `id` for a clip whose captions are at `placement`, as wide as
+/// the safe area (`placement.rs`, D-171).
+pub fn zone(id: ZoneId, placement: CaptionPlacement) -> Rect {
+    match id {
+        ZoneId::Event => placement::event_zone(placement::block_at(placement)),
+        ZoneId::Caption => placement::block_at(placement),
+        ZoneId::Full => SAFE_AREA,
+    }
+}
 
 /// The bottom-left corner of the safe area, as `(x, y)`.
 pub const WATERMARK_ANCHOR: (f32, f32) = (SAFE_AREA.x, SAFE_AREA.y + SAFE_AREA.h);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_zones_at_the_default_placement_are_inside_the_safe_area() {
+        let rows = |id| {
+            let r = zone(id, CaptionPlacement::bottom());
+            (r.x, r.y, r.w, r.h)
+        };
+        // 56 lp above V3's (860 and 1220): the watermark's band (Entry 17).
+        assert_eq!(rows(ZoneId::Event), (60.0, 804.0, 900.0, 320.0));
+        assert_eq!(rows(ZoneId::Caption), (60.0, 1164.0, 900.0, 280.0));
+        assert_eq!(rows(ZoneId::Full), (60.0, 250.0, 900.0, 1250.0));
+    }
+}

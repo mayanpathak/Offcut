@@ -1,0 +1,326 @@
+/* The primitives that hold a value (v4implementation D-181): Tabs, Switch,
+   SegmentedControl and Slider. The others are in primitives.module.css; the
+   rules of both files are the same. Every colour, size, space, radius and
+   duration is a token of tokens.css. Disabled means `:disabled` or
+   `[aria-disabled="true"]` (disabled with a reason, still focusable). */
+
+/* --- Shared states -------------------------------------------------------- */
+
+.tab:focus-visible,
+.switchRow:focus-visible,
+.segment:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.tab[aria-disabled="true"],
+.switchRow:disabled,
+.switchRow[aria-disabled="true"],
+.segment:disabled,
+.segment[aria-disabled="true"],
+.range:disabled,
+.range[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- Tabs ----------------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabList {
+  display: flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The tabs share the list's width; an icon sits above its label, so four
+   tabs fit the narrow panel (--panel-w-sm). */
+.tab {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  min-height: calc(var(--sp-7) - var(--sp-2));
+  padding: var(--sp-2) var(--sp-1);
+  border: 0;
+  border-radius: var(--r-control) var(--r-control) 0 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-500);
+  line-height: var(--lh-tight);
+  cursor: pointer;
+}
+
+.tabLabel {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab:hover:not([aria-disabled="true"]),
+.tab[aria-selected="true"] {
+  color: var(--text);
+}
+
+/* The selected tab is marked by a line of the brand colour, without motion. */
+.tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  right: var(--sp-3);
+  bottom: -1px;
+  left: var(--sp-3);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.tabPanel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.tabPanel:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+/* --- Switch --------------------------------------------------------------- */
+
+/* The row reaches into the space beside it by its own padding, so its words
+   line up with the text above and below it, and its hover fills the gap. */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: calc(100% + 2 * var(--sp-3));
+  min-height: calc(var(--sp-7) - var(--sp-2));
+  margin: 0 calc(-1 * var(--sp-3));
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.switchRow:hover:not(:disabled, [aria-disabled="true"]) {
+  background: var(--surface-2);
+}
+
+.switchRow:active:not(:disabled, [aria-disabled="true"]) {
+  background: var(--border);
+}
+
+.switchText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.switchLabel {
+  font-weight: var(--fw-500);
+}
+
+/* As primitives.module.css's .hint. */
+.switchHint {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+}
+
+.switchTrack {
+  position: relative;
+  flex: none;
+  width: calc(var(--sp-6) + var(--sp-1));
+  height: calc(var(--sp-4) + var(--sp-1));
+  border-radius: var(--sp-3);
+  background: var(--border);
+  transition: background-color var(--fast) var(--ease);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: var(--sp-4);
+  height: var(--sp-4);
+  border-radius: 50%;
+  background: var(--text-2);
+  transition:
+    translate var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+/* On: light track, dark thumb. The brand colour is kept for the one primary
+   action and the selected tab (G 10.9). */
+.switchRow[aria-checked="true"] .switchTrack {
+  background: var(--text);
+}
+
+.switchRow[aria-checked="true"] .switchThumb {
+  translate: var(--sp-4) 0;
+  background: var(--bg);
+}
+
+/* --- SegmentedControl ----------------------------------------------------- */
+
+.segmented {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border-radius: var(--r-card);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.segment {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--sp-6);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: var(--fw-500);
+  cursor: pointer;
+  transition:
+    background-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.segment:hover:not(:disabled, [aria-disabled="true"]) {
+  color: var(--text);
+}
+
+.segment[aria-checked="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--shadow-1);
+}
+
+/* --- Slider --------------------------------------------------------------- */
+
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sliderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.sliderLabel {
+  font-weight: var(--fw-500);
+}
+
+.sliderValue {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Slider.tsx sets --fill, the share of the track left of the thumb. */
+.range {
+  width: 100%;
+  height: var(--sp-6);
+  margin: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: var(--sp-1);
+  border-radius: var(--sp-1);
+  background: linear-gradient(to right, var(--text-2) var(--fill, 0%), var(--border) var(--fill, 0%));
+}
+
+.range::-webkit-slider-thumb {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  margin-top: calc((var(--sp-1) - var(--sp-4)) / 2);
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: var(--shadow-1);
+  appearance: none;
+  transition: scale var(--fast) var(--ease);
+}
+
+.range::-moz-range-track {
+  height: var(--sp-1);
+  border-radius: var(--sp-1);
+  background: var(--border);
+}
+
+.range::-moz-range-progress {
+  height: var(--sp-1);
+  border-radius: var(--sp-1);
+  background: var(--text-2);
+}
+
+.range::-moz-range-thumb {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+.range:hover:not(:disabled, [aria-disabled="true"])::-webkit-slider-thumb {
+  scale: 1.125;
+}
+
+.range:active:not(:disabled, [aria-disabled="true"])::-webkit-slider-thumb {
+  scale: 1.25;
+}
+
+.range:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.range:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus);
+}
+
+.range:focus-visible::-moz-range-thumb {
+  box-shadow: var(--focus);
+}
+
+/* A slider's label for assistive technology only (`labelHidden`). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

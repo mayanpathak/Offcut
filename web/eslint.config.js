@@ -154,6 +154,20 @@ const layerPolicies = [
     from: fromFile("usecases", "start-export.ts"),
     allow: { to: to("usecases", "control-preview.ts") },
   },
+
+  // The review's edges V4 adds (v4implementation §4, D-147): every review
+  // change goes through the one update rule, which holds the queue of one,
+  // the optimistic edit and the history (D-184); the rule pauses the preview
+  // around a change and plays it again after (TS §12.4).
+  {
+    from: fromFile("usecases", "edit-word.ts", "replace-all.ts", "toggle-event.ts", "set-style.ts",
+      "set-highlight-numbers.ts", "set-caption-position.ts", "set-crop-offset.ts", "undo-redo.ts"),
+    allow: { to: to("usecases", "review-update.ts") },
+  },
+  {
+    from: fromFile("usecases", "review-update.ts"),
+    allow: { to: to("usecases", "control-preview.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------
@@ -227,11 +241,13 @@ const NO_SWALLOWED_ERROR = [
 
 const restrictedSyntax = (...groups) => ["error", ...groups.flat()];
 
-// Seven files of the main thread turn a raw browser value into a unit or an
+// Eleven files of the main thread turn a raw value into a unit or an
 // id (v2implementation D-59). Each may hold one cast, to one type, in one
 // named place: the last `return` of its minting helper or, in model-store.ts,
 // the constant that is the zero of the initial state. Every other cast in
-// the file is refused as before.
+// the file is refused as before. control-preview.ts mints program time
+// (D-126); run-pipeline.ts the two recording times of the identity time map
+// (V4 Prompt 99).
 const MINTING = [
   { file: "src/persistence/opfs.ts", brand: "Bytes", helper: "toBytes" },
   { file: "src/models/download.ts", brand: "Bytes", helper: "toBytes" },
@@ -239,8 +255,12 @@ const MINTING = [
   { file: "src/state/model-store.ts", brand: "Bytes", constant: "ZERO_BYTES" },
   { file: "src/usecases/import-clip.ts", brand: "ClipId", helper: "newClipId" },
   { file: "src/usecases/start-export.ts", brand: "ExportId", helper: "newExportId" },
-  { file: "src/usecases/control-preview.ts", brand: "TimeMs", helper: "toTimeMs" },
+  { file: "src/usecases/control-preview.ts", brand: "OutMs", helper: "toOutMs" },
+  { file: "src/usecases/run-pipeline.ts", brand: "TimeMs", helper: "recordingTime" },
   { file: "src/persistence/clips-repo.ts", brand: "Bytes", helper: "toBytes" },
+  // The review names a sentence and a word by its place in the transcript (D-146, D-175).
+  { file: "src/usecases/review-update.ts", brand: "SentenceIdx", helper: "sentenceAt" },
+  { file: "src/usecases/replace-all.ts", brand: "WordIdx", helper: "wordAt" },
 ];
 
 /** The brand-cast rule for a minting file: NO_BRAND_CAST, less its one named cast. */
@@ -350,7 +370,7 @@ export default defineConfig(
     files: ["src/analytics/client.ts"],
     rules: { "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST) },
   },
-  // The seven minting files: one named cast each (D-59).
+  // The nine minting files: one named cast each (D-59).
   ...MINTING.map((entry) => ({
     files: [entry.file],
     rules: {

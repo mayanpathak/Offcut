@@ -6,10 +6,11 @@ use offcut_types::{ClipInfo, CropOffset};
 use crate::CropRect;
 
 /// The 9:16 part of the clip's frame, in source display pixels. A frame
-/// wider than 9:16 loses its sides; a narrower one loses top and bottom.
+/// wider than 9:16 loses its sides, moved by `offset` from the far left
+/// (-1) through the centre (0) to the far right (1) (D-131); a narrower one
+/// loses top and bottom, and its offset is ignored (TS §19.7).
 pub fn crop_rect(clip: &ClipInfo, offset: CropOffset) -> CropRect {
-    // V2 centres every clip (BP §4.1 C). V4: `let offset = offset.get();`
-    let (offset, _unused) = (0.0f32, offset);
+    let offset = offset.get();
     let display_w = clip.display_width.get() as f32;
     let display_h = clip.display_height.get() as f32;
     // `display_w / display_h > 9 / 16`, in whole numbers.
@@ -39,11 +40,20 @@ mod tests {
     use crate::testing::clip;
 
     #[test]
-    fn a_1920x1080_clip_is_cropped_to_its_centre_strip_at_any_offset() {
-        for offset in [-1.0, -0.25, 0.0, 0.5, 1.0] {
+    fn a_1920x1080_clip_is_cropped_to_the_strip_its_offset_names() {
+        // D-160: V2's stand-in centred every offset; the offset now moves
+        // the strip, `x = (1920 - 607.5) / 2 x (1 + offset)`.
+        let strips = [
+            (-1.0, 0.0),
+            (-0.25, 492.1875),
+            (0.0, 656.25),
+            (0.5, 984.375),
+            (1.0, 1_312.5),
+        ];
+        for (offset, x) in strips {
             let crop = crop_rect(&clip(1920, 1080, 60_000), CropOffset::new(offset).unwrap());
             let expected = CropRect {
-                x: 656.25,
+                x,
                 y: 0.0,
                 w: 607.5,
                 h: 1080.0,

@@ -2,9 +2,15 @@
 // To change anything here, change the Rust source and run the script again.
 
 /**
- * A position on the recording's timeline, in ms (the only timeline, INV-5).
+ * A position on the recording's timeline, in ms: what was said, when.
  */
 export type TimeMs = number & { readonly __unit: "TimeMs" };
+/**
+ * A position on the program's timeline, in ms: the export's time, which the
+ * scene, the clock and the frame index run on (D-125). In V4 the time map is
+ * always the identity, so the two numbers are equal.
+ */
+export type OutMs = number & { readonly __unit: "OutMs" };
 /**
  * A length in ms.
  */
@@ -70,6 +76,12 @@ export type JobId = number & { readonly __unit: "JobId" };
  * A stretch of the timeline. Invariant `start <= end`; build it with [`Span::new`].
  */
 export type Span = { start: TimeMs, end: TimeMs, };
+
+/**
+ * A stretch of the program's timeline. Invariant `start <= end`; build it
+ * with [`OutSpan::new`].
+ */
+export type OutSpan = { start: OutMs, end: OutMs, };
 
 /**
  * Half-open: `start` is included, `end` is not.
@@ -138,6 +150,14 @@ export type NormalizedSpan = { words: WordRange, quantity: Quantity, };
 
 export type Transcript = { words: Array<Word>, sentences: Array<Sentence>, numbers: Array<NormalizedSpan>, model_version: string, };
 
+/**
+ * The kind of a detected event, and from V4 the kind of a plan item
+ * (`PlanItem.kind`, v4implementation D-118): there is no second kind enum.
+ * The four variants have the codes 0-3 of the event-id hash (D-47), fixed
+ * forever. A release that draws a new kind appends a variant with the next
+ * code; none is moved or removed. The order is the code order (a key of the
+ * plan crate's per-kind limits).
+ */
 export type EventKind = "number_reveal" | "list_reveal" | "from_to" | "keyword_pop";
 
 /**
@@ -152,6 +172,91 @@ export type DetectedEvent = { id: EventId, kind: EventKind, span: Span, anchors:
  * Always at least the kind's threshold; lower ones are never constructed.
  */
 confidence: Confidence, enabled: boolean, };
+
+export type EditPlan = {
+/**
+ * `PLAN_FORMAT`.
+ */
+format: number,
+/**
+ * The `CATALOG_VERSION` the plan was produced against.
+ */
+catalog: number, source: PlanSource,
+/**
+ * Empty until V6.2.
+ */
+cuts: Array<Cut>, items: Array<PlanItem>,
+/**
+ * Empty until V6.1.
+ */
+chapters: Array<Chapter>,
+/**
+ * Empty until V6.1.
+ */
+extras: TextExtras,
+/**
+ * `None` until V6.3.
+ */
+music: MusicCue | null, };
+
+/**
+ * Who wrote the plan: set by the producer, never by a model.
+ */
+export type PlanSource = { "kind": "rules" } | { "kind": "model", provider: string, model: string, };
+
+export type Cut = { "kind": "lead", keep: DurMs, } | { "kind": "trail", keep: DurMs, } | { "kind": "gap", after: WordIdx, keep: DurMs, } | { "kind": "keep_gap", after: WordIdx, } | { "kind": "words", range: WordRange, why: CutWhy, };
+
+export type CutWhy = "filler" | "false_start";
+
+/**
+ * One visual of the plan. `kind` is the event kind (D-118); `params` repeat
+ * it as their tag, and validation checks that the two agree.
+ */
+export type PlanItem = { id: EventId, kind: EventKind, anchors: WordRange, params: ItemParams,
+/**
+ * `Some` for an item of the rules (INV-6), `None` for one of a model.
+ */
+confidence: Confidence | null, };
+
+/**
+ * What an item shows. The four kinds point at words; `Detected` carries the
+ * detector's own reading and is written by the rules producer only (D-120).
+ */
+export type ItemParams = { "kind": "number_reveal", "params": { value: QuantityRef, label: Label | null, } } | { "kind": "list_reveal", "params": { header: Label | null, items: Array<ListPoint>, } } | { "kind": "from_to", "params": { from: QuantityRef, to: QuantityRef, label: Label | null, } } | { "kind": "keyword_pop", "params": { word: WordIdx, } } | { "kind": "detected", "params": EventParams };
+
+export type ListPoint = { at: WordIdx, label: Label, };
+
+/**
+ * A number as a pointer to the words that say it; `validate` reads the
+ * number from them (D-121). One field, so that a later form can be added
+ * beside `words` without breaking format 1.
+ */
+export type QuantityRef = { words: WordRange, };
+
+/**
+ * Text a plan shows. Its length and digit rules are `validate`'s (TS §40.4 V-4).
+ */
+export type Label = string;
+
+export type Chapter = { starts_at: WordIdx, title: Label, };
+
+/**
+ * Text around the video. Every field may be left out (empty until V6.1).
+ */
+export type TextExtras = { hook: Label | null, post_caption: string | null, hashtags: Array<Label>, };
+
+export type MusicEnergy = "calm" | "steady" | "upbeat";
+
+export type MusicCue = { fits: boolean, energy: MusicEnergy, };
+
+/**
+ * What `offcut-plan`'s `validate` left out of a plan, and why (TS §40.4).
+ * `kind` is `None` for a cut, a chapter, a text extra or a music cue. No
+ * content: it may become an analytics event (V6.1).
+ */
+export type Dropped = { kind: EventKind | null, reason: DropReason, };
+
+export type DropReason = "unknown_kind" | "wrong_producer" | "params_mismatch" | "anchors_out_of_range" | "anchor_rule" | "label_too_long" | "label_digits" | "number_unresolved" | "over_limit" | "too_close" | "zone_taken" | "not_in_this_build";
 
 /**
  * Both values are z-scores against the word's sentence.
@@ -174,6 +279,17 @@ export type StyleId = "clean" | "bold" | "tech";
  */
 export type CropOffset = number;
 
+/**
+ * Where the caption block's centre sits: 0.0 at the top of the band captions
+ * may use, 1.0 at its bottom (v4implementation D-171). Checked in `new` and
+ * when deserializing.
+ */
+export type CaptionPlacement = number;
+
+/**
+ * REOPENED in V4 (D-169, D-171): the last two fields. Their serde defaults
+ * make a record V3 wrote read as V4's default.
+ */
 export type EditState = {
 /**
  * Replacement text; "" hides the word; timing never changes.
@@ -182,7 +298,22 @@ word_edits: { [key in WordIdx]: string },
 /**
  * The enabled flag chosen by the user.
  */
-event_overrides: { [key in EventId]: boolean }, style: StyleId, crop_offset: CropOffset, };
+event_overrides: { [key in EventId]: boolean }, style: StyleId, crop_offset: CropOffset, caption_position: CaptionPlacement,
+/**
+ * Numbers in the captions in the accent colour (D-169).
+ */
+highlight_numbers: boolean, };
+
+/**
+ * One stretch of the program, in program order.
+ */
+export type Segment = { "kind": "source", src: Span, } | { "kind": "hold", at: TimeMs, dur: DurMs, };
+
+/**
+ * The program as a list of segments. The field is private: `identity` is the
+ * one constructor in V4, and deserialization checks what it reads.
+ */
+export type TimeMap = { segments: Array<Segment>, };
 
 export type Plan = "free" | "creator";
 
@@ -245,6 +376,9 @@ export const LIMITS = {
   MIN_WORDS: 3,
   MAX_RECENT_CLIPS: 5,
 } as const;
+
+export const PLAN_FORMAT = 1;
+export const CATALOG_VERSION = 1;
 
 export const ERROR_CODES = [
   "E_MODEL_DOWNLOAD",

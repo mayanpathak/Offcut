@@ -1,13 +1,15 @@
 // The decoded frames of a clip, by time: the demuxer's samples through one
 // `VideoDecoder` into a short queue (TS §20.1). The preview asks for the
-// frame of a time without waiting; the export waits for it.
+// frame of a time without waiting; the export waits for it. The decoder
+// itself is managed by `frame-decoder.ts` (v4implementation D-150).
 //
 // Who closes a frame: this file, and nothing else. A frame that was handed
 // out stays open until a newer one takes its place, so the loop that holds
 // it may draw it again, and must not close it (TS §21.4).
 
 import type { ClipInfo, TimeMs } from "../../gen/domain";
-import { WorkerFailure } from "../rpc";
+import { WorkerFailure } from "../rpc-worker";
+import { decodeFailure, FrameDecoder } from "./frame-decoder";
 
 /** What the decoder is fed through. `RenderSession` of the render bundle is one (D-30). */
 export interface DemuxerHandle {
@@ -22,9 +24,6 @@ export interface DemuxerHandle {
   video_full_range(): boolean;
 }
 
-/** What the decoder of a clip had to be told of its colours (D-70): kept for later sources of the same clip. */
-const toldColours = new WeakMap<DemuxerHandle, VideoColorSpaceInit>();
-
 /**
  * The `VideoFrame`s that are open. Every code path that obtains one adds 1,
  * here for a decoder's output, and every `close()` takes 1 away. 0 at the end
@@ -36,20 +35,6 @@ export const liveFrames: { count: number } = { count: 0 };
 export const PREVIEW_QUEUE = 6;
 /** The export keeps up to this many (TS §31). */
 const EXPORT_QUEUE = 8;
-/** The decoder is given more work only while it holds fewer samples than this. */
-const DECODE_QUEUE_MAX = 3;
-/** A time this far past everything fed so far is a jump: decoding starts again at its keyframe. */
-const JUMP_AHEAD_US = 1_000_000;
-/**
- * A time this little before the oldest frame held is not a jump back: the
- * clock that drives a preview may step back by a frame when it is corrected.
- */
-const STEP_BACK_US = 100_000;
-
-function decodeFailure(detail: string): WorkerFailure {
-  return new WorkerFailure("E_DECODE_VIDEO", detail);
-}
-
 /** What was thrown, as the failure of this file. The demuxer throws `{ code, detail }`. */
 function asFailure(thrown: unknown): WorkerFailure {
   if (thrown instanceof WorkerFailure) {
@@ -62,14 +47,7 @@ function asFailure(thrown: unknown): WorkerFailure {
 }
 
 export class VideoSource {
-  readonly #demuxer: DemuxerHandle;
-  #config: VideoDecoderConfig;
-  readonly #count: number;
-  readonly #fullRange: boolean;
-
-  #decoder: VideoDecoder | undefined;
-  /** Goes up with every new decoder: an output of an old one is closed unseen. */
-  #generation = 0;
+  readonly #frames: FrameDecoder;
   /** Decoded frames that were not handed out yet, in the order of their time. */
   #queue: VideoFrame[] = [];
   /** The frame that was handed out last. */
@@ -77,38 +55,42 @@ export class VideoSource {
   /** `#shown` is from before a jump: still open for the loop that holds it, and not handed out again. */
   #shownIsOld = false;
 
-  /** The next sample to give the decoder, in decoding order. */
-  #next = 0;
-  /** The time of the keyframe decoding last started at, and the latest time given to the decoder since. */
-  #startUs = Number.POSITIVE_INFINITY;
-  #fedUntilUs = Number.NEGATIVE_INFINITY;
   /** The time last asked for and how many frames to keep ahead of it: what feeding goes by between two calls. */
   #wantUs = 0;
   #ahead = PREVIEW_QUEUE;
 
-  #draining = false;
-  /** Every sample was decoded and every frame of it is out. */
-  #drained = false;
   #failed: WorkerFailure | undefined;
   #closed = false;
   #waiters: (() => void)[] = [];
 
   constructor(demuxer: DemuxerHandle, info: ClipInfo) {
-    this.#demuxer = demuxer;
-    this.#count = demuxer.video_sample_count();
-    // The frames are stored unturned: the display size with its sides
-    // exchanged for a clip that is shown turned a quarter.
-    const turned = info.rotation === "r90" || info.rotation === "r270";
-    const description = demuxer.video_description();
-    const colorSpace = toldColours.get(demuxer);
-    this.#fullRange = demuxer.video_full_range();
-    this.#config = {
-      codec: info.video_codec_string,
-      codedWidth: turned ? info.display_height : info.display_width,
-      codedHeight: turned ? info.display_width : info.display_height,
-      ...(description === undefined ? {} : { description }),
-      ...(colorSpace === undefined ? {} : { colorSpace }),
-    };
+    this.#frames = new FrameDecoder(demuxer, info, {
+      opened: () => {
+        liveFrames.count += 1;
+      },
+      keep: (frame) => {
+        this.#keep(frame);
+      },
+      release: (frame) => {
+        this.#release(frame);
+      },
+      wake: () => {
+        this.#wake();
+      },
+      fail: (thrown) => {
+        this.#fail(thrown);
+      },
+      failed: () => this.#failed !== undefined,
+      wantsMore: () => this.#framesAhead() < this.#ahead,
+      startAgain: () => {
+        try {
+          this.#restart(this.#wantUs);
+          this.#frames.feed();
+        } catch (thrown) {
+          this.#fail(thrown);
+        }
+      },
+    });
   }
 
   /**
@@ -131,7 +113,7 @@ export class VideoSource {
     const tUs = t * 1000;
     for (;;) {
       this.#ask(tUs, EXPORT_QUEUE);
-      if (this.#drained || this.#queue.some((frame) => frame.timestamp > tUs)) {
+      if (this.#frames.drained || this.#queue.some((frame) => frame.timestamp > tUs)) {
         // A clip whose first frame is after `t` starts with that frame.
         const frame = this.#take(tUs) ?? this.#takeFirst();
         if (frame === null) {
@@ -145,9 +127,21 @@ export class VideoSource {
     }
   }
 
-  /** V4: starts decoding at `from` before a frame of it is asked for. */
+  /**
+   * Starts decoding at the keyframe at or before `from`, before a frame of
+   * it is asked for, and hands no frame out (v4implementation §15.3): a play
+   * or a seek that follows finds its frames decoded. A failure is kept for
+   * the next `frameAt` to throw.
+   */
   prefetch(from: TimeMs): void {
-    void from;
+    if (this.#closed || this.#failed !== undefined) {
+      return;
+    }
+    try {
+      this.#ask(from * 1000, PREVIEW_QUEUE);
+    } catch (thrown) {
+      this.#failed ??= asFailure(thrown);
+    }
   }
 
   /** Closes every frame this object holds, the one handed out last too, and the decoder. */
@@ -156,15 +150,12 @@ export class VideoSource {
       return;
     }
     this.#closed = true;
-    this.#generation += 1;
     this.#dropQueue();
     if (this.#shown !== null) {
       this.#release(this.#shown);
       this.#shown = null;
     }
-    if (this.#decoder !== undefined && this.#decoder.state !== "closed") {
-      this.#decoder.close();
-    }
+    this.#frames.close();
     this.#wake();
   }
 
@@ -203,153 +194,31 @@ export class VideoSource {
     }
     this.#wantUs = tUs;
     this.#ahead = ahead;
+    // Of the frames at or before the time asked for, only the latest can be
+    // shown: the others are closed now, not when the next frame arrives. A
+    // decoder gives out a frame only while it has one free (it has a few),
+    // so after a seek forward the next frame would otherwise never come.
+    this.#dropDue();
     try {
-      if (this.#jumped(tUs)) {
+      // The time of the oldest frame that is still held, if any: a time
+      // before it is a jump back (`FrameDecoder.jumped`).
+      const held = this.#shown !== null && !this.#shownIsOld ? this.#shown.timestamp : this.#queue[0]?.timestamp;
+      if (this.#frames.jumped(tUs, held)) {
         this.#restart(tUs);
       }
-      this.#feed();
+      this.#frames.feed();
     } catch (thrown) {
       this.#failed ??= asFailure(thrown);
       throw this.#failed;
     }
   }
 
-  /** Whether `tUs` is somewhere the decoder cannot get to by going on. */
-  #jumped(tUs: number): boolean {
-    if (this.#decoder === undefined) {
-      return true;
-    }
-    if (this.#count === 0) {
-      return false;
-    }
-    // Back: before the oldest frame that is still held, or, while none is
-    // held yet, before the keyframe decoding started at. What lies between
-    // that keyframe and a frame that is held was decoded and closed.
-    const held = this.#shown !== null && !this.#shownIsOld ? this.#shown.timestamp : this.#queue[0]?.timestamp;
-    if (tUs < (held ?? this.#startUs) - STEP_BACK_US) {
-      return true;
-    }
-    // Ahead: only when a keyframe that was not fed yet is nearer to it. Going
-    // back to a keyframe that was fed already would decode the same again.
-    return (
-      tUs > this.#fedUntilUs + JUMP_AHEAD_US &&
-      this.#fedUntilUs !== Number.NEGATIVE_INFINITY &&
-      this.#demuxer.keyframe_at_or_before(tUs / 1000) >= this.#next
-    );
-  }
-
-  /** A new decoder, fed from the keyframe at or before `tUs`. What was decoded for another place is closed. */
+  /** Decoding starts again at the keyframe at or before `tUs`. What was decoded for another place is closed. */
   #restart(tUs: number): void {
-    if (this.#decoder !== undefined && this.#decoder.state !== "closed") {
-      this.#decoder.close();
-    }
+    this.#frames.stop();
     this.#dropQueue();
     this.#shownIsOld = this.#shown !== null;
-    this.#next = this.#count === 0 ? 0 : this.#demuxer.keyframe_at_or_before(tUs / 1000);
-    this.#startUs = Number.POSITIVE_INFINITY;
-    this.#fedUntilUs = Number.NEGATIVE_INFINITY;
-    this.#draining = false;
-    this.#drained = false;
-
-    this.#generation += 1;
-    const generation = this.#generation;
-    const decoder = new VideoDecoder({
-      output: (frame) => {
-        liveFrames.count += 1;
-        if (generation !== this.#generation || this.#toldFullRange(frame)) {
-          this.#release(frame);
-          return;
-        }
-        this.#keep(frame);
-        this.#wake();
-      },
-      error: (error) => {
-        if (generation === this.#generation) {
-          this.#fail(decodeFailure(error.name));
-        }
-      },
-    });
-    decoder.addEventListener("dequeue", () => {
-      if (generation !== this.#generation) {
-        return;
-      }
-      try {
-        this.#feed();
-      } catch (thrown) {
-        this.#fail(thrown);
-      }
-      this.#wake();
-    });
-    decoder.configure(this.#config);
-    this.#decoder = decoder;
-  }
-
-  /**
-   * A clip that says it is full-range is drawn so (D-70). The browser may
-   * decode it as limited-range, and obeys only a whole colour space: so the
-   * decoder is told the range with the colours the browser assumed, and
-   * decoding starts again, once for a clip. Returns whether it did.
-   */
-  #toldFullRange(frame: VideoFrame): boolean {
-    const assumed = frame.colorSpace;
-    if (!this.#fullRange || assumed.fullRange === true || this.#config.colorSpace !== undefined) {
-      return false;
-    }
-    const colorSpace: VideoColorSpaceInit = {
-      fullRange: true,
-      matrix: assumed.matrix ?? "bt709",
-      primaries: assumed.primaries ?? "bt709",
-      transfer: assumed.transfer ?? "bt709",
-    };
-    toldColours.set(this.#demuxer, colorSpace);
-    this.#config = { ...this.#config, colorSpace };
-    try {
-      this.#restart(this.#wantUs);
-      this.#feed();
-    } catch (thrown) {
-      this.#fail(thrown);
-    }
-    return true;
-  }
-
-  /** Gives the decoder samples while it has room and too few frames are decoded ahead. */
-  #feed(): void {
-    const decoder = this.#decoder;
-    if (decoder === undefined || decoder.state !== "configured" || this.#failed !== undefined) {
-      return;
-    }
-    while (this.#next < this.#count && decoder.decodeQueueSize < DECODE_QUEUE_MAX && this.#framesAhead() < this.#ahead) {
-      const sample = this.#demuxer.read_video_sample(this.#next);
-      this.#startUs = Math.min(this.#startUs, sample.ptsUs);
-      this.#fedUntilUs = Math.max(this.#fedUntilUs, sample.ptsUs);
-      this.#next += 1;
-      decoder.decode(
-        new EncodedVideoChunk({
-          type: sample.isKeyframe ? "key" : "delta",
-          timestamp: sample.ptsUs,
-          duration: sample.durationUs,
-          data: sample.data,
-        }),
-      );
-    }
-    // After the last sample the decoder is told to give out what it holds.
-    if (this.#next >= this.#count && !this.#draining) {
-      this.#draining = true;
-      const generation = this.#generation;
-      decoder.flush().then(
-        () => {
-          if (generation === this.#generation) {
-            this.#drained = true;
-            this.#wake();
-          }
-        },
-        (error: unknown) => {
-          if (generation === this.#generation && !this.#closed) {
-            this.#fail(error);
-          }
-        },
-      );
-    }
+    this.#frames.start(tUs);
   }
 
   #framesAhead(): number {
@@ -360,6 +229,11 @@ export class VideoSource {
   #keep(frame: VideoFrame): void {
     const after = this.#queue.findIndex((queued) => queued.timestamp > frame.timestamp);
     this.#queue.splice(after === -1 ? this.#queue.length : after, 0, frame);
+    this.#dropDue();
+  }
+
+  /** Closes the queued frames at or before the time asked for, all but the latest of them. */
+  #dropDue(): void {
     const due = this.#queue.filter((queued) => queued.timestamp <= this.#wantUs).length;
     for (const old of this.#queue.splice(0, Math.max(0, due - 1))) {
       this.#release(old);

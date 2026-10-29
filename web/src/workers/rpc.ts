@@ -1,6 +1,11 @@
 // The plumbing between the main thread and a worker: a request, its one
 // response, progress in between, and a cooperative cancel flag (TS §14).
-// `createClient` is the main thread's side, `serveWorker` the worker's.
+// A worker that fails (`error`, `messageerror`) is dead: every pending call
+// is rejected with `E_WORKER_CRASH` and the crash is told to whoever asked
+// (v4implementation D-153); the pool makes a new worker for the next call.
+// `createClient` is the main thread's side; the worker's side is in
+// `rpc-worker.ts` (v4implementation D-150), so that the page imports no
+// worker code. `toAppFailure` is used by both sides and stays here.
 
 import { ERROR_CODES, type ErrorCode, type JobId } from "../gen/domain";
 import type { AppFailure, Cancel, FailureStage, Progress, Req, Res } from "./protocol";
@@ -33,38 +38,6 @@ export type Client<Api> = {
       ? (p: P, o?: CallOptions) => Promise<R | Cancelled>
       : never;
 };
-
-export type JobContext = {
-  jobId: JobId;
-  isCancelled(): boolean;
-  progress(p: Omit<Progress, "type" | "jobId">): void;
-};
-
-export type Handlers<Api> = { [M in keyof Api]: (params: never, ctx: JobContext) => Promise<unknown> | void };
-
-/**
- * What code in a worker throws for a failure it can name: the code, a word
- * of detail for development builds, and its own stage when that is not the
- * worker's default (D-32).
- */
-export class WorkerFailure extends Error {
-  readonly code: ErrorCode;
-  readonly detail: string;
-  readonly stage?: FailureStage;
-
-  constructor(code: ErrorCode, detail: string, stage?: FailureStage) {
-    super(code);
-    this.name = "WorkerFailure";
-    this.code = code;
-    this.detail = detail;
-    if (stage !== undefined) {
-      this.stage = stage;
-    }
-  }
-}
-
-/** A handler returns this after it has seen its cancel flag set. */
-export const CANCELLED: unique symbol = Symbol("cancelled");
 
 // --- Failures ----------------------------------------------------------------
 
@@ -159,31 +132,70 @@ type PendingCall = {
   resolve: (result: unknown) => void;
   reject: (error: WorkerCallError) => void;
   onProgress: ((p: Progress) => void) | undefined;
+  /** Told how the call ended: `true` when it answered as cancelled. */
+  ended: ((cancelled: boolean) => void)[];
 };
 
-export function createClient<Api>(
-  worker: Worker,
-  stage: FailureStage,
-): {
+/** The main thread's side of one worker (v4implementation §14.2). */
+export type WorkerClient<Api> = {
   call: Client<Api>;
   notify(method: string, params: unknown): void;
+  /** Asks the worker to stop job `jobId` (its cancel flag); the job answers when it sees it. */
   cancel(jobId: JobId): void;
+  /** `cb` is told the failure when the worker crashes, once. Not when it is disposed. */
+  onCrash(cb: (failure: AppFailure) => void): void;
+  /** The worker crashed or was disposed: it answers nothing more. */
+  isDead(): boolean;
+  /** The calls waiting for an answer, oldest first. */
+  pendingJobs(): JobId[];
+  /** Resolves when job `jobId` has ended, with `true` when it answered as cancelled. At once (`false`) for a job not pending. */
+  ended(jobId: JobId): Promise<boolean>;
+  /** Ends the worker; every pending call is rejected with `E_WORKER_CRASH`. */
   dispose(): void;
-} {
+};
+
+export function createClient<Api>(worker: Worker, stage: FailureStage): WorkerClient<Api> {
   const pending = new Map<JobId, PendingCall>();
+  const crashListeners: ((failure: AppFailure) => void)[] = [];
+  let dead = false;
   let lastJob = 0;
   const nextJob = (): JobId => {
     lastJob += 1;
     return lastJob as JobId;
   };
+  const crashFailure = (): AppFailure => ({ code: CRASH, stage, retryable: RETRYABLE[CRASH] });
 
-  // The worker is gone, or sent something that cannot be read: nothing that
-  // is waiting will ever be answered (TS C-14).
+  /** Ends a pending call: it leaves the table first, the single record of what waits. */
+  const settle = (jobId: JobId, how: (call: PendingCall) => void, cancelled = false): void => {
+    const call = pending.get(jobId);
+    if (call === undefined) {
+      return;
+    }
+    pending.delete(jobId);
+    how(call);
+    for (const tell of call.ended) {
+      tell(cancelled);
+    }
+  };
+
+  /** Nothing that is waiting will ever be answered: each call is rejected, and the table is empty after. */
+  const rejectAll = (): void => {
+    for (const jobId of [...pending.keys()]) {
+      settle(jobId, (call) => {
+        call.reject(new WorkerCallError(crashFailure()));
+      });
+    }
+  };
+
+  // The worker is gone, or sent something that cannot be read (TS C-14, D-153).
   const crash = (): void => {
-    const calls = [...pending.values()];
-    pending.clear();
-    for (const call of calls) {
-      call.reject(new WorkerCallError({ code: CRASH, stage, retryable: RETRYABLE[CRASH] }));
+    if (dead) {
+      return;
+    }
+    dead = true;
+    rejectAll();
+    for (const cb of crashListeners) {
+      cb(crashFailure());
     }
   };
   worker.addEventListener("error", crash);
@@ -200,24 +212,31 @@ export function createClient<Api>(
       call.onProgress?.(message);
       return;
     }
-    pending.delete(message.jobId);
     if ("cancelled" in message) {
-      call.resolve({ cancelled: true } satisfies Cancelled);
+      settle(message.jobId, (c) => c.resolve({ cancelled: true } satisfies Cancelled), true);
     } else if (message.ok) {
-      call.resolve(message.result);
+      const { result } = message;
+      settle(message.jobId, (c) => c.resolve(result));
     } else {
-      call.reject(new WorkerCallError(message.failure));
+      const { failure } = message;
+      settle(message.jobId, (c) => c.reject(new WorkerCallError(failure)));
     }
   });
 
   const invoke = (method: string, params: unknown, o: CallOptions = {}): Promise<unknown> =>
     new Promise((resolve, reject) => {
+      // A dead worker answers nothing: the call fails now, not never.
+      if (dead) {
+        reject(new WorkerCallError(crashFailure()));
+        return;
+      }
       const jobId = nextJob();
       const transfer = o.transfer ?? [];
-      pending.set(jobId, { resolve, reject, onProgress: o.onProgress });
+      pending.set(jobId, { resolve, reject, onProgress: o.onProgress, ended: [] });
       const refuse = (thrown: unknown): void => {
-        pending.delete(jobId);
-        reject(new WorkerCallError(toAppFailure(thrown, stage)));
+        settle(jobId, (call) => {
+          call.reject(new WorkerCallError(toAppFailure(thrown, stage)));
+        });
       };
       try {
         worker.postMessage({ type: "req", jobId, method, params } satisfies Req<string, unknown>, transfer);
@@ -248,130 +267,34 @@ export function createClient<Api>(
   return {
     call,
     notify(method, params) {
-      worker.postMessage({ type: "req", jobId: nextJob(), method, params } satisfies Req<string, unknown>);
+      if (!dead) {
+        worker.postMessage({ type: "req", jobId: nextJob(), method, params } satisfies Req<string, unknown>);
+      }
     },
     cancel(jobId) {
-      worker.postMessage({ type: "cancel", jobId } satisfies Cancel);
+      if (!dead && pending.has(jobId)) {
+        worker.postMessage({ type: "cancel", jobId } satisfies Cancel);
+      }
+    },
+    onCrash(cb) {
+      crashListeners.push(cb);
+    },
+    isDead: () => dead,
+    pendingJobs: () => [...pending.keys()],
+    ended(jobId) {
+      const call = pending.get(jobId);
+      if (call === undefined) {
+        return Promise.resolve(false);
+      }
+      return new Promise((resolve) => {
+        call.ended.push(resolve);
+      });
     },
     dispose() {
+      // Terminated, it can send nothing late: what waits is rejected here.
       worker.terminate();
-      crash();
+      dead = true;
+      rejectAll();
     },
   };
-}
-
-// --- The worker's side -------------------------------------------------------
-
-// What a worker's global scope offers this file. `self` is typed as a
-// window, because the app is compiled with both libraries.
-type WorkerScope = {
-  postMessage(message: unknown, options?: { transfer?: Transferable[] }): void;
-  addEventListener(type: "message", listener: (event: MessageEvent<Req<string, unknown> | Cancel>) => void): void;
-};
-
-type Job = { jobId: JobId; method: string; cancelled: boolean };
-
-/** The buffers of a result that must move, not be copied (TS §14.3). */
-function transferablesOf(result: unknown): Transferable[] {
-  const fields: unknown[] = typeof result === "object" && result !== null ? Object.values(result) : [];
-  return [result, ...fields].flatMap((value): Transferable[] => {
-    if (value instanceof Float32Array && value.buffer instanceof ArrayBuffer) {
-      return [value.buffer];
-    }
-    return value instanceof OffscreenCanvas ? [value] : [];
-  });
-}
-
-/**
- * Serves the methods of one worker. One job at a time: a second request
- * while one is pending is refused, unless it is listed in `duringPreview`
- * and the pending job is `previewPlay`. A method in `oneWay` is run and
- * never answered.
- */
-export function serveWorker<Api>(
-  handlers: Handlers<Api>,
-  o: { stage: FailureStage; oneWay: readonly string[]; duringPreview: readonly string[] },
-): void {
-  const scope: WorkerScope = self;
-  const table: Partial<Record<string, (params: never, ctx: JobContext) => Promise<unknown> | void>> = handlers;
-  const running = new Map<JobId, Job>();
-  let main: Job | undefined;
-
-  const post = (message: Res<unknown> | Progress, transfer: Transferable[] = []): void => {
-    scope.postMessage(message, { transfer });
-  };
-  const refuse = (jobId: JobId, detail: string): void => {
-    post({ type: "res", jobId, ok: false, failure: { code: "E_INTERNAL", stage: o.stage, retryable: false, detail } });
-  };
-
-  scope.addEventListener("message", (event) => {
-    const message = event.data;
-    if (message.type === "cancel") {
-      const job = running.get(message.jobId);
-      if (job !== undefined) {
-        job.cancelled = true;
-      }
-      return;
-    }
-
-    const { jobId, method, params } = message;
-    const oneWay = o.oneWay.includes(method);
-    const handler = table[method];
-    const beside = main?.method === "previewPlay" && o.duringPreview.includes(method);
-    if (handler === undefined || (main !== undefined && !beside)) {
-      if (!oneWay) {
-        refuse(jobId, handler === undefined ? "NoHandler" : "Busy");
-      }
-      return;
-    }
-
-    const job: Job = { jobId, method, cancelled: false };
-    running.set(jobId, job);
-    // A one-way message, or a call beside the preview, does not occupy the worker.
-    const occupies = !oneWay && !beside;
-    if (occupies) {
-      main = job;
-    }
-    const ctx: JobContext = {
-      jobId,
-      isCancelled: () => job.cancelled,
-      progress: (p) => {
-        post({ type: "progress", jobId, ...p });
-      },
-    };
-    const done = (): void => {
-      running.delete(jobId);
-      if (occupies) {
-        main = undefined;
-      }
-    };
-
-    void Promise.resolve()
-      .then(() => handler(params as never, ctx))
-      .then(
-        (result) => {
-          done();
-          if (oneWay) {
-            return;
-          }
-          if (result !== CANCELLED) {
-            post({ type: "res", jobId, ok: true, result }, transferablesOf(result));
-          } else if (job.cancelled) {
-            post({ type: "res", jobId, cancelled: true });
-          } else {
-            refuse(jobId, "CancelledUnasked");
-          }
-        },
-        (thrown: unknown) => {
-          done();
-          if (oneWay) {
-            // No answer can carry it. An uncaught error reaches the client
-            // as a crash of this worker, which is what it is.
-            reportError(thrown);
-          } else {
-            post({ type: "res", jobId, ok: false, failure: toAppFailure(thrown, o.stage) });
-          }
-        },
-      );
-  });
 }

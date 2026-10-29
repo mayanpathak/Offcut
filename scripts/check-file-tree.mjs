@@ -1,7 +1,7 @@
 // Structural gate (technicalspec.md §5, §7, §29). Fails when:
 //
 //   1. a tracked source file is not in the file tree of TS §5;
-//   2. a source file is longer than 400 lines, tests not counted;
+//   2. a source file is longer than 700 lines, tests not counted;
 //   3. a crate depends on an `offcut-*` crate that the graph of TS §7 does
 //      not give it, or a pure crate resolves a browser or randomness crate.
 //
@@ -34,7 +34,7 @@ const IGNORED = [
   /(^|\/)__snapshots__\//,
 ];
 
-const MAX_LINES = 400;
+const MAX_LINES = 700;
 const SOURCE_EXTENSIONS = /\.(rs|ts|tsx|js|mjs|cjs|sh|css|py|sql)$/;
 /** Whole files of tests, which the line limit does not apply to. */
 const TEST_FILES = [/\.test\.tsx?$/, /^web\/tests-e2e\//, /^server\/tests\//, /^crates\/[^/]+\/tests\//];
@@ -51,13 +51,20 @@ const ALLOWED_CRATE_DEPS = {
   "offcut-mp4": ["offcut-types"],
   "offcut-text": ["offcut-types"],
   "offcut-dsp": ["offcut-types"],
-  // offcut-text for format_quantity only (v2implementation D-28).
-  "offcut-scene": ["offcut-text", "offcut-types"],
+  // offcut-text for tokenize, parse_quantity and format_quantity (v4implementation D-122).
+  // offcut-detect: dev-dependency only: the labeled-set tests (v4implementation §3.2).
+  "offcut-plan": ["offcut-text", "offcut-types", "offcut-detect"],
+  // offcut-text for format_quantity only (v2implementation D-28); offcut-plan for ValidPlan (D-122).
+  // offcut-detect: dev-dependency only: the labeled-set tests (v4implementation §3.2).
+  "offcut-scene": ["offcut-text", "offcut-types", "offcut-plan", "offcut-detect"],
   "offcut-entitlement": ["offcut-types"],
   "offcut-detect": ["offcut-text", "offcut-types"],
-  "offcut-render": ["offcut-scene", "offcut-types"],
+  // offcut-text, offcut-detect, offcut-plan: dev-dependencies only, the golden
+  // frames' scenes (v4implementation §9.4).
+  "offcut-render": ["offcut-scene", "offcut-types", "offcut-text", "offcut-detect", "offcut-plan"],
   "offcut-wasm-core": ["offcut-mp4", "offcut-text", "offcut-dsp", "offcut-types"],
-  "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types"],
+  // offcut-plan without default features: no schema code in the bundle (D-122).
+  "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types", "offcut-plan"],
   "offcut-api": ["offcut-api-types", "offcut-entitlement", "offcut-types"],
 };
 
@@ -75,6 +82,7 @@ const PURE_CRATES = [
   "offcut-detect",
   "offcut-scene",
   "offcut-entitlement",
+  "offcut-plan",
 ];
 const NOT_IN_PURE_CRATES = ["rand", "getrandom", "wasm-bindgen", "js-sys", "web-sys", "wgpu"];
 

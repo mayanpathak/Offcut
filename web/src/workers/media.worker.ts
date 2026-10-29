@@ -7,7 +7,7 @@ import { type CoreApi, loadCore } from "../wasm/load-core";
 import { decodeAudio } from "./media/audio-decode";
 import { byteSize, importToOpfs, openSource } from "./media/import";
 import type { MediaWorkerApi } from "./protocol";
-import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc";
+import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 type Probed = { ok: ClipInfo } | { rejected: RejectReason };
 

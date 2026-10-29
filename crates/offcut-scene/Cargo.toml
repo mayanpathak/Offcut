@@ -9,8 +9,21 @@ workspace = true
 
 [dependencies]
 offcut-types = { workspace = true }
-# For `format_quantity` only (D-28).
+# For `format_quantity` (D-28), and `tokenize` and `parse_quantity` to tell
+# a caption word that shows a number (D-169).
 offcut-text = { workspace = true }
+# The scene draws a valid plan, which only `offcut-plan` can make (D-122).
+# Without `prompt`: the scene needs no schema code.
+offcut-plan = { workspace = true, default-features = false }
 parley = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+# The display-list snapshots (v4implementation D-157, §8.10).
+insta = { workspace = true }
+# The detector's events of labeled transcripts, read as JSON: the identity
+# map's test (timemap_identity.rs) and the labeled-set tests (v4implementation
+# §3.2). The identity reference that also used them is gone (V4 Prompt 101).
+offcut-detect = { workspace = true }
+serde_json = { workspace = true }

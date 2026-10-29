@@ -20,3 +20,6 @@ ebur128 = { workspace = true }
 proptest = { workspace = true, features = ["std"] }
 # The stamp check of the generated fixtures (v3implementation §6.4).
 sha2 = { workspace = true }
+# A time map that is not the identity, for `assemble` to refuse: `TimeMap`
+# has no other constructor (v4implementation D-164), so the test reads one.
+serde_json = { workspace = true }

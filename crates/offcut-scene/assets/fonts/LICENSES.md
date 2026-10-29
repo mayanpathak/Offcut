@@ -1,6 +1,6 @@
 # Fonts in this directory
 
-The three font files below are the only font files in the repository (`technicalspec.md` §19.4). Each is a variable font, taken from its project unchanged; only the file name differs. All three are under the SIL Open Font License, Version 1.1. None of the three licence files names a Reserved Font Name.
+The font files below are the only fonts the scene embeds (`technicalspec.md` §19.4). The interface has one more, self-hosted: `web/src/ui/assets/inter-latin.woff2`, listed in `web/LICENSES.md` (V4, D-180). Each is a variable font, taken from its project unchanged; only the file name differs. All three are under the SIL Open Font License, Version 1.1. None of the three licence files names a Reserved Font Name.
 
 | File | Font | Taken from | Licence file | SHA-256 of the font file |
 |---|---|---|---|---|

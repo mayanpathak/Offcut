@@ -9,7 +9,7 @@
 import { type AutomaticSpeechRecognitionPipeline, env, pipeline } from "@huggingface/transformers";
 
 import type { Confidence, DurMs, TimeMs } from "../../gen/domain";
-import { CANCELLED } from "../rpc";
+import { CANCELLED } from "../rpc-worker";
 import { createModelCache } from "./model-cache-adapter";
 import { type AsrWindow, mergeWindows, postProcess } from "./word-timestamps";
 

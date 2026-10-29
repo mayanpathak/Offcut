@@ -1,14 +1,12 @@
-//! The overlay: a display list drawn by Vello into a texture as large as the
-//! target. This file reads a list command by command and knows nothing of
-//! what the commands mean.
+//! The overlay: the commands of a display list after its video, drawn by
+//! Vello into a texture as large as the target. This file reads them command
+//! by command and knows nothing of what they mean. The video and any image
+//! are the compositor's (D-133).
 
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::sync::Arc;
 
-use offcut_scene::fonts;
-use offcut_scene::layout::normalized_coords;
-use offcut_scene::{Affine, DisplayList, DrawCmd, FontId, PathEl, Rect, Rgba};
+use offcut_scene::{Affine, DrawCmd, FontKey, FontSet, PathEl, Rect, Rgba};
 use vello::kurbo;
 use vello::peniko::{Blob, Color, Fill, FontData, Mix};
 
@@ -17,8 +15,11 @@ use crate::RenderError;
 /// What Vello renders into: this format, and written by a compute shader.
 const OVERLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
-/// A font as Vello takes it: the file, and where on its axes the font stands.
+/// A face as Vello takes it: the file, and where on its axes the face
+/// stands. `file` is the set's own data, by which a cached face is known to
+/// still be the face of its key.
 struct Face {
+    file: Arc<[u8]>,
     data: FontData,
     coords: Vec<i16>,
 }
@@ -30,8 +31,8 @@ pub(crate) struct Overlay {
     view: wgpu::TextureView,
     width: u32,
     height: u32,
-    /// Each font is read on its first use.
-    faces: BTreeMap<FontId, Face>,
+    /// Each face is read on its first use, once per key (D-132).
+    faces: BTreeMap<FontKey, Face>,
 }
 
 fn texture_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -113,28 +114,40 @@ impl Overlay {
         self.height = height;
     }
 
-    /// The file and the axis coordinates of `font`, read once.
-    fn face(faces: &mut BTreeMap<FontId, Face>, font: FontId) -> Result<&Face, RenderError> {
-        if let Entry::Vacant(slot) = faces.entry(font) {
-            let coords = normalized_coords(font).map_err(|_| RenderError::Overlay)?;
-            let data = FontData::new(Blob::new(Arc::new(fonts::bytes(font))), 0);
-            slot.insert(Face { data, coords });
+    /// The file and the axis coordinates of the face `key` of `fonts`, read
+    /// once. A key whose face is another file than the one read is read again.
+    fn face<'a>(
+        faces: &'a mut BTreeMap<FontKey, Face>,
+        key: FontKey,
+        fonts: &FontSet,
+    ) -> Result<&'a Face, RenderError> {
+        let wanted = fonts.get(key).ok_or(RenderError::Overlay)?;
+        let held = faces
+            .get(&key)
+            .is_some_and(|face| Arc::ptr_eq(&face.file, &wanted.data));
+        if !held {
+            let file = Arc::clone(&wanted.data);
+            let data = FontData::new(Blob::new(Arc::new(Arc::clone(&file))), 0);
+            let coords = wanted.coords.clone();
+            faces.insert(key, Face { file, data, coords });
         }
-        faces.get(&font).ok_or(RenderError::Overlay)
+        faces.get(&key).ok_or(RenderError::Overlay)
     }
 
-    /// Draws `list` into the overlay texture, over nothing: where the list
-    /// draws nothing the texture is transparent.
+    /// Draws `cmds` into the overlay texture, over nothing: where they draw
+    /// nothing the texture is transparent. Glyph runs are set in the faces of
+    /// `fonts`.
     pub fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        list: &DisplayList,
+        cmds: &[DrawCmd],
+        fonts: &FontSet,
     ) -> Result<(), RenderError> {
         self.scene.reset();
         let whole = kurbo::Rect::new(0.0, 0.0, f64::from(self.width), f64::from(self.height));
         let mut layers = 0u32;
-        for cmd in &list.cmds {
+        for cmd in cmds {
             match cmd {
                 DrawCmd::FillRect {
                     rect: r,
@@ -169,7 +182,7 @@ impl Overlay {
                     transform,
                     text: _,
                 } => {
-                    let face = Self::face(&mut self.faces, *font)?;
+                    let face = Self::face(&mut self.faces, *font, fonts)?;
                     let glyphs = || {
                         glyphs.iter().map(|glyph| vello::Glyph {
                             id: glyph.id,
@@ -216,6 +229,8 @@ impl Overlay {
                         layers -= 1;
                     }
                 }
+                // The compositor draws the video; V4 draws no image.
+                DrawCmd::Video { .. } | DrawCmd::Image { .. } => {}
             }
         }
         // A list that leaves a layer open is closed here, so that it cannot

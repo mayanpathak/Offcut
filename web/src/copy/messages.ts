@@ -11,8 +11,10 @@ import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type Unsuppo
 type EventName = AnalyticsEvent["name"];
 type ErrorCopy = { title: string; body: string; action: string };
 /**
- * The error codes that can reach a person: the six of V1 and, since V2, the
- * three of the model download. The others get copy with the flows they belong to.
+ * The error codes that can reach a person: the six of V1, the three of the
+ * model download (V2), and the twelve more a person can meet on this device
+ * since v4implementation D-159. The account, billing and entitlement codes
+ * get copy with their flows (V6).
  */
 type ErrorCodeWithCopy = Extract<
   ErrorCode,
@@ -25,6 +27,18 @@ type ErrorCodeWithCopy = Extract<
   | "E_MODEL_DOWNLOAD"
   | "E_MODEL_HASH"
   | "E_MODEL_STORAGE"
+  | "E_STORAGE_QUOTA"
+  | "E_STORAGE_IO"
+  | "E_DECODE_AUDIO"
+  | "E_DECODE_VIDEO"
+  | "E_ASR_RUNTIME"
+  | "E_ASR_OOM"
+  | "E_DSP"
+  | "E_GPU_INIT"
+  | "E_GPU_LOST"
+  | "E_ENCODE_VIDEO"
+  | "E_ENCODE_AUDIO"
+  | "E_MUX"
 >;
 
 const MS_PER_SECOND = 1000;
@@ -34,6 +48,7 @@ const BYTES_PER_MB = 1_000_000;
 /** `MAX_INPUT_FPS` is in thousandths of a frame per second. */
 const FPS_MILLI_PER_FPS = 1000;
 const MAX_FPS = LIMITS.MAX_INPUT_FPS / FPS_MILLI_PER_FPS;
+const PERCENT = 100;
 
 /** "45 seconds", "1 minute", "12 minutes": a wait, rounded up to whole minutes from one minute on. */
 function waitText(seconds: number): string {
@@ -43,6 +58,13 @@ function waitText(seconds: number): string {
   }
   const minutes = Math.ceil(seconds / SECONDS_PER_MINUTE);
   return `${String(minutes)} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+/** "0:42", "1:05": a time in the video, as a player shows it. */
+function clockTime(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / MS_PER_SECOND));
+  const seconds = total % SECONDS_PER_MINUTE;
+  return `${String(Math.floor(total / SECONDS_PER_MINUTE))}:${seconds < 10 ? "0" : ""}${String(seconds)}`;
 }
 
 export const messages = {
@@ -59,17 +81,26 @@ export const messages = {
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
-      `Drop a clip (up to ${String(limits.MAX_CLIP_DURATION / MS_PER_SECOND)} seconds, English).`,
-    sampleButton: "Try with a sample clip",
-    fetchingSample: "Getting the sample clip…",
+      `Drop a video (up to ${String(limits.MAX_CLIP_DURATION / MS_PER_SECOND)} seconds, in English)`,
+    or: "or", sampleButton: "Try a sample",
+    fetchingSample: "Getting the sample video…",
   },
 
   modelDownload: {
+    title: "Getting ready",
     body: (sizeMb: number) =>
-      `One-time setup: downloading the speech model (about ${String(sizeMb)} MB). It stays in your browser, and your video is not uploaded.`,
+      `Offcut is downloading what it needs to write your captions (about ${String(sizeMb)} MB). This happens only the first time, and your video is not uploaded.`,
     progress: (etaSecs: number) => `About ${waitText(etaSecs)} left.`,
     verifying: "Checking the download…",
   },
+
+  // The processing card (v4implementation D-188): four steps in plain words.
+  processing: {
+    title: "Making your short",
+    steps: { audio: "Preparing audio", voice: "Cleaning your voice", captions: "Writing captions", visuals: "Finding visual moments" },
+    reassure: "Everything runs on your computer. This usually takes a couple of minutes.",
+  },
+  cancel: { button: "Cancel", cancelled: "Cancelled.", processAgain: "Process again" },
 
   // The processing feed (PS §10 J6). A line is shown for something that
   // happened, and for nothing else. `display` is the event's own figure; a
@@ -90,33 +121,93 @@ export const messages = {
   },
 
   preview: {
-    play: "Play",
-    pause: "Pause",
-    replay: "Play again",
+    play: "Play", pause: "Pause", replay: "Play again",
+    canvas: "Preview of your video", canvasWords: "Its words are in the Captions tab, where each can be fixed.", seek: "Position",
+    loadingFrame: "Loading the frame…",
+    clock: (ms: number) => clockTime(ms),
+    time: (positionMs: number, lengthMs: number) => `${clockTime(positionMs)} / ${clockTime(lengthMs)}`,
+    watermarkBadge: "Free exports include a small watermark",
+    captionHandle: "Caption position", captionAt: (percent: number) => `${String(percent)}% of the way down`,
   },
 
+  // `button` is the top bar's Export (v4implementation §17.5's `editor.export`).
   export: {
-    button: "Export video",
+    button: "Export",
     unavailable: "Exporting needs an account, and accounts are not open yet.",
-    stage: {
-      rendering: "Rendering",
-      muxing: "Writing the file",
-      saving: "Saving",
-    },
-    elapsed: (seconds: number) => `${String(seconds)} ${seconds === 1 ? "second" : "seconds"} so far.`,
+    stage: { rendering: "Rendering video", muxing: "Finishing file", saving: "Saving" },
     renderingLocally: "Everything is rendering on your computer.",
-    done: "Your video is ready. Your browser has downloaded it.",
+    done: "Your video is downloaded.",
+    percent: (percent: number) => `${String(percent)}%`,
+    timeLeft: (seconds: number) => `About ${waitText(seconds)} left`, downloadAgain: "Download again",
+    // The pill's name for assistive technology (D-189).
+    label: "Export",
   },
 
+  // The one action of an error card, chosen by where the failure happened (D-190).
+  recovery: {
+    tryAgain: "Try again", reloadPreview: "Reload preview", undoChange: "Undo this change", close: "Close",
+    details: "Details",
+  },
+
+  // The editor's top bar and side panel (v4implementation D-178, D-184, §17.5).
   editor: {
     failedStub: "Something went wrong on this device.",
     startOver: "Start over",
+    mark: "Offcut",
+    lengthLabel: (ms: number) => `Video length ${clockTime(ms)}`,
+    saved: "Saved on this device", saving: "Saving…",
+    undo: "Undo", redo: "Redo",
+    // The toast after an undo or a redo (D-184), with the other one as its action.
+    undone: "Change undone.", redone: "Change redone.",
+    availableAfterExport: "Available when the export finishes",
+  },
+  panel: { label: "Edit your video", captions: "Captions", style: "Style", visuals: "Visuals", framing: "Framing" },
+  captions: {
+    hint: "Click any word to fix it.", changeAll: "Change all",
+    follow: "Follow playback", followHint: "The text scrolls with the video.",
+    hide: "Hide word", restore: "Restore original", show: "Show", wordMenu: "Word options", wordField: "Fix this word",
+    replaceAll: (n: number, from: string, to: string) => `Change all ${String(n)} “${from}” to “${to}”?`,
+    hidden: (word: string) => `“${word}” hidden.`,
+  },
+  style: {
+    clean: "Clean", bold: "Bold", mono: "Mono",
+    cleanLine: "Soft and premium: the spoken word on a highlight.",
+    boldLine: "Big and loud: capitals, and each word pops as it is said.",
+    monoLine: "Calm and precise: a typewriter look on a dark panel.",
+    highlightNumbers: "Highlight numbers",
+    highlightNumbersHint: "Numbers in your captions get the accent colour.",
+  },
+  visuals: {
+    count: (on: number, total: number) => `${String(on)} of ${String(total)} visuals on`, goTo: (time: string) => `Go to ${time}`,
+    fromTo: (from: string, to: string) => `${from} → ${to}`, points: (n: number) => `${String(n)} ${n === 1 ? "point" : "points"}`,
+    kind: { number_reveal: "Big number", list_reveal: "List", from_to: "Before → after", keyword_pop: "Emphasis" } satisfies
+      Record<EventKind, string>,
+    // PS §10 J7.
+    noEventsFound: "No numbers or lists found in this clip. Captions and cleanup applied.",
+    whatWeLookFor: "Offcut looks for numbers, lists and before-and-after comparisons you say out loud.",
+  },
+  framing: {
+    captionPosition: "Caption position",
+    top: "Top", middle: "Middle", bottom: "Bottom",
+    dragCaptions: "Or drag the captions on the video.", crop: "Framing",
+    cropValue: (offset: number) =>
+      offset === 0 ? "Centre" : `${String(Math.round(Math.abs(offset) * PERCENT))}% ${offset < 0 ? "left" : "right"}`,
+    dragVideo: "Or drag the video sideways.",
   },
 
-  capability: {
-    checking: "Checking your browser…",
-    supported: "Your browser can do this.",
+  // The shortcuts sheet (v4implementation D-185); undo and redo are `editor`'s.
+  shortcuts: {
+    title: "Keyboard shortcuts", open: "Show keyboard shortcuts",
+    playPause: "Play or pause", stepFrame: "One frame back or forward", stepSecond: "One second back or forward",
+    close: "Close a field or a menu", help: "Show this list", dismiss: "Close",
   },
+  // How a shortcut names its keys (`Kbd`, v4implementation D-181).
+  keys: {
+    modMac: "⌘", modOther: "Ctrl", shift: "Shift", space: "Space", escape: "Esc",
+    left: "←", right: "→", z: "Z", y: "Y", question: "?", or: "or",
+  },
+
+  capability: { checking: "Checking your browser…", supported: "Your browser can do this." },
 
   unsupported: {
     title: "Offcut cannot run in this browser yet",
@@ -152,18 +243,11 @@ export const messages = {
         : `Too many tries from this network. Please try again in ${waitText(seconds)}.`,
     offline: "You appear to be offline. Check your connection and try again.",
     unavailable: "We could not save that just now. Please try again in a minute.",
-    wanted: {
-      launch: "the launch",
-      safari: "Safari",
-      firefox: "Firefox",
-      mobile: "phones and tablets",
-      linux: "Linux",
-    } satisfies Record<Wanted, string>,
+    wanted: { launch: "the launch", safari: "Safari", firefox: "Firefox", mobile: "phones and tablets", linux: "Linux" } satisfies
+      Record<Wanted, string>,
   },
 
-  api: {
-    waking: "Connecting to the account service…",
-  },
+  api: { waking: "Connecting to the account service…" },
 
   // Why an action cannot start now (TS §12.5): the four a person can meet in
   // V2. The others come with the room check and with accounts.
@@ -234,15 +318,77 @@ export const messages = {
       body: "You have sent this several times in a short while.",
       action: "Wait a little and try again.",
     },
+    // The fourteen of D-159 below, in the words of D-190: what happened in
+    // one sentence, then what to do. The card's button is the action itself.
     E_INTERNAL: {
       title: "Something went wrong in Offcut",
       body: "This is a fault in Offcut, not in your clip or your browser.",
-      action: "Reload the page.",
+      action: "If it happens again, reload the page.",
     },
     E_WORKER_CRASH: {
       title: "Part of Offcut stopped working",
-      body: "A background task could not start, or stopped unexpectedly.",
-      action: "Reload the page and try again.",
+      body: "A task running in the background stopped unexpectedly.",
+      action: "If it happens again, reload the page.",
+    },
+    E_STORAGE_QUOTA: {
+      title: "Your browser is out of space",
+      body: "Offcut keeps your clip on this device, and the browser has no room left for it.",
+      action: "Free some disk space, then try again.",
+    },
+    E_STORAGE_IO: {
+      title: "Offcut could not save on this device",
+      body: "Your browser did not let Offcut read or write its files just now.",
+      action: "If it happens again, reload the page.",
+    },
+    E_DECODE_AUDIO: {
+      title: "The sound of this clip could not be read",
+      body: "Part of the audio in this file could not be played back in this browser.",
+      action: "If it happens again, export the clip again from your editor and drop the new file.",
+    },
+    E_DECODE_VIDEO: {
+      title: "The picture of this clip could not be read",
+      body: "Part of the video in this file could not be played back in this browser.",
+      action: "If it happens again, export the clip again from your editor and drop the new file.",
+    },
+    E_ASR_RUNTIME: {
+      title: "The captions could not be written",
+      body: "The speech model stopped while it was listening to your clip.",
+      action: "If it happens again, reload the page.",
+    },
+    E_ASR_OOM: {
+      title: "Your computer ran out of memory",
+      body: "Writing the captions needed more memory than the browser could give.",
+      action: "Close other tabs and apps, then try again.",
+    },
+    E_DSP: {
+      title: "Your voice could not be cleaned",
+      body: "Something went wrong while the sound of your clip was being prepared.",
+      action: "If it happens again, reload the page.",
+    },
+    E_GPU_INIT: {
+      title: "The preview could not start",
+      body: "Offcut could not use your graphics card to draw the video.",
+      action: "Close other apps that show video or games, then try again.",
+    },
+    E_GPU_LOST: {
+      title: "The preview stopped",
+      body: "Your graphics card was reset, which can happen when another app uses it.",
+      action: "Reload preview",
+    },
+    E_ENCODE_VIDEO: {
+      title: "The video file could not be made",
+      body: "Your browser stopped while it was turning your edit into a video.",
+      action: "Close other tabs, then try again.",
+    },
+    E_ENCODE_AUDIO: {
+      title: "The sound could not be added to the file",
+      body: "Your browser stopped while it was writing the audio of your video.",
+      action: "If it happens again, reload the page.",
+    },
+    E_MUX: {
+      title: "The video file could not be finished",
+      body: "The picture and the sound were ready, but joining them into one file failed.",
+      action: "If it happens again, reload the page.",
     },
     E_MODEL_DOWNLOAD: {
       title: "The speech model could not be downloaded",

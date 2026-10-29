@@ -8,6 +8,11 @@
 // case that fails stops the ones after it. The case of the founder's second
 // recording runs on its own after them, on the development machine only, so
 // that it cannot hide one of theirs (D-99).
+//
+// V4 (v4implementation D-154, D-156, D-160, D-193): "Preview plays" also
+// reads the player's statistics and "Events" the plan's rows; three cases
+// are new: the statistics of a 5 s play, the long-task limits while
+// processing and editing, and a clip with nothing to show.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -23,18 +28,32 @@ import { type FakeApi, installFakeApi } from "./helpers/fake-api";
 import {
   type AssetLog,
   NO_GPU,
+  dragCaptions,
   dropClip,
+  editWord,
   ensureModelCached,
+  genFixture,
+  openTab,
+  openWord,
   opfsList,
   opfsSize,
   patient,
+  player,
+  previewStats,
   readIndexedDb,
   referenceClip,
   routeAssets,
   sampleClipPath,
+  seekTo,
+  setStyle,
   sourceDurationMs,
+  trackSaves,
+  transcriptWords,
   v3TestClip,
+  wordField,
 } from "./helpers/fixtures";
+
+type WasmCall = { at: number; end: number; bundle: string };
 
 declare global {
   interface Window {
@@ -42,8 +61,17 @@ declare global {
     e2eFeed?: string[][];
     /** The length in milliseconds of every main-thread task of 50 ms or more, with the time it started. */
     e2eLongTasks?: { at: number; ms: number }[];
+    /** Every `WebAssembly.instantiate` or `instantiateStreaming` on the main thread: when, and of which file. */
+    e2eWasm?: WasmCall[];
   }
 }
+
+/** The limits of a main-thread task: while processing (D-156, TS §13.5) and while editing (D-193). */
+const PROCESSING_TASK_MS = 100;
+const EDITING_TASK_MS = 50;
+/** A play of this long draws more than this many frames at 30 fps (D-155's statistics). */
+const STATS_PLAY_MS = 5_000;
+const STATS_MIN_FRAMES = 100;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** Analytics sends what it has every 10 s; a case waits that long for an event, and a little more. */
@@ -73,7 +101,41 @@ async function watchPage(page: Page): Promise<void> {
         window.e2eLongTasks?.push({ at: entry.startTime, ms: entry.duration });
       }
     }).observe({ type: "longtask", buffered: true });
+    // The one thing a long task is excused for: the first instantiation of a
+    // WASM bundle on this thread (D-156). Each is recorded with its file.
+    window.e2eWasm = [];
+    for (const name of ["instantiate", "instantiateStreaming"] as const) {
+      const original = WebAssembly[name] as (...args: unknown[]) => Promise<unknown>;
+      (WebAssembly as unknown as Record<string, unknown>)[name] = (...args: unknown[]) => {
+        const at = performance.now();
+        const result = original.apply(WebAssembly, args);
+        void Promise.resolve(args[0])
+          .then((source) => (source instanceof Response ? source.url : `${name} of bytes`))
+          .catch(() => `${name} of a failed fetch`)
+          .then(async (bundle) => {
+            await result.catch(() => undefined);
+            window.e2eWasm?.push({ at, end: performance.now(), bundle });
+          });
+        return result;
+      };
+    }
   });
+}
+
+/**
+ * The long tasks that started between `from` and `to`, less those that
+ * overlap the first instantiation of a WASM bundle on the main thread
+ * (D-156): nothing else is excused.
+ */
+function tasksBetween(tasks: { at: number; ms: number }[], wasm: WasmCall[], from: number, to: number): { at: number; ms: number }[] {
+  const first = new Map<string, WasmCall>();
+  for (const call of [...wasm].sort((a, b) => a.at - b.at)) {
+    if (!first.has(call.bundle)) {
+      first.set(call.bundle, call);
+    }
+  }
+  const excused = (task: { at: number; ms: number }) => [...first.values()].some((call) => task.at <= call.end && task.at + task.ms >= call.at);
+  return tasks.filter((task) => task.at >= from && task.at <= to && !excused(task));
 }
 
 /** The pixels of a PNG as its file holds them, filter bytes included. */
@@ -235,6 +297,7 @@ test.describe("one clip, from the drop to the preview", () => {
     api = await installFakeApi(page);
     assets = await routeAssets(page);
     await watchPage(page);
+    await trackSaves(page);
     await page.goto("/app");
     await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
 
@@ -374,6 +437,8 @@ test.describe("one clip, from the drop to the preview", () => {
     expect(record).toBeNull();
 
     await expect(button(page, messages.preview.play)).toBeEnabled({ timeout: 30_000 });
+    // V4 (D-160): no play has drawn yet, so the player carries no statistics.
+    expect(Number.isNaN((await previewStats(page)).frames)).toBe(true);
     await button(page, messages.preview.play).click();
     await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
     // Past the first second and a half, in which the speaker has not begun.
@@ -382,6 +447,16 @@ test.describe("one clip, from the drop to the preview", () => {
     expect(first.equals(second)).toBe(false);
     expect(hasDetail(first)).toBe(true);
     expect(hasDetail(second)).toBe(true);
+
+    // V4 (D-155, D-160): the play's statistics are on the player once it stops; it plays on after.
+    await button(page, messages.preview.pause).click();
+    await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
+    await expect.poll(async () => (await previewStats(page)).frames, { timeout: 10_000 }).toBeGreaterThan(0);
+    const stats = await previewStats(page);
+    expect(Number.isFinite(stats.late)).toBe(true);
+    expect(Number.isFinite(stats.maxDriftMs)).toBe(true);
+    await button(page, messages.preview.play).click();
+    await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
   });
 
   test("pause and resume: a paused preview stands still, and goes on when played", async () => {
@@ -396,10 +471,29 @@ test.describe("one clip, from the drop to the preview", () => {
     const [movingOne, movingTwo] = await twoPictures(canvas(page), page, 1_000);
     expect(movingOne.equals(movingTwo)).toBe(false);
     // A frame that was not given back fails the pause, and the page would say so (D-45).
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
     await button(page, messages.preview.pause).click();
     await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
+  });
+
+  // V4 (D-155): what a play drew is on the player, never sent.
+  test("statistics: after a 5 s play the player says it drew more than 100 frames, and how far they drifted", async () => {
+    // From the start, so that the clip does not end within the play.
+    await seekTo(page, 0);
+    await page.waitForTimeout(300);
+    const before = (await previewStats(page)).frames;
+    await button(page, messages.preview.play).click();
+    await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(STATS_PLAY_MS);
+    await button(page, messages.preview.pause).click();
+    await expect(button(page, messages.preview.play)).toBeVisible({ timeout: 30_000 });
+    await expect.poll(async () => (await previewStats(page)).frames, { timeout: 10_000 }).not.toBe(before);
+    const stats = await previewStats(page);
+    expect(stats.frames).toBeGreaterThan(STATS_MIN_FRAMES);
+    expect(await player(page).getAttribute("data-max-drift-ms")).not.toBeNull();
+    expect(Number.isFinite(stats.maxDriftMs)).toBe(true);
+    process.stdout.write(`      a 5 s play drew ${String(stats.frames)} frames, ${String(stats.late)} late, the worst drift ${String(stats.maxDriftMs)} ms\n`);
   });
 
   // V3 (D-91): four stages, the chain's beside the recognizer's, and the
@@ -440,6 +534,16 @@ test.describe("one clip, from the drop to the preview", () => {
     expect(api.eventsOf("client_error")).toEqual([]);
     // Two plays, one event: it is sent for the first play of a preview.
     expect(api.eventsOf("preview_played")).toEqual([{ name: "preview_played" }]);
+
+    // V4 (D-160): the scene is made from a plan, and the plan's rows are the
+    // counted moments. A KeywordPop may be left out of the plan (the
+    // validator's drops), so its rows are at most its count.
+    await openTab(page, "Visuals");
+    const rows = (kind: string) => page.getByTestId("plan-items").locator(`li[data-kind="${kind}"]`);
+    await expect(rows("number_reveal")).toHaveCount(2);
+    await expect(rows("list_reveal")).toHaveCount(1);
+    await expect(rows("from_to")).toHaveCount(1);
+    expect(await rows("keyword_pop").count()).toBeLessThanOrEqual(done.props.n_keyword);
   });
 
   test("event shape: every batch is a batch, no property is free text, and nothing of the feed is sent", () => {
@@ -465,6 +569,45 @@ test.describe("one clip, from the drop to the preview", () => {
     expect(carrying.map((request) => `${request.method} ${request.url}`)).toEqual([]);
   });
 
+  // V4 (D-156, D-193): after the events were read, since an edit sends its own.
+  test("long tasks: none over 100 ms from the drop to ready, and none over 50 ms in a word edit, a style switch and a caption drag", async ({}, testInfo) => {
+    const tasks = () => page.evaluate(() => window.e2eLongTasks ?? []);
+    const wasm = () => page.evaluate(() => window.e2eWasm ?? []);
+    const write = (line: string) => {
+      testInfo.annotations.push({ type: "long task", description: line });
+      process.stdout.write(`      ${line}\n`);
+    };
+    const main = await wasm();
+    write(`WASM instantiations on the main thread: ${main.length === 0 ? "none" : main.map((call) => `${call.bundle.slice(call.bundle.lastIndexOf("/") + 1)} ${String(Math.round(call.end - call.at))} ms`).join(", ")}`);
+
+    const processing = tasksBetween(await tasks(), main, processingMs.from, processingMs.to);
+    write(`processing: ${String(processing.length)} tasks of 50 ms or more, the longest ${String(Math.round(Math.max(0, ...processing.map((task) => task.ms))))} ms`);
+    expect(processing.filter((task) => task.ms > PROCESSING_TASK_MS).map((task) => Math.round(task.ms))).toEqual([]);
+
+    const words = await transcriptWords(page);
+    const word = words.find((candidate, i) => i > words.length / 2 && /^\p{L}{3,}$/u.test(candidate.text));
+    expect(word, "the transcript has a word of letters in its second half").toBeDefined();
+    const interactions: [string, () => Promise<void>][] = [
+      ["a word edit", () => editWord(page, word?.index ?? 0, "fixed")],
+      ["a style switch", () => setStyle(page, "Bold")],
+      ["a caption drag", () => dragCaptions(page, "top")],
+    ];
+    for (const [what, act] of interactions) {
+      if (what === "a caption drag") {
+        // Paused on a word: a caption is shown to take hold of.
+        await openWord(page, word?.index ?? 0);
+        await page.keyboard.press("Escape");
+        await expect(wordField(page)).toHaveCount(0);
+        await page.waitForTimeout(300);
+      }
+      const from = await page.evaluate(() => performance.now());
+      await act();
+      const during = tasksBetween(await tasks(), await wasm(), from, await page.evaluate(() => performance.now()));
+      write(`${what}: ${String(during.length)} tasks of 50 ms or more, the longest ${String(Math.round(Math.max(0, ...during.map((task) => task.ms))))} ms`);
+      expect(during.filter((task) => task.ms > EDITING_TASK_MS).map((task) => Math.round(task.ms)), what).toEqual([]);
+    }
+  });
+
   test("start over: the drop zone comes back and the clip is gone from the device", async () => {
     await button(page, messages.editor.startOver).click();
     await expect(page.getByTestId("drop-zone")).toBeVisible();
@@ -472,7 +615,7 @@ test.describe("one clip, from the drop to the preview", () => {
     await expect.poll(() => opfsList(page, "clips"), { timeout: 30_000 }).toEqual([]);
     // The page is on the editor still, ready for the next clip.
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByText(messages.editor.failedStub)).toHaveCount(0);
+    await expect(page.getByText(messages.editor.failedStub).or(page.getByTestId("preview-failed"))).toHaveCount(0);
   });
 });
 
@@ -489,6 +632,27 @@ test("sample clip: the button fetches the clip from the asset host and imports i
   expect(sample[0]?.headers.filter((header) => header.name === "range" || header.name === "cookie")).toEqual([]);
   await expect.poll(() => api.eventsOf("clip_accepted"), { timeout: FLUSH_WAIT_MS }).toEqual([
     { name: "clip_accepted", props: { source: "sample", orientation: "landscape", duration_bucket: "lte90" } },
+  ]);
+});
+
+// V4 (D-154): a clip with speech and nothing to show is ready, with captions only.
+test("zero events: a clip with no number or list reaches ready, and the Visuals tab says so, with no row", async ({ page, context }) => {
+  test.setTimeout(patient(420_000));
+  await ensureModelCached(context);
+  const api = await installFakeApi(page);
+  await routeAssets(page);
+  await page.goto("/app");
+  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+
+  await dropClip(page, genFixture("speech/speech_20s_noevents.mp4"));
+  await expect(canvas(page).or(page.getByTestId("clip-failed")).or(page.getByTestId("clip-rejected"))).toBeVisible({ timeout: patient(240_000) });
+  await expect(canvas(page), "the clip was processed").toBeVisible();
+  await openTab(page, "Visuals");
+  await expect(page.getByTestId("no-events-found")).toHaveText(messages.visuals.noEventsFound);
+  await expect(page.getByTestId("plan-items")).toHaveCount(0);
+  await expect(page.locator("li[data-kind]")).toHaveCount(0);
+  await expect.poll(() => api.eventsOf("pipeline_done"), { timeout: FLUSH_WAIT_MS }).toEqual([
+    { name: "pipeline_done", props: { total_ms: expect.any(Number), n_number: 0, n_list: 0, n_from_to: 0, n_keyword: 0 } },
   ]);
 });
 

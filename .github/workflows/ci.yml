@@ -54,9 +54,11 @@ env:
   # The ffmpeg that `pnpm fixtures` generates the test fixtures with, before
   # `cargo test` reads them (v3implementation D-94): a static Linux build of
   # 9.0.2, by its dated release, refused unless its checksum is this one.
-  # BtbN deletes a dated release after about six weeks (v3changelog open item 7).
-  FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz
-  FFMPEG_LINUX_SHA256: 1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29457
+  # BtbN deletes its daily releases after about two weeks and keeps the last
+  # build of each month for about two years: this is the one of 2026-09-30
+  # (v4changelog, V3 CL item 7 closed by Prompt 125).
+  FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz
+  FFMPEG_LINUX_SHA256: 68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269
   # The public half of the E2E test key (v2implementation D-24): the key of
   # the fixed seed in web/tests-e2e/helpers/fake-api.ts. It is no secret. A
   # build made with it accepts the entitlement tokens the tests mint, so it
@@ -92,6 +94,27 @@ jobs:
         with:
           # The whole history, for the secret scan.
           fetch-depth: 0
+
+      # The tests of offcut-render build wgpu's native backends (v4implementation
+      # D-134), and with the restored target/ the runner's disk ran out while
+      # linking (v4changelog Entry 2). Nothing in this job uses these
+      # preinstalled toolchains.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # The Ubuntu mirror sometimes drops a download: in the run of 0fc25f9
+      # apt gave the Mesa package up after 6 min 33 s and asked again
+      # (v4changelog Entry 15). The image's own apt settings give a 15 s
+      # timeout and one retry; this file is read after them (apt reads
+      # apt.conf.d in name order) and gives three, for every apt-get of the
+      # job, Playwright's included. The values apt uses are printed last.
+      - name: Make apt retry
+        run: |
+          echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/zz-offcut-retries
+          apt-config dump | grep -E '^Acquire::(https?::Timeout|Retries) ' | tail -n 3
 
       - name: Check the configuration
         run: |
@@ -152,6 +175,18 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
+      # The Ubuntu packages this job installs (Mesa's Vulkan driver, and the
+      # fonts and libraries of Playwright's --with-deps), kept between runs so
+      # that they need not come from the mirror (v4changelog Entry 15). The
+      # files are named by version: apt takes one from its archive only when
+      # it is the version the index asks for, and downloads any other.
+      - name: Restore the downloaded Ubuntu packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/apt-archives
+          key: apt-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml', 'pnpm-lock.yaml') }}
+          restore-keys: apt-${{ runner.os }}-
+
       - name: Install the build tools
         run: |
           set -eu
@@ -206,6 +241,32 @@ jobs:
       - name: cargo deny
         run: cargo deny check
 
+      # wgpu's native backends (Vulkan, DX12) are for the tests of
+      # offcut-render alone, through its dev-dependency (v4implementation
+      # D-134, §19.1). The browser's tree must not resolve them, nor the
+      # host's normal tree: wgpu leaves them out on wasm32 by itself, so only
+      # the host read sees a native feature put on the normal dependency
+      # (v4changelog known issue 5).
+      - name: No native GPU backend outside the tests
+        run: |
+          set -eu
+          natives='^(ash|d3d12|windows|gpu-alloc[a-z-]*) v'
+          for target in wasm32-unknown-unknown host; do
+            if [ "$target" = host ]; then
+              tree=$(cargo tree -p offcut-render -e normal,no-proc-macro --prefix none --locked)
+            else
+              tree=$(cargo tree -p offcut-render -e normal,no-proc-macro --prefix none --locked --target "$target")
+            fi
+            # A tree with no wgpu in it would pass for the wrong reason.
+            echo "$tree" | grep -qE '^wgpu v'
+            found=$(echo "$tree" | grep -E "$natives" | sort -u || true)
+            if [ -n "$found" ]; then
+              echo "::error::The normal dependencies of offcut-render resolve a native GPU backend ($target): $found"
+              exit 1
+            fi
+            echo "$target: no native GPU backend in the normal tree of offcut-render"
+          done
+
       # --- 3. The generated TypeScript matches the Rust types ---------------
       - name: Generate the types
         run: pnpm gen:types
@@ -225,8 +286,39 @@ jobs:
       - name: Generate the fixtures
         run: pnpm fixtures
 
+      # The software adapter the golden frames are drawn on: lavapipe, Mesa's
+      # Vulkan driver (v4implementation D-134), with its version in the log.
+      - name: Install the software Vulkan driver
+        run: |
+          set -eu
+          if ls ~/apt-archives/*.deb > /dev/null 2>&1; then
+            sudo cp ~/apt-archives/*.deb /var/cache/apt/archives/
+            echo "$(ls ~/apt-archives/*.deb | wc -l) packages from the cache"
+          fi
+          sudo apt-get update -q
+          sudo apt-get install -y -q mesa-vulkan-drivers
+          dpkg -s mesa-vulkan-drivers | grep Version
+
       - name: cargo test
+        env:
+          # An unreviewed snapshot fails the job; nothing is written (D-157).
+          INSTA_UPDATE: "no"
+          CI: "true"
         run: cargo test --workspace
+
+      # Again, with each golden's similarity and the adapter it was read on in
+      # the log: `cargo test` keeps a passing test's output (v4implementation §21.1).
+      - name: Golden frames, with their readings
+        run: cargo test -p offcut-render --test golden_frames -- --nocapture
+
+      - name: Keep the frames that differ from their goldens
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: golden-out
+          path: target/golden-out
+          retention-days: 7
+          if-no-files-found: ignore
 
       # --- 5. The WASM bundle -----------------------------------------------
       - name: Build the WASM bundle
@@ -277,6 +369,18 @@ jobs:
       # --- 9. End-to-end, in Chrome, against the build ----------------------
       - name: Install Chrome for Playwright
         run: pnpm --filter web exec playwright install --with-deps chrome
+
+      # After the last apt-get of the job: what it downloaded, for the cache
+      # (saved at the end of the job when its key was not found). An image
+      # that keeps no downloaded package leaves the cache empty, not the job
+      # failed.
+      - name: Keep the downloaded Ubuntu packages
+        run: |
+          mkdir -p ~/apt-archives
+          if ls /var/cache/apt/archives/*.deb > /dev/null 2>&1; then
+            cp /var/cache/apt/archives/*.deb ~/apt-archives/
+          fi
+          echo "$(find ~/apt-archives -name '*.deb' | wc -l) packages, $(du -sh ~/apt-archives | cut -f1)"
 
       - name: Playwright, the non-media suites
         run: pnpm e2e
@@ -452,7 +556,11 @@ jobs:
       - name: Headers of the deployment
         run: node scripts/check-headers.mjs "$APP_ORIGIN"
 
-      # Smoke: isolated, WASM compiles under the CSP, API reachable.
+      # Smoke: isolated, WASM compiles under the CSP, API reachable. apt
+      # retries as in the ci job.
+      - name: Make apt retry
+        run: echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/zz-offcut-retries
+
       - name: Install Chrome for Playwright
         run: pnpm --filter web exec playwright install --with-deps chrome
 

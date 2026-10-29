@@ -2,16 +2,26 @@
 //! where a position is expected. Inner fields are private: construction goes
 //! through `new` and the conversion functions in this file only.
 //!
-//! No unit converts from a bare integer, and there is no second timeline type (INV-5).
+//! No unit converts from a bare integer. Two timelines exist from V4 on
+//! (v4implementation D-125, TS §40.1): `TimeMs`, a position in the recording,
+//! and `OutMs`, a position in the program (the export). Neither converts to
+//! the other: only the time map of `timemap.rs` relates them.
 
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use ts_rs::TS;
 
-/// A position on the recording's timeline, in ms (the only timeline, INV-5).
+/// A position on the recording's timeline, in ms: what was said, when.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
 #[serde(transparent)]
 pub struct TimeMs(u32);
+
+/// A position on the program's timeline, in ms: the export's time, which the
+/// scene, the clock and the frame index run on (D-125). In V4 the time map is
+/// always the identity, so the two numbers are equal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
+#[serde(transparent)]
+pub struct OutMs(u32);
 
 /// A length in ms.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
@@ -85,6 +95,14 @@ pub struct Span {
     pub end: TimeMs,
 }
 
+/// A stretch of the program's timeline. Invariant `start <= end`; build it
+/// with [`OutSpan::new`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
+pub struct OutSpan {
+    pub start: OutMs,
+    pub end: OutMs,
+}
+
 /// `new` and `get` for an integer unit. Both are `const` so `limits.rs` can use them.
 macro_rules! int_unit {
     ($($name:ident: $inner:ty),+ $(,)?) => {$(
@@ -102,6 +120,7 @@ macro_rules! int_unit {
 
 int_unit! {
     TimeMs: u32,
+    OutMs: u32,
     DurMs: u32,
     Micros: i64,
     FrameIdx: u32,
@@ -168,16 +187,24 @@ impl Span {
     }
 }
 
+impl OutSpan {
+    /// `None` when `start > end`.
+    pub fn new(start: OutMs, end: OutMs) -> Option<Self> {
+        (start <= end).then_some(Self { start, end })
+    }
+}
+
 /// Output frames per second, as the divisor of the frame conversions.
 /// A local copy of `limits::OUTPUT_FPS` would be a second source; this reads it.
 const FPS: u64 = crate::limits::OUTPUT_FPS as u64;
 
 impl FrameIdx {
-    /// `n * 1000 / 30`, integer division. Saturates at `u32::MAX` ms, which no
-    /// accepted clip reaches.
-    pub fn to_time_ms(self) -> TimeMs {
+    /// `n * 1000 / 30`, integer division: a frame is a place in the program,
+    /// not in the recording (D-125; it returned a `TimeMs` until V3). Saturates at
+    /// `u32::MAX` ms, which no accepted clip reaches.
+    pub fn to_out_ms(self) -> OutMs {
         let ms = u64::from(self.0) * 1000 / FPS;
-        TimeMs(u32::try_from(ms).unwrap_or(u32::MAX))
+        OutMs(u32::try_from(ms).unwrap_or(u32::MAX))
     }
 
     /// `n * 1_000_000 / 30`, integer division.
@@ -211,13 +238,30 @@ impl TimeMs {
     }
 }
 
+impl OutMs {
+    /// `ms * 1000`.
+    pub fn to_micros(self) -> Micros {
+        Micros(i64::from(self.0) * 1000)
+    }
+
+    /// A position plus a length. `None` on overflow.
+    pub fn checked_add(self, d: DurMs) -> Option<OutMs> {
+        self.0.checked_add(d.0).map(OutMs)
+    }
+
+    /// The length from `earlier` to `self`. `None` when `earlier` is later than `self`.
+    pub fn duration_since(self, earlier: OutMs) -> Option<DurMs> {
+        self.0.checked_sub(earlier.0).map(DurMs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn frame_30_is_one_second() {
-        assert_eq!(FrameIdx::new(30).to_time_ms(), TimeMs::new(1000));
+        assert_eq!(FrameIdx::new(30).to_out_ms(), OutMs::new(1000));
     }
 
     #[test]
@@ -263,7 +307,7 @@ mod tests {
 
     #[test]
     fn frame_conversions_do_not_overflow() {
-        assert_eq!(FrameIdx::new(u32::MAX).to_time_ms(), TimeMs::new(u32::MAX));
+        assert_eq!(FrameIdx::new(u32::MAX).to_out_ms(), OutMs::new(u32::MAX));
         assert_eq!(
             FrameIdx::new(u32::MAX).to_micros(),
             Micros::new(i64::from(u32::MAX) * 1_000_000 / 30)
@@ -327,10 +371,43 @@ mod tests {
     }
 
     #[test]
+    fn program_time_has_the_arithmetic_of_recording_time() {
+        let t = OutMs::new(1_000);
+        assert_eq!(t.to_micros(), Micros::new(1_000_000));
+        assert_eq!(t.checked_add(DurMs::new(500)), Some(OutMs::new(1_500)));
+        assert_eq!(OutMs::new(u32::MAX).checked_add(DurMs::new(1)), None);
+        assert_eq!(t.duration_since(OutMs::new(400)), Some(DurMs::new(600)));
+        assert_eq!(t.duration_since(OutMs::new(1_001)), None);
+        assert_eq!(FrameIdx::new(1).to_out_ms(), OutMs::new(33));
+        assert_eq!(FrameIdx::new(2).to_out_ms(), OutMs::new(66));
+    }
+
+    #[test]
+    fn out_span_rejects_reversed_bounds() {
+        let (a, b) = (OutMs::new(100), OutMs::new(200));
+        assert_eq!(OutSpan::new(b, a), None);
+        assert_eq!(OutSpan::new(a, b), Some(OutSpan { start: a, end: b }));
+        assert_eq!(OutSpan::new(a, a), Some(OutSpan { start: a, end: a }));
+        let json = serde_json::to_string(&OutSpan::new(a, b).unwrap()).unwrap();
+        assert_eq!(json, r#"{"start":100,"end":200}"#);
+    }
+
+    #[test]
+    fn the_two_timelines_meet_only_as_numbers() {
+        // There is no `From` either way (D-125): `OutMs::from(TimeMs::new(5))`
+        // and `TimeMs::new(5) == OutMs::new(5)` do not compile. Comparing the
+        // two is only possible through their numbers, on purpose.
+        assert_eq!(TimeMs::new(5).get(), OutMs::new(5).get());
+        assert_eq!(serde_json::to_string(&OutMs::new(5)).unwrap(), "5");
+    }
+
+    #[test]
     fn typescript_names_and_shapes() {
         let cfg = ts_rs::Config::default();
         assert_eq!(TimeMs::name(&cfg), "TimeMs");
         assert_eq!(TimeMs::inline(&cfg), "number");
+        assert_eq!(OutMs::name(&cfg), "OutMs");
+        assert_eq!(OutMs::inline(&cfg), "number");
         assert_eq!(Bytes::inline(&cfg), "number");
         assert_eq!(Micros::inline(&cfg), "number");
         assert_eq!(Confidence::inline(&cfg), "number");

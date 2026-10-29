@@ -1,7 +1,11 @@
-//! The source frame: copied into a texture, then drawn to the target turned
-//! and cropped. A `VideoFrame` is read here and never closed (TS §19.6).
+//! The source frame: copied into a texture, then drawn to the target turned,
+//! cropped and placed in its rectangle. A `VideoFrame` is read here and never
+//! closed (TS §19.6). The crop and the rectangle come with each frame: they
+//! are the `Video` command's `src` and `dst` (D-133).
 
-use offcut_scene::CropRect;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::RgbaImage;
+use offcut_scene::{CropRect, Rect};
 use offcut_types::Rotation;
 use web_sys::VideoFrame;
 
@@ -25,8 +29,8 @@ pub(crate) struct VideoPass {
 }
 
 const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
-/// Two `vec4<f32>`: the `Placement` of `shaders/video.wgsl`.
-const PLACEMENT_BYTES: usize = 32;
+/// Three `vec4<f32>`: the `Placement` of `shaders/video.wgsl`.
+const PLACEMENT_BYTES: usize = 48;
 
 /// The shader of both passes. Each pipeline uses the entry points it names.
 pub(crate) fn shader(device: &wgpu::Device) -> wgpu::ShaderModule {
@@ -136,6 +140,19 @@ pub(crate) fn placement(crop: CropRect, rotation: Rotation, frame: (u32, u32)) -
     }
 }
 
+/// Where `dst` lies on a target of `target` pixels, as the shader reads it:
+/// its top-left corner as shares of the target, and one over its width and
+/// its height as shares. On the whole target: `[0, 0, 1, 1]`, exactly.
+pub(crate) fn rectangle(dst: Rect, target: (u32, u32)) -> [f32; 4] {
+    let (target_w, target_h) = (target.0.max(1) as f32, target.1.max(1) as f32);
+    [
+        dst.x / target_w,
+        dst.y / target_h,
+        target_w / dst.w,
+        target_h / dst.h,
+    ]
+}
+
 /// Copies the frame into `texture`, which is `size` large. The copy exists
 /// in a browser only.
 #[cfg(target_arch = "wasm32")]
@@ -171,7 +188,8 @@ fn import(
     Ok(())
 }
 
-/// V4: an image in memory takes the place of the frame (`render_to_image`).
+/// Natively no `VideoFrame` exists: a frame comes as an image in memory,
+/// through `VideoPass::load_image`.
 #[cfg(not(target_arch = "wasm32"))]
 fn import(
     _queue: &wgpu::Queue,
@@ -267,17 +285,14 @@ impl VideoPass {
         }
     }
 
-    /// Takes `frame` in and sets where it is drawn. The frame stays the caller's.
-    pub fn load(
+    /// The texture for a frame of `width` by `height`: the one held when it
+    /// is that size, else a new one. A frame of no size is refused.
+    fn texture_for(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        frame: &VideoFrame,
-        crop: CropRect,
-        rotation: Rotation,
-    ) -> Result<(), RenderError> {
-        // A frame that was closed has no size.
-        let (width, height) = (frame.display_width(), frame.display_height());
+        width: u32,
+        height: u32,
+    ) -> Result<&FrameTexture, RenderError> {
         if width == 0 || height == 0 {
             return Err(RenderError::FrameImport);
         }
@@ -288,22 +303,86 @@ impl VideoPass {
         if !fits {
             self.frame = Some(self.frame_texture(device, width, height));
         }
-        let Some(held) = self.frame.as_ref() else {
-            return Err(RenderError::FrameImport);
-        };
-        import(queue, frame, &held.texture, (held.width, held.height))?;
+        self.frame.as_ref().ok_or(RenderError::FrameImport)
+    }
 
-        let [a, b, c, d, e, f] = placement(crop, rotation, (width, height));
+    /// Sets where the held frame is drawn: the part `src` of it, turned by
+    /// `rotation`, into `dst` on a target of `target` pixels.
+    fn place(
+        &self,
+        queue: &wgpu::Queue,
+        (src, rotation): (CropRect, Rotation),
+        stored: (u32, u32),
+        (dst, target): (Rect, (u32, u32)),
+    ) {
+        let [a, b, c, d, e, f] = placement(src, rotation, stored);
+        let [x, y, inverse_w, inverse_h] = rectangle(dst, target);
         let mut bytes = [0u8; PLACEMENT_BYTES];
-        let values = [a, b, c, d, e, f, 0.0, 0.0];
+        let values = [a, b, c, d, e, f, 0.0, 0.0, x, y, inverse_w, inverse_h];
         for (slot, value) in bytes.as_chunks_mut::<4>().0.iter_mut().zip(values) {
             *slot = value.to_le_bytes();
         }
         queue.write_buffer(&self.placement, 0, &bytes);
+    }
+
+    /// Takes `frame` in and sets where it is drawn: the part `src` of it,
+    /// turned by `rotation`, into `dst` on a target of `target` pixels. The
+    /// frame stays the caller's.
+    pub fn load(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        frame: &VideoFrame,
+        src: CropRect,
+        rotation: Rotation,
+        (dst, target): (Rect, (u32, u32)),
+    ) -> Result<(), RenderError> {
+        // A frame that was closed has no size.
+        let stored = (frame.display_width(), frame.display_height());
+        let held = self.texture_for(device, stored.0, stored.1)?;
+        import(queue, frame, &held.texture, (held.width, held.height))?;
+        self.place(queue, (src, rotation), stored, (dst, target));
         Ok(())
     }
 
-    /// Draws the frame that was loaded over the whole target.
+    /// `load` for an image in memory in place of a `VideoFrame` (native
+    /// tests, D-134). Its pixels are sRGB-encoded with straight alpha, as a
+    /// decoded frame's are when it is copied in.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn load_image(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        image: &RgbaImage,
+        src: CropRect,
+        rotation: Rotation,
+        (dst, target): (Rect, (u32, u32)),
+    ) -> Result<(), RenderError> {
+        let stored = (image.width, image.height);
+        let expected = u64::from(image.width) * u64::from(image.height) * 4;
+        if u64::try_from(image.data.len()).ok() != Some(expected) {
+            return Err(RenderError::FrameImport);
+        }
+        let held = self.texture_for(device, stored.0, stored.1)?;
+        queue.write_texture(
+            held.texture.as_image_copy(),
+            &image.data,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(image.width * 4),
+                rows_per_image: Some(image.height),
+            },
+            wgpu::Extent3d {
+                width: image.width,
+                height: image.height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.place(queue, (src, rotation), stored, (dst, target));
+        Ok(())
+    }
+
+    /// Draws the frame that was loaded in its rectangle, black around it.
     pub fn draw(&self, pass: &mut wgpu::RenderPass<'_>) {
         let Some(held) = self.frame.as_ref() else {
             return;
@@ -423,5 +502,24 @@ mod tests {
             corners(placement(top, Rotation::R90, stored));
         assert_eq!((top_left, top_right), ((0.0, 1.0), (0.0, 0.0)));
         assert_eq!((bottom_left, bottom_right), ((0.5, 1.0), (0.5, 0.0)));
+    }
+
+    #[test]
+    fn the_whole_target_is_the_rectangle_one_and_a_part_is_measured_in_shares() {
+        let whole = Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 540.0,
+            h: 960.0,
+        };
+        // Multiplying by exactly 1 leaves the target's point as it is: V3's.
+        assert_eq!(rectangle(whole, (540, 960)), [0.0, 0.0, 1.0, 1.0]);
+        let right_half = Rect {
+            x: 270.0,
+            y: 0.0,
+            w: 270.0,
+            h: 960.0,
+        };
+        assert_eq!(rectangle(right_half, (540, 960)), [0.5, 0.0, 2.0, 1.0]);
     }
 }

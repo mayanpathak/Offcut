@@ -56,3 +56,11 @@ export const env: {
   dev: import.meta.env.DEV,
   entitlementTestPublicKey: readEntitlementTestPublicKey(import.meta.env.VITE_ENTITLEMENT_TEST_PUBLIC_KEY),
 };
+
+/**
+ * The page's development hooks are installed (`ui/dev-hooks.ts`): in the
+ * development server and in a build made with `--mode development`, as
+ * `pnpm screens` makes one, never in a production build. A constant, so that
+ * the production build drops the hooks' module (v4implementation D-155).
+ */
+export const DEV_HOOKS: boolean = import.meta.env.MODE !== "production";

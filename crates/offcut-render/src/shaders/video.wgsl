@@ -1,16 +1,22 @@
 // The two things a frame of the output is made of, each drawn with one
-// triangle that covers the whole target: the source frame, turned and
-// cropped, and over it the overlay.
+// triangle that covers the whole target: the source frame, turned, cropped
+// and placed in its rectangle, and over it the overlay.
 //
 // No colour is converted. The frame and the overlay hold sRGB-encoded values
 // and so does the target.
 
-// Where a point of the target lies in the frame's texture:
+// Where a point of the video's rectangle on the target lies in the frame's
+// texture:
 //   frame_uv = (m.x * u + m.z * v + t.x,  m.y * u + m.w * v + t.y)
-// video_pass.rs works the six numbers out from the crop and the rotation.
+// where (u, v) = (target_uv - dst.xy) * dst.zw is the point measured in the
+// rectangle, 0,0 at its top-left and 1,1 at its bottom-right. `dst.zw` is
+// one over the rectangle's share of the target: on the whole target it is
+// exactly 1 and (u, v) is the target's own point. video_pass.rs works the
+// numbers out from the crop, the rotation and the rectangle (D-133).
 struct Placement {
     m: vec4<f32>,
     t: vec4<f32>,
+    dst: vec4<f32>,
 }
 
 @group(0) @binding(0) var frame: texture_2d<f32>;
@@ -36,13 +42,19 @@ fn whole_target(@builtin(vertex_index) index: u32) -> Corner {
     return corner;
 }
 
+// Outside the rectangle the target is black. The frame is sampled at every
+// point, so that the sample stays in uniform control flow, and black is
+// chosen after.
 @fragment
 fn video(corner: Corner) -> @location(0) vec4<f32> {
+    let local = (corner.uv - placement.dst.xy) * placement.dst.zw;
     let uv = vec2<f32>(
-        placement.m.x * corner.uv.x + placement.m.z * corner.uv.y + placement.t.x,
-        placement.m.y * corner.uv.x + placement.m.w * corner.uv.y + placement.t.y,
+        placement.m.x * local.x + placement.m.z * local.y + placement.t.x,
+        placement.m.y * local.x + placement.m.w * local.y + placement.t.y,
     );
-    return vec4<f32>(textureSample(frame, smooth_sampler, uv).rgb, 1.0);
+    let sampled = textureSample(frame, smooth_sampler, uv).rgb;
+    let inside = all(local >= vec2<f32>(0.0)) && all(local <= vec2<f32>(1.0));
+    return vec4<f32>(select(vec3<f32>(0.0), sampled, inside), 1.0);
 }
 
 // The overlay texture holds straight alpha. It is premultiplied here, and the

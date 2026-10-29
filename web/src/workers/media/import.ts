@@ -3,7 +3,7 @@
 
 import type { Bytes, ClipId } from "../../gen/domain";
 import { fileHandle, OpfsError, paths } from "../../persistence/opfs";
-import { CANCELLED, type JobContext, WorkerFailure } from "../rpc";
+import { CANCELLED, type JobContext, WorkerFailure } from "../rpc-worker";
 
 /** One chunk is all of the file that is in memory at a time. */
 const CHUNK_BYTES = 4 * 1024 * 1024;

@@ -1,14 +1,18 @@
 // The first-run download of the speech model (J4): what is being
-// downloaded and why, how far it is, and what went wrong if it failed.
-// It only reads the model store; nothing is started from here.
+// downloaded and why, how far it is, and what went wrong if it failed. It
+// fills the stage's frame like the processing card (v4implementation D-188),
+// its bar in the brand colour. It only reads the model store; nothing is
+// started from here. Cancel stops the download, keeping what has arrived for
+// the next run, and the run that waits for it (D-152).
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import manifest from "../../config/model-manifest.json";
 import { messages } from "../../copy/messages";
 import type { ErrorCode } from "../../gen/domain";
 import { useModelStore } from "../../state/model-store";
 import styles from "../styles/components.module.css";
+import { CancelButton } from "./ProcessingCard";
 
 const BYTES_PER_MB = 1_000_000;
 /** The size is said to the nearest 10 MB (TS §16.1). */
@@ -25,11 +29,35 @@ function failureCopy(code: ErrorCode | undefined) {
   return undefined;
 }
 
+/** The time left is said in steps of this many seconds. */
+const ETA_STEP_S = 5;
+/** A higher time left is said only once it is this share above the one shown. */
+const ETA_RISE = 0.25;
+
+/**
+ * The time left as it is said (design review 1): rounded up to steps of
+ * ETA_STEP_S, always allowed to fall, and allowed to rise only when the
+ * download has really slowed. The estimate from the last 5 s of speed
+ * (model-manager.ts) would otherwise go up and down with every piece.
+ */
+function useSteadyEta(etaSecs: number | null): number | null {
+  const [shown, setShown] = useState<number | null>(null);
+  useEffect(() => {
+    if (etaSecs === null) {
+      setShown(null);
+      return;
+    }
+    const stepped = Math.ceil(etaSecs / ETA_STEP_S) * ETA_STEP_S;
+    setShown((last) => (last === null || stepped < last || stepped > last * (1 + ETA_RISE) ? stepped : last));
+  }, [etaSecs]);
+  return shown;
+}
+
 export function ModelDownloadPanel() {
   const status = useModelStore((state) => state.status);
   const done = useModelStore((state) => state.done);
   const total = useModelStore((state) => state.total);
-  const etaSecs = useModelStore((state) => state.etaSecs);
+  const etaSecs = useSteadyEta(useModelStore((state) => state.etaSecs));
   const error = useModelStore((state) => state.error);
   const bodyId = useId();
   const bar = useRef<HTMLDivElement>(null);
@@ -49,30 +77,32 @@ export function ModelDownloadPanel() {
   }
 
   return (
-    <section className={styles.modelPanel}>
-      <p id={bodyId} className={styles.notice}>
+    <section className={styles.card} aria-busy={status !== "failed"} data-testid="model-download">
+      <h2 className={styles.cardTitle}>{messages.modelDownload.title}</h2>
+      <p id={bodyId} className={styles.cardText}>
         {messages.modelDownload.body(SIZE_MB)}
       </p>
       <div
-        className={styles.progressTrack}
+        className={styles.meter}
         role="progressbar"
         aria-labelledby={bodyId}
         aria-valuemin={0}
         aria-valuemax={PERCENT}
         aria-valuenow={percent}
       >
-        <div ref={bar} className={styles.progressBar} />
+        <div ref={bar} className={styles.meterBar} />
       </div>
-      <p className={styles.status} role="status">
-        {line}
-      </p>
+      <p className={styles.cardHint}>{line}</p>
       {failure !== undefined && (
-        <div className={styles.statusError} role="alert">
-          <p className={styles.label}>{failure.title}</p>
-          <p className={styles.notice}>{failure.body}</p>
-          <p className={styles.notice}>{failure.action}</p>
+        <div className={styles.cardFailure} role="alert">
+          <p className={styles.cardText}>{failure.title}</p>
+          <p className={styles.cardHint}>{failure.body}</p>
+          <p className={styles.cardHint}>{failure.action}</p>
         </div>
       )}
+      <div className={styles.cardActions}>
+        <CancelButton scope="model" />
+      </div>
     </section>
   );
 }

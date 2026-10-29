@@ -1,15 +1,16 @@
 //! NumberReveal: a spoken number, shown large while it is said (TS §19.5).
 
 use offcut_text::format_quantity;
-use offcut_types::{OUTPUT_FPS, Quantity, Span, TimeMs};
+use offcut_types::{OUTPUT_FPS, OutMs, OutSpan, Quantity};
 
 use crate::SceneError;
 use crate::anim::{self, eval};
-use crate::display_list::{Affine, DrawCmd, Rgba, Stroke};
+use crate::display_list::{Affine, DrawCmd, Rect, Rgba, Stroke};
 use crate::easing::{Easing, ease};
-use crate::layout::{ShapedRun, shape};
-use crate::safe_area::EVENT_ZONE;
+use crate::events::{Text, after, text};
+use crate::fonts::FontSet;
 use crate::styles::StyleSpec;
+use crate::theme::Theme;
 
 /// The size of the number, in logical pixels, when it fits.
 pub const VALUE_SIZE: f32 = 200.0;
@@ -26,20 +27,11 @@ pub const HOLD_MS: u32 = 1_200;
 /// and how long it then takes to fade.
 pub const FADE_MS: u32 = 200;
 
-/// A text shaped once: its runs and what they measure together.
-#[derive(Clone, Debug, PartialEq)]
-struct Text {
-    runs: Vec<ShapedRun>,
-    width: f32,
-    ascent: f32,
-    descent: f32,
-}
-
 /// A NumberReveal laid out. `draw` shapes nothing: every text it can show
 /// was shaped here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Track {
-    span: Span,
+    span: OutSpan,
     /// The number as it is at each output frame of the count-up; empty for a
     /// number that scales in.
     counting: Vec<Text>,
@@ -49,20 +41,12 @@ pub struct Track {
     opacity: anim::Track,
     fill: Rgba,
     stroke: Option<Stroke>,
-    /// The top of the number's box and of the label's, in logical pixels.
+    /// The middle of the event zone, and the top of the number's box and of
+    /// the label's, in logical pixels.
+    centre_x: f32,
     value_top: f32,
     label_top: f32,
     label_scale: f32,
-}
-
-fn text(string: &str, style: &StyleSpec, size: f32) -> Result<Text, SceneError> {
-    let runs = shape(string, style.font, size)?;
-    Ok(Text {
-        width: runs.iter().map(|run| run.width).sum(),
-        ascent: runs.iter().map(|run| run.ascent).fold(0.0, f32::max),
-        descent: runs.iter().map(|run| run.descent).fold(0.0, f32::max),
-        runs,
-    })
 }
 
 /// The number at each frame of its count-up, as text. Empty when it does
@@ -84,23 +68,29 @@ fn count_up(value: &Quantity, easing: Easing) -> Vec<String> {
 }
 
 /// `None` when there is nothing to draw, or the number would have to be
-/// smaller than `MIN_VALUE_SIZE` to fit the zone.
+/// smaller than `MIN_VALUE_SIZE` to fit `event_zone`, the clip's event zone
+/// (D-171).
 pub fn layout(
     value: &Quantity,
     label: Option<&str>,
-    span: Span,
+    span: OutSpan,
+    event_zone: Rect,
     style: &StyleSpec,
+    theme: &Theme,
+    fonts: &FontSet,
 ) -> Result<Option<Track>, SceneError> {
     let stroke = (style.stroke_width > 0.0).then_some(Stroke {
         width: style.stroke_width,
-        color: style.stroke_color,
+        color: theme.color(style.stroke),
     });
-    let room = EVENT_ZONE.w - style.stroke_width.max(0.0);
-    let strings = count_up(value, style.easing);
+    let font = (theme.font(style.font), fonts);
+    let room = event_zone.w - style.stroke_width.max(0.0);
+    let easing = style.motion.easing;
+    let strings = count_up(value, easing);
 
     // One size for the whole reveal: the size at which the widest text it
     // shows fits. A count-up passes texts that are wider than its end.
-    let at_full = |string: &str| text(string, style, VALUE_SIZE).map(|text| text.width);
+    let at_full = |string: &str| text(string, font, VALUE_SIZE).map(|text| text.width);
     let mut widest = at_full(&value.display)?;
     if widest <= 0.0 {
         return Ok(None);
@@ -117,19 +107,19 @@ pub fn layout(
         return Ok(None);
     }
 
-    let shown = text(&value.display, style, size)?;
+    let shown = text(&value.display, font, size)?;
     let mut counting = Vec::with_capacity(strings.len());
     for string in &strings {
-        counting.push(text(string, style, size)?);
+        counting.push(text(string, font, size)?);
     }
     let label = match label.map(str::trim).filter(|label| !label.is_empty()) {
-        Some(label) => Some(text(label, style, LABEL_SIZE)?).filter(|text| text.width > 0.0),
+        Some(label) => Some(text(label, font, LABEL_SIZE)?).filter(|text| text.width > 0.0),
         None => None,
     };
 
     let value_height = shown.ascent + shown.descent;
     let label_height = label.as_ref().map_or(0.0, |l| l.ascent + l.descent);
-    let value_top = EVENT_ZONE.y + (EVENT_ZONE.h - value_height - label_height) / 2.0;
+    let value_top = event_zone.y + (event_zone.h - value_height - label_height) / 2.0;
     let enter = if counting.is_empty() {
         vec![
             (span.start, SCALE_IN_FROM),
@@ -149,30 +139,27 @@ pub fn layout(
         label,
         scale: anim::Track {
             keys: enter,
-            easing: style.easing,
+            easing,
         },
         opacity: anim::Track {
             keys: vec![(hold_end, 1.0), (after(hold_end, FADE_MS), 0.0)],
             easing: Easing::Linear,
         },
-        fill: style.fill,
+        fill: theme.color(style.fill),
         stroke,
+        centre_x: event_zone.x + event_zone.w / 2.0,
         value_top,
         label_top: value_top + value_height,
     }))
 }
 
-fn after(t: TimeMs, ms: u32) -> TimeMs {
-    TimeMs::new(t.get().saturating_add(ms))
-}
-
 /// Shown from the start of its first word until the fade has ended.
-pub fn visible_at(track: &Track, t: TimeMs) -> bool {
+pub fn visible_at(track: &Track, t: OutMs) -> bool {
     track.span.start <= t && t < after(after(track.span.end, HOLD_MS), FADE_MS)
 }
 
 /// Adds the reveal as it looks at `t`; nothing outside its time.
-pub fn draw(track: &Track, t: TimeMs, out: &mut Vec<DrawCmd>) {
+pub fn draw(track: &Track, t: OutMs, out: &mut Vec<DrawCmd>) {
     if !visible_at(track, t) {
         return;
     }
@@ -192,7 +179,7 @@ pub fn draw(track: &Track, t: TimeMs, out: &mut Vec<DrawCmd>) {
             clip: None,
         });
     }
-    let centre_x = EVENT_ZONE.x + EVENT_ZONE.w / 2.0;
+    let centre_x = track.centre_x;
     // The number grows from the middle of its own box.
     let height = track.value.ascent + track.value.descent;
     let pivot_y = track.value_top + height / 2.0;
@@ -234,12 +221,27 @@ fn runs(
 
 #[cfg(test)]
 mod tests {
-    use offcut_types::{EditState, StyleId, Unit};
+    use offcut_types::{CaptionPlacement, DurMs, EditState, StyleId, TimeMap, Unit};
 
     use super::*;
+    use crate::safe_area::{ZoneId, zone};
     use crate::styles::spec;
-    use crate::testing::{build, clip, number_event, profile, transcript, word};
+    use crate::testing::{build, clip, number_event, plan, profile, transcript, word};
     use crate::{SceneInput, build_scene};
+
+    fn track_of(value: &Quantity, label: Option<&str>, span: OutSpan) -> Option<Track> {
+        let theme = Theme::default_for(StyleId::Clean);
+        layout(
+            value,
+            label,
+            span,
+            zone(ZoneId::Event, CaptionPlacement::bottom()),
+            &spec(StyleId::Clean),
+            &theme,
+            &FontSet::embedded(),
+        )
+        .unwrap()
+    }
 
     fn quantity(value: f64, unit: Unit, display: &str) -> Quantity {
         Quantity {
@@ -249,14 +251,14 @@ mod tests {
         }
     }
 
-    fn span(start: u32, end: u32) -> Span {
-        Span::new(TimeMs::new(start), TimeMs::new(end)).unwrap()
+    fn span(start: u32, end: u32) -> OutSpan {
+        OutSpan::new(OutMs::new(start), OutMs::new(end)).unwrap()
     }
 
     /// What is drawn at `t`: the texts of the runs, and the opacity of the layer.
     fn at(track: &Track, t: u32) -> (Vec<String>, Option<f32>) {
         let mut out = Vec::new();
-        draw(track, TimeMs::new(t), &mut out);
+        draw(track, OutMs::new(t), &mut out);
         let mut layer = None;
         let mut texts = Vec::new();
         for cmd in out {
@@ -267,7 +269,10 @@ mod tests {
                     layer = Some(opacity);
                 }
                 DrawCmd::PopLayer => {}
-                DrawCmd::FillRect { .. } | DrawCmd::FillPath { .. } => {
+                DrawCmd::FillRect { .. }
+                | DrawCmd::FillPath { .. }
+                | DrawCmd::Video { .. }
+                | DrawCmd::Image { .. } => {
                     panic!("a number draws glyph runs only")
                 }
             }
@@ -277,11 +282,8 @@ mod tests {
 
     #[test]
     fn ten_thousand_dollars_counts_up_holds_and_goes() {
-        let style = spec(StyleId::Clean);
         let value = quantity(10_000.0, Unit::Usd, "$10k");
-        let track = layout(&value, None, span(2_000, 2_400), &style)
-            .unwrap()
-            .unwrap();
+        let track = track_of(&value, None, span(2_000, 2_400)).unwrap();
 
         assert_eq!(at(&track, 1_900), (vec![], None));
         assert_eq!(at(&track, 1_999), (vec![], None));
@@ -305,13 +307,11 @@ mod tests {
             quantity(3.0, Unit::None, "3"),
             quantity(12.5, Unit::Percent, "12.5%"),
         ] {
-            let track = layout(&small, None, span(2_000, 2_400), &style)
-                .unwrap()
-                .unwrap();
+            let track = track_of(&small, None, span(2_000, 2_400)).unwrap();
             assert!(track.counting.is_empty());
             let scale_at = |t: u32| {
                 let mut out = Vec::new();
-                draw(&track, TimeMs::new(t), &mut out);
+                draw(&track, OutMs::new(t), &mut out);
                 match out.as_slice() {
                     [DrawCmd::GlyphRun { transform, .. }] => transform.m[0],
                     other => panic!("{other:?}"),
@@ -324,9 +324,7 @@ mod tests {
         }
 
         // A label is a second row under the number. V2 detects none.
-        let labelled = layout(&value, Some("in sales"), span(2_000, 2_400), &style)
-            .unwrap()
-            .unwrap();
+        let labelled = track_of(&value, Some("in sales"), span(2_000, 2_400)).unwrap();
         assert_eq!(at(&labelled, 2_600).0, ["$10k", "in sales"]);
     }
 
@@ -335,37 +333,45 @@ mod tests {
         let style = spec(StyleId::Clean);
         let long = "123,456,789,012,345,678";
         let value = quantity(1.234_567_890_123_456_7e20, Unit::None, long);
-        assert_eq!(layout(&value, None, span(2_000, 2_400), &style), Ok(None));
+        assert_eq!(track_of(&value, None, span(2_000, 2_400)), None);
 
         let transcript = transcript(&[word("so", 1_000, 1_200), word("much", 1_300, 1_600)]);
-        let events = [number_event(value, 2_000, 2_400)];
+        let events = [number_event(value, 0, 2_000, 2_400)];
         let edit = EditState::default();
         let (clip, profile) = (clip(1080, 1920, 10_000), profile(1080));
+        let (theme, fonts) = (Theme::default_for(StyleId::Clean), FontSet::embedded());
         let scene = build_scene(SceneInput {
             transcript: &transcript,
-            events: &events,
+            plan: &plan(&transcript, &events),
             edit: &edit,
             clip: &clip,
             profile: &profile,
+            time_map: &TimeMap::identity(DurMs::new(10_000)),
+            theme: &theme,
+            fonts: &fonts,
         })
         .unwrap();
         assert_eq!(scene.summary().visual_moments, 0);
-        assert!(scene.frame_at(TimeMs::new(2_600)).cmds.is_empty());
+        // Nothing is drawn over the video (every frame starts with it, D-130).
+        let cmds = scene.frame_at(OutMs::new(2_600)).cmds;
+        assert!(
+            matches!(cmds.as_slice(), [DrawCmd::Video { .. }]),
+            "{cmds:?}"
+        );
 
         // One that fits is counted, and one a little too wide is made smaller.
         let fits = [number_event(
             quantity(10_000.0, Unit::Usd, "$10k"),
+            0,
             2_000,
             2_400,
         )];
         assert_eq!(build(&transcript, &fits, 1080).summary().visual_moments, 1);
         let wide = quantity(250_000.0, Unit::Usd, "$250k");
-        let track = layout(&wide, None, span(2_000, 2_400), &style)
-            .unwrap()
-            .unwrap();
+        let track = track_of(&wide, None, span(2_000, 2_400)).unwrap();
         assert!(track.value.runs[0].size < VALUE_SIZE);
         assert!(track.value.runs[0].size > MIN_VALUE_SIZE);
-        let room = EVENT_ZONE.w - style.stroke_width;
+        let room = zone(ZoneId::Event, CaptionPlacement::bottom()).w - style.stroke_width;
         assert!(track.counting.iter().all(|text| text.width <= room + 0.01));
     }
 }

@@ -1,18 +1,22 @@
-// J9: the export button. V2 has no account and no counter: the button starts
-// an export with the token this device holds, and says so when it holds none
-// (v2implementation D-23).
+// J9: the export button, the one primary action of the editor's top bar
+// (v4implementation D-178). V2 has no account and no counter: the button
+// starts an export with the token this device holds, and says so when it
+// holds none (v2implementation D-23). While something stands in the way, the
+// button is disabled and its tooltip says what.
 
 import { messages } from "../../copy/messages";
 import { type BlockerCode, forExport } from "../../state/blockers";
 import { useClipStore } from "../../state/clip-store";
 import { useExportStore } from "../../state/export-store";
 import { startExport } from "../../usecases/start-export";
+import { Download } from "../icons";
+import { Button } from "../primitives/Button";
 import styles from "../styles/components.module.css";
 
 /** The words of a blocker. The ones no person can meet yet have none (D-57). */
-function blockerText(code: BlockerCode): string {
+function blockerText(code: BlockerCode): string | undefined {
   const copy: Partial<Record<BlockerCode, string>> = messages.blockers;
-  return copy[code] ?? "";
+  return copy[code];
 }
 
 export function ExportButton() {
@@ -22,20 +26,18 @@ export function ExportButton() {
   useClipStore((state) => state.status);
   useExportStore((state) => state.status);
   const blocker = forExport();
-
-  let line = "";
-  if (blocker !== null) {
-    line = blockerText(blocker);
-  } else if (unavailable) {
-    line = messages.export.unavailable;
-  }
+  const reason = blocker === null ? undefined : blockerText(blocker);
 
   return (
     <div className={styles.exportPanel}>
-      <button
-        className={styles.button}
-        type="button"
+      <p className={styles.exportStatus} role="status" data-testid="export-status">
+        {unavailable ? messages.export.unavailable : ""}
+      </p>
+      <Button
+        variant="primary"
+        icon={<Download />}
         disabled={blocker !== null || clipId === undefined}
+        {...(reason === undefined ? {} : { disabledReason: reason })}
         onClick={() => {
           if (clipId !== undefined) {
             void startExport(clipId);
@@ -43,10 +45,7 @@ export function ExportButton() {
         }}
       >
         {messages.export.button}
-      </button>
-      <p className={styles.status} role="status" data-testid="export-status">
-        {line}
-      </p>
+      </Button>
     </div>
   );
 }

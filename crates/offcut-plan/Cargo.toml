@@ -1,0 +1,34 @@
+[package]
+name = "offcut-plan"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+# A pure crate (TS §7, v4implementation D-122): no browser, GPU, clock or
+# randomness crate. The render binding takes it without default features, so
+# the schema generator and `serde_json` stay out of the browser bundle.
+[features]
+default = ["prompt"]
+prompt = ["dep:serde_json"]
+
+[dependencies]
+offcut-types = { workspace = true }
+# tokenize, parse_quantity, format_quantity: numbers are resolved from the
+# effective words (D-121).
+offcut-text = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The inline tests read and write JSON also when the feature `prompt` is off.
+serde_json = { workspace = true }
+# Snapshots of the prompt, the schema and the user message (D-157, section 7.3).
+insta = { workspace = true }
+# The labeled-set tests: detect, from_rules, validate (D-165).
+offcut-detect = { workspace = true }
+# ValidPlan has no public constructor (INV-21).
+trybuild = { workspace = true }

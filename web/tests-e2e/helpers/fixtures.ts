@@ -1,7 +1,9 @@
 // Helpers shared by the E2E tests: the analytics flush, the files of the asset
 // host served from this machine, the reference clip, the generated fixtures,
-// the speech model put on the browser's device without a download, and what
-// the page keeps in its storage.
+// the speech model put on the browser's device without a download, what
+// the page keeps in its storage, and (v4implementation G 16.1) the editor's
+// controls driven as a person drives them, the preview's statistics, the
+// pixels of a screenshot and the accessibility scan.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -9,8 +11,10 @@ import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, 
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { inflateSync } from "node:zlib";
 
-import type { BrowserContext, Page, Route } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { type BrowserContext, expect, type Page, type Route } from "@playwright/test";
 
 import { paths } from "../../src/persistence/opfs";
 import { DB_NAME } from "../../src/persistence/schema";
@@ -250,8 +254,8 @@ export type AssetRequest = {
   /** Every header as the browser sent it, a repeated one twice. Names are in lower case. */
   headers: { name: string; value: string }[];
   hasBody: boolean;
-  /** What came back: a status with the bytes of its body, a broken connection, or the real host's answer. */
-  answer: { status: number; bytes: number } | "aborted" | "network";
+  /** What came back: a status with the bytes of its body, a broken connection, no answer yet, or the real host's answer. */
+  answer: { status: number; bytes: number } | "aborted" | "held" | "network";
 };
 
 export type AssetLog = {
@@ -271,6 +275,12 @@ export type AssetOptions = {
   failAfterBytes?: number;
   /** Without `failAfterBytes`: every model request is answered with this status. */
   status?: number;
+  /**
+   * Once this many bytes of the model were served, a model request is never
+   * answered: the download waits on it until the page gives it up, as a
+   * cancel does (D-152). A later `routeAssets` serves the requests after it.
+   */
+  holdAfterBytes?: number;
 };
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -383,6 +393,11 @@ export async function routeAssets(page: Page, o: AssetOptions = {}): Promise<Ass
       return;
     }
     if (isModel(assetPath)) {
+      if (o.holdAfterBytes !== undefined && served >= o.holdAfterBytes) {
+        entry.answer = "held";
+        // Never settles: the page's abort ends the request, and the context's close ends this handler.
+        await new Promise<never>(() => undefined);
+      }
       const failing = o.failAfterBytes === undefined ? o.status !== undefined : served >= o.failAfterBytes;
       if (failing && o.status !== undefined) {
         entry.answer = { status: o.status, bytes: 0 };
@@ -601,4 +616,359 @@ export async function ensureModelCached(context: BrowserContext): Promise<void> 
   } finally {
     await page.close();
   }
+}
+
+// --- The editor (v4implementation G 16.1) -----------------------------------------
+//
+// Each helper drives the page the way a person does: the scrub bar, the
+// transcript's words and their field, the switches, the cards and drags on
+// the preview. None reaches into a worker or a store (D-155); what the
+// preview shows is read through the player's `data-*` attributes, which a
+// test build (`pnpm build:e2e`) has besides the statistics every build has.
+// A spec that changes the clip calls `trackSaves(page)` before it opens it.
+
+/** The words of the save state while an edit is written, and after (§17.5's `editor.saving`, `editor.saved`). */
+const SAVING = "Saving…";
+const SAVED = "Saved on this device";
+
+/** The element that holds the preview's canvas and its `data-*` attributes (D-155). */
+export function player(page: Page) {
+  return page.locator("div:has(> [data-testid=preview-canvas])");
+}
+
+/** What the last play drew (D-155): `NaN` for a number no play has written yet. */
+export async function previewStats(
+  page: Page,
+): Promise<{ frames: number; late: number; maxDriftMs: number; downscaled: boolean }> {
+  const root = player(page);
+  const read = async (name: string): Promise<number> => Number((await root.getAttribute(name)) ?? Number.NaN);
+  return {
+    frames: await read("data-frames"),
+    late: await read("data-late"),
+    maxDriftMs: await read("data-max-drift-ms"),
+    downscaled: (await root.getAttribute("data-downscaled")) === "true",
+  };
+}
+
+/** The caption the preview shows, as the test build mirrors it (D-155): its text, its colours, its placement. */
+export async function captionMirror(page: Page): Promise<{ text: string; colors: string[]; position: number }> {
+  const root = player(page);
+  const text = (await root.getAttribute("data-caption-text")) ?? "";
+  const colors = ((await root.getAttribute("data-caption-colors")) ?? "").split(" ").filter((c) => c !== "");
+  return { text, colors, position: Number((await root.getAttribute("data-caption-position")) ?? Number.NaN) };
+}
+
+/** Fails at once, with what to do, when the page was built without the test build's mirrors and hooks. */
+export async function expectTestBuild(page: Page): Promise<void> {
+  const hooks = await page.evaluate(() => "__offcutDev" in window);
+  expect(hooks, "this case needs the test build's mirrors and hooks: build with pnpm build:e2e").toBe(true);
+}
+
+/**
+ * Counts, from before the page loads, every time the top bar's save state
+ * turns to "Saving…": the update rule shows it when a change has been drawn
+ * and is being written (D-184). A change's end is then "a save after the
+ * count read before it, and none in progress" (`settled`). Looking at the
+ * save state alone races the change: right after a commit it still says
+ * "Saved", from the change before (found by this prompt's first run).
+ */
+export async function trackSaves(page: Page): Promise<void> {
+  await page.addInitScript((saving) => {
+    const w = window as unknown as { e2eSaves: number; e2eSaving: boolean };
+    w.e2eSaves = 0;
+    w.e2eSaving = false;
+    new MutationObserver(() => {
+      const now = (document.body.textContent ?? "").includes(saving);
+      if (now && !w.e2eSaving) {
+        w.e2eSaves += 1;
+      }
+      w.e2eSaving = now;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  }, SAVING);
+}
+
+/** How many saves the page has begun (`trackSaves`). */
+export async function saves(page: Page): Promise<number> {
+  const count = await page.evaluate(() => (window as unknown as { e2eSaves?: number }).e2eSaves);
+  if (count === undefined) {
+    throw new Error("trackSaves(page) must be called before the page is opened");
+  }
+  return count;
+}
+
+/**
+ * Waits for the update rule to be done with the change made after `since`
+ * (`saves(page)` read before the change): a save begun after it, and the
+ * save state back to "Saved" (§17.5).
+ */
+export async function settled(page: Page, since: number): Promise<void> {
+  await expect.poll(() => saves(page), { timeout: 30_000, message: "the change was written" }).toBeGreaterThan(since);
+  await expect(page.getByText(SAVING, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByText(SAVED, { exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+/** The scrub bar (D-148). */
+export function scrubBar(page: Page) {
+  return page.getByTestId("preview-scrub");
+}
+
+/**
+ * Seeks the paused preview to `ms` through the scrub bar, as a drag that
+ * ends there does: the value is set, the bar's `input` moves the preview and
+ * its `change` lets it go. Resolves when the value is set, not when the
+ * frame is drawn: a case that times the frame watches the canvas.
+ */
+export async function seekTo(page: Page, ms: number): Promise<void> {
+  await scrubBar(page).evaluate((element, value) => {
+    const input = element as HTMLInputElement;
+    // React tracks the value it last set: the native setter makes the change one it sees.
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    descriptor?.set?.call(input, String(value));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, ms);
+}
+
+/** Where the preview is, in milliseconds: the scrub bar's value. */
+export async function previewAt(page: Page): Promise<number> {
+  return Number(await scrubBar(page).inputValue());
+}
+
+/** Opens tab `name` of the side panel ("Captions", "Style", "Visuals", "Framing"). */
+export async function openTab(page: Page, name: string): Promise<void> {
+  const tab = page.getByRole("tab", { name, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
+/** The transcript's button of word `index` (D-182). */
+export function wordButton(page: Page, index: number) {
+  return page.getByTestId("caption-editor").locator(`button[data-word="${String(index)}"]`);
+}
+
+/** The field a word is fixed in (§17.5's `captions.wordField`). */
+export function wordField(page: Page) {
+  return page.getByRole("textbox", { name: "Fix this word" });
+}
+
+/** The words of the transcript as their buttons read now, by index, from the Captions tab (which it opens). */
+export async function transcriptWords(page: Page): Promise<{ index: number; text: string }[]> {
+  await openTab(page, "Captions");
+  await expect(page.getByTestId("caption-editor").locator("button[data-word]").first()).toBeVisible();
+  return page
+    .getByTestId("caption-editor")
+    .locator("button[data-word]")
+    .evaluateAll((elements) =>
+      elements.map((element) => ({ index: Number((element as HTMLElement).dataset.word), text: element.textContent ?? "" })),
+    );
+}
+
+/**
+ * Opens word `index` in its field from the Captions tab: a click on its
+ * button, which also pauses the preview and seeks to the word (D-182).
+ */
+export async function openWord(page: Page, index: number): Promise<void> {
+  await openTab(page, "Captions");
+  const button = wordButton(page, index);
+  await button.scrollIntoViewIfNeeded();
+  await button.click();
+  await expect(wordField(page)).toBeFocused();
+}
+
+/**
+ * Fixes word `index` to `text` (D-182): opened, its text replaced, committed
+ * with Enter; resolves when the update rule is done with it. An empty
+ * `text` hides the word.
+ */
+export async function editWord(page: Page, index: number, text: string): Promise<void> {
+  await openWord(page, index);
+  await wordField(page).fill(text);
+  const since = await saves(page);
+  await page.keyboard.press("Enter");
+  await expect(wordField(page)).toHaveCount(0);
+  await settled(page, since);
+}
+
+/**
+ * Switches the visual whose row is labelled `label` (`visuals.kind`'s words:
+ * "Big number", "List", "Before → after", "Emphasis") to `on`, from the
+ * Visuals tab; resolves when the update rule is done with it.
+ */
+export async function toggleItem(page: Page, label: string, on: boolean): Promise<void> {
+  await openTab(page, "Visuals");
+  const control = page.getByTestId("plan-items").getByRole("switch", { name: label }).first();
+  if ((await control.getAttribute("aria-checked")) !== String(on)) {
+    const since = await saves(page);
+    await control.click();
+    await expect(control).toHaveAttribute("aria-checked", String(on));
+    await settled(page, since);
+  }
+}
+
+/** Chooses the style card named `name` ("Clean", "Bold", "Mono") on the Style tab; resolves once it applies. */
+export async function setStyle(page: Page, name: string): Promise<void> {
+  await openTab(page, "Style");
+  const card = page.getByTestId("style-cards").getByRole("button", { name: new RegExp(`^${name}`) });
+  if ((await card.getAttribute("aria-pressed")) !== "true") {
+    const since = await saves(page);
+    await card.click();
+    await expect(card).toHaveAttribute("aria-pressed", "true");
+    await settled(page, since);
+  }
+}
+
+/** The pointer layer over the canvas, which takes the gestures (D-183). */
+function pointerLayer(page: Page) {
+  return page.getByTestId("preview-pointer");
+}
+
+/**
+ * Moves the mouse to (`x`, `y`), fractions of the preview, and waits until
+ * the hover's hit test has said what is there (`data-hit`) and it is one of
+ * `kinds`: a press acts on the hit the cursor showed, so a drag starts only
+ * once it is known.
+ */
+export async function hoverPreview(page: Page, x: number, y: number, kinds: readonly string[]): Promise<boolean> {
+  const box = await pointerLayer(page).boundingBox();
+  if (box === null) {
+    throw new Error("the preview is not on the page");
+  }
+  await page.mouse.move(box.x + x * box.width, box.y + y * box.height, { steps: 2 });
+  const deadline = Date.now() + 1_500;
+  while (Date.now() < deadline) {
+    const hit = (await pointerLayer(page).getAttribute("data-hit")) ?? "";
+    if (kinds.includes(hit)) {
+      return true;
+    }
+    await page.waitForTimeout(50);
+  }
+  return false;
+}
+
+/** A press where the mouse is, a move to (`x`, `y`) in small steps as a hand moves, and the release. */
+async function dragTo(page: Page, x: number, y: number): Promise<void> {
+  const box = await pointerLayer(page).boundingBox();
+  if (box === null) {
+    throw new Error("the preview is not on the page");
+  }
+  await page.mouse.down();
+  await page.mouse.move(box.x + x * box.width, box.y + y * box.height, { steps: 12 });
+  await page.mouse.up();
+}
+
+// The caption block's track on the 1080 x 1920 canvas: `CAPTION_TRACK` of
+// usecases/preview-interact.ts (D-183), and its snaps (`CAPTION_SNAPS`).
+const TRACK = { top: 390 / 1920, bottom: 1304 / 1920 };
+export const CAPTION_SNAP_AT = { top: 0.15, middle: 0.55, bottom: 1.0 } as const;
+
+/** The centre of the caption block at `placement`, as a fraction of the preview's height. */
+function blockCentre(placement: number): number {
+  return TRACK.top + placement * (TRACK.bottom - TRACK.top);
+}
+
+/**
+ * Drags the caption block on the paused preview to `to` (a snap's name, or a
+ * placement from 0 to 1), as a person does (D-183); resolves when the one
+ * change of the drag is applied. The block is taken at its centre, from the
+ * player's mirror of where it is; a caption must be shown at this time.
+ */
+export async function dragCaptions(page: Page, to: keyof typeof CAPTION_SNAP_AT | number): Promise<void> {
+  const from = blockCentre((await captionMirror(page)).position);
+  const target = blockCentre(typeof to === "number" ? to : CAPTION_SNAP_AT[to]);
+  let x: number | undefined;
+  for (const candidate of [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74]) {
+    if (await hoverPreview(page, candidate, from, ["block", "word"])) {
+      x = candidate;
+      break;
+    }
+  }
+  if (x === undefined) {
+    throw new Error("no caption block under the pointer: is a caption shown at this time?");
+  }
+  const since = await saves(page);
+  await dragTo(page, x, target);
+  await settled(page, since);
+}
+
+/**
+ * Drags the video of a wide clip sideways on the paused preview by `dx`, a
+ * fraction of the preview's width (positive is to the right), as a person
+ * does (D-183); resolves when the one change of the drag is applied. The
+ * video is taken in its upper part, away from the captions.
+ */
+export async function dragVideo(page: Page, dx: number): Promise<void> {
+  const start = { x: 0.5, y: 0.1 };
+  if (!(await hoverPreview(page, start.x, start.y, ["video"]))) {
+    throw new Error("no video under the pointer: the preview must be paused on a wide clip");
+  }
+  const since = await saves(page);
+  await dragTo(page, start.x + dx, start.y);
+  await settled(page, since);
+}
+
+export type AxeViolation = Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"][number];
+
+/** The page's serious and critical accessibility violations (D-192), by `@axe-core/playwright`. */
+export async function axe(page: Page): Promise<AxeViolation[]> {
+  const results = await new AxeBuilder({ page }).analyze();
+  return results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+}
+
+// --- The pixels of a screenshot -----------------------------------------------------
+
+/** The pixels of an 8-bit, non-interlaced RGB or RGBA PNG, as a screenshot is: decoded and unfiltered. */
+export function pngPixels(png: Buffer): { width: number; height: number; channels: number; data: Uint8Array } {
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const depth = png.readUInt8(24);
+  const colorType = png.readUInt8(25);
+  const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : 0;
+  if (depth !== 8 || channels === 0 || png.readUInt8(28) !== 0) {
+    throw new Error("only 8-bit RGB or RGBA PNGs without interlacing are read here");
+  }
+  const chunks: Buffer[] = [];
+  for (let at = 8; at + 8 <= png.length; ) {
+    const length = png.readUInt32BE(at);
+    if (png.toString("latin1", at + 4, at + 8) === "IDAT") {
+      chunks.push(png.subarray(at + 8, at + 8 + length));
+    }
+    at += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(chunks));
+  const stride = width * channels;
+  const data = new Uint8Array(height * stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)] ?? 0;
+    const line = y * (stride + 1) + 1;
+    for (let i = 0; i < stride; i += 1) {
+      const value = raw[line + i] ?? 0;
+      const a = i >= channels ? (data[y * stride + i - channels] ?? 0) : 0;
+      const b = y > 0 ? (data[(y - 1) * stride + i] ?? 0) : 0;
+      const c = y > 0 && i >= channels ? (data[(y - 1) * stride + i - channels] ?? 0) : 0;
+      let predicted = 0;
+      if (filter === 1) {
+        predicted = a;
+      } else if (filter === 2) {
+        predicted = b;
+      } else if (filter === 3) {
+        predicted = Math.floor((a + b) / 2);
+      } else if (filter === 4) {
+        const p = a + b - c;
+        const [pa, pb, pc] = [Math.abs(p - a), Math.abs(p - b), Math.abs(p - c)];
+        predicted = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      data[y * stride + i] = (value + predicted) & 0xff;
+    }
+  }
+  return { width, height, channels, data };
+}
+
+/** The mean brightness of a screenshot, 0 to 255: the mean of its pixels' R, G and B. */
+export function meanBrightness(png: Buffer): number {
+  const { width, height, channels, data } = pngPixels(png);
+  let sum = 0;
+  for (let p = 0; p < width * height; p += 1) {
+    sum += (data[p * channels] ?? 0) + (data[p * channels + 1] ?? 0) + (data[p * channels + 2] ?? 0);
+  }
+  return sum / (width * height * 3);
 }
