@@ -1082,20 +1082,25 @@ runPipeline(clipId)                           ⇒ clip: accepted → processing(
       → preview-loop.runPreview(): per rAF: t = clock.now()
           → video-source.frameAt(t) → session.render_frame(frame, t)      same t for audio, video and scene
   first play only                             [evt preview_played]
-no events detected → ReviewPanel shows messages.NO_EVENTS_FOUND (PS §10 J7)
+no item in the valid plan → the Visuals tab (PlanItemList) shows messages.visuals.noEventsFound (PS §10 J7; V4 D-154)
 <Pause>/<Seek> → controlPreview.pause() / seek(TimeMs) ⇒ playing → paused / → seeking → paused|playing
 ```
 
 **C-6. Review edits (J8)**
 ```text
-<CaptionEditor onCommit(wordIdx, text)> → editWord(wordIdx, text)
-  → editsRepo.put → pool.render.redetectSentence({sentenceIdx, wordEdits})
-      → redetect_sentence() → events for that sentence replaced; toggles kept by EventId
-  → clipStore.setEvents() → pool.render.setScene(...)                          [evt review_action action=word_edit]
-<EventToggleList onToggle(id, on)> → toggleEvent(id, on)
-  → editsRepo.put → pool.render.setScene(...)                                  [evt review_action action=event_toggle]
-<StylePicker> → setStyle(styleId) → setScene                                   [evt review_action action=style]
-<CropOffsetControl> (landscape only) → setCropOffset(offset) → setScene        [evt review_action action=crop_offset]
+As built in V4 every change goes through one update rule (usecases/review-update.ts, D-184): the clip ready →
+updating, the preview paused, the worker's calls, the scene set, then ready, the change written and pushed on the
+undo history (50 steps); a failure leaves the edit before it and offers "Undo this change".
+<CaptionEditor> (click a word, Enter or Tab commits) → editWord(wordIdx, text)
+  → pool.render.redetectSentence({sentenceIdx, wordEdits}) → rulesPlan → setScene(plan, ...)
+      → events for that sentence replaced; toggles kept by EventId               [evt review_action action=word_edit]
+  → the "Change all" toast → replaceAll(from, to) → detect({wordEdits}) → ...   [evt review_action action=replace_all]
+<PlanItemList> (Visuals tab) switch → toggleEvent(id, on) → setScene           [evt review_action action=event_toggle]
+<StylePicker> (Style tab cards) → setStyle(styleId) → setScene                  [evt review_action action=style]
+<Highlight numbers> → setHighlightNumbers(on) → setScene                        [evt review_action action=highlight_numbers]
+<FramingPanel> / caption drag on the preview → setCaptionPosition(p) → setScene [evt review_action action=caption_position]
+<CropOffsetControl> / video drag (wider than 9:16 only) → setCropOffset → setScene [evt review_action action=crop_offset]
+Ctrl/⌘+Z, Shift+Ctrl/⌘+Z → undo / redo → setScene with the step's edit          [evt review_action action=undo|redo]
 all: preview ⇒ playing → paused during the update, then restored
 no edit changes the audio, the clip duration or any timestamp
 ```
@@ -1284,9 +1289,11 @@ pub struct ExportCount(u32);
 pub struct UsdCents(u32);
 
 pub struct Span { pub start: TimeMs, pub end: TimeMs }    // invariant start <= end
+pub struct OutSpan { pub start: OutMs, pub end: OutMs }  // V4: the same on the program timeline; made with OutSpan::new
 
 impl FrameIdx { pub fn to_out_ms(self) -> OutMs; pub fn to_micros(self) -> Micros; }   // n * 1000 / 30, n * 1_000_000 / 30
-                                                                                          // (v1.2, V4: to_out_ms replaces to_time_ms)
+                                                                                          // (as built in V4, D-125: to_out_ms replaces
+                                                                                          // to_time_ms; saturates at u32::MAX ms)
 impl TimeMs   { pub fn to_micros(self) -> Micros; pub fn from_micros_floor(m: Micros) -> TimeMs; }
 // No From<u32>. A position (TimeMs) and a length (DurMs) are distinct types. TimeMs and OutMs never convert
 // except through TimeMap (§40.1); with the identity map they are numerically equal.
@@ -1428,14 +1435,23 @@ Every `TimeMs` in a `Word`, `Sentence`, `ListItem` or `DetectedEvent` is the tim
 
 ```rust
 // edit.rs
-pub enum StyleId { Clean, Bold, Tech }                  // PS §12.2; default Clean
+pub enum StyleId { Clean, Bold, Tech }                  // PS §12.2; default Clean. V4: `Tech` is shown as "Mono" (D-170);
+                                                        // the serialized id stays "tech" so stored edits read unchanged
 pub struct CropOffset(f32);                             // -1.0 (left) ..= 1.0 (right); 0.0 centre; checked in new()
+pub struct CaptionPlacement(f32);                       // V4 (D-171): the caption block's centre, 0.0 = top of the band
+                                                        // captions may use, 1.0 = its bottom (V3's zone, the default);
+                                                        // new() refuses a value that is not finite or outside 0.0..=1.0
 pub struct EditState {
     pub word_edits: BTreeMap<WordIdx, String>,          // replacement text; "" hides the word; timing never changes
     pub event_overrides: BTreeMap<EventId, bool>,       // enabled flag chosen by the user
     pub style: StyleId,
     pub crop_offset: CropOffset,
-}                                                       // user choices only; no field changes audio, duration or timing
+    #[serde(default = "CaptionPlacement::bottom")]
+    pub caption_position: CaptionPlacement,             // V4 (D-171): where the captions sit; snaps Top 0.15, Middle 0.55, Bottom 1.0
+    #[serde(default = "yes")]
+    pub highlight_numbers: bool,                        // V4 (D-169): numbers in the captions in the accent colour; default true
+}                                                       // user choices only; no field changes audio, duration or timing.
+                                                        // A V3 record has neither V4 field and reads with the defaults
 // v1.2 additions, each in the release that uses it (§40.10): item_overrides keyed by EventId (V4 reuses
 // event_overrides), cut_restores: BTreeSet<CutKey> and filler_cuts: bool (V6.2), music: Option<MusicChoice> (V6.3),
 // caption_preset (V6.5), brand_kit: bool (V6.7). Cuts are restored, never invented, by the user (PS §8 principle 7).
@@ -1759,23 +1775,32 @@ runCapabilityCheck(): Promise<CapabilityReport>          // platform/capability.
 
 ### 13.3 Key components
 
+As built in V4 (the editor of the V4 plan's §17, D-178 to D-192). Components that later versions add (`SignInDialog`, `ChangeSummary`, `PostExportQuestion`, `UpgradePrompt`, `RecentClips`) keep their rows of the version that builds them.
+
 | Component | Reads | Calls |
 |---|---|---|
 | `CapabilityGate` | capability store | none |
-| `DropZone` | clip store, blockers | `importClip` |
-| `ModelDownloadPanel` | model store | `cancelJob("model")`, retry via `runPipeline` |
-| `ProcessingFeed` | clip store feed lines | `cancelJob("pipeline")` |
-| `PreviewPlayer` | preview store, clip store | `controlPreview.*` |
-| `ReviewPanel` → `CaptionEditor`, `EventToggleList`, `StylePicker`, `CropOffsetControl` | clip store | `editWord`, `toggleEvent`, `setStyle`, `setCropOffset` |
+| `DropZone` (`landing` and `stage` variants) | clip store, blockers | `importClip` |
+| `EditorLayout` → `TopBar`, `Stage`, `SidePanel` | ui store, clip store | none; holds the `aria-live` region and the `ToastHost` (D-192) |
+| `TopBar` | clip store (length, save state), history | `undo`, `redo`; holds `ExportButton` or `ExportProgress` |
+| `Stage` | clip store, preview store | holds `DropZone`, `ModelDownloadPanel`, `ProcessingCard`, `PreviewPlayer`, `RejectionPanel` or `ErrorPanel` by state |
+| `ModelDownloadPanel` | model store | `cancelJob("model")` |
+| `ProcessingCard` → `ProcessingFeed` | clip store (stage, feed lines) | `cancelJob("import" \| "pipeline")`; the cancelled card's `runPipeline` ("Process again") and `dismissClip` |
+| `PreviewPlayer` → `PreviewGestures` | preview store, clip store | `controlPreview.*`; `hitTest` on hover; caption and video drags (D-183); the `data-*` statistics (D-155) |
+| `SidePanel` (`Tabs`: Captions, Style, Visuals, Framing) | ui store | none |
+| `CaptionEditor` → `CaptionWordControls` | clip store (transcript, `SceneReport.chunks`), ui store | `editWord`, `replaceAll`, `controlPreview.seek` |
+| `StylePanel` → `StylePicker` | clip store, preview store | `setStyle`, `setHighlightNumbers`; `styleThumbnails` |
+| `PlanItemList` → `CutsSection` | clip store (plan, overrides) | `toggleEvent`, `controlPreview.seek`; the empty state `NO_EVENTS_FOUND` (D-154); `CutsSection` renders nothing in V4 |
+| `FramingPanel` → `CropOffsetControl` | clip store | `setCaptionPosition`, `setCropOffset` |
 | `ExportButton` | export store, `entitlement.effective()`, blockers | `startExport` |
-| `ExportProgress` | export store | `cancelJob("export")` |
-| `SignInDialog` | auth store | `requestMagicLink` |
-| `ChangeSummary`, `PostExportQuestion` | export store | `answerPostExport` |
-| `UpgradePrompt` | entitlement store | `startCheckout` |
+| `ExportProgress` (the pill, D-189) | export store | `cancelJob("export")` |
+| `ShortcutsSheet` (opened with `?`, D-185) | ui store | none |
+| `ToastHost` (a stack of at most three) | ui store | the toast's action: replace-all, hide, undo |
 | `WhatLeavesTable` | `gen/api.ts::ANALYTICS_EVENT_DOCS` | none |
-| `RecentClips` | clips repo via clip store | `restoreClip(clipId)` |
-| `RejectionPanel`, `ErrorPanel` | clip/export store failure | retry use-case, `track("client_error")` |
+| `RejectionPanel`, `ErrorPanel` (by context, D-190) | clip/export store failure | retry, `reloadPreview`, undo; `failureShown` sends `client_error` once |
 | `NotifyMeForm` | none | `submitNotifyMe` |
+
+The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`, `SegmentedControl`, `Skeleton`, `Slider`, `Spinner`, `Switch`, `Tabs`, `Toast`, `Tooltip`) take their values from `ui/styles/tokens.css` only (D-179, D-181); no component library is used.
 
 ### 13.4 Rules
 
@@ -1824,47 +1849,68 @@ export type AppFailure = { code: ErrorCode; stage: FailureStage; retryable: bool
 
 ### 14.2 Methods
 
+As built in V4 (copied from `web/src/workers/protocol.ts`; v4implementation D-124, D-126 to D-128, D-155, D-174, D-182, D-186):
+
 ```ts
 export interface MediaWorkerApi {
   importAndProbe(p: { clipId: ClipId; file: File }): Promise<{ ok: ClipInfo } | { rejected: RejectReason }>;
-  extractAudio(p: { clipId: ClipId }): Promise<{ pcm48: Float32Array; pcm16: Float32Array }>;   // transferred
+  extractAudio(p: { clipId: ClipId }): Promise<{ pcm48: Float32Array; pcm16: Float32Array }>;   // both transferred
 }
 export interface AsrWorkerApi {
   load(p: { modelId: string; backend: "webgpu" | "wasm" }): Promise<{ backend: "webgpu" | "wasm" }>;
   transcribe(p: { pcm16: Float32Array }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
   unload(): Promise<void>;
 }
+// The audio worker has no method that detects silence or plans a cut. Only `assemble` applies a time map,
+// and in V4 the only map is the identity.
 export interface AudioWorkerApi {
   runChain(p: { pcm48: Float32Array }): Promise<{ loudness: Lufs }>;                 // out48 kept in the worker; out48.length === pcm48.length
   measureProsody(p: { words: Word[]; sentences: Sentence[] }):
     Promise<{ out48: Float32Array; prosody: Prosody }>;                              // out48 transferred out, unmodified
+  assemble(p: { out48: Float32Array; timeMap: TimeMap; speech: OutSpan[] }):
+    Promise<{ prog48: Float32Array; loudness: Lufs }>;                               // V4 (D-127): out48 in, prog48 out; the worker keeps nothing
+  release(): void;                                                                   // V4 (D-128): fire-and-forget; drops any audio it holds
 }
-// The audio worker has no method that detects silence, plans or applies cuts, or changes the length of the audio.
 export interface RenderWorkerApi {
   openSession(p: { clipId: ClipId; clipInfo: ClipInfo }): Promise<void>;
-  detect(p: { transcript: Transcript; prosody: Prosody }): Promise<DetectedEvent[]>;
+  detect(p: { transcript: Transcript; prosody: Prosody; wordEdits?: Record<number, string> }): Promise<DetectedEvent[]>;
+                                                                                     // with wordEdits: the transcript as edited (replace-all, D-175)
   redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): Promise<DetectedEvent[]>;
-  setScene(p: { transcript: Transcript; events: DetectedEvent[]; edit: EditState;
-                profile: "preview" | { entitlementToken: string } }): Promise<void>;
-  attachPreview(p: { canvas: OffscreenCanvas }): Promise<void>;                      // transferred
-  previewPlay(p: { clock: ClockSync }): Promise<void>;
+  rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan>;   // V4 (D-124): stateless
+  setScene(p: { transcript: Transcript; plan: EditPlan; edit: EditState; timeMap: TimeMap;
+                profile: "preview" | { entitlementToken: string } }): Promise<SceneReport>;
+                                                                                     // the plan is validated against the transcript as edited first (§40.4)
+  attachPreview(p: { canvas: OffscreenCanvas }): Promise<void>;                      // transferred; answers once the first frame is drawn
+  previewPlay(p: { clock: ClockSync }): Promise<PreviewStats>;                       // answers when the loop returns
   previewClock(p: { clock: ClockSync }): void;                                       // fire-and-forget
   previewPause(): Promise<void>;
-  previewSeek(p: { at: TimeMs }): Promise<void>;
+  previewSeek(p: { at: OutMs }): Promise<void>;
+  hitTest(p: { at: OutMs; x: number; y: number }): Promise<Hit>;                     // V4 (D-174); { kind: "video" } at once while playing
+  styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
+                                                                                     // V4 (D-186): Clean, Bold, Mono of `at`, paused only; transferred
+  captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;                    // development and test builds only (D-155)
   exportClip(p: { exportId: ExportId; entitlementToken: string; out48: Float32Array }):
     Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
 }
-export type ClockSync = { audioMs: TimeMs; epochMs: number };   // epochMs = performance.timeOrigin + performance.now()
+export type ClockSync = { audioMs: OutMs; epochMs: number };   // program time (D-126); epochMs = performance.timeOrigin + performance.now()
+export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };              // what validation left out; the captions' chunks (D-182)
+export type SceneChunk = { start: WordIdx; end: WordIdx; at: OutMs };
+export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs; downscaled: boolean };   // D-155, D-149
+export type CanvasBox = { x: number; y: number; w: number; h: number };              // fractions of the canvas
+export type Hit = { kind: "word"; word: WordIdx; rect: CanvasBox } | { kind: "captions"; rect: CanvasBox } | { kind: "video" };
+export type CaptionMirror = { text: string; colors: string[] };                      // the shown caption, each word's fill as #rrggbbaa
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };
 ```
+
+The development builds' fault messages (`devCrash`, `devHang`, `devFailNext`, `ui/dev-hooks.ts`) are compiled out of production (`__OFFCUT_DEV_FAULTS__`, §20.4 of the V4 plan).
 
 ### 14.3 Lifecycle, cancellation, backpressure
 
 - **Creation.** `pool.ts` creates each worker lazily on first use and loads its WASM bundle once. `asr` keeps its worker but drops the model session on `unload()`. `render` lives from `openSession` to `closeSession`.
-- **One job per worker.** A second `req` while one is pending is rejected with `E_INTERNAL`. Exception: `previewClock`, `previewPause`, `previewSeek` and `cancel` are accepted during `previewPlay`.
+- **One job per worker.** A second `req` while one is pending is rejected with `E_INTERNAL` (detail `Busy`). Exception: `previewClock`, `previewPause`, `previewSeek` and `cancel` are accepted during `previewPlay`. As built in V4: the render worker has several callers that do not wait for each other, so the calls that must not fail (the update rule's, a seek, a play, a pause) go through `pool.ts`'s `whenFree`, which asks again every 16 ms for up to 2 s; the calls that may be dropped (a hit test, the style cards, the development mirror) take the refusal (V4 CL known issue 31). A worker that was just restarted may hold its OPFS files a moment: `whenReleased` retries a file operation that finds one locked.
 - **Cancellation points.** Import: every 4 MiB chunk. Audio decode: every decoded AAC batch. ASR: every 30 s audio window. DSP: every 1 s block. Render/export: every frame. A step past its check finishes, then the job resolves `{cancelled: true}` and releases every `VideoFrame`, closes encoders and deletes temp files.
-- **Cancel timeout.** `CANCEL_TIMEOUT = 2 s` (assumption, M1.5). No response → `pool.restartWorker(kind)`.
+- **Cancel timeout.** `CANCEL_TIMEOUT_MS = 2000` (`workers/pool.ts`; kept after V4's measurement on D1: a render worker made to hang is restarted and its run back at `accepted` 2.4 to 2.5 s after Cancel is pressed, `cancel.spec.ts`). No response → `pool.restartWorker(kind)`, which ends the worker, rejects its pending calls with `E_WORKER_CRASH` and makes a fresh one on the next call. `usecases/cancel-job.ts` (V4, D-152) owns one abort signal per scope (`import`, `pipeline`, `model`, `export`) and sends one `job_cancelled { stage }` when the job ended as cancelled.
 - **Progress backpressure.** Workers post at most 10 progress messages per second per job; feed lines are never dropped.
 - **Transfer rule.** Every `Float32Array` and `OffscreenCanvas` in a message is in the transfer list. `rpc.ts` asserts in dev builds that a sent buffer is detached afterwards.
 - **Restart budget.** At most 2 automatic restarts per worker per clip; then the failure is surfaced with the persistent copy.
@@ -2302,7 +2348,7 @@ No constant in this table is a silence threshold for cutting, a minimum pause, a
 
 ## 19. Scene Graph, Typography and Renderer
 
-**v1.2 contract change (V4, §40.5):** `SceneInput` takes a `ValidPlan`, a `TimeMap`, a `Theme`, a `FontSet` and `SceneAssets` instead of `events`; `frame_at` takes `OutMs`; the video is a `DrawCmd::Video` in the list (crop, zoom, mask per frame) and `Scene::crop()` is removed; `FontId` becomes `FontKey` in a `FontSet`; styles reference theme roles. The signatures in §19.2 below are the v1.1 ones and are superseded where §40.5 differs.
+**As built in V4 (§40.5; the V4 implementation plan's D-125 to D-143, D-167 to D-174).** `SceneInput` takes a `ValidPlan`, a `TimeMap`, a `Theme` and a `FontSet` instead of `events`; `frame_at` takes `OutMs`; the video is a `DrawCmd::Video` in the list, and `Scene::crop()` is gone; `FontId` became `FontKey` in a `FontSet`; styles reference theme roles. §19.2 to §19.4 below are V4's, copied from the code; the v1.1 signatures they replace are in the history of this file.
 
 **Model: a deterministic scene is compiled on the CPU into a backend-neutral `DisplayList` for any output time; Vello on WebGPU draws the list to an overlay texture; one wgpu pass composites it over the rotated, cropped source frame. Rejected: DOM/CSS overlays captured to canvas (not deterministic, not exportable frame-accurately), layout in JavaScript (two implementations of one rule), Canvas2D as the primary path (PS §9.8 keeps it as the fallback).**
 
@@ -2310,95 +2356,122 @@ No constant in this table is a silence threshold for cutting, a minimum pause, a
 
 - Logical canvas: 1080 x 1920 logical pixels (lp). All layout is in lp. Output scale = `profile.width / 1080` (Creator 1.0, Free 2/3, Preview 1/2).
 - Safe area insets (assumption, E-2): top 250, bottom 420, left 60, right 120.
-- `EVENT_ZONE`: y 860-1180. `CAPTION_ZONE`: y 1220-1500. `WATERMARK_ANCHOR`: bottom-left of the safe area.
+- `EVENT_ZONE`: y 860-1180. Captions (V4, D-171, `placement.rs`): the caption block's centre moves along a track whose bottom is `CAPTION_BOTTOM` (the safe area's bottom less `WATERMARK_BAND` = 56 lp less 140 lp: y 1304) and whose top is y 390; `EditState.caption_position` places it (0.0 top, 1.0 bottom, the default), with snaps Top 0.15, Middle 0.55, Bottom 1.0. The visuals' zone is moved below the captions when they sit at the top. `WATERMARK_ANCHOR`: bottom-left of the safe area, in its own band under the captions (D-143).
 
 ### 19.2 Interfaces
 
 ```rust
 // offcut-scene
-pub struct SceneInput<'a> { pub transcript: &'a Transcript, pub events: &'a [DetectedEvent], pub edit: &'a EditState,
-                            pub clip: &'a ClipInfo, pub profile: &'a ExportProfile }
+pub struct SceneInput<'a> {
+    pub transcript: &'a Transcript, pub plan: &'a ValidPlan, pub edit: &'a EditState, pub clip: &'a ClipInfo,
+    pub profile: &'a ExportProfile, pub time_map: &'a TimeMap, pub theme: &'a Theme, pub fonts: &'a FontSet,
+}
 pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError>;
 impl Scene {
-    pub fn duration(&self) -> DurMs;                        // == clip.duration, always
-    pub fn frame_count(&self) -> u32;                       // ceil(duration_ms * OUTPUT_FPS / 1000); 2,700 for 90 s
-    pub fn crop(&self) -> CropRect;                         // constant per scene at MVP
-    pub fn frame_at(&self, t: TimeMs) -> DisplayList;        // pure function of (scene, t)
-    pub fn summary(&self) -> ChangeSummary;
+    pub fn duration(&self) -> DurMs;                                  // the time map's program length
+    pub fn frame_count(&self) -> u32;                                 // ceil(duration_ms * OUTPUT_FPS / 1000); 2,700 for 90 s
+    pub fn frame_at(&self, t: OutMs) -> DisplayList;                  // pure: the video, the chunk shown, the items shown, the watermark
+    pub fn source_at(&self, t: OutMs) -> SrcPos;                      // which source frame the main video slot shows
+    pub fn hit(&self, t: OutMs, x: f32, y: f32) -> Option<Hit>;       // D-174: a word of the chunk shown, the caption block, or the video
+    pub fn word_box(&self, t: OutMs, word: WordIdx) -> Option<Rect>;  // the glyph box hit() finds a word by (D-183)
+    pub fn chunk_ranges(&self) -> Vec<(WordRange, OutMs)>;            // the chunks as the transcript editor shows them (D-182)
+    pub fn caption_words(&self, t: OutMs) -> Vec<(String, Rgba)>;     // the chunk shown, as drawn: development builds' mirror (D-155)
+    pub fn caption_block(&self) -> Rect;                              // the box the caption lines are centred in (D-171)
+    pub fn fonts(&self) -> &FontSet;
+    pub fn summary(&self) -> ChangeSummary;                           // the items drawn, by kind (D-144)
 }
-pub struct CropRect { pub x: f32, pub y: f32, pub w: f32, pub h: f32 }   // in source display pixels
-pub struct DisplayList { pub cmds: Vec<DrawCmd> }                        // Serialize: the Canvas2D seam
+pub struct DisplayList { pub cmds: Vec<DrawCmd> }                     // Serialize: the Canvas2D seam
 pub enum DrawCmd {
-    FillRect   { rect: Rect, radius: f32, color: Rgba },
-    FillPath   { path: Vec<PathEl>, color: Rgba },
-    GlyphRun   { font: FontId, size: f32, glyphs: Vec<PositionedGlyph>, fill: Rgba, stroke: Option<Stroke>,
-                 transform: Affine, text: String },                     // text kept for the Canvas2D seam
-    PushLayer  { opacity: f32, clip: Option<Rect> },
+    FillRect  { rect: Rect, radius: f32, color: Rgba },
+    FillPath  { path: Vec<PathEl>, color: Rgba },
+    GlyphRun  { font: FontKey, size: f32, glyphs: Vec<PositionedGlyph>, fill: Rgba, stroke: Option<Stroke>,
+                transform: Affine, text: String },                   // stroked, then filled (D-68); text for the Canvas2D seam
+    PushLayer { opacity: f32, clip: Option<Rect> },
     PopLayer,
+    Video     { slot: VideoSlot, src: CropRect, dst: Rect, opacity: f32, mask: Option<Vec<PathEl>> },
+                                                                      // src in source display pixels; dst an axis-aligned Rect in output
+                                                                      // pixels (D-130); mask is V6.5's
+    Image     { image: ImageKey, rect: Rect, opacity: f32 },          // V6.x; V4 draws none
 }
 // offcut-render
+pub struct VideoSources<'a> { pub main: (&'a web_sys::VideoFrame, Rotation) }
 impl Renderer {
     pub async fn new(canvas: web_sys::OffscreenCanvas, width: Px, height: Px) -> Result<Renderer, RenderError>;
     pub fn resize(&mut self, width: Px, height: Px) -> Result<(), RenderError>;
-    pub fn render(&mut self, frame: &web_sys::VideoFrame, crop: CropRect, rotation: Rotation,
-                  list: &DisplayList) -> Result<(), RenderError>;       // result is on the canvas
+    pub fn set_canvas(&mut self, canvas: web_sys::OffscreenCanvas, width: Px, height: Px) -> Result<(), RenderError>;
+                                                                      // an export's canvas after the preview's, on the same device
+    pub fn render(&mut self, sources: &VideoSources<'_>, list: &DisplayList, fonts: &FontSet) -> Result<(), RenderError>;
+                                                                      // the list in its order; V4's support rule (D-133, composite.rs):
+                                                                      // exactly one Video, the first command, of the Main slot, opaque,
+                                                                      // no mask, src inside the frame and dst inside the canvas, and no
+                                                                      // Image; any other list is Unsupported
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn render_to_image(&mut self, source: &RgbaImage, crop: CropRect, rotation: Rotation,
-                           list: &DisplayList) -> Result<RgbaImage, RenderError>;   // golden tests
+    pub async fn new_headless(width: Px, height: Px) -> Result<Renderer, RenderError>;   // a software adapter: WARP or lavapipe (D-134)
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn render_to_image(&mut self, source: &RgbaImage, rotation: Rotation, list: &DisplayList,
+                           fonts: &FontSet) -> Result<RgbaImage, RenderError>;          // golden tests
 }
-// offcut-wasm-render/src/session.rs
+// offcut-wasm-render/src/session.rs and scene_api.rs (the render worker's binding)
 impl RenderSession {
     pub async fn open(clip: ClipInfo, source: JsRandomAccess) -> Result<RenderSession, JsValue>;
-    pub fn set_scene(&mut self, input: JsValue /* SceneInput by value */) -> Result<(), JsValue>;
-    pub fn attach_canvas(&mut self, canvas: web_sys::OffscreenCanvas, width: Px, height: Px) -> js_sys::Promise;
-    pub fn render_frame(&mut self, frame: &web_sys::VideoFrame, t: TimeMs) -> Result<(), JsValue>;
+    pub fn set_scene(&mut self, input: JsValue) -> Result<JsValue, JsValue>;            // validates the plan, builds; answers SceneReport
+    pub async fn attach_canvas(&mut self, canvas: OffscreenCanvas, width: u32, height: u32) -> Result<(), JsValue>;
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), JsValue>;
+    pub fn render_frame(&mut self, frame: &VideoFrame, t_out_ms: u32) -> Result<(), JsValue>;
+    pub fn source_at(&self, t_out_ms: u32) -> JsValue;
+    pub fn hit(&self, t_out_ms: u32, x: f32, y: f32) -> JsValue;
+    pub fn caption_mirror(&self, t_out_ms: u32) -> JsValue;
     pub fn frame_count(&self) -> u32;
     pub fn summary(&self) -> JsValue;
 }
+pub fn rules_plan(transcript: JsValue, events: JsValue) -> Result<JsValue, JsValue>;     // the detector's events as a plan (D-124)
 ```
 
-`offcut-scene/src/display_list.rs` defines `Rect`, `Rgba`, `PathEl`, `PositionedGlyph`, `Stroke`, `Affine` and a closed `FontId` enum with four members, one per font instance, because `GlyphRun` has no weight field (v2implementation D-29, §11.4). `JsRandomAccess` is private to each binding crate and wraps a `FileSystemSyncAccessHandle`; there is no shared binding crate (v2implementation D-30).
+`offcut-scene/src/display_list.rs` defines `Rect`, `Rgba`, `PathEl`, `PositionedGlyph`, `Stroke`, `Affine`, `CropRect`, `VideoSlot`, `ImageKey` and `FontKey`. `FontSet::embedded()` holds five faces, keys 0 to 4: Inter 700, Inter 900, JetBrains Mono 700, Noto Emoji, Inter 800 (D-132: a key is appended, never renumbered). `JsRandomAccess` is private to each binding crate and wraps a `FileSystemSyncAccessHandle`; there is no shared binding crate (v2implementation D-30).
 
 ### 19.3 Build and frame evaluation
 
 ```text
 build_scene:
-  crop      = framing::crop_rect(clip, edit.crop_offset)
-  words     = effective words (edits applied, hidden removed, number spans replaced by Quantity.display)
-  times     = word and event timestamps exactly as in the transcript (no conversion; INV-5)
-  chunks    = captions::chunk(words, style)                    // §19.4
-  tracks    = for each enabled event: events::<kind>::layout(event, style) → keyframe tracks
+  every time the scene uses is mapped through time_map.to_out exactly once (identity in V4-V6, §40.1)
+  video     = video::track(clip, edit.crop_offset)               // one DrawCmd::Video per frame; framing below
+  words     = effective words (edits applied, hidden removed, a number's span replaced by its display, §40.4)
+  chunks    = captions::chunk(words, style)                      // §19.4; laid out and shaped once (scene cache)
+  items     = for each enabled plan item: visuals::<kind>::layout(item, style, theme) → keyframe tracks
   watermark = profile.watermark ? watermark::layout() : none
 frame_at(t):
-  cmds = []
-  for chunk visible at t:   captions::draw(chunk, t)           // active word, KeywordPop scale
-  for event visible at t:   events::<kind>::draw(track, t)     // anim::eval(track, t) with easing
+  cmds = [video at t]
+  for the chunk shown at t:   captions::draw(chunk, t)           // the active word's treatment, KeywordPop scale
+  for each item shown at t:   visuals::<kind>::draw(track, t)    // motion::eval(track, t) with easing
   watermark → cmds
-  scale all cmds by output scale
-framing::crop_rect(clip, offset):                              // target aspect 9:16
+  scale all cmds but Video.dst by the output scale
+framing (video.rs):                                              // target aspect 9:16
   a = display_w / display_h
   a > 9/16  → w = display_h * 9/16; x = (display_w - w)/2 * (1 + offset); y = 0; h = display_h      // landscape, square
-  a <= 9/16 → h = display_w * 16/9; y = (display_h - h)/2; x = 0; w = display_w                     // portrait
+  a <= 9/16 → h = display_w * 16/9; y = (display_h - h)/2; x = 0; w = display_w                     // portrait; a 3:4 frame loses its sides
 ```
 
-### 19.4 Captions and styles (`styles.rs`; visual values are (assumption), reviewed in E-2)
+### 19.4 Captions and styles (`styles.rs`, `readability.rs`, `placement.rs`; visual values are (assumption), reviewed in E-2)
 
 ```text
-captions::chunk: start a new chunk when
-   sentence boundary | gap to previous word >= CHUNK_GAP (350 ms)
-   | characters would exceed style.max_chars_per_line * style.max_lines | words == style.max_words
-chunk visible from first word start - 80 ms to last word end + 120 ms, clamped so chunks never overlap
-active word = word with start <= t < end; drawn in style.active_color
-KeywordPop word: scale 1.0 → 1.25 → 1.10 over 180 ms from its start, style.pop_color
+captions::chunk: hard breaks at a sentence end, a gap of CHUNK_GAP_MS (350 ms) or more, max_words, and the line
+   and character limits; between two hard breaks the chunk and line boundaries of least total cost (V4, D-167,
+   readability.rs: after , ; : — costs 0, before a clause word 1, a plain break 3, after a binder 12, a one-word
+   chunk 8 unless a 250 ms pause stands on both sides, unbalanced lines their difference); a number is one word
+a chunk is shown from its first word's start less a lead to its last word's end plus CHUNK_TAIL_MS (120 ms), never
+   overlapping the next; at least MIN_CHUNK_MS (700 ms) when the silence after it allows (D-168); no word moves
+active word = word with start <= t < end, drawn with the style's treatment
+KeywordPop word: scale 1.0 → 1.25 → 1.10 over 180 ms from its start, in the style's pop colour
+numbers in the captions take the accent colour while EditState.highlight_numbers is on (D-169)
 ```
 
-| Style | Font | Size (lp) | Case | Line limits | Treatment | Motion |
+| Style (interface name) | Font | Size (lp) | Case | Line limits | Treatment | Motion |
 |---|---|---|---|---|---|---|
-| Clean (default) | Inter 700 | 64 | As spoken | 18 chars x 2 lines, 5 words | White fill, 6 lp dark stroke, active word accent | Ease-out cubic, 120 ms |
-| Bold | Inter 900 | 84 | Upper | 12 chars x 2 lines, 3 words | White fill, 10 lp stroke, active word accent, word-by-word pop | Back-out, 140 ms |
-| Tech | JetBrains Mono 700 | 56 | As spoken | 22 chars x 2 lines, 5 words | Rounded dark panel at 85% opacity, green active word, block cursor | Linear, 80 ms |
+| Clean (default) | Inter 800 | 72 | As spoken | 16 chars x 2 lines, 4 words | White, 5 lp dark stroke, drop shadow (0 x 4 lp, black at 45%); the active word on a rounded pill (radius 14 lp, padding 12 x 4 lp) in the accent `#FFD60A`, the word in `#111114`; the pill slides word to word over `PILL_SLIDE_MS` (90 ms) and grows from 0.9 to 1.0 | Ease-out cubic, 120 ms |
+| Bold | Inter 900 | 84 | Upper | 12 chars x 2 lines, 3 words | White, 10 lp stroke, the same shadow, active word in the accent, KeywordPop in `#FF5E3A` | Back-out, 140 ms |
+| Tech ("Mono") | JetBrains Mono 700 | 56 | As spoken | 22 chars x 2 lines, 5 words | Rounded dark panel (radius 24, padding 32) at 85%, green `#3DDC84` active word, block cursor | Linear, 80 ms |
 
-Same layout rules for all three (PS §12.2). A glyph run is stroked first and filled over the stroke, so the outline that shows is the outer half of the stroke width (v2implementation D-68). Fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them; `cargo deny` plus a CI grep assert no other font files exist.
+Same layout rules for all three (PS §12.2), from D-170 (the premium default). The colours are the `Theme`'s roles (`theme.rs`, the only place a colour literal may be); `styles_use_theme.rs` asserts no style names one. A glyph run is stroked first and filled over the stroke, so the outline that shows is the outer half of the stroke width (v2implementation D-68). The scene's fonts are OFL-licensed and embedded in `offcut-scene/assets/fonts/`; `LICENSES.md` lists them. They are the only fonts the scene embeds; the interface's self-hosted Inter (`web/src/ui/assets/inter-latin.woff2`, D-180) is listed in `web/LICENSES.md`.
 
 ### 19.5 Event visuals (PS §12.2)
 
@@ -2443,23 +2516,25 @@ Count-up values at frame time `t` are `round(lerp(0, value, ease(t)))`, formatte
 ### 20.1 Interfaces
 
 ```ts
-// usecases/control-preview.ts
-export function attach(canvas: HTMLCanvasElement, out48: Float32Array): Promise<void>;
-export function play(): Promise<void>;
-export function pause(): Promise<void>;
-export function seek(at: TimeMs): Promise<void>;
-// workers/render/video-source.ts
+// usecases/control-preview.ts (as built in V4)
+export function attach(canvas: HTMLCanvasElement, prog48: Float32Array): Promise<void>;   // the program audio (D-127)
+export function play(): Promise<void>;          // the page's one AudioContext is made at the first play (V4 CL Entry 37)
+export function pause(): Promise<void>;         // ends with a still frame of the paused time
+export function seek(at: OutMs): Promise<void>; // one seek in flight, the latest target sent when it answers (D-148)
+export function scrub(ms: number): Promise<void>;
+export function togglePlay(): Promise<void>; export function stepFrame(direction: -1 | 1): Promise<void>; export function stepSecond(direction: -1 | 1): Promise<void>;
+// workers/render/video-source.ts (time arguments are the source's: scene.source_at(t))
 export class VideoSource {
   constructor(demuxer: DemuxerHandle, info: ClipInfo);
   frameAt(t: TimeMs): VideoFrame | null;          // latest decoded frame with pts <= t; null while decoding
-  frameAtBlocking(t: TimeMs): Promise<VideoFrame>; // export only: waits for decode, never returns a stale frame
-  prefetch(from: TimeMs): void;
+  frameAtBlocking(t: TimeMs): Promise<VideoFrame>; // waits for decode, never returns a stale frame
+  prefetch(from: TimeMs): void;                   // V4: after a pause, and when the scene is set before a canvas
   close(): void;                                  // closes every queued frame and the decoder
 }
 // workers/render/preview-loop.ts
 export function runPreview(session: RenderSession, source: VideoSource,
-                           clock: () => TimeMs, isStopped: () => boolean): Promise<PreviewStats>;
-export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs };
+                           clock: () => OutMs, isStopped: () => boolean): Promise<PreviewStats>;
+export type PreviewStats = { frames: number; late: number; maxDriftMs: DurMs; downscaled: boolean };
 ```
 
 `DemuxerHandle` is a TypeScript interface declared in `video-source.ts`; `RenderSession` satisfies it through four extra exported methods, so the render worker reads samples through the session that owns the demuxer and loads only `offcut_render.wasm` (v2implementation D-30, §13.5).
@@ -2473,10 +2548,10 @@ main thread: AudioBufferSourceNode(out48 at 48 kHz) → destination
 worker clock(): audioMs + (performance.timeOrigin + performance.now() - epochMs)
 
 runPreview, per requestAnimationFrame in the worker:
-   t = clock(); if t >= clip duration → resolve (ended)
+   t = clock(); if t >= program duration → resolve (ended)
    n = floor(t * OUTPUT_FPS / 1000); if n == lastN → return
-   tn = FrameIdx(n).to_time_ms()                      // output time == source time (INV-5)
-   frame = source.frameAt(tn)  ?? lastFrame           // late frame: reuse and count
+   tn = FrameIdx(n).to_out_ms()                       // program time (V4); identity map: equal to source time
+   frame = source.frameAt(scene.source_at(tn)) ?? lastFrame   // late frame: reuse and count
    session.render_frame(frame, tn)
    stats.maxDriftMs = max(stats.maxDriftMs, |t - tn|)
 
@@ -2572,7 +2647,7 @@ exportClip(exportId, token, out48):
   N = session.frame_count()                                    // ceil(clip duration x 30 / 1000): 2,700 for a 90 s clip
   for n in 0..N:
      if isCancelled() → abort (close frames, encoders; sink.abort()) → {cancelled}
-     t     = FrameIdx(n).to_time_ms()                          // output time == source time (INV-5)
+     t     = FrameIdx(n).to_out_ms()                           // as built in V4 (D-125); identity map: source time (INV-5)
      frame = await source.frameAtBlocking(t)                   // waits for decode; never skips
      session.render_frame(frame, t)
      vf = new VideoFrame(exportCanvas, { timestamp: FrameIdx(n).to_micros(), duration: 33_333 })
@@ -3519,7 +3594,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | Passwords, OAuth, 2FA | PS §17: magic link at MVP; Google sign-in is P1 |
 | Redis, queues, cron services, microservices, read replicas | PS §15: one small server; nothing here needs them |
 | Functions or middleware on the static host | The static host proxies only; a second runtime doubles the security surface |
-| Third-party analytics, error trackers, tag managers, web fonts from a CDN | PS §17 and the closed network list |
+| Third-party analytics, error trackers, tag managers, web fonts from a CDN (a font self-hosted in the build, served from the app's own origin as a hashed, immutable asset, is allowed: V4's interface font, Inter, `web/src/ui/assets/inter-latin.woff2`, D-180) | PS §17 and the closed network list |
 | Admin dashboard, metrics UI | `scripts/metrics.sql` is enough until M4 |
 | A/B testing framework | E-6 needs one enum and one branch |
 | GraphQL, OpenAPI generators, tRPC | Fifteen routes; DTOs are generated from Rust by `ts-rs` |
@@ -3768,17 +3843,17 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` (§18.3) — M1.2, TE-13, E-2. Measured in V3 (docs/v3/experiments.md): the denoiser's delay is 480 samples, constant, and compensated exactly; TE-13 passes on D1 (not R1) with denoise on.
 12. Safe-area insets, zones, style values, event timings, emoji fallback font (§19) — E-2, M1.4.
 13. Watermark text, size, opacity, placement (§19.6; PS §19 minor) — alpha.
-14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6.
-15. Preview size, queue length, late-frame and first-frame targets, seek target (§20) — M1.5.
+14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6. Measured in V4 (docs/v4/experiments.md, D1 and CI): the 16 goldens read 1.0000 on D1's WARP and 0.9994-1.0000 on the runner's lavapipe, the parity cases at least 0.9994: one folder serves both, at 0.98 (and 0.99 for parity); the verifier's thresholds are V5's (M1.6).
+15. Preview size, queue length, late-frame and first-frame targets, seek target (§20) — M1.5. Measured in V4 on D1 (not R1, D-114): first frame 76-94 ms after `ready` (500 ms), seek 78-94 ms (300 ms), drift at most 26.9 ms over 60 s with 0% late frames (80 ms, 5%), never downscaled; the queue of 6 and the 360 x 640 downscale size are kept.
 16. Video and audio bitrates, keyframe interval, 2-channel audio, encoder ladder order (§21.2) — TE-4.
-17. `CANCEL_TIMEOUT`; `API_TIMEOUT`; `API_COLD_START_BUDGET` (§14.3, §22.9) — M1.5, TE-11.
+17. `CANCEL_TIMEOUT`; `API_TIMEOUT`; `API_COLD_START_BUDGET` (§14.3, §22.9) — M1.5, TE-11. Measured in V4 on D1: a hung render worker's run is back at `accepted` 2.4-2.5 s after Cancel; `CANCEL_TIMEOUT_MS = 2000` kept.
 18. Magic-link, access-token and refresh-token lifetimes; all rate-limit values in §22.1 — M1.7.
 19. Free quota month = UTC calendar month (§22.3) — product confirmation at M1.7.
 20. Creator until `current_period_end` for canceled and past-due; refund ends access immediately (§22.3, §22.5) — TE-9.
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
-24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3).
+24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
@@ -3847,7 +3922,7 @@ pub enum Cut {
 }
 pub struct PlanItem { pub id: EventId, pub kind: ItemKind, pub anchors: WordRange, pub params: ItemParams,
                       pub confidence: Option<Confidence> }   // Some for rule items (INV-6), None for model items
-pub struct QuantityRef { pub words: WordRange }      // a number is a pointer to spoken words, resolved at build time
+pub struct QuantityRef { pub words: WordRange }      // a number is a pointer to spoken words, resolved by validate (§40.4, V4 D-121)
 pub struct Label(String);                            // checked by validate (§40.4 V-4)
 pub struct Chapter { pub starts_at: WordIdx, pub title: Label }
 pub struct TextExtras { pub hook: Option<Label>, pub post_caption: Option<String>, pub hashtags: Vec<Label> }
@@ -3909,7 +3984,23 @@ pub struct Dropped { pub kind: ItemKind, pub reason: DropReason }   // DropReaso
 | V-8 | Chapters strictly increasing, at most 6, each at least 8 s of program time | Extra chapters dropped |
 
 - A rules plan passes the same validator. A word edit re-runs `validate` on the stored plan (not a new request): a corrected number shows the corrected value (V-5 reads effective words), an item whose number no longer parses is dropped, and `redetect_sentence` still serves the rules plan.
-- `ValidPlan` is the only plan type `build_scene`, `timemap::build` and `assemble` accept.
+- `ValidPlan` is the only plan type `build_scene`, `timemap::build` and `assemble` accept. It has no public constructor (INV-21, `tests/ui.rs`).
+
+As built in V4 (D-121, D-165, the V4 plan's §8.7):
+
+```rust
+pub struct ValidPlan { /* private */ }                    // source(), items() in draw order (start, kind, first word), is_empty()
+pub struct ValidItem { pub id: EventId, pub kind: EventKind, pub anchors: WordRange, pub span: Span,
+                       pub params: EventParams, pub marks: Vec<TimeMs>, pub confidence: Option<Confidence> }
+pub struct PlanConfig { pub per_kind: BTreeMap<EventKind, KindLimits>, pub min_keep_gap: DurMs,
+                        pub max_cut_share_permille: u32, pub max_chapters: u32 }       // PlanConfig::default() reads the catalog
+pub struct KindLimits { pub max_per_clip: u8, pub min_gap: DurMs, pub label_chars: u32, pub header_chars: u32 }
+```
+
+- **Numbers are resolved here, not in the scene.** `validate` turns every `QuantityRef` into a `Quantity` with `parse_quantity` over the effective words of its range (V-5) and hands the scene `EventParams` with resolved values; the scene parses nothing (INV-24).
+- **`marks`** are the recording times a visual steps at, read from the words: a FromTo's second value, which a `DetectedEvent` has no time for.
+- **V4's limits** (`catalog.rs`, (assumption, V6.1, E-11)): NumberReveal 8 per clip, min gap 1,500 ms; ListReveal 3, 10,000 ms; FromTo 4, 3,000 ms; KeywordPop 12, 800 ms; labels 32 characters, list headers 24. Every rules plan of the 31 labeled files validates with nothing dropped (`validate_rules_plans.rs`).
+- In V4, V-7 and V-8 drop every cut, chapter and text extra: no producer makes them yet.
 
 ### 40.5 Scene and renderer contracts
 
@@ -3945,6 +4036,13 @@ impl Renderer {
 - **V4 implements:** one `Video` command per frame with any scale/translate `dst`, opacity 1.0, no mask; `Image` is in the type but returns `RenderError::Unsupported` until its first user (V6.1 icons if raster, else V6.7 logo); `mask` returns `Unsupported` until V6.5. Display lists and goldens use the new shape from V4, so V6.x adds drawing code, not contract changes.
 - **Styles are data on theme roles.** `StyleSpec` names theme roles, never `Rgba` literals (`styles_use_theme.rs`); `StyleSpec.motion: CaptionMotion { unit: Word | Glyph, enter: MotionPreset, stagger: DurMs, active: ActiveTreatment }` expresses Clean, Bold and Tech in V4, and V6.5's kinetic presets are more rows of data plus any new `MotionPreset` arm.
 - **Zones.** `safe_area.rs` holds a named zone table (`Top`, `Event`, `Caption`, `LowerThird`, `Full`) in place of the two constants; items claim zones through the catalog (V-6).
+
+**As built in V4** (§19.2 holds the full signatures):
+- `SceneInput` has no `assets` field yet: no V4 kind draws an image, so `SceneAssets` comes with `Image`'s first user (V6.1 icons if raster, else V6.7).
+- `Video.dst` is an axis-aligned `Rect` in output pixels, not an `Affine` (D-130): every V4-V6.5 framing is a scale and a translate, and the list's scaling leaves `dst` alone.
+- `Theme` also has `on_accent` (the word on Clean's pill), `shadow`, and **`mono_font`** (D-136: the font of code-style captions, Tech/"Mono"'s JetBrains Mono): `Theme { text, stroke, accent, accent_alt, panel, backdrop, on_accent, shadow, display_font, body_font, mono_font }`, made by `Theme::default_for(StyleId)`.
+- `Renderer::render(&mut self, sources: &VideoSources<'_>, list: &DisplayList, fonts: &FontSet)` takes the `FontSet` the glyph runs are set in; `VideoSources` is `{ main: (&VideoFrame, Rotation) }`.
+- The renderer's V4 support rule (D-133): exactly one `Video`, the first command, of the `Main` slot, opaque, with no mask, `src` inside the frame and `dst` inside the canvas, and no `Image`; any other list is `RenderError::Unsupported`.
 
 ### 40.6 Program audio (`crates/offcut-dsp/src/program.rs` [ONLY place that changes duration])
 
@@ -3998,7 +4096,7 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 |---|---|---|---|---|
 | S-1 | V4 | `OutMs`, `TimeMap::identity`, `FrameIdx::to_out_ms`; scene and preview on program time; `VideoSource` reads `to_src` | One-timeline rule of §10.1, TDR-7 | `timemap_identity.rs`; `preview-sync.spec.ts` unchanged |
 | S-2 | V4 | `offcut-plan` crate: `EditPlan`, `ValidPlan`, `from_rules`, `validate` (V-1 to V-6 for the four kinds), `catalog` (four kinds), `prompt` + `output_schema` generation | `SceneInput.events` | `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`; goldens unchanged |
-| S-3 | V4 | `QuantityRef` resolved at scene build from effective words | Literal `Quantity` in scene input | `display_list_snapshots.rs` with a word-edit case |
+| S-3 | V4 | `QuantityRef` resolved from effective words by `validate` (V4 D-121: the scene draws resolved values and parses nothing) | Literal `Quantity` in scene input | `display_list_snapshots.rs` with a word-edit case |
 | S-4 | V4 | `DrawCmd::Video` (crop and zoom per frame), `DrawCmd::Image` (type only), renderer drawing in list order | `Renderer::render(frame, crop, rotation, list)`, `Scene::crop()` | Snapshots include the `Video` command; a punch-in golden (scale 1.1) |
 | S-5 | V4 | `FontKey` + `FontSet`; `Theme` roles; `StyleSpec.motion`; zone table | Closed `FontId` enum (v2implementation D-29); `EVENT_ZONE`/`CAPTION_ZONE` constants | `styles_use_theme.rs`; goldens unchanged |
 | S-6 | V4 | `offcut-dsp::program::assemble` (identity, no music), `silence_profile`, `AudioWorkerApi.assemble`; preview plays `prog48` | Preview playing `out48` directly | `program_identity.rs` |
@@ -4007,7 +4105,7 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 | S-9 | V5 | Render-cache key adds the plan hash, time-map hash, theme hash and music id | §21.4 cache key | `render-cache` case in `start-export.test.ts` |
 | S-10 | V6 | Account delete and export iterate a list of per-user tables, so `plan_usage` is one more entry | Hard-coded table list | `account_delete.rs` |
 
-Nothing else is reserved. Each later variant (`ItemKind` codes 4+, `Cut` arms used, `VideoSlot` members, masks) is added by the release that draws or applies it.
+Nothing else is reserved, except the plan's wire format, fixed at `PLAN_FORMAT = 1` in V4 (D-119, D-163): from V6.1 a stored or sent plan is a contract, and fixing it once costs less than changing it. Each later variant (`ItemKind` codes 4+, `Cut` arms used, `VideoSlot` members, masks) is added by the release that draws or applies it.
 
 ### 40.10 The V6.x releases
 

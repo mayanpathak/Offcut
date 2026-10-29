@@ -122,7 +122,7 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 
 ## 3. Target Customer
 
-**Primary ICP (MVP serves this one).** Technical creators and indie founders making 2-5 short talking-head videos per week for X, LinkedIn, YouTube Shorts, Reels or TikTok about software, metrics, benchmarks, launches or lessons learned. Solo or two-person operations. Budget ceiling for a video tool: $15-$30/month (ASSUMPTION; tested by E-5). Comfortable with desktop Chrome, file uploads and account sign-up. Currently use CapCut, a caption tool, or DaVinci/Premiere for occasional polish.
+**Primary ICP (MVP serves this one; widened in V4, the founder's decision of 2026-10-22).** Short-form creators who film talking-head clips, 2-5 per week, technical or not, for X, LinkedIn, YouTube Shorts, Reels or TikTok. Technical creators and indie founders, who talk about software, metrics, benchmarks, launches or lessons learned, stay the first distribution channel: their speech is full of the numbers and lists the four MVP visuals show. As first written: technical creators and indie founders making 2-5 short talking-head videos per week for X, LinkedIn, YouTube Shorts, Reels or TikTok about software, metrics, benchmarks, launches or lessons learned. Solo or two-person operations. Budget ceiling for a video tool: $15-$30/month (ASSUMPTION; tested by E-5). Comfortable with desktop Chrome, file uploads and account sign-up. Currently use CapCut, a caption tool, or DaVinci/Premiere for occasional polish.
 
 **Secondary ICP (not served by the MVP).** Coaches, consultants and LinkedIn thought-leadership creators who record talking-head advice. They care about the same time savings but their speech has fewer numbers and lists, so the four MVP event types help them less. Plausible price: $15-$29/month. Target them when P1 event types (quote card, warning, question, checklist) ship and E-7 shows event keep rate ≥ 60% (§21, item 4).
 
@@ -141,6 +141,8 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 - **What annoys him:** time spent on mechanical steps; captions that treat "$2k to $20k" like any other words; fear of uploading unreleased product footage to a random web app.
 - **Constraints:** posting is not his job; budget is his own card; he will try a tool for 15 minutes and abandon it if the first output is not clearly good.
 
+**Maya Okafor, 27** (added in V4: the audience is creators in general), a fitness coach in Manchester who posts four Reels and Shorts a week from her phone: tips, routines, "three mistakes beginners make". Not technical. She uses CapCut's auto-captions and fixes them by hand, and wants captions that look like the creators she follows without learning an editor. Every word on Offcut's screen must make sense to her without help: "Visuals", "Captions", "Style", "Framing", "Export"; never "detector", "scene", "plan" or "LUFS" outside the settings page's technical note.
+
 ---
 
 ## 5. Jobs To Be Done
@@ -156,7 +158,7 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 
 ## 6. Value Proposition
 
-For **technical creators who post short talking-head videos full of numbers and lists**, Offcut is a **browser-based short-form video maker** that **turns a raw clip into a captioned, cleaned-up vertical short with automatic visuals for what you said, without uploading your video**, unlike **CapCut (manual timeline work) and cloud caption tools (upload, credits, generic styling)**.
+For **creators who post short talking-head videos** (V4; first published for technical creators whose videos are full of numbers and lists, still the first channel), Offcut is a **browser-based short-form video maker** that **turns a raw clip into a captioned, cleaned-up vertical short with automatic visuals for what you said, without uploading your video**, unlike **CapCut (manual timeline work) and cloud caption tools (upload, credits, generic styling)**.
 
 ---
 
@@ -472,11 +474,11 @@ Local transcription with word timestamps → number and structure detection → 
 | **FromTo** | "from $2k to $20k", "800 ms down to 120 ms" | Two values side by side with an arrow and proportional bars; the second value emphasized |
 | **KeywordPop** | Acoustically and lexically emphasized words (energy/pitch above sentence baseline, or a recognized emphasis word) | The word scales and highlights in the caption |
 
-**Caption styles:** Clean, Bold, Tech (typography, color, motion curves differ; same layout rules). Default: Clean.
+**Caption styles:** Clean, Bold, Mono (typography, color, motion curves differ; same layout rules). Default: Clean, the premium one since V4: the spoken word sits on a coloured pill that slides from word to word. Mono is the style first called Tech (its stored id is still `tech`). In every style the captions break at natural phrase boundaries, each stays on screen long enough to read, and numbers can be shown in the accent colour.
 
 ### 12.3 Configurable at MVP vs later
 
-At MVP (V4-V6): style choice (3), event on/off per event, crop offset, caption word edits. V6.1-V6.7: plan item on/off, cut restore, filler cuts on/off, music on/off and track, caption presets, brand kit, regenerate plan. Not configurable at launch: per-item timing, positions, animation curves (no timeline, principle 3).
+At MVP (V4-V6): style choice (3), visual on/off per visual, crop offset (by dragging the video too), caption word edits (with "Change all" for a word heard several times), caption position (dragged on the preview, with Top, Middle and Bottom snaps), numbers highlighted on or off, undo and redo. V6.1-V6.7: plan item on/off, cut restore, filler cuts on/off, music on/off and track, caption presets, brand kit, regenerate plan. Not configurable at launch: per-item timing, the visuals' positions, animation curves (no timeline, principle 3).
 
 ### 12.4 Why this technical approach (and what was rejected)
 

@@ -416,13 +416,15 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 
 ---
 
-## 6. V4 - The look and the editor (M1.4, M1.5; week 4, second half: 5-8 Nov)
+## 6. V4 - The look and the editor (M1.4, M1.5; week 4, second half: 5-8 Nov; planned at thirteen working days in 19 steps, built from 22 Oct)
 
 **Goal.** The preview shows the finished look, and the user can fix it: three caption styles, four event visuals, 9:16 framing for landscape clips, a synced preview with scrubbing, and the review controls (edit a word, toggle an event, pick a style, drag the crop).
 
 **What you can demo.** The AHA moment of PS §10 J7: drop a clip, watch your own words animate with a number counting up and a list building. Then fix a mis-heard word and see the number graphic update.
 
 **Depends on.** V3.
+
+**As built (V4 copy-back).** `docs/v4/v4implementation.md` planned V4 at thirteen working days in 19 steps (S1 to S19, its §2) instead of this section's four, because V4 carries the seven seams of A2, the caption intelligence and the editor besides the look; the build started on 22 Oct 2026, ahead of this calendar (V3 closed on 21 Oct). Beyond the tables below it built: smart line breaks, a reading-time floor and number highlighting in the captions (D-167 to D-169); caption placement by drag with Top, Middle and Bottom snaps (D-171); a premium default style, Clean with a sliding pill on the spoken word, and Tech named "Mono" in the interface (D-170); a self-hosted interface font and a design system of tokens and primitives (D-179 to D-181); an editor with a top bar, a stage and a side panel of four tabs (Captions, Style, Visuals, Framing), direct manipulation on the preview, a transcript editor with "Change all", undo and redo of 50 steps, keyboard shortcuts and toasts (D-178, D-182 to D-187); two design reviews by the founder (D-191). `ReviewPanel.tsx` became `SidePanel` and its tabs (C below). The record is `docs/v4/v4changelog.md`.
 
 ### 6.1 Build
 
@@ -484,11 +486,18 @@ Read on D1, the development machine, and recorded under the label `d1` until R1 
 
 ### 6.3 Exit checklist
 
-- [ ] `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` pass.
+As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks, measurements, deployment, records); these are its headlines:
+
+- [ ] `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` (16 goldens, on WARP and lavapipe) pass.
+- [ ] Caption intelligence: `line_breaks.rs`, `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` pass.
+- [ ] The editor: every state reachable and matching the reviewed screens; axe finds no serious or critical violation; every control works by keyboard; no source file over 700 lines (tests excluded).
+- [ ] Edit to preview at most 150 ms (90th percentile), style thumbnails at most 400 ms, the app shell within 400 kB gzip with the font; `build_scene` at most 1 s and mean `frame_at` at most 2 ms; seek within 300 ms; the bench file committed and `render_encode` within E-4's line.
 - [ ] `pipeline-preview.spec.ts` (all cases), `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts` pass.
 - [ ] `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` pass.
 - [ ] Preview drift at most 80 ms over 60 s; first preview frame within 500 ms of `ready`.
 - [ ] v1.2 seams S-1 to S-7: `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs` pass; the scene takes no `events` argument; no `TimeMs` reaches `frame_at`; the renderer has no crop parameter.
+- [ ] Deployed: `ci.yml` green on `main`, the header check and `@smoke` pass, and the editor works on the deployed page on D1; `review_action`, `job_cancelled` and `client_error` rows hold enum props only.
+- [ ] Design reviews 1 and 2 passed by the founder; five goldens looked at.
 - [ ] Tagged `v4`.
 
 **Not in V4.** Export beyond the V2 spike, the watermark in a real export, accounts.
@@ -677,6 +686,7 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 | GPU-loss, quota and decode-error handling; `ErrorPanel.tsx` complete | C-14: retry from the last completed stage; a second failure with the same code shows the `.persistent` copy; "Report this" sends one `client_error {error_code, stage}` event and nothing else |
 | `messages.ts`: every `E_*` code of TS §11.2 with `title`, `body`, `action` and a `.persistent` variant | `check-copy-codes.mjs` enforces coverage |
 | Fixtures `bad_audio_payload.mp4`, `bad_video_payload.mp4` | Valid tables, corrupted payloads |
+| The empty-output retry on WASM (TS §16.6): a transcription that comes back empty on WebGPU is tried once on WASM before `REJECT_NO_SPEECH` | Listed for V4 by V2 §25.2; moved here with failure recovery (V4 implementation plan §24 item 10) |
 | `web/tests-e2e/restore.spec.ts`, `clear-local-data.spec.ts`, `failure-recovery.spec.ts`; `persistence/receipt-outbox.test.ts` | The V7 proofs |
 
 ### 9.2 Non-code work: E-2 starts (weeks 6-9)

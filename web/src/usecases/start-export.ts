@@ -158,6 +158,7 @@ async function renderAndDeliver(
 
   // 7. The export reads its own copy of the audio: a buffer that is handed
   //    to a worker is gone from this thread, and the preview keeps its own (D-51).
+  //    V5: the export encodes `prog48` instead (TS §40.9 S-8; `program_identity.rs` proves it equals `out48`).
   const out48 = await opfs.readAudio(clipId);
   goOn(signal);
 
@@ -301,6 +302,8 @@ export async function startExport(clipId: ClipId): Promise<void> {
   exportStore.saved();
   unlockAfterExport();
   const kept = useClipStore.getState().events.filter((event) => event.enabled).length;
+  // V5: the render cache (TS §40.9 S-9) sets `from_cache`; the edit's own values take the place of
+  // `word_edits`, `events_disabled`, `style` and `crop_adjusted`; `result.summary` is shown (ChangeSummary, PS §10 J11).
   track({
     name: "export_done",
     props: {
