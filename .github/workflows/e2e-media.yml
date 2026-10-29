@@ -1,8 +1,9 @@
 # The media suites of technicalspec.md §33, step 10, as far as a hosted
 # runner can run them: the cases tagged @no-gpu, which are the download of
-# the speech model, the import of the sample clip and the rejection suite
-# (every refusal at import, "start over", an accepted file's record), in
-# Chrome on Windows. The rejection suite reads the generated fixtures, which
+# the speech model, the import of the sample clip, the rejection suite
+# (every refusal at import, "start over", an accepted file's record) and,
+# since V4, the cancel of an import and of the model's download
+# (cancel.spec.ts, v4implementation §19.4), in Chrome on Windows. The rejection suite reads the generated fixtures, which
 # this job makes first (v3implementation D-93, D-94).
 #
 # A hosted runner has no graphics card. Its Chrome can be given a software

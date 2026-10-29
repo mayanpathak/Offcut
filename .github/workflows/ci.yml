@@ -54,9 +54,11 @@ env:
   # The ffmpeg that `pnpm fixtures` generates the test fixtures with, before
   # `cargo test` reads them (v3implementation D-94): a static Linux build of
   # 9.0.2, by its dated release, refused unless its checksum is this one.
-  # BtbN deletes a dated release after about six weeks (v3changelog open item 7).
-  FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz
-  FFMPEG_LINUX_SHA256: 1592a01343378ff03db9022878765919119073d4b84ee22e020cc45f57e29457
+  # BtbN deletes its daily releases after about two weeks and keeps the last
+  # build of each month for about two years: this is the one of 2026-09-30
+  # (v4changelog, V3 CL item 7 closed by Prompt 125).
+  FFMPEG_LINUX_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz
+  FFMPEG_LINUX_SHA256: 68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269
   # The public half of the E2E test key (v2implementation D-24): the key of
   # the fixed seed in web/tests-e2e/helpers/fake-api.ts. It is no secret. A
   # build made with it accepts the entitlement tokens the tests mint, so it
@@ -238,6 +240,32 @@ jobs:
 
       - name: cargo deny
         run: cargo deny check
+
+      # wgpu's native backends (Vulkan, DX12) are for the tests of
+      # offcut-render alone, through its dev-dependency (v4implementation
+      # D-134, §19.1). The browser's tree must not resolve them, nor the
+      # host's normal tree: wgpu leaves them out on wasm32 by itself, so only
+      # the host read sees a native feature put on the normal dependency
+      # (v4changelog known issue 5).
+      - name: No native GPU backend outside the tests
+        run: |
+          set -eu
+          natives='^(ash|d3d12|windows|gpu-alloc[a-z-]*) v'
+          for target in wasm32-unknown-unknown host; do
+            if [ "$target" = host ]; then
+              tree=$(cargo tree -p offcut-render -e normal,no-proc-macro --prefix none --locked)
+            else
+              tree=$(cargo tree -p offcut-render -e normal,no-proc-macro --prefix none --locked --target "$target")
+            fi
+            # A tree with no wgpu in it would pass for the wrong reason.
+            echo "$tree" | grep -qE '^wgpu v'
+            found=$(echo "$tree" | grep -E "$natives" | sort -u || true)
+            if [ -n "$found" ]; then
+              echo "::error::The normal dependencies of offcut-render resolve a native GPU backend ($target): $found"
+              exit 1
+            fi
+            echo "$target: no native GPU backend in the normal tree of offcut-render"
+          done
 
       # --- 3. The generated TypeScript matches the Rust types ---------------
       - name: Generate the types

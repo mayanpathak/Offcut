@@ -68,11 +68,13 @@ const FACTS = [
   {
     id: "D-94",
     host: "BtbN/FFmpeg-Builds (GitHub releases)",
-    fact: "The Linux ffmpeg of ci.yml (FFMPEG_LINUX_URL) still downloads, and its SHA-256 is still FFMPEG_LINUX_SHA256: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-16-13-04/ffmpeg-n9.0.2-28-g669f5ab083-linux64-gpl-9.0.tar.xz",
-    // The checksum was taken from the downloaded archive on 2026-10-16, and
+    fact: "The Linux ffmpeg of ci.yml (FFMPEG_LINUX_URL) still downloads, and its SHA-256 is still FFMPEG_LINUX_SHA256: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz",
+    // The checksum was taken from the downloaded archive on 2026-10-29, and
     // equals the digest GitHub lists for the asset (v3implementation D-94).
-    checked: "2026-10-16",
-    note: "a dated release is deleted after about six weeks: expect this one gone near the end of November 2026",
+    // On that day the releases listed were the dailies back to 2026-10-15
+    // and the last build of every month back to 2024-11-30 (V4 Prompt 125).
+    checked: "2026-10-29",
+    note: "the last build of a month, which BtbN keeps for about two years: expect it gone near the end of 2028",
   },
 ];
 
