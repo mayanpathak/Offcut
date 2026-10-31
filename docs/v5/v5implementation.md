@@ -408,8 +408,8 @@ CI still runs on every code push. The Windows `@no-gpu` job stays: it caught `wa
 Audio and frames are read by piping `ffmpeg` into NumPy, with no temporary files:
 
 ```python
-def pcm(path):       # mono float32 at 48 kHz, ffmpeg applying the file's edit lists
-    run(["ffmpeg","-v","error","-nostdin","-i",path,"-map","0:a:0","-ac","1","-ar","48000","-f","f32le","-"])
+def pcm(path):       # mono float32 at 48 kHz, ffmpeg applying the file's edit lists, a late start filled with silence
+    run(["ffmpeg","-v","error","-nostdin","-i",path,"-map","0:a:0","-ac","1","-ar","48000","-af","aresample=async=1:first_pts=0","-f","f32le","-"])
 def grey(path, filt, width, height):   # frames as bytes through a filter
     run(["ffmpeg","-v","error","-nostdin","-i",path,"-map","0:v:0","-vf",filt+",format=gray","-f","rawvideo","-"])
 ```
@@ -437,8 +437,8 @@ A shortened pause moves the last window by its length, so it fails even when che
 Video part, over the whole file:
 
 1. One mean brightness per frame: `-vf fps=30,scale=16:16:flags=area` for the source (it may be VFR) and `scale=16:16` for the export, as grey.
-2. A frame is a flash when its mean is at least `FLASH_MIN = 200` and at least 80 above the median of the 30 frames around it **(assumption, read in Prompt 130)**.
-3. Export and source must have the same number of flashes, each within one frame. The source has none (the reference clip): `INFO 8: no white frame in the source, video offset not measured`. Otherwise `INFO 8: 2 flashes compared, largest offset 0 frames`.
+2. A frame is a flash when its mean is at least `FLASH_MIN = 225` and at least `FLASH_ABOVE = 30` above the median of the 30 frames around it. **Read in Prompt 130:** the fixtures' white is 234 on scenes up to 195, and an export's is 254. A first guess of 200 and 80 missed real white frames. A cut to a bright scene does not count, because that scene raises the median too.
+3. Export and source must have the same number of flashes, each within one frame. The source has none: `INFO 8: no white frame in the source, video offset not compared`, which `expectAllChecks` accepts (the second recording). Otherwise `INFO 8: 2 flashes compared, largest offset 0 frames`. The reference clip has two white frames, at about 150 and 1946.
 
 `expectAllChecks` takes `{ flashes: n }` and asserts that line for the pause fixtures.
 
@@ -479,7 +479,7 @@ The `no metadata` case of `export-creator.spec.ts` stays, on `testclips/v3testcl
 
 `verify/test_verify_mp4.py`, `unittest`, standard library plus NumPy, about 180 lines. It takes `speech_20s_long_pause.mp4` from `pnpm fixtures`, in one temporary directory, which it deletes:
 
-**Good file.** Scale and crop to 720x1280, `ultrafast`, AAC-LC stereo, `-map_metadata -1`, `+faststart`, and a `volume` filter computed by measuring first, so that it reads -14 LUFS. A second good file burns in the mask with `blend=all_expr='if(eq(B,128),A,0.6*B+0.4*A)'` for the `free` profile. The creator-size good file scales to 1080x1920.
+**Good file.** Scale and crop to 720x1280, `ultrafast`, AAC-LC stereo, `-map_metadata -1`, `+faststart`, and a `volume` filter computed by measuring first, so that it reads -14 LUFS. A second good file overlays the mask, where it is not its background, at 60% (`geq`, `alphamerge`, `overlay`) for the `free` profile; `blend` on a converted mask misses its exact 128. The creator-size good file scales to 1080x1920.
 
 | Bad file (a copy with one change) | Must print | Encode? |
 |---|---|---|
@@ -1420,6 +1420,8 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 24 | The answered set in `answer-post-export.ts` needed a use-case edge from `start-export.ts` | V5 §14.5 | D-234: in `export-store.ts` |
 | 25 | `fakeExport` reaches `rendering` only; `screens.spec.ts`'s done state needs a hook | V5 §4 | `fakeExportDone` in `dev-hooks.ts` |
 | 26 | This plan said case 14's budget is unaffected by a shared clip; its reading fell to 26 ms on old cards | V5 §6.3, D-201 | Case 14 on its own load: 5 loads, as D-201 allows |
+| 28 | Check 8 read a source's audio from its first sample, so a phone's late start (0.305 s on the second recording) read as a 305 ms offset; the fixtures have none | V5 §7 | `pcm` fills the gap, and the self-test has the case |
+| 29 | §7.2's flash numbers missed real white frames, and it said the reference clip has none; `not measured` for no white frame would fail `expectAllChecks` on any clip without one | V5 §7.2 | 225 and 30; two in the reference clip; `not compared` |
 | 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 
 **To copy back at Prompt 136, from the code:** TS §5 (new files), §9 (C-7, C-9, C-10), §12.2's prose, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 item 14, §40.9 (S-8, S-9 as built). BP §7: "as built". Corrections to `verify/README.md`. V5 as built goes in a table in this document, as V4 §24.3 did.
@@ -1475,7 +1477,7 @@ Per BP §1.3. The implementer gets this row, the section named, TS §2, §7, §1
 | `SYNC_LIMIT_MS` | 20 | `verify_mp4.py` | TS §27.2 |
 | `MIN_ENVELOPE_CORR` | 0.5 | `verify_mp4.py` | (assumption, Prompt 130) |
 | `SILENT_WINDOW_DBFS` | -50 | `verify_mp4.py` | (assumption) |
-| `FLASH_MIN`, `FLASH_ABOVE` | 200, 80 | `verify_mp4.py` | (assumption) |
+| `FLASH_MIN`, `FLASH_ABOVE` | 225, 30 | `verify_mp4.py` | Read in Prompt 130 |
 | `WATERMARK_FRAMES` | 15 | `verify_mp4.py` | (assumption) |
 | `WATERMARK_FREE_MIN`, `WATERMARK_CREATOR_MAX` | 0.5, 0.2 | `verify_mp4.py` | (assumption, TS §39.3 item 14) |
 | `BITRATE_LIMIT` | 12 and 6 Mb/s | `verify_mp4.py` | TS §27.2 |

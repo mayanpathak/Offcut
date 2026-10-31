@@ -9,8 +9,7 @@
 // the founder's second recording runs on its own after them, on the
 // development machine only (D-99, D-100).
 
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -21,6 +20,7 @@ import { type FakeApi, installFakeApi, mintEntitlementToken, seedEntitlement } f
 import {
   dropClip,
   ensureModelCached,
+  expectAllChecks,
   opfsList,
   patient,
   referenceClip,
@@ -49,6 +49,8 @@ const FLUSH_WAIT_MS = 20_000;
 const EXPORT_TIMEOUT_MS = patient(240_000);
 /** A seed that is not the test key's: a token signed with it must be refused. */
 const OTHER_SEED = new Uint8Array(32).fill(7);
+/** The white frames of the reference clip, which check 8 compares (read in P130). */
+const REFERENCE_FLASHES = 2;
 
 type Recorded = { method: string; url: string };
 
@@ -88,56 +90,6 @@ async function watchExport(page: Page): Promise<void> {
       }
     }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
   }, messages.export.renderingLocally);
-}
-
-type Tag = { where: string; key: string; value: string };
-
-/** Every tag of `file`, at format and stream level, as `ffprobe` reads them. */
-function tagsOf(file: string): Tag[] {
-  const probe = JSON.parse(
-    execFileSync("ffprobe", ["-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", file], { encoding: "utf8" }),
-  ) as { format?: { tags?: Record<string, string> }; streams?: { tags?: Record<string, string> }[] };
-  return [
-    ...Object.entries(probe.format?.tags ?? {}).map(([key, value]) => ({ where: "format", key, value })),
-    ...(probe.streams ?? []).flatMap((stream, index) =>
-      Object.entries(stream.tags ?? {}).map(([key, value]) => ({ where: `stream ${String(index)}`, key, value })),
-    ),
-  ];
-}
-
-/** The tags D-100 names: none of these may carry the source's value. */
-const SOURCE_TAGS = ["creation_time", "title", "comment", "encoder"];
-
-/**
- * What of `source`'s metadata `file` carries, as a list of problems; `[]` for
- * none (D-100, an early part of the verifier's check 11): no tag whose key
- * names a location, no `creation_time` but the muxer's epoch 0, no `title`,
- * `comment`, `encoder` or `creation_time` with the source's value, and
- * neither `©xyz` nor `ISO6709` anywhere in its bytes.
- */
-function metadataProblems(file: string, source: string): string[] {
-  const problems: string[] = [];
-  const ofSource = new Set(tagsOf(source).map((tag) => `${tag.key.toLowerCase()}=${tag.value}`));
-  for (const tag of tagsOf(file)) {
-    const key = tag.key.toLowerCase();
-    if (key.includes("location") || key.includes("iso6709")) {
-      problems.push(`${tag.where}: a location tag, ${tag.key}`);
-    }
-    if (key === "creation_time" && !tag.value.startsWith("1970-01-01T00:00:00")) {
-      problems.push(`${tag.where}: a creation_time other than the epoch, ${tag.value}`);
-    }
-    if (SOURCE_TAGS.includes(key) && ofSource.has(`${key}=${tag.value}`)) {
-      problems.push(`${tag.where}: the source's ${tag.key}`);
-    }
-  }
-  const bytes = readFileSync(file);
-  if (bytes.includes(Buffer.from([0xa9, 0x78, 0x79, 0x7a]))) {
-    problems.push("the bytes of a ©xyz atom");
-  }
-  if (bytes.includes(Buffer.from("ISO6709"))) {
-    problems.push("the bytes ISO6709");
-  }
-  return problems;
 }
 
 async function forgetProgress(page: Page): Promise<void> {
@@ -260,10 +212,7 @@ test.describe("one clip, exported", () => {
     creator = { name: download.suggestedFilename(), file, stored: "", requests: during, ...(await locked) };
 
     expect(statSync(file).size).toBeGreaterThan(1_000_000);
-    const verdict = verifyMp4(file, "creator", durationMs);
-    expect(verdict.output).toContain("PASS 6");
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
+    expectAllChecks(verifyMp4(file, "creator", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
   });
 
   test("progress: the stages in order, the bar, and the line that says where the work is done", async () => {
@@ -345,13 +294,12 @@ test.describe("one clip, exported", () => {
   test("Free-plan token: the file is 720 by 1280, as the token says", async () => {
     await seedEntitlement(page, mintEntitlementToken({ plan: "free" }));
     const { file } = await exportAndSave("free.mp4");
-    const verdict = verifyMp4(file, "free", durationMs);
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
-    // The same file is not a Creator's: its size is the one thing that differs (INV-9).
-    const asCreator = verifyMp4(file, "creator", durationMs);
+    expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
+    // The same file is not a Creator's: its size and its watermark say so (INV-9).
+    const asCreator = verifyMp4(file, "creator", durationMs, referenceClip());
     expect(asCreator.status).toBe(1);
     expect(asCreator.output).toContain("FAIL 2");
+    expect(asCreator.output).toContain("FAIL 9");
     await expect.poll(() => api.eventsOf("export_started").length, { timeout: FLUSH_WAIT_MS }).toBe(3);
     expect(api.eventsOf("export_started").at(-1)).toEqual({ name: "export_started", props: { profile: "free" } });
   });
@@ -397,11 +345,10 @@ test("no metadata: an export of the second recording carries none of the source'
     await (await arriving).saveAs(file);
     await expect(page.getByTestId("export-done")).toHaveText(messages.export.done, { timeout: 30_000 });
 
-    expect(metadataProblems(file, source)).toEqual([]);
-    const verdict = verifyMp4(file, "creator", sourceDurationMs(source));
-    expect(verdict.output).toContain("PASS 6");
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
+    // Check 11, against what this source carries (D-100, D-208).
+    const verdict = verifyMp4(file, "creator", sourceDurationMs(source), source);
+    expect(verdict.output).toContain("PASS 11");
+    expectAllChecks(verdict);
   } finally {
     await context.close();
     rmSync(scratch, { recursive: true, force: true });

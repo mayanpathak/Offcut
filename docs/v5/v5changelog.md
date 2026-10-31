@@ -14,12 +14,13 @@
 ## Known issues
 | # | Issue | Where | Version |
 |---|---|---|---|
-| 1 | **An export reads about 3 LU over the target.** The chain measures its mono programme as one channel, and the export doubles it to two. The same PCM read -23.2 LUFS as one channel and -20.2 LUFS as two (`ffmpeg ebur128`, 2026-10-31), so an export should read about -11 LUFS, and check 7 would fail. D-204 fixes the product | `offcut-dsp/src/loudness.rs` | P130 |
+| 1 | ~~**An export reads about 3 LU over the target.**~~ Closed in Entry 5: -11.4 LUFS before the fix, -14.3 after, read by `ffmpeg` on real exports | `offcut-dsp/src/loudness.rs` | P130 |
 | 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
 | 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's queries, 2026-10-31). All are from 2026-10-29: the four within 71 s from 14:59:33 UTC, ten minutes after the deploy finished, and the crash at 15:29:00. None since, including the agent's three clips on the deployed site on 2026-10-31, so they do not reproduce on the sample and landscape clips. Which clip caused them is unknown: the rows carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
+| 7 | **A clip's preview can fail at once in a fresh browser with `E_DECODE_VIDEO` · `preview` · `Error`, and works on a retry.** 6 of 14 fresh Chrome starts on `speech_20s_long_pause.mp4` (D1, keyed build, 2026-10-31); 5 further clips in one browser were fine. It is the code of known issue 5's production rows, so it predates V5, and a person would see "The picture of this clip could not be read" on a good file. **Not diagnosed, not fixed:** the detail `Error` says little, and the code is in `frame-decoder.ts` and `video-source.ts`, frozen in V5. The media project's setup page may hide it from the suites (unproven). The founder decides when it is fixed | `web/src/workers/render/` | Founder decides |
 
 ---
 
@@ -110,3 +111,32 @@
 **Not checked.** `ci.yml`'s new job has not run yet: `actionlint` is not on D1 and no YAML parser was at hand, so this push is its first test, read at P130's start (D-198). A docs-only pull request has not been seen to skip. `model-download.spec.ts`'s waits run in CI's `e2e-media`.
 
 **Open.** Open item 1; known issues 1 to 6.
+
+## Entry 5 - 2026-10-31 - P130: verifier checks 7-11, its self-test, and the stereo loudness fix
+
+**What.** `Channel::DualMono` in `loudness.rs`: **a product change.** An export is about 3 dB quieter, and so is the preview, which matches it. Checks 7 to 11 in `verify_mp4.py`; `watermark_mask_720.png` and the tool that drew it; `test_verify_mp4.py`, 16 cases, also in `ci.yml`. `verifyMp4(…, source?)`, `expectAllChecks`, `OFFCUT_KEEP_EXPORTS`. `metadataProblems` and `tagsOf` moved into check 11. `pnpm verify:test`. Two TS §5 rows. **Known issue 1 closed.**
+
+**The readings** (`d1`, real exports, by `ffmpeg`).
+| Export | Loudness | Audio offset, start / end, correlation | White frames | Watermark | Bitrate |
+|---|---|---|---|---|---|
+| Creator, reference, **before the fix** | **-11.4 LUFS**, fails check 7, and only check 7 | 1.5 / -1.1 ms, 0.90 / 0.97 | 2, off by 1 | -0.05 | 8.3 Mb/s |
+| Creator, reference | -14.3 LUFS | 1.3 / -1.7 ms, 0.95 / 0.99 | 2, off by 1 | -0.05 | 8.3 Mb/s |
+| Free, reference | -14.3 LUFS | 1.3 / -1.7 ms, 0.95 / 0.99 | 2, off by 1 | **0.74** | 4.1 Mb/s |
+| Creator, long pause | -14.3 LUFS | -0.3 / 0.5 ms, 0.97 / 0.99 | 2, off by 0 | -0.01 | 8.3 Mb/s |
+| Creator, second recording | Passes all 11, `PASS 11` on a source that carries a location; read before `pcm` was fixed: -14.1 LUFS, 8.5 Mb/s, watermark 0.06 | | none in it | | |
+
+The stereo test reads -11.29 LUFS with `Center` put back. No threshold of checks 7, 9, 10 or `MIN_ENVELOPE_CORR` moved. `pink_noise_reaches_the_target` did not fire and is unchanged. `a_1khz_sine_of_peak_minus_20_reads_minus_23` is rewritten by name to `..._reads_minus_20`.
+
+**Differs from the plan** (§7, §25 rows 28, 29, the guide and the prompts are corrected in this commit).
+- **Check 8 was wrong on phone clips, and the product was right.** The second recording's audio starts 304.9 ms after its video. Raw `ffmpeg` output drops that gap, so a correct export read -305 ms at both ends. `pcm` now fills it (`aresample=async=1:first_pts=0`), with a self-test case. No fixture has a late start, so only a real recording could show this.
+- **Flash numbers:** 225 and 30, not 200 and 80, which missed real white frames. The reference clip has two white frames; the plan said none.
+- `not compared`, not `not measured`, for a source with no white frame, which `expectAllChecks` would otherwise refuse on any such clip.
+- The self-test overlays the mask (`geq`, `alphamerge`) rather than `blend`, whose `eq(B,128)` misses a converted mask. It also has a good creator file, a no-source case and a 3 LU over case beyond §7.6's list. Good files use `-fflags +bitexact`, or the source's `encoder` tag would fail check 11.
+
+**Checked.** Self-test 16 of 16 in 73 s, its directory gone. `export-creator.spec.ts --grep "no token|another key|Creator export|Free-plan"`: 4 passed, on a keyed build with the fix. `--grep "no metadata"`: passed. `cargo test -p offcut-dsp`: 39 + 7 + 7 + 11 + 3 + 10 passed, 1 ignored. Drills: `Center` back fails the stereo test; hidden NumPy exits 2; `expectAllChecks` refuses no `--source`, a `FAIL`, and missing flashes. A `FAIL 11` prints no value (the self-test asserts it). The mask, enlarged beside a real Free frame, lines up. Saved exports and `zz-` files are deleted.
+
+**Not checked.** The new `ci.yml` steps have not run: no push in this prompt (D-198). A Free export of a pause fixture. How a person hears it: P136.
+
+**Found, not fixed.** Known issue 7, the most important result of this prompt. `trackSaves`' init script reads `document.body` before it exists, a harmless `pageerror` in the tests only. `device-bench.ts`'s comment says the recognizer hears the cleaned voice; it hears `pcm16`.
+
+**Open.** Open item 1; known issues 2 to 7.

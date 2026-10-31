@@ -326,6 +326,19 @@ jobs:
       - name: Generate the fixtures
         run: pnpm fixtures
 
+      # A runner cannot make a real export, so this is what runs the verifier's
+      # checks 7 to 11 here: a good file and one bad file per failure, all made
+      # with ffmpeg (v5implementation D-209). The Python of verify/README.md.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: The verifier's own test
+        run: |
+          python -m pip install -r verify/requirements.txt
+          python verify/test_verify_mp4.py
+
       # The software adapter the golden frames are drawn on: lavapipe, Mesa's
       # Vulkan driver (v4implementation D-134), with its version in the log.
       - name: Install the software Vulkan driver

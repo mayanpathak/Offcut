@@ -569,7 +569,7 @@ ENVELOPE_HOP_SAMPLES = 480
 SYNC_WINDOW_MS, SYNC_LAG_HOPS, SYNC_LIMIT_MS = 5000, 100, 20
 MIN_ENVELOPE_CORR = 0.5        # (assumption, P130)
 SILENT_WINDOW_DBFS = -50.0     # (assumption)
-FLASH_MIN, FLASH_ABOVE = 200, 80   # (assumption)
+FLASH_MIN, FLASH_ABOVE = 225, 30   # read in P130
 WATERMARK_FRAMES = 15          # (assumption)
 WATERMARK_FREE_MIN, WATERMARK_CREATOR_MAX = 0.5, 0.2   # (assumption, TS §39.3 item 14)
 BITRATE_LIMIT = {"creator": 12_000_000, "free": 6_000_000}
@@ -592,7 +592,7 @@ export function expectAllChecks(verdict: Verdict, o?: { flashes?: number }): voi
 #### 2. Check 8 (§7.2)
 Audio: both decoded to mono at 48 kHz; RMS over 480-sample hops, linear, not dB. Two windows on the **export's** timeline: first and last 5,000 ms; a clip of 10 s or less uses one window. Normalized cross-correlation at lags ±100 hops, around the same place in the source; best lag; a parabola through the peak and its neighbours; times 10 ms. Pass when `abs(offset) <= 20 ms` and the peak is at least `MIN_ENVELOPE_CORR`. A source window whose peak RMS is under -50 dBFS: `INFO 8: window at <t> s is silent in the source, not measured`.
 
-Video: one mean brightness per frame (`-vf fps=30,scale=16:16:flags=area` for the source, which may be VFR; `scale=16:16` for the export; grey). A flash is at least 200 and at least 80 above the median of the 30 frames around it. Same count, each within one frame. None in the source: `INFO 8: no white frame in the source, video offset not measured`. Otherwise `INFO 8: 2 flashes compared, largest offset 0 frames`.
+Video: one mean brightness per frame (`-vf fps=30,scale=16:16:flags=area` for the source, which may be VFR; `scale=16:16` for the export; grey). A flash is at least 225 and at least 30 above the median of the 30 frames around it. Same count, each within one frame. None in the source: `INFO 8: no white frame in the source, video offset not compared`. Otherwise `INFO 8: 2 flashes compared, largest offset 0 frames`.
 
 #### 3. Check 9 (§7.3)
 The mask's box: pixels not 128, plus 4 px. 15 frames evenly spaced by index, skipping flashes, scaled to 720 x 1280 (`select`, `scale=720:1280:flags=area`); their mean inside the box. Subtract a 9 x 9 box blur from both the mean and the mask. Pearson over the box. `free` ≥ 0.5, `creator` ≤ 0.2. `INFO 9: watermark correlation 0.78`.
@@ -606,7 +606,7 @@ The mask's box: pixels not 128, plus 4 px. 15 frames evenly spaced by index, ski
 No format or stream tag whose key contains `location` or `iso6709`. No `title`, `comment`, `description`, `artist`, `album` tag with a non-empty value. `creation_time` absent or the epoch. With `--source`: no `title`, `comment`, `encoder` or `creation_time` tag carrying the source's value. Neither the bytes of `©xyz` nor `ISO6709`, read in 1 MiB pieces with an overlap of 7 bytes. **A `FAIL 11` names the key, never the value.**
 
 #### 6. The self-test (§7.6)
-`unittest`, the verifier by subprocess. The good file: scale and crop to 720 x 1280, `ultrafast`, AAC-LC stereo, `-map_metadata -1`, `+faststart`, and a `volume` filter computed by measuring first, so it reads -14 LUFS. A second burns in the mask with `blend=all_expr='if(eq(B,128),A,0.6*B+0.4*A)'` for `free`. A creator-size one at 1080 x 1920. Then §7.6's eleven bad files; each asserts its `FAIL n` and every other check `PASS`. It honours `OFFCUT_FIXTURES_DIR`, cleans its directory, and prints no path from the repo's media. Under 3 minutes.
+`unittest`, the verifier by subprocess. The good file: scale and crop to 720 x 1280, `ultrafast`, AAC-LC stereo, `-map_metadata -1`, `+faststart`, and a `volume` filter computed by measuring first, so it reads -14 LUFS. A second overlays the mask, where it is not its background, at 60% (`geq`, `alphamerge`, `overlay`) for `free`. A creator-size one at 1080 x 1920. Then §7.6's eleven bad files; each asserts its `FAIL n` and every other check `PASS`. It honours `OFFCUT_FIXTURES_DIR`, cleans its directory, and prints no path from the repo's media. Under 3 minutes.
 
 #### 7. The temporary long-pause export
 `web/tests-e2e/zz-longpause.spec.ts` and `web/zz-pw.config.ts` (SAB rule 7), which export the fixture once under `OFFCUT_KEEP_EXPORTS` and are deleted before the commit.
@@ -1767,5 +1767,6 @@ Found while reading `v5implementation.md`, `v5buildguide.md` and the code togeth
 | 9 | `exportedAs` when `profile.kind` is `preview` | A token never verifies as `preview`; mapped to `free`, so the type holds | 134 |
 | 10 | Eight screen states at two widths become nine | 18 PNGs; only the done state's two go to `~/v5-review/` | 135 |
 | 11 | `pnpm test` needs Docker, the bench needs it closed | Bench first, Docker closed; then Docker on for Tier 4 | 136 |
+| 12b | The real files against §7 (found running P130): a phone's late audio start, the flash numbers, `not measured` for no white frame | Plan §25 rows 28, 29 | 130 |
 | 12a | Case 14's budget on a shared clip, an ambiguous `Undo`, `--repeat-each` in a shared group, a backslash in `--grep` (found running P129) | Plan §25 rows 26, 27 | 129 |
 | 12 | `v5-build` does not exist, and the documents are uncommitted on `v4-build` | They go in the Setup commit, with V4's Entry 40, since V4 is merged | Setup |

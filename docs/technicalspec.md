@@ -801,6 +801,8 @@ offcut/
 ├── verify/
 │   ├── verify_mp4.py
 │   ├── watermark_mask_720.png          watermark template drawn independently of the renderer
+│   ├── make_watermark_mask.py          the one-time tool that drew it, from the font file (v5implementation D-206)
+│   ├── test_verify_mp4.py              proves each check tells a good file from a bad one; runs in CI (v5implementation D-209)
 │   ├── requirements.txt
 │   └── README.md
 ├── fixtures/

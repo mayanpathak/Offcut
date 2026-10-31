@@ -10,6 +10,7 @@
 
 use std::path::PathBuf;
 
+use ebur128::{Channel, EbuR128, Mode};
 use offcut_dsp::compressor::Compressor;
 use offcut_dsp::config::{BLOCK_SAMPLES, LOUDNESS_RETRY_LU, SAMPLE_RATE};
 use offcut_dsp::denoise::Denoise;
@@ -244,6 +245,31 @@ fn the_long_pause_speech_reaches_the_target() {
 #[test]
 fn the_sparse_speech_reaches_the_target() {
     speech_on_target("speech_30s_sparse.mp4");
+}
+
+/// What the export writes: the mono voice in both channels of a stereo file,
+/// read by a meter of two channels, not by the chain's own (v5implementation
+/// D-204). The chain's own reading could not see that the file was too loud.
+#[test]
+fn the_output_as_a_stereo_file_reads_the_target() {
+    for name in [
+        "speech_60s_portrait.mp4",
+        "speech_20s_long_pause.mp4",
+        "speech_30s_sparse.mp4",
+    ] {
+        let out = chain(&pcm(name));
+        let mut meter = EbuR128::new(2, SAMPLE_RATE.get(), Mode::I).unwrap();
+        meter.set_channel(0, Channel::Left).unwrap();
+        meter.set_channel(1, Channel::Right).unwrap();
+        meter
+            .add_frames_planar_f32(&[&out.samples, &out.samples])
+            .unwrap();
+        let lufs = meter.loudness_global().unwrap();
+        assert!(
+            (lufs - f64::from(TARGET)).abs() <= 1.0,
+            "{name}: {lufs} LUFS as two channels"
+        );
+    }
 }
 
 #[test]

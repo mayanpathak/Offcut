@@ -1145,6 +1145,8 @@ export VITE_ENTITLEMENT_TEST_PUBLIC_KEY=$(grep -E '^ +E2E_TEST_PUBLIC_KEY:' .git
 | `FAIL 9` on a Free file | The mask is misaligned; compare it with a frame. Or the watermark moved: run the tool again |
 | `FAIL 10` | A hardware encoder over 1.5x: `bitrateMode: "constant"` on that entry. TE-4 changes both copies of the constant or neither |
 | `not measured` in `expectAllChecks` | `--source` missing, or a window with no speech |
+| `FAIL 8` with a steady offset at both ends | The source's audio starts late and the gap was lost, or the product really is off: read `ffprobe`'s `start_time` of both streams before anything else |
+| The preview's card, `E_DECODE_VIDEO` · `preview` · `Error`, on a clip that plays on a retry | V5 CL known issue 7 |
 | `review_action` holds `undo` in a shared case | `sendQueuedAnalytics` missing, or the 300 ms too short on a loaded machine |
 | A toast's text from the case before | `resetClip` did not wait, or the pointer is on the toast, which pauses its timer |
 | `E_MUX` `OutOfOrder` on a real export | A chunk beyond `MAX_REORDER`, or `Writer.video`'s frame is wrong. Read the timestamp |
@@ -1191,6 +1193,8 @@ Each is applied to `v5implementation.md` in the same change, and listed in its �
 | 9 | Check 11 could print a source's tag value, and `v3testclip.mp4` carries a location | A `FAIL 11` names the key only | §7.5, Step 2.4 |
 | 10 | D-195 said one document; the founder asked on 2026-10-31 for a guide and prompts file | D-195 rewritten; §22 is a summary table | D-195, §22 |
 | 11 | The -11 LUFS is inferred, and after the fix it could not be read any more | Step 2.1 reads a real export before the fix | Step 2.1 |
+| 12a | A phone's audio can start after its video (0.305 s on the second recording), which read as a 305 ms offset until `pcm` filled the gap | `pcm`, a self-test case | §7, Step 2.4 |
+| 12b | The first flash numbers (200, 80) missed real white frames, and the reference clip has two | 225, 30 | §7.2 |
 | 12 | `pnpm test` needs Docker running, and the bench needs it closed | Docker on for Step 8.4's Rust run; closed for the bench | Steps 8.1, 8.4 |
 
 ### (c) Work placed differently from §5

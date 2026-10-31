@@ -7,12 +7,14 @@ use offcut_types::{Dbfs, Lufs};
 
 use crate::config::{BLOCK_SAMPLES, ChainConfig, NO_PEAK_DBFS, SAMPLE_RATE, dbfs};
 
-/// Integrated loudness of a mono 48 kHz programme, weighted as channel
-/// `Center`. `None` when no block passes the gate (silence, or a programme too
-/// short or too quiet to measure).
+/// Integrated loudness of a mono 48 kHz programme, weighted as a mono signal
+/// on two loudspeakers (`DualMono`): the export writes it into both channels of
+/// a stereo file, and this is what that file reads (v5implementation D-204).
+/// `None` when no block passes the gate (silence, or a programme too short or
+/// too quiet to measure).
 pub fn integrated(samples: &[f32]) -> Option<Lufs> {
     let mut meter = EbuR128::new(1, SAMPLE_RATE.get(), Mode::I).ok()?;
-    meter.set_channel(0, Channel::Center).ok()?;
+    meter.set_channel(0, Channel::DualMono).ok()?;
     // In blocks, so that the meter's memory stays bounded.
     for chunk in samples.chunks(BLOCK_SAMPLES) {
         meter.add_frames_f32(chunk).ok()?;
@@ -59,14 +61,32 @@ mod tests {
         ChainConfig::default()
     }
 
-    #[test]
-    fn a_1khz_sine_of_peak_minus_20_reads_minus_23() {
+    fn sine_of_peak_minus_20() -> Vec<f32> {
         let peak = 10_f32.powf(-20.0 / 20.0);
-        let x: Vec<f32> = (0..480_000)
+        (0..480_000)
             .map(|i| (2.0 * std::f32::consts::PI * 1_000.0 * i as f32 / 48_000.0).sin() * peak)
-            .collect();
-        let l = integrated(&x).map(|l| l.get());
-        assert!(l.is_some_and(|l| (l + 23.0).abs() <= 0.1), "{l:?}");
+            .collect()
+    }
+
+    #[test]
+    fn a_1khz_sine_of_peak_minus_20_reads_minus_20() {
+        let l = integrated(&sine_of_peak_minus_20()).map(|l| l.get());
+        assert!(l.is_some_and(|l| (l + 20.0).abs() <= 0.1), "{l:?}");
+    }
+
+    #[test]
+    fn a_mono_programme_reads_3_lu_louder_as_two_loudspeakers() {
+        let x = sine_of_peak_minus_20();
+        let as_dual_mono = integrated(&x).map(|l| f64::from(l.get()));
+        let mut one = EbuR128::new(1, SAMPLE_RATE.get(), Mode::I).unwrap();
+        one.set_channel(0, Channel::Center).unwrap();
+        one.add_frames_f32(&x).unwrap();
+        let as_one_channel = one.loudness_global().unwrap();
+        let difference = as_dual_mono.map(|l| l - as_one_channel);
+        assert!(
+            difference.is_some_and(|d| (d - 3.01).abs() <= 0.05),
+            "{difference:?}"
+        );
     }
 
     #[test]

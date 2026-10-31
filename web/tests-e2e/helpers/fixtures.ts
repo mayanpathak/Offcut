@@ -8,7 +8,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import { closeSync, copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -183,21 +183,55 @@ export function sourceDurationMs(fixture: string): number {
   return Math.round(seconds * 1000);
 }
 
+export type Verdict = { status: number | null; output: string };
+
+/** The checks of `verify/verify_mp4.py` (TS §27.2). */
+const VERIFIER_CHECKS = 11;
+
 /**
  * Runs the independent verifier on an exported file (TS §27.2) and gives its
- * exit status and what it printed: 0 only when every check it makes passes.
- * `python` is the one on PATH, which must be the Python of `verify/README.md`.
+ * exit status and what it printed: 0 only when every check passes. The test
+ * works out the expected duration, and gives it apart from the source
+ * (v5implementation D-210). `python` is the one on PATH, which must be the
+ * Python of `verify/README.md`.
  */
-export function verifyMp4(file: string, profile: "free" | "creator", expectedDurationMs: number): { status: number | null; output: string } {
+export function verifyMp4(file: string, profile: "free" | "creator", expectedDurationMs: number, source?: string): Verdict {
+  // A directory outside the repository, for tuning the verifier on real exports
+  // offline (v5implementation §6.2). Never set in CI; emptied when the tuning ends.
+  const keep = process.env.OFFCUT_KEEP_EXPORTS;
+  if (keep !== undefined) {
+    copyFileSync(file, path.join(keep, path.basename(file)));
+  }
   const run = spawnSync(
     "python",
-    [path.join(ROOT, "verify/verify_mp4.py"), file, "--profile", profile, "--expected-duration-ms", String(expectedDurationMs)],
+    [
+      path.join(ROOT, "verify/verify_mp4.py"),
+      file,
+      "--profile",
+      profile,
+      "--expected-duration-ms",
+      String(expectedDurationMs),
+      ...(source === undefined ? [] : ["--source", source]),
+    ],
     { encoding: "utf8" },
   );
   if (run.error !== undefined) {
     throw run.error;
   }
   return { status: run.status, output: `${run.stdout}${run.stderr}` };
+}
+
+/** Every check passed and none was not measured. `flashes`: how many white frames were compared. */
+export function expectAllChecks(verdict: Verdict, o: { flashes?: number } = {}): void {
+  for (let check = 1; check <= VERIFIER_CHECKS; check += 1) {
+    expect(verdict.output).toContain(`PASS ${String(check)}`);
+  }
+  expect(verdict.output).not.toContain("FAIL");
+  expect(verdict.output).not.toContain("not measured");
+  if (o.flashes !== undefined) {
+    expect(verdict.output).toContain(`INFO 8: ${String(o.flashes)} flashes compared`);
+  }
+  expect(verdict.status, verdict.output).toBe(0);
 }
 
 // --- The cache of the asset host's files -----------------------------------------
