@@ -93,7 +93,7 @@ async function writeExport(
   run.switched = true;
   session.set_scene({ ...scene, profile });
   const canvas = new OffscreenCanvas(profile.width, profile.height);
-  await session.attach_canvas(canvas, profile.width, profile.height);
+  await state.source.whileSessionHeld(() => session.attach_canvas(canvas, profile.width, profile.height));
 
   const temporary = paths.exportTmp(p.exportId);
   const final = paths.exportFinal(p.exportId);
@@ -164,7 +164,7 @@ async function afterExport(run: ExportRun, w: WorkerState): Promise<void> {
     // The preview's size for this clip: 360 x 640 if it was downscaled (D-149).
     const profile = previewProfile(state);
     state.session.set_scene({ ...scene, profile });
-    await state.session.attach_canvas(previewCanvas, profile.width, profile.height);
+    await state.source.whileSessionHeld(() => state.session.attach_canvas(previewCanvas, profile.width, profile.height));
   }
 }
 

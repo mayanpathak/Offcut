@@ -18,7 +18,7 @@
 
 1. Scope: what V5 is and is not
 1A. Preconditions: what V5 starts from
-2. Decisions this document makes (D-194 to D-239)
+2. Decisions this document makes (D-194 to D-240)
 3. Tools, dependencies, environment variables
 4. V5 file tree: what is created and changed
 5. Build order: phases, prompts, time
@@ -197,6 +197,7 @@ Numbering continues from V4's D-193. Each is the smallest choice that gets V5's 
 | D-236 | **Known issues.** 33: `modelDownloadEvent`'s poll takes `patient(5_000)`. 36: `openEditor` waits `patient(30_000)`. 37: re-read at Prompt 136. An issue is closed only by what it should show: no first-attempt failure of those cases in V5's CI runs | Both are one line; the runner's scale does not reach these waits today |
 | D-237 | **`export_done`'s values are computed from the clip at the moment the export starts**, not when it ends; `events_kept` and `events_disabled` read `edit.event_overrides[id] ?? event.enabled` | Today's `kept` reads `event.enabled` alone, so a switched-off visual still counts as kept |
 | D-238 | **`ExportProgress`'s time left starts again when the frames fall back to 0** after a restart | Otherwise it divides by a stale start |
+| D-240 | **`VideoSource.whileSessionHeld`: nothing reads the session while `attach_canvas` holds it.** `attach_canvas` holds the session mutably across an await, and the decoder runs by itself. A `dequeue` in that wait read a sample, wasm-bindgen threw "recursive use of an object", and the source kept it as `E_DECODE_VIDEO`, ending the preview of a good clip. Feeding waits, and a restart a full-range clip asks for waits too. All five callers use it. `video-source.ts`, `frame-decoder.ts` and `preview-job.ts` leave the frozen list, at the founder's word | Found in P130 and fixed before P131 (V5 CL Entry 6). Since V4's Prompt 124 the decoder starts before the canvas exists, and in a cold browser attaching is slow: 6 of 14 fresh starts failed. Keeping that early start keeps its first-frame gain |
 | D-239 | **What V5 builds for V6.x, the complete list:** the loop on `source_at`; `prog48.f32`; the expected duration as an argument separate from the source; `theme` and `musicId` in the key; `summaryRows`; a new render distinguished from a cache hit in one place; the shared-clip helper. Nothing else | TS §40.9: nothing else is reserved |
 
 ---
@@ -282,6 +283,10 @@ web/src/
   workers/render/export-loop.test.ts        new
   workers/render/encoders.ts                     supportedConfigs (pickVideoConfig stays for the capability check)
   workers/render/opfs-sink.ts                    reset()
+  workers/render/video-source.ts                 whileSessionHeld (D-240)
+  workers/render/video-source.test.ts       new  the session held, with a session that throws as wasm-bindgen does
+  workers/render/frame-decoder.ts                feeds nothing while the session is held
+  workers/render/preview-job.ts                  its two attach_canvas (D-240)
 web/
   vite.config.ts                                 __RENDERER_VERSION__
   playwright.config.ts                           timeline-preserved.spec.ts in MEDIA_SUITES
@@ -1421,6 +1426,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 25 | `fakeExport` reaches `rendering` only; `screens.spec.ts`'s done state needs a hook | V5 §4 | `fakeExportDone` in `dev-hooks.ts` |
 | 26 | This plan said case 14's budget is unaffected by a shared clip; its reading fell to 26 ms on old cards | V5 §6.3, D-201 | Case 14 on its own load: 5 loads, as D-201 allows |
 | 28 | Check 8 read a source's audio from its first sample, so a phone's late start (0.305 s on the second recording) read as a 305 ms offset; the fixtures have none | V5 §7 | `pcm` fills the gap, and the self-test has the case |
+| 30 | Reading the session during `attach_canvas` ended a good clip's preview; no suite saw it, since a warmed browser attaches quickly | V4's Prompt 124 | D-240 |
 | 29 | §7.2's flash numbers missed real white frames, and it said the reference clip has none; `not measured` for no white frame would fail `expectAllChecks` on any clip without one | V5 §7.2 | 225 and 30; two in the reference clip; `not compared` |
 | 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 

@@ -18,9 +18,9 @@
 | 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
-| 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's queries, 2026-10-31). All are from 2026-10-29: the four within 71 s from 14:59:33 UTC, ten minutes after the deploy finished, and the crash at 15:29:00. None since, including the agent's three clips on the deployed site on 2026-10-31, so they do not reproduce on the sample and landscape clips. Which clip caused them is unknown: the rows carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
+| 5 | **Production `client_error` rows.** On 2026-10-29: `E_DECODE_VIDEO` at `preview` 4 times, within 71 s from 14:59:33 UTC, ten minutes after V4's deploy finished, which fits known issue 7 and cannot be proved from rows that hold no detail. `E_WORKER_CRASH` at `import` once, at 15:29:00, **still unexplained**. None since. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
-| 7 | **A clip's preview can fail at once in a fresh browser with `E_DECODE_VIDEO` · `preview` · `Error`, and works on a retry.** 6 of 14 fresh Chrome starts on `speech_20s_long_pause.mp4` (D1, keyed build, 2026-10-31); 5 further clips in one browser were fine. It is the code of known issue 5's production rows, so it predates V5, and a person would see "The picture of this clip could not be read" on a good file. **Not diagnosed, not fixed:** the detail `Error` says little, and the code is in `frame-decoder.ts` and `video-source.ts`, frozen in V5. The media project's setup page may hide it from the suites (unproven). The founder decides when it is fixed | `web/src/workers/render/` | Founder decides |
+| 7 | ~~**A clip's preview could fail at once in a fresh browser with `E_DECODE_VIDEO`.**~~ Closed in Entry 6: 6 of 14 fresh starts before the fix, 0 of 24 after | `web/src/workers/render/` | Fixed; reaches production with the next merge |
 
 ---
 
@@ -140,3 +140,23 @@ The stereo test reads -11.29 LUFS with `Center` put back. No threshold of checks
 **Found, not fixed.** Known issue 7, the most important result of this prompt. `trackSaves`' init script reads `document.body` before it exists, a harmless `pageerror` in the tests only. `device-bench.ts`'s comment says the recognizer hears the cleaned voice; it hears `pcm16`.
 
 **Open.** Open item 1; known issues 2 to 7.
+
+## Entry 6 - 2026-10-31 - Known issue 7 fixed: the session read while `attach_canvas` holds it (D-240)
+
+**At the founder's request, between P130 and P131.** A product fix outside the plan's prompts, so it has its own commit, and three files leave the frozen list at their word.
+
+**The cause, read from the browser, not inferred.** A temporary log gave `recursive use of an object detected which would lead to unsafe aliasing in rust`. `attach_canvas` is an async Rust call holding the session mutably across its await. Since V4's Prompt 124 (`a573d68`) the decoder starts when the scene is set, before the canvas exists, to speed up the first frame. A `dequeue` during the wait called `read_video_sample`; wasm-bindgen threw a plain `Error`; `VideoSource` kept it as a permanent `E_DECODE_VIDEO` with the detail `Error`. A person saw "The picture of this clip could not be read" on a good file. Attaching is slowest with a cold GPU, hence fresh browsers. The media suites' setup page opens the app first, which may be why none saw it (unproven).
+
+**The fix.** `VideoSource.whileSessionHeld(step)`: `FrameDecoder.feed` does nothing while it runs, and feeding goes on after it from where it was, which loses nothing. A second way in was closed too: a full-range clip's restart calls `keyframe_at_or_before`, so it is deferred; the old decoder's frames in between are dropped by the restart. All five `attach_canvas` callers use it. The early start stays. No change to Rust, the protocol or any test's expectation.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| Fresh Chrome starts, keyed build | Before: 6 failed of 14, long-pause fixture. After: **0 failed of 24** (18 long-pause, 6 landscape) |
+| `video-source.test.ts`, new | 7 passed, with a session that throws as wasm-bindgen does; one case reproduces the bug unguarded |
+| Each half of the fix removed in turn | 2 cases fail each time; restored |
+| `preview-sync`, `pipeline-preview`, `cancel`, `export-creator`, `review-edit` | **54 passed, 0 failed**, 27.3 min: first frame 87 ms (limit 500), seek 83 ms (300), drift 24.4 ms (80), style cards 87 ms (400) |
+
+**Not checked.** The deployed site still has the bug until a merge. `model-download` and `rejections` were not re-run: they draw no preview. Other machines: D1 only.
+
+**Open.** Open item 1; known issues 2 to 6.

@@ -17,7 +17,7 @@ V5 is also the version that must not repeat V4's test time: 22 full media runs, 
 | `BP §n`, `PS §n` | `docs/buildplan.md`, `docs/product.md` |
 | `V4 §n`, `V4 CL` | `docs/v4/v4implementation.md`; `docs/v4/v4changelog.md` |
 | `V5 CL` | `docs/v5/v5changelog.md` |
-| `D-n` | A decision: D-1 to D-193 are V1-V4's, D-194 to D-239 are V5's (§2) |
+| `D-n` | A decision: D-1 to D-193 are V1-V4's, D-194 to D-240 are V5's (§2) |
 | `P<nn>` | A prompt of `docs/v5/coding-promptsv5.md` (129 to 136) |
 | `S-8`, `S-9` | The seams of TS §40.9 V5 builds |
 | Tier 0-4 | The test tiers of Step 0.6 (§6.1) |
@@ -83,7 +83,9 @@ Six problems found by reading the code at `0a8aa80`, and the open items of `v5ch
 
 8. **Goldens and snapshots do not change in V5.** V5 changes neither the scene nor the renderer. A changed `.png` or `.snap` in the diff is an error to explain, never to accept. The frozen check of Step 0.5 catches it.
 
-9. **`B_STORAGE_LOW` is on `COPY_PENDING` today.** `check-copy-codes.mjs` fails when a code has copy and is still listed, so the copy and the removal go in one commit (Step 6.4).
+9. **Every `attach_canvas` goes through `state.source.whileSessionHeld`** (D-240). The decoder runs by itself, and reading the session while that call waits throws. Phase 4's new attempts and Phase 6's `exportProfile` call add no new `attach_canvas`; any that does must use it.
+
+9a. **`B_STORAGE_LOW` is on `COPY_PENDING` today.** `check-copy-codes.mjs` fails when a code has copy and is still listed, so the copy and the removal go in one commit (Step 6.4).
 
 10. **Commit and push only on `v5-build`, and never wait where this guide says not to.** `git branch --show-current` before every commit. Merging, pushing to `main`, marking the pull request ready and tagging are the founder's (D-194). A push to `main` deploys.
 
@@ -168,7 +170,7 @@ git diff --name-only "$BASE" -- \
   web/vercel.json web/src/gen web/src/net web/src/models web/src/platform web/src/analytics \
   web/src/workers/audio.worker.ts web/src/workers/media.worker.ts web/src/workers/asr.worker.ts web/src/workers/media web/src/workers/asr \
   web/src/workers/rpc.ts web/src/workers/pool.ts \
-  web/src/workers/render/preview-job.ts web/src/workers/render/preview-loop.ts web/src/workers/render/video-source.ts web/src/workers/render/frame-decoder.ts \
+  web/src/workers/render/preview-loop.ts \
   web/src/usecases/control-preview.ts web/src/usecases/review-update.ts \
   web/tests-e2e/preview-sync.spec.ts fixtures/golden fixtures/labeled fixtures/speech corpus render.yaml
 # expect: no output
@@ -1146,7 +1148,7 @@ export VITE_ENTITLEMENT_TEST_PUBLIC_KEY=$(grep -E '^ +E2E_TEST_PUBLIC_KEY:' .git
 | `FAIL 10` | A hardware encoder over 1.5x: `bitrateMode: "constant"` on that entry. TE-4 changes both copies of the constant or neither |
 | `not measured` in `expectAllChecks` | `--source` missing, or a window with no speech |
 | `FAIL 8` with a steady offset at both ends | The source's audio starts late and the gap was lost, or the product really is off: read `ffprobe`'s `start_time` of both streams before anything else |
-| The preview's card, `E_DECODE_VIDEO` · `preview` · `Error`, on a clip that plays on a retry | V5 CL known issue 7 |
+| `E_DECODE_VIDEO` with the detail `Error`, on a clip that plays on a retry | The session was read while a call held it: an `attach_canvas` outside `whileSessionHeld` (D-240) |
 | `review_action` holds `undo` in a shared case | `sendQueuedAnalytics` missing, or the 300 ms too short on a loaded machine |
 | A toast's text from the case before | `resetClip` did not wait, or the pointer is on the toast, which pauses its timer |
 | `E_MUX` `OutOfOrder` on a real export | A chunk beyond `MAX_REORDER`, or `Writer.video`'s frame is wrong. Read the timestamp |

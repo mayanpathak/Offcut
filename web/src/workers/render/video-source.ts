@@ -63,6 +63,11 @@ export class VideoSource {
   #closed = false;
   #waiters: (() => void)[] = [];
 
+  /** A call that holds the session is waiting (`whileSessionHeld`): nothing may read the session now. */
+  #sessionHeld = false;
+  /** The decoder asked to start again while the session was held. */
+  #restartWhenFree = false;
+
   constructor(demuxer: DemuxerHandle, info: ClipInfo) {
     this.#frames = new FrameDecoder(demuxer, info, {
       opened: () => {
@@ -82,7 +87,12 @@ export class VideoSource {
       },
       failed: () => this.#failed !== undefined,
       wantsMore: () => this.#framesAhead() < this.#ahead,
+      sessionHeld: () => this.#sessionHeld,
       startAgain: () => {
+        if (this.#sessionHeld) {
+          this.#restartWhenFree = true;
+          return;
+        }
         try {
           this.#restart(this.#wantUs);
           this.#frames.feed();
@@ -142,6 +152,43 @@ export class VideoSource {
     } catch (thrown) {
       this.#failed ??= asFailure(thrown);
     }
+  }
+
+  /**
+   * Runs `step`, a call that holds the session while it waits: `attach_canvas`
+   * takes it mutably across an await. The decoder runs by itself, and reading
+   * the session meanwhile would throw wasm-bindgen's "recursive use of an
+   * object", which is no decode failure and would end the clip's preview. So
+   * nothing is fed until `step` is over, and feeding then goes on from where it
+   * was. In a browser whose GPU is cold, attaching takes long enough for this
+   * to be the usual case.
+   */
+  async whileSessionHeld<T>(step: () => Promise<T>): Promise<T> {
+    this.#sessionHeld = true;
+    try {
+      return await step();
+    } finally {
+      this.#sessionHeld = false;
+      this.#resume();
+    }
+  }
+
+  /** What had to wait for the session. A failure is kept for the next call that asks for a frame. */
+  #resume(): void {
+    const restart = this.#restartWhenFree;
+    this.#restartWhenFree = false;
+    if (this.#closed || this.#failed !== undefined) {
+      return;
+    }
+    try {
+      if (restart) {
+        this.#restart(this.#wantUs);
+      }
+      this.#frames.feed();
+    } catch (thrown) {
+      this.#fail(thrown);
+    }
+    this.#wake();
   }
 
   /** Closes every frame this object holds, the one handed out last too, and the decoder. */

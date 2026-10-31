@@ -693,6 +693,7 @@ offcut/
 │   │   │   ├── audio.worker.ts
 │   │   │   ├── render.worker.ts
 │   │   │   ├── render/video-source.ts       demux + VideoDecoder + frame queue
+│   │   │   ├── render/video-source.test.ts  the decoder while a call holds the session (v5implementation D-240)
 │   │   │   ├── render/frame-decoder.ts      the VideoDecoder's management, out of video-source.ts (v4implementation D-150)
 │   │   │   ├── render/preview-job.ts        play, pause, seek, clock, the resize rule (D-148, D-149, D-150)
 │   │   │   ├── render/export-job.ts         the export handlers, out of render.worker.ts (D-150)

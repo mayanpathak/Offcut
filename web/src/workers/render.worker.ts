@@ -201,8 +201,7 @@ async function setScene(p: {
 async function attachPreview(p: { canvas: OffscreenCanvas }): Promise<void> {
   const state = opened();
   const size = previewProfile(state);
-  // No other call on the session until this has answered.
-  await state.session.attach_canvas(p.canvas, size.width, size.height);
+  await state.source.whileSessionHeld(() => state.session.attach_canvas(p.canvas, size.width, size.height));
   previewCanvas = p.canvas;
   await drawStill(worker);
 }
