@@ -196,6 +196,14 @@ fn stts(runs: &[(u32, u32)]) -> Vec<u8> {
     full(b"stts", 0, &fields)
 }
 
+/// `runs` are (sample count, how long after its decode time each of them is
+/// shown, in the media timescale). Version 0: an offset is never negative.
+pub(crate) fn ctts(runs: &[(u32, u32)]) -> Vec<u8> {
+    let mut fields = words(&[count(runs.len())]);
+    fields.extend(runs.iter().flat_map(|&(run, offset)| words(&[run, offset])));
+    full(b"ctts", 0, &fields)
+}
+
 /// The numbers, from 1, of the samples a decoder can start at.
 fn stss(sync: &[u32]) -> Vec<u8> {
     let mut fields = words(&[count(sync.len())]);
@@ -232,15 +240,18 @@ fn co64(chunks: &[Chunk]) -> Vec<u8> {
 }
 
 /// The sample tables of a track, after its sample description. `sync` is
-/// given for video: the numbers, from 1, of the keyframes.
+/// given for video: the numbers, from 1, of the keyframes. `offsets` is given
+/// only when samples are shown in another order than they are decoded.
 pub(crate) fn stbl(
     stsd: Vec<u8>,
     runs: &[(u32, u32)],
+    offsets: Option<&[(u32, u32)]>,
     sync: Option<&[u32]>,
     sizes: &[u32],
     chunks: &[Chunk],
 ) -> Vec<u8> {
     let mut tables = vec![stsd, stts(runs)];
+    tables.extend(offsets.map(ctts));
     tables.extend(sync.map(stss));
     tables.extend([stsc(chunks), stsz(sizes), co64(chunks)]);
     container(b"stbl", &tables)

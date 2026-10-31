@@ -15,11 +15,12 @@ use offcut_mp4::demux::Demuxer;
 use offcut_mp4::mux::{AudioTrackSpec, MOOV_RESERVE, MemSink, Mp4Muxer, VideoTrackSpec};
 use offcut_mp4::probe::probe;
 use offcut_mp4::reader::MemReader;
-use offcut_mp4::sample_table::read_elst;
+use offcut_mp4::sample_table::{read_ctts, read_elst};
 use offcut_types::{
     AudioCodec, Bytes, ContainerKind, FpsMilli, FrameIdx, Hz, Micros, Px, VideoCodec,
 };
 use proptest::prelude::*;
+use sha2::{Digest, Sha256};
 
 /// H.264 High at level 4.0. The muxer only needs it not to be empty.
 const AVCC: [u8; 8] = [0x01, 0x64, 0x00, 0x28, 0xFF, 0xE1, 0x00, 0x00];
@@ -436,7 +437,7 @@ fn the_video_track_has_its_size_no_rotation_and_no_user_data() {
     for unwanted in [b"udta", b"meta", b"ilst", b"\xa9nam", b"\xa9xyz"] {
         assert!(!kinds.contains(unwanted), "found {unwanted:?}");
     }
-    // The six tables of the video track, and no `ctts` before V5.
+    // The six tables of the video track, and no `ctts` when nothing is reordered.
     let stbl = boxes::descend(&mut reader, &video, &[*b"mdia", *b"minf", *b"stbl"])
         .unwrap()
         .unwrap();
@@ -449,4 +450,279 @@ fn the_video_track_has_its_size_no_rotation_and_no_user_data() {
         tables,
         [*b"stsd", *b"stts", *b"stss", *b"stsc", *b"stsz", *b"co64"]
     );
+}
+
+// --- Frames that come out of the order they are shown (v5implementation §9) ---
+
+/// The muxer's output on the code before `ctts` existed: a file with no
+/// reordering must stay this, to the byte (D-211).
+const BEFORE_REORDERING: [(i64, &str); 2] = [
+    (
+        0,
+        "2061536314eb0431583754289fac7e4e9d4f1339fc95f6aec7c9d91eb1c68dd0",
+    ),
+    (
+        -21_333,
+        "99b09c4bc358a74060e4e8bedda496d3a0ce8e81addeef30297f0f5e8dd0a838",
+    ),
+];
+
+/// A keyframe, then three frames at a time written as an encoder with B-frames
+/// gives them: the last of the three first, then the two shown before it.
+fn b_frame_order(frames: u32) -> Vec<u32> {
+    let mut order = vec![0];
+    let mut next = 1;
+    while next + 2 < frames {
+        order.extend([next + 2, next, next + 1]);
+        next += 3;
+    }
+    order.extend(next..frames);
+    order
+}
+
+/// Muxes samples shown as `order` says, in turns with `audio_samples` of audio.
+fn mux_shown(order: &[u32], audio_samples: u32) -> (Vec<u8>, Vec<Vec<u8>>) {
+    let mut seeded = Seeded(0x9E37_79B9_7F4A_7C15);
+    let mut sink = MemSink::default();
+    let mut muxer = Mp4Muxer::new(&mut sink, video_spec(), audio_spec()).unwrap();
+    let mut written = Vec::new();
+    let mut audio = 0u32;
+    for (number, &frame) in (0u32..).zip(order) {
+        let data = seeded.bytes(300 + (frame as usize % 7));
+        muxer
+            .add_video_sample(&data, FrameIdx::new(frame), frame % 60 == 0)
+            .unwrap();
+        written.push(data);
+        while audio < audio_samples && u64::from(audio) * 1_024 < u64::from(number + 1) * 1_600 {
+            muxer
+                .add_audio_sample(&[1, 2, 3], audio_pts(Micros::new(0), audio), AAC_FRAME)
+                .unwrap();
+            audio += 1;
+        }
+    }
+    muxer.finalize().unwrap();
+    (sink.0, written)
+}
+
+/// Each sample comes back with its bytes, in the order written, at the time it is shown.
+fn assert_shown(file: &[u8], order: &[u32], written: &[Vec<u8>]) {
+    let mut d = Demuxer::open(MemReader(file.to_vec())).unwrap();
+    assert_eq!(d.video_sample_count() as usize, order.len());
+    let mut out = Vec::new();
+    for (n, (&frame, data)) in (0u32..).zip(order.iter().zip(written)) {
+        let meta = d.read_video_sample(n, &mut out).unwrap();
+        assert_eq!(&out, data, "the bytes of video sample {n}");
+        assert_eq!(meta.pts, FrameIdx::new(frame).to_micros(), "sample {n}");
+        assert_eq!(meta.is_keyframe, frame % 60 == 0, "sample {n}");
+    }
+}
+
+/// The types of the tables of the video track.
+fn video_tables(file: &[u8]) -> Vec<[u8; 4]> {
+    let (mut reader, video, _) = traks(file);
+    let stbl = boxes::descend(&mut reader, &video, &[*b"mdia", *b"minf", *b"stbl"])
+        .unwrap()
+        .unwrap();
+    boxes::children(&mut reader, &stbl)
+        .unwrap()
+        .iter()
+        .map(|h| h.kind)
+        .collect()
+}
+
+#[test]
+fn frames_written_in_decode_order_are_shown_in_presentation_order() {
+    let order = [0, 3, 1, 2, 6, 4, 5];
+    let (file, written) = mux_shown(&order, 10);
+    assert_shown(&file, &order, &written);
+
+    let (mut reader, video, _) = traks(&file);
+    let stbl = boxes::descend(&mut reader, &video, &[*b"mdia", *b"minf", *b"stbl"])
+        .unwrap()
+        .unwrap();
+    let ctts = boxes::child(&mut reader, &stbl, b"ctts").unwrap().unwrap();
+    // Sample 2 is frame 1, a frame behind: that is the delay, 1,000 ticks. Each
+    // sample's offset is its frame's time, less its decode time, plus the delay.
+    assert_eq!(
+        read_ctts(&mut reader, &ctts).unwrap(),
+        [(1, 1_000), (1, 3_000), (2, 0), (1, 3_000), (2, 0),]
+    );
+    let elst = boxes::descend(&mut reader, &video, &[*b"edts", *b"elst"])
+        .unwrap()
+        .unwrap();
+    let edits = read_elst(&mut reader, &elst).unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].media_time, 1_000);
+    // Seven frames at 30 fps, in milliseconds.
+    assert_eq!(edits[0].segment_duration, 233);
+    assert_eq!(
+        video_tables(&file),
+        [
+            *b"stsd", *b"stts", *b"ctts", *b"stss", *b"stsc", *b"stsz", *b"co64"
+        ]
+    );
+    // The keyframes are numbered by sample, in decode order.
+    let d = Demuxer::open(MemReader(file.clone())).unwrap();
+    assert_eq!(d.keyframe_at_or_before(offcut_types::TimeMs::new(100)), 0);
+}
+
+#[test]
+fn no_reordering_writes_no_ctts_and_no_video_edit() {
+    for (first, expected) in BEFORE_REORDERING {
+        let w = three_seconds(Micros::new(first));
+        let hash: String = Sha256::digest(&w.file)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(hash, expected, "the file changed, first audio at {first}");
+        assert_eq!(
+            video_tables(&w.file),
+            [*b"stsd", *b"stts", *b"stss", *b"stsc", *b"stsz", *b"co64"]
+        );
+        let (mut reader, video, _) = traks(&w.file);
+        assert_eq!(boxes::child(&mut reader, &video, b"edts").unwrap(), None);
+    }
+}
+
+#[test]
+fn a_gap_in_the_frames_is_out_of_order_at_finalize() {
+    let mut sink = MemSink::default();
+    let mut muxer = Mp4Muxer::new(&mut sink, video_spec(), audio_spec()).unwrap();
+    muxer
+        .add_video_sample(&[1], FrameIdx::new(0), true)
+        .unwrap();
+    muxer
+        .add_video_sample(&[1], FrameIdx::new(2), false)
+        .unwrap();
+    assert_eq!(muxer.finalize(), Err(MuxError::OutOfOrder));
+}
+
+#[test]
+fn a_frame_far_ahead_is_out_of_order_at_once() {
+    let mut muxer = Mp4Muxer::new(MemSink::default(), video_spec(), audio_spec()).unwrap();
+    muxer
+        .add_video_sample(&[1], FrameIdx::new(0), true)
+        .unwrap();
+    // Sample 1 may be shown up to 16 frames ahead of its turn, and no further.
+    assert_eq!(
+        muxer.add_video_sample(&[1], FrameIdx::new(18), false),
+        Err(MuxError::OutOfOrder)
+    );
+    muxer
+        .add_video_sample(&[1], FrameIdx::new(17), false)
+        .unwrap();
+}
+
+#[test]
+fn ninety_seconds_reordered_fit_the_space_kept_for_moov() {
+    let order = b_frame_order(2_700);
+    let (file, written) = mux_shown(&order, 4_220);
+    let top = top_level(&file);
+    let (moov, mdat) = (find(&top, b"moov"), find(&top, b"mdat"));
+    assert!(moov.end.get() - moov.start.get() < MOOV_RESERVE);
+    assert_eq!(mdat.start.get() - moov.start.get(), MOOV_RESERVE);
+    assert_shown(&file, &order, &written);
+}
+
+/// One-byte frames in their order, a chunk of their own when `turns`, written
+/// in turns with as many audio samples. What `finalize` says, and the file.
+fn mux_small(frames: u32, turns: bool) -> (Result<Bytes, MuxError>, Vec<u8>) {
+    let mut sink = MemSink::default();
+    // One byte longer than `AVCC`: the rest of `moov` is an odd length, and this
+    // makes it a multiple of 4, so that a count of frames can fill the space exactly.
+    let spec = VideoTrackSpec {
+        avcc: [&AVCC[..], &[0]].concat(),
+        ..video_spec()
+    };
+    let mut muxer = Mp4Muxer::new(&mut sink, spec, audio_spec()).unwrap();
+    for n in 0..frames {
+        muxer
+            .add_video_sample(&[1], FrameIdx::new(n), n == 0)
+            .unwrap();
+        if turns {
+            muxer
+                .add_audio_sample(&[2], audio_pts(Micros::new(0), n), AAC_FRAME)
+                .unwrap();
+        }
+    }
+    let result = muxer.finalize();
+    (result, sink.0)
+}
+
+/// How much of the space kept for `moov` a file left over: the size of its `free` box.
+fn left_over(file: &[u8]) -> u64 {
+    top_level(file)
+        .iter()
+        .find(|h| &h.kind == b"free")
+        .map_or(0, |h| h.end.get() - h.start.get())
+}
+
+#[test]
+fn a_moov_over_the_reserve_is_refused() {
+    let (result, file) = mux_small(30_000, true);
+    assert_eq!(result, Err(MuxError::MoovOverflow));
+    // Nothing was written over the samples: the space is still as it was kept.
+    let top = top_level(&file);
+    let order: Vec<[u8; 4]> = top.iter().map(|h| h.kind).collect();
+    assert_eq!(order, [*b"ftyp", *b"free", *b"mdat"]);
+    let free = find(&top, b"free");
+    assert_eq!(free.end.get() - free.start.get(), MOOV_RESERVE);
+    let body = &file[free.body.get() as usize..free.end.get() as usize];
+    assert!(body.iter().all(|&byte| byte == 0));
+}
+
+#[test]
+fn a_reserve_with_under_8_bytes_left_is_refused() {
+    // A frame in an open chunk adds 4 bytes to `moov`, so one count of frames
+    // leaves 8 bytes, the next 4, too few for a `free` box, and the next none.
+    let (first, file) = mux_small(50_000, false);
+    first.unwrap();
+    // 15 frames take a chunk: 15 x 4 bytes in `stsz` and 8 in `co64`.
+    let mut frames = 50_000 + (left_over(&file) as u32 - 16) / 68 * 15;
+    let mut before = None;
+    let refused = loop {
+        match mux_small(frames, false) {
+            (Ok(_), file) => before = Some(left_over(&file)),
+            (Err(error), _) => break error,
+        }
+        frames += 1;
+        assert!(frames < 62_000, "no count of frames was refused");
+    };
+    assert_eq!(refused, MuxError::MoovOverflow);
+    // It was refused with room left, and not for want of room: one frame more
+    // fills the space exactly, and is accepted.
+    assert_eq!(before, Some(8));
+    let (fits, file) = mux_small(frames + 1, false);
+    fits.unwrap();
+    assert_eq!(left_over(&file), 0);
+    let top = top_level(&file);
+    let moov = find(&top, b"moov");
+    assert_eq!(moov.end.get() - moov.start.get(), MOOV_RESERVE);
+}
+
+/// `count` frames, with each group of `window` after the first frame turned by `turn`.
+fn permuted(count: u32, window: usize, turn: usize) -> Vec<u32> {
+    let mut order: Vec<u32> = (0..count).collect();
+    if let Some(rest) = order.get_mut(1..) {
+        for group in rest.chunks_mut(window) {
+            group.rotate_left(turn % group.len());
+        }
+    }
+    order
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    #[test]
+    fn any_permutation_within_the_window_comes_back(
+        count in 1u32..=240,
+        window in 1usize..=16,
+        turn in 0usize..16,
+        audio in 0u32..=40,
+    ) {
+        let order = permuted(count, window, turn);
+        let (file, written) = mux_shown(&order, audio);
+        assert_shown(&file, &order, &written);
+    }
 }

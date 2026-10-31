@@ -313,7 +313,8 @@ offcut/
 │   │   └── tests/
 │   │       ├── demux_fixtures.rs
 │   │       ├── probe_rejections.rs
-│   │       └── mux_roundtrip.rs
+│   │       ├── mux_roundtrip.rs
+│   │       └── mux_reorder.rs         real B-frames through the muxer, read by ffprobe and ffmpeg (v5implementation D-212)
 │   ├── offcut-text/
 │   │   ├── Cargo.toml
 │   │   ├── src/
@@ -808,7 +809,7 @@ offcut/
 │   └── README.md
 ├── fixtures/
 │   ├── gen_fixtures.sh                generates the synthetic and derived fixtures with the ffmpeg CLI into .gen/ (dev and CI tool)
-│   ├── manifest.json                  fixture name -> recipe kind, expected outcome, probe properties, tests (25 fixtures)
+│   ├── manifest.json                  fixture name -> recipe kind, expected outcome, probe properties, tests (26 fixtures)
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
@@ -3162,6 +3163,7 @@ The generator takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs
 | `ok_moov_at_end.mp4` | `moov` after `mdat` | Accepted | `demux_fixtures.rs` |
 | `ok_portrait_3x4.mp4` | 1080x1440 | Accepted; cropped to 9:16 | `demux_fixtures.rs`, `framing.rs` |
 | `ok_two_video_first_disabled.mp4` | Two video tracks (320x180 disabled, 640x360 default) and one audio track | Accepted; the 640x360 track is the video (§15.4) | `demux_fixtures.rs` |
+| `ok_bframes.mp4` | Synthetic, 1280x720, 2 s at 30 fps, encoded with B-frames, so with `ctts` | Accepted; constant frame rate; its samples re-muxed come back at 1/30 s | `mux_reorder.rs`, `demux_fixtures.rs` |
 | `rej_too_long_91s.mp4` | 91 s | `REJECT_DURATION` | §15.3 tests |
 | `rej_4k.mp4` | 3840x2160 | `REJECT_RESOLUTION` | §15.3 tests |
 | `rej_hevc.mov` | HEVC | `REJECT_HEVC` | §15.3 tests |

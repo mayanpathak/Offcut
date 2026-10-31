@@ -160,3 +160,24 @@ The stereo test reads -11.29 LUFS with `Center` put back. No threshold of checks
 **Not checked.** The deployed site still has the bug until a merge. `model-download` and `rejections` were not re-run: they draw no preview. Other machines: D1 only.
 
 **Open.** Open item 1; known issues 2 to 6.
+
+## Entry 7 - 2026-10-31 - P131: `ctts`, video edit list, moov overflow guard tested
+
+**What.** `add_video_sample`'s `frame` is now the frame a sample is shown as, and samples come in decode order: first frame 0 and a keyframe, each frame once, at most `MAX_REORDER = 16` ahead of its turn. `finalize` refuses a gap before it writes anything. When frames came out of order, `moov` writes `ctts` version 0 after `stts` and a video `elst` starting at the largest delay; otherwise neither. `ok_bframes.mp4`, the 26th fixture, and `mux_reorder.rs`. **G problem 5 closed.** No browser and no WASM rebuild, as the prompt says: nothing on the page changes until P132's build carries this.
+
+**"Byte-identical" is proved against the old code.** SHA-256 of two files (first audio at 0, and with priming) was taken from the muxer before any change, and is pinned in `no_reordering_writes_no_ctts_and_no_video_edit`.
+
+**Differs from the plan.** `mux_roundtrip.rs` changed in its one comment and also in its imports (`read_ctts`, `sha2`); no existing case's body changed. `a_reserve_with_under_8_bytes_left_is_refused` needs no search over many sizes: `moov` is an odd length, so a test's `avcC` is one byte longer, and then 8 bytes left is accepted, 4 is refused, 0 is accepted. That last one is what shows the refusal is this rule and not a plain overflow.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `ok_bframes.mp4` | 60 frames: 2 I, 26 P, 32 B; `demux_fixtures.rs` accepts it |
+| `real_b_frames_come_back_at_30_fps` | The file really is reordered; the demuxer's times and bytes match; `ffprobe` reads time base 1/30000, first frame at 0, every delta 1,000 ticks; `ffmpeg` decodes with no error line |
+| `cargo test -p offcut-mp4` | 87 passed: 39 + 12 + 1 + 20 + 15 |
+| Drills | `ctts` left out: `real_b_frames_come_back_at_30_fps` fails. `ctts` written with nothing reordered: `no_reordering_writes_no_ctts_and_no_video_edit` fails |
+| `pnpm check`, Vitest 182, frozen check | Pass |
+
+**Not checked.** No real encoder has given this muxer reordered frames: D1's never reorders, so `Writer.video` to `ctts` runs only on the fixture's samples here. Phone playback of a reordered file is V10's checklist. The new tests have not run in CI: P134 pushes.
+
+**Open.** Open item 1; known issues 2 to 6.

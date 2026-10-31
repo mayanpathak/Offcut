@@ -3,9 +3,10 @@
 //! so `moov`, which is only known at the end, goes into space kept free for
 //! it in front of them.
 //!
-//! Video is H.264 at exactly 30 frames per second, in the order the frames
-//! are shown. Audio is AAC at 48 kHz in two channels. No sample is held in
-//! memory: each one goes through the sink at once.
+//! Video is H.264 at exactly 30 frames per second, written in the order the
+//! encoder gives it: an encoder with B-frames gives a frame before the frames
+//! shown ahead of it. Audio is AAC at 48 kHz in two channels. No sample is held
+//! in memory: each one goes through the sink at once.
 
 use offcut_types::{Bytes, FrameIdx, Hz, Micros, Px};
 
@@ -27,6 +28,9 @@ const VIDEO_CHUNK_SAMPLES: u32 = 15;
 const AUDIO_CHUNK_SAMPLES: u32 = 24;
 /// The most table room asked for ahead, whatever the caller expects.
 const MAX_HINT: u32 = 8_192;
+/// H.264's limit on frames a decoder holds back (its DPB): a frame further
+/// ahead of its turn than this cannot be a real reordering.
+const MAX_REORDER: u32 = 16;
 const MICROS_PER_SECOND: i128 = 1_000_000;
 
 /// Where the bytes of the file go. In the browser it is a synchronous OPFS
@@ -130,6 +134,10 @@ pub struct Mp4Muxer<S> {
     video: TrackLog,
     /// The numbers, from 1, of the keyframes.
     sync: Vec<u32>,
+    /// Where each video sample is shown, as an output frame, in the order written.
+    presented: Vec<u32>,
+    /// Which output frames have arrived.
+    seen: Vec<bool>,
     audio: TrackLog,
     /// Runs of (sample count, duration in ticks of 1/48,000 s).
     audio_runs: Vec<(u32, u32)>,
@@ -192,6 +200,8 @@ impl<S: MuxSink> Mp4Muxer<S> {
             last: None,
             video: TrackLog::new(VIDEO_CHUNK_SAMPLES, video.frame_count_hint),
             sync: Vec::new(),
+            presented: Vec::new(),
+            seen: Vec::new(),
             audio: TrackLog::new(AUDIO_CHUNK_SAMPLES, 0),
             audio_runs: Vec::new(),
             audio_ticks: 0,
@@ -209,7 +219,10 @@ impl<S: MuxSink> Mp4Muxer<S> {
         Ok(muxer)
     }
 
-    /// Frames come in the order they are shown, numbered from 0 with no gap.
+    /// `frame` is the output frame this sample is shown as, and samples come
+    /// in the order they are decoded. The first is frame 0 and a keyframe; each
+    /// frame comes once, at most `MAX_REORDER` ahead of its turn. `finalize`
+    /// finds a frame that never came.
     pub fn add_video_sample(
         &mut self,
         data: &[u8],
@@ -217,7 +230,11 @@ impl<S: MuxSink> Mp4Muxer<S> {
         is_keyframe: bool,
     ) -> Result<(), MuxError> {
         let number = self.video.count();
-        if frame.get() != number {
+        let shown = frame.get();
+        let too_far = shown > number.saturating_add(MAX_REORDER);
+        let first_elsewhere = number == 0 && shown != 0;
+        let again = self.seen.get(shown as usize).copied().unwrap_or(false);
+        if too_far || first_elsewhere || again {
             return Err(MuxError::OutOfOrder);
         }
         if number == 0 && !is_keyframe {
@@ -225,6 +242,12 @@ impl<S: MuxSink> Mp4Muxer<S> {
         }
         let (offset, size, apart) = self.append_sample(data, Kind::Video)?;
         self.video.push(offset, size, apart);
+        self.presented.push(shown);
+        let needed = (shown as usize).saturating_add(1).max(self.seen.len());
+        self.seen.resize(needed, false);
+        if let Some(arrived) = self.seen.get_mut(shown as usize) {
+            *arrived = true;
+        }
         if is_keyframe {
             self.sync.push(number.saturating_add(1));
         }
@@ -264,6 +287,10 @@ impl<S: MuxSink> Mp4Muxer<S> {
     /// Writes the size of `mdat`, then `moov` into the space kept for it.
     /// Returns the size of the file.
     pub fn finalize(mut self) -> Result<Bytes, MuxError> {
+        // Each frame came once, so one that never came shows as a frame beyond the count.
+        if self.seen.len() != self.video.sizes.len() {
+            return Err(MuxError::OutOfOrder);
+        }
         let mdat_size = self.end.saturating_sub(self.mdat_at);
         self.sink
             .write_at(Bytes::new(self.mdat_at), &boxes::mdat_header(mdat_size))?;
@@ -303,6 +330,36 @@ impl<S: MuxSink> Mp4Muxer<S> {
         Ok((offset, size, apart))
     }
 
+    /// When frames came out of the order they are shown: the `ctts` runs, and
+    /// how far the first frame lies into the media, which an edit takes out.
+    /// `None` when they did not, and then the track has neither.
+    fn reordering(&self) -> Option<(Vec<(u32, u32)>, u32)> {
+        let decoded = (0u64..).map(|number| number * u64::from(VIDEO_SAMPLE_DELTA));
+        let shown = |frame: u32| u64::from(frame) * u64::from(VIDEO_SAMPLE_DELTA);
+        let times = || self.presented.iter().zip(decoded.clone());
+        let delay = times()
+            .map(|(&frame, dts)| dts.saturating_sub(shown(frame)))
+            .max()
+            .unwrap_or(0);
+        if delay == 0 {
+            // No frame is shown before its decode time, so none is shown after it either.
+            return None;
+        }
+        let mut runs: Vec<(u32, u32)> = Vec::new();
+        for (&frame, dts) in times() {
+            let offset = shown(frame).saturating_add(delay).saturating_sub(dts);
+            let offset = u32::try_from(offset).unwrap_or(u32::MAX);
+            if let Some((run, last)) = runs.last_mut()
+                && *last == offset
+            {
+                *run = run.saturating_add(1);
+            } else {
+                runs.push((1, offset));
+            }
+        }
+        Some((runs, u32::try_from(delay).unwrap_or(u32::MAX)))
+    }
+
     fn moov(&self) -> Vec<u8> {
         let video_ticks = u64::from(self.video.count()) * u64::from(VIDEO_SAMPLE_DELTA);
         let video_duration = movie_ticks(video_ticks, VIDEO_TIMESCALE);
@@ -315,15 +372,19 @@ impl<S: MuxSink> Mp4Muxer<S> {
             0 => Vec::new(),
             count => vec![(count, VIDEO_SAMPLE_DELTA)],
         };
+        let reordering = self.reordering();
         let video = boxes::trak(
             boxes::tkhd(1, video_duration, Some((self.width, self.height))),
-            None,
+            reordering
+                .as_ref()
+                .map(|&(_, delay)| boxes::edts(video_duration, delay)),
             boxes::mdia(
                 boxes::mdhd(VIDEO_TIMESCALE, media(video_ticks)),
                 b"vide",
                 boxes::stbl(
                     boxes::stsd_video(self.width, self.height, &self.avcc),
                     &video_runs,
+                    reordering.as_ref().map(|(runs, _)| runs.as_slice()),
                     Some(&self.sync),
                     &self.video.sizes,
                     &self.video.chunks,
@@ -340,6 +401,7 @@ impl<S: MuxSink> Mp4Muxer<S> {
                 boxes::stbl(
                     boxes::stsd_audio(AUDIO_TIMESCALE, AUDIO_CHANNELS as u16, &self.asc),
                     &self.audio_runs,
+                    None,
                     None,
                     &self.audio.sizes,
                     &self.audio.chunks,

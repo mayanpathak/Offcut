@@ -93,6 +93,8 @@ enc ok_portrait_3x4 $GLOBAL $(src 1080 1440 30 3) $OUTF $H264 $FAST $AAC $FS "$O
 enc ok_two_video_first_disabled $GLOBAL $(video 320 180 30 3) $(video 640 360 30 3) $(tone 3) $OUTF \
   -map 0:v -map 1:v -map 2:a $H264 $FAST $AAC -disposition:v:0 0 -disposition:v:1 default $FS \
   "$OUT/ok_two_video_first_disabled.mp4"
+# The one fixture with B-frames, and so with `ctts`: what the muxer's reordering is proved on (v5implementation D-212).
+enc ok_bframes $GLOBAL $(src 1280 720 30 2) $OUTF -c:v libx264 -bf 2 -g 30 -pix_fmt yuv420p $FAST $AAC $FS "$OUT/ok_bframes.mp4"
 enc rej_too_long_91s $GLOBAL $(src 320 180 30 91) $OUTF $H264 $FAST $AAC $FS "$OUT/rej_too_long_91s.mp4"
 enc rej_4k $GLOBAL $(src 3840 2160 30 1) $OUTF $H264 -preset ultrafast $AAC $FS "$OUT/rej_4k.mp4"
 enc rej_hevc $GLOBAL $(src 1280 720 30 2) $OUTF -c:v libx265 -tag:v hvc1 -g 30 -pix_fmt yuv420p \
