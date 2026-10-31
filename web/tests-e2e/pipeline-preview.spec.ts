@@ -356,9 +356,10 @@ test.describe("one clip, from the drop to the preview", () => {
     const clips = await opfsList(page, "clips");
     expect(clips).toEqual([expect.stringMatching(UUID)]);
     const dir = `clips/${clips[0] ?? ""}`;
-    expect(await opfsList(page, dir)).toEqual(["out48.f32", "source"]);
+    expect(await opfsList(page, dir)).toEqual(["out48.f32", "prog48.f32", "source"]);
     // 48 kHz mono, four bytes a sample, exactly as long as the recording (D-34).
     expect(await opfsSize(page, `${dir}/out48.f32`)).toBe(Math.round(sourceDurationMs(referenceClip()) * 48) * 4);
+    expect(await opfsSize(page, `${dir}/prog48.f32`)).toBe(Math.round(sourceDurationMs(referenceClip()) * 48) * 4);
     expect(await opfsSize(page, `${dir}/source`)).toBeGreaterThan(0);
     // The name the file was dropped under is in no entry of the device (P-11).
     const names = await page.evaluate(async () => {

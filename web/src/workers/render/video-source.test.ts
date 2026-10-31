@@ -247,6 +247,26 @@ describe("a source while the session is held", () => {
     expect(liveFrames.count).toBe(0);
   });
 
+  it("`rewind` starts at the first frame, though the time last shown is under 100 ms back", async () => {
+    const video = source(fakeSession());
+    const first = video.frameAtBlocking(at(66));
+    decoder().emit(new FakeFrame(0));
+    decoder().emit(new FakeFrame(FRAME_US));
+    decoder().emit(new FakeFrame(2 * FRAME_US));
+    decoder().emit(new FakeFrame(3 * FRAME_US));
+    await first;
+
+    video.rewind();
+    expect(FakeDecoder.made).toHaveLength(2);
+    const again = video.frameAtBlocking(at(0));
+    const frame = new FakeFrame(0);
+    decoder().emit(frame);
+    decoder().emit(new FakeFrame(FRAME_US));
+    expect(await again).toBe(frame);
+    video.close();
+    expect(liveFrames.count).toBe(0);
+  });
+
   it("a read that really fails after it is kept for the next ask", async () => {
     const session = fakeSession();
     const video = source(session);

@@ -11,7 +11,7 @@ import type { ErrorCode } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
-import { crashWorker, failNextSetScene, hangWorker } from "../usecases/dev-faults";
+import { crashWorker, failEncoderAt, failNextSetScene, hangWorker } from "../usecases/dev-faults";
 import { wordAt } from "../usecases/replace-all";
 
 type WorkerKind = Parameters<typeof crashWorker>[0];
@@ -34,6 +34,8 @@ export type DevHooks = {
   failNextSetScene(): void;
   /** Worker `kind` stops answering for good: a cancel restarts it after 2 s (D-152). */
   hangWorker(kind: WorkerKind): void;
+  /** The video encoder fails at `frame`, the next `times` attempts (v5implementation D-218). */
+  failEncoderAt(frame: number, times: number): void;
 };
 
 declare global {
@@ -68,5 +70,6 @@ export function installDevHooks(): void {
     crash: crashWorker,
     failNextSetScene,
     hangWorker,
+    failEncoderAt,
   };
 }

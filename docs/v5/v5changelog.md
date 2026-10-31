@@ -181,3 +181,32 @@ The stereo test reads -11.29 LUFS with `Center` put back. No threshold of checks
 **Not checked.** No real encoder has given this muxer reordered frames: D1's never reorders, so `Writer.video` to `ctts` runs only on the fixture's samples here. Phone playback of a reordered file is V10's checklist. The new tests have not run in CI: P134 pushes.
 
 **Open.** Open item 1; known issues 2 to 6.
+
+## Entry 8 - 2026-10-31 - P132 (S-8): export over program time, `prog48`, ladder restart
+
+**What.** The loop renders at program time, asks the scene what each frame shows (`source_at`) and asks the source for that. The audio it encodes is `prog48`, read from a new `prog48.f32` beside `out48.f32`. `runExport` is now a loop over `attempt`: an `E_ENCODE_VIDEO` empties the file, sets the bar to 0 and starts from frame 0 on the next supported entry; an `E_ENCODE_AUDIO` gets one more try on the same entry. A sink error, `E_GPU_LOST`, `E_MUX` and a cancel never restart. `failEncoderAt`, behind `__OFFCUT_DEV_FAULTS__`. `useTimeLeft` starts again when the frames fall back (D-238). `export-loop.test.ts`, 18 cases.
+
+**REOPENED CONTRACT** `RenderWorkerApi.exportClip`: `out48` becomes `prog48`, page and worker in this commit (D-214).
+
+**Differs from the plan** (§10.3, §25 row 31, the guide and the prompts are corrected in this commit).
+- **`VideoSource.rewind()`, new, and a real bug avoided.** The plan said `frameAtBlocking(0)` is a jump back. Under 100 ms it is not: `#ask` takes it for the clock stepping back, then `frameAtBlocking` hands out a later frame as "a clip that starts later". A restart after a failure in the first three frames would have begun with the wrong frames, with the frame count still right, so no check would have caught it. A preview paused in the first 100 ms and then exported already had this. Each attempt now rewinds.
+- **`pickVideoConfig` is removed,** not kept "for the capability check": `capability.ts` reads the ladder directly, so nothing would call it.
+- **`pipeline-preview.spec.ts`'s OPFS case** lists a clip's files exactly, and gains `prog48.f32` and its size. The plan missed it; it is added to SAB rule 4.
+- `DEV_FAULTS && takeEncoderFault(n)`, with `DEV_FAULTS` exported: a call alone stayed in the production bundle.
+- The fakes throw `WorkerFailure`, and each failure comes once, so a loop that wrongly restarts fails its case instead of hanging the run. A first drill did hang, which is how this was found.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `export-loop.test.ts` | 18 passed: accounting, identity, the seam (0, 1,000, 1,033, held 2,000 twice), `null`, audio padded and never trimmed, backpressure reaches its limit, every restart path, cancel; `liveFrames` 0 and encoders closed after each |
+| Drills | The source asked the program time, no `sink.reset`, a restart on `E_GPU_LOST`, no `rewind`: each fails its named cases |
+| `export-creator.spec.ts --grep "no token\|another key\|Creator export\|Free-plan"` | 4 passed on a keyed build with the muxer, the stereo fix and this: all 11 checks on real files |
+| `pipeline-preview.spec.ts --grep "OPFS"` | Passed, `prog48.f32` the same size as `out48.f32` |
+| `pnpm build`, `check-hosts` | Exit 0; no `devFailEncoder` or `DevFault` in `web/dist`; app shell about 337.7 kB |
+| `pnpm check`, Vitest, frozen check | See the commit's gate: pass |
+
+**Not checked.** A real encoder failure in a browser: P133's `failEncoderAt` cases. The wider media suites on this change: P133 and P134 run theirs, P136 the whole. None of this in CI: P134 pushes.
+
+**Found, not fixed.** `readAudio` has no caller now; it stays for V6.2's rebuild of `prog48` (D-213).
+
+**Open.** Open item 1; known issues 2 to 6.

@@ -371,9 +371,10 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
   });
 
-  // 13. (F) The audio the export will read (D-51, D-129), before it is
-  //     handed on; then the program's audio from it, on the identity map
-  //     (D-127); then the clip's records.
+  // 13. (F) The cleaned voice, kept for what rebuilds the program later (V6.2,
+  //     V6.3), before it is handed on; then the program's audio from it, on
+  //     the identity map (D-127), which the export will read (TS §40.9 S-8);
+  //     then the clip's records.
   run.stage = "storage";
   await opfs.writeAudio(clipId, out48);
   goOn(signal);
@@ -385,6 +386,8 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   );
   const prog48 = owned(program.prog48);
   run.stage = "storage";
+  // A write copies: `prog48` stays this thread's, for the preview.
+  await opfs.writeProgram(clipId, prog48);
   await transcriptRepo.put(clipId, { transcript, prosody });
   await editsRepo.put(clipId, { editState: edit });
   goOn(signal);

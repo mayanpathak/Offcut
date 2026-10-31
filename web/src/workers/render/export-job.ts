@@ -76,7 +76,7 @@ type ExportRun = {
  * to its place. What must be undone when it does not get there is in `run`.
  */
 async function writeExport(
-  p: { exportId: ExportId; entitlementToken: string; out48: Float32Array },
+  p: { exportId: ExportId; entitlementToken: string; prog48: Float32Array },
   ctx: JobContext,
   run: ExportRun,
   w: WorkerState,
@@ -106,7 +106,7 @@ async function writeExport(
     session,
     source: state.source,
     profile,
-    out48: p.out48,
+    prog48: p.prog48,
     sink,
     canvas,
     onProgress: (done, total) => {
@@ -169,7 +169,7 @@ async function afterExport(run: ExportRun, w: WorkerState): Promise<void> {
 }
 
 export async function exportClip(
-  p: { exportId: ExportId; entitlementToken: string; out48: Float32Array },
+  p: { exportId: ExportId; entitlementToken: string; prog48: Float32Array },
   ctx: JobContext,
   w: WorkerState,
 ): Promise<Exported | typeof CANCELLED> {

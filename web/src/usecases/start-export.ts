@@ -156,17 +156,17 @@ async function renderAndDeliver(
   await opfs.remove(opfs.paths.exportsRoot()).catch(() => undefined);
   delivered = undefined;
 
-  // 7. The export reads its own copy of the audio: a buffer that is handed
-  //    to a worker is gone from this thread, and the preview keeps its own (D-51).
-  //    V5: the export encodes `prog48` instead (TS §40.9 S-8; `program_identity.rs` proves it equals `out48`).
-  const out48 = await opfs.readAudio(clipId);
+  // 7. The export reads its own copy of the program's audio: a buffer that is
+  //    handed to a worker is gone from this thread, and the preview keeps its
+  //    own (D-51; TS §40.9 S-8).
+  const prog48 = await opfs.readProgram(clipId);
   goOn(signal);
 
   // 8.
   const result = await pool.render.exportClip(
-    { exportId, entitlementToken, out48 },
+    { exportId, entitlementToken, prog48 },
     {
-      transfer: [out48.buffer],
+      transfer: [prog48.buffer],
       onProgress: (p) => {
         if (signal.aborted) {
           return;

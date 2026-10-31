@@ -134,7 +134,8 @@ export interface RenderWorkerApi {
   exportClip(p: {
     exportId: ExportId;
     entitlementToken: string;
-    out48: Float32Array;
+    /** The program's audio; transferred (TS §40.9 S-8). */
+    prog48: Float32Array;
   }): Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
 }

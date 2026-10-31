@@ -640,20 +640,20 @@ a.session.render_frame(frame, t);
 
 | Order | File | Watch for |
 |---|---|---|
-| 1 | `web/src/workers/render/encoders.ts` | `supportedConfigs(profile)`, an async generator of the entries `isConfigSupported` accepts, in order. `pickVideoConfig` becomes "the first of them, or `E_ENCODE_VIDEO`" and keeps its signature |
+| 1 | `web/src/workers/render/encoders.ts` | `supportedConfigs(profile)`, an async generator of the entries `isConfigSupported` accepts, in order. `pickVideoConfig` goes: nothing else calls it |
 | 2 | `web/src/workers/render/opfs-sink.ts` | `reset()`: `handle.truncate(0)`, tagged as `writeAt` is. Closed: `io` |
 | 3 | `web/src/workers/render/export-loop.ts` | Today's body becomes `attempt(a, config)`, unchanged except its first line. The new `runExport` is §10.3's, verbatim. The encoders, `Watch`, `Writer` and the muxer are made inside `attempt`; its `finally` closes them |
 | 4 | Same | `Writer.video`'s comment about "out of turn" is updated (D-211) |
 | 5 | `web/src/ui/components/ExportProgress.tsx` | `useTimeLeft` resets `first.current` when `done` falls below `first.current.done` (D-238). `exportStore.progress` already accepts the fall |
 
-Only `E_ENCODE_VIDEO` moves down the ladder; `E_ENCODE_AUDIO` retries once with the same entry. A sink error, `E_GPU_LOST`, `E_MUX` and a cancel are never restarted.
+Each attempt begins with `a.source.rewind()`: a time under 100 ms back is not a jump for `#ask`, so `frameAtBlocking(0)` alone can hand out a later frame. `pipeline-preview.spec.ts`'s OPFS case lists a clip's files exactly, and gains `prog48.f32`. Only `E_ENCODE_VIDEO` moves down the ladder; `E_ENCODE_AUDIO` retries once with the same entry. A sink error, `E_GPU_LOST`, `E_MUX` and a cancel are never restarted.
 
 ### Step 4.5 - The dev fault (D-218)
 
 | Order | File | Watch for |
 |---|---|---|
 | 1 | `web/src/workers/rpc-worker.ts` | `devFault` gains `devFailEncoder` with `{ at, times }`, kept in module state; `export function takeEncoderFault(n: number): boolean`, `false` unless `DEV_FAULTS` and `n === at` and `times > 0`, which then lowers `times` |
-| 2 | `web/src/workers/render/export-loop.ts` | Before `venc.encode`: `if (takeEncoderFault(n)) { throw new WorkerFailure("E_ENCODE_VIDEO", "DevFault"); }` |
+| 2 | `web/src/workers/render/export-loop.ts` | Before `venc.encode`: `if (DEV_FAULTS && takeEncoderFault(n)) { throw new WorkerFailure("E_ENCODE_VIDEO", "DevFault"); }` |
 | 3 | `web/src/usecases/dev-faults.ts`, `web/src/ui/dev-hooks.ts` | `failEncoderAt(frame, times)`, through `pool.render.notify` |
 | 4 | `scripts/check-hosts.mjs` | `DEV_MARKERS` gains `devFailEncoder`: the list is explicit, so a name not on it proves nothing |
 

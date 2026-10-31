@@ -700,6 +700,7 @@ offcut/
 │   │   │   ├── render/export-job.ts         the export handlers, out of render.worker.ts (D-150)
 │   │   │   ├── render/preview-loop.ts
 │   │   │   ├── render/export-loop.ts
+│   │   │   ├── render/export-loop.test.ts   the loop with fake WebCodecs: frames, program time, restarts (v5implementation D-219)
 │   │   │   ├── render/encoders.ts           [ONLY] WebCodecs encoder configs and ladder
 │   │   │   └── render/opfs-sink.ts
 │   │   └── ui/

@@ -281,9 +281,9 @@ web/src/
   workers/render/export-job.ts                   prog48; sink passed on
   workers/render/export-loop.ts                  source_at, attempts, ladder
   workers/render/export-loop.test.ts        new
-  workers/render/encoders.ts                     supportedConfigs (pickVideoConfig stays for the capability check)
+  workers/render/encoders.ts                     supportedConfigs, in place of pickVideoConfig
   workers/render/opfs-sink.ts                    reset()
-  workers/render/video-source.ts                 whileSessionHeld (D-240)
+  workers/render/video-source.ts                 whileSessionHeld (D-240), rewind
   workers/render/video-source.test.ts       new  the session held, with a session that throws as wasm-bindgen does
   workers/render/frame-decoder.ts                feeds nothing while the session is held
   workers/render/preview-job.ts                  its two attach_canvas (D-240)
@@ -662,7 +662,7 @@ a.session.render_frame(frame, t);
 export async function* supportedConfigs(profile: ExportProfile): AsyncGenerator<VideoEncoderConfig> { ... }
 ```
 
-`pickVideoConfig` becomes "the first of `supportedConfigs`, or `E_ENCODE_VIDEO`" and keeps its signature for the capability check.
+`pickVideoConfig` goes: `capability.ts` reads `VIDEO_ENCODE_LADDER` directly, so nothing would call it. `E_ENCODE_VIDEO` `NoSupportedConfig` is `runExport`'s, when the generator gives nothing.
 
 `export-loop.ts`: today's `runExport` body becomes `attempt(a, config)`, unchanged except for its first line. The new `runExport`:
 
@@ -693,11 +693,11 @@ export async function runExport(a: ExportArgs): Promise<{ bytes: Bytes } | { can
 }
 ```
 
-What each attempt starts clean: the encoders, `Watch`, `Writer` and the muxer are made inside `attempt`, and its `finally` closes them. `liveFrames` balances in its `finally`. The source: `frameAtBlocking(0)` after being at frame `k` is a jump back, which `#ask` handles as a seek does. The scene and the canvas are unchanged.
+What each attempt starts clean: the encoders, `Watch`, `Writer` and the muxer are made inside `attempt`, and its `finally` closes them. `liveFrames` balances in its `finally`. The source: each attempt starts with `source.rewind()`. `frameAtBlocking(0)` alone is not enough: `#ask` takes a time under 100 ms back for the clock stepping back, so after a failure in the first frames, or a preview paused there, it would hand out a later frame in place of the first. The scene and the canvas are unchanged.
 
 `OpfsSink.reset()`: `handle.truncate(0)`, tagged as `writeAt` is. A sink error is never restarted.
 
-`takeEncoderFault(n)` (D-218), in the frame loop before `venc.encode`: in a production build it is `false` and is folded away.
+`DEV_FAULTS && takeEncoderFault(n)` (D-218), in the frame loop before `venc.encode`: the constant is what folds it out of a production build; a call alone stays in the bundle.
 
 `ExportProgress.tsx` (D-238): `useTimeLeft` resets `first.current` when `done` falls below `first.current.done`. The bar falls to 0, which is honest: the work did start again. `exportStore.progress` already accepts it.
 
@@ -1428,6 +1428,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 28 | Check 8 read a source's audio from its first sample, so a phone's late start (0.305 s on the second recording) read as a 305 ms offset; the fixtures have none | V5 §7 | `pcm` fills the gap, and the self-test has the case |
 | 30 | Reading the session during `attach_canvas` ended a good clip's preview; no suite saw it, since a warmed browser attaches quickly | V4's Prompt 124 | D-240 |
 | 29 | §7.2's flash numbers missed real white frames, and it said the reference clip has none; `not measured` for no white frame would fail `expectAllChecks` on any clip without one | V5 §7.2 | 225 and 30; two in the reference clip; `not compared` |
+| 31 | §10.3 relied on `frameAtBlocking(0)` as a jump back, untrue under 100 ms; `pickVideoConfig` had no caller left; `pipeline-preview.spec.ts`'s OPFS case lists a clip's files exactly | V5 §10.3, §4 | `VideoSource.rewind`; removed; the case names `prog48.f32` |
 | 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 
 **To copy back at Prompt 136, from the code:** TS §5 (new files), §9 (C-7, C-9, C-10), §12.2's prose, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 item 14, §40.9 (S-8, S-9 as built). BP §7: "as built". Corrections to `verify/README.md`. V5 as built goes in a table in this document, as V4 §24.3 did.

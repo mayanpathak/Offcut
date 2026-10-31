@@ -191,6 +191,24 @@ export class VideoSource {
     this.#wake();
   }
 
+  /**
+   * Decoding starts again at the clip's first frame. `#ask` takes a time less
+   * than 100 ms back for the clock stepping back, not a jump, and would then
+   * hand out a later frame in place of the first: so an export, which needs
+   * every frame from the first, says so. A failure is kept for the next ask.
+   */
+  rewind(): void {
+    if (this.#closed || this.#failed !== undefined) {
+      return;
+    }
+    this.#wantUs = 0;
+    try {
+      this.#restart(0);
+    } catch (thrown) {
+      this.#fail(thrown);
+    }
+  }
+
   /** Closes every frame this object holds, the one handed out last too, and the decoder. */
   close(): void {
     if (this.#closed) {

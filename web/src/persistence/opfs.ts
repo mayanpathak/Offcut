@@ -34,6 +34,7 @@ export const paths = {
   clipDir: (id: ClipId): string => `clips/${id}`,
   clipSource: (id: ClipId): string => `clips/${id}/source`,
   clipOut48: (id: ClipId): string => `clips/${id}/out48.f32`,
+  clipProg48: (id: ClipId): string => `clips/${id}/prog48.f32`,
   exportsRoot: (): string => "exports",
   exportTmp: (id: ExportId): string => `exports/tmp/${id}.mp4`,
   exportFinal: (id: ExportId): string => `exports/${id}.mp4`,
@@ -218,6 +219,19 @@ export function writeAudio(id: ClipId, out48: Float32Array<ArrayBuffer>): Promis
     const handle = await fileHandle(paths.clipOut48(id), { create: true });
     await write(handle, false, (writable) => writable.write(out48));
   });
+}
+
+/** The program's audio, which the export encodes, in the same form (v5implementation D-213). */
+export function writeProgram(id: ClipId, prog48: Float32Array<ArrayBuffer>): Promise<void> {
+  return guarded(async () => {
+    const handle = await fileHandle(paths.clipProg48(id), { create: true });
+    await write(handle, false, (writable) => writable.write(prog48));
+  });
+}
+
+/** What `writeProgram` wrote. */
+export function readProgram(id: ClipId): Promise<Float32Array<ArrayBuffer>> {
+  return guarded(async () => new Float32Array(await (await getFile(paths.clipProg48(id))).arrayBuffer()));
 }
 
 /** What `writeAudio` wrote (D-51). */
