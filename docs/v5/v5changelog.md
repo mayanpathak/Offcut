@@ -210,3 +210,38 @@ The stereo test reads -11.29 LUFS with `Center` put back. No threshold of checks
 **Found, not fixed.** `readAudio` has no caller now; it stays for V6.2's rebuild of `prog48` (D-213).
 
 **Open.** Open item 1; known issues 2 to 6.
+
+## Entry 9 - 2026-11-01 - P133: `timeline-preserved` on both pause fixtures, all 11 checks
+
+**What.** `timeline-preserved.spec.ts`, two serial groups, 9 cases: 1-5, 8, 9 on the long pause, and both of the sparse clip. It joins `MEDIA_SUITES`. `watchExport` and the `Window` fields it writes move to `helpers/fixtures.ts`. Only tests changed, so no build; the prompt ran on P132's keyed build. **BP §7's demo is now a test.** The real restart P132 could not show is shown here.
+
+**The readings** (`d1`, real exports, by `ffmpeg`).
+| Export | Loudness | Audio offset, start / end, correlation | White frames | Watermark | Bitrate | Frames, H.264 profile |
+|---|---|---|---|---|---|---|
+| Long pause | -14.3 LUFS | -0.3 / 0.5 ms, 0.97 / 0.99 | 2, off by 0 | -0.01 | 8.3 Mb/s | 600, High |
+| Long pause, edited (a word, a visual off, Bold) | -14.3 LUFS | -0.3 / 0.5 ms, 0.97 / 0.99 | 2, off by 0 | -0.01 | 8.3 Mb/s | 600, High |
+| Long pause, encoder failed at frame 30 | -14.3 LUFS | -0.3 / 0.5 ms, 0.97 / 0.99 | 2, off by 0 | -0.01 | 8.3 Mb/s | 600, **Main** |
+| Sparse | -14.3 LUFS | 0.0 / 0.3 ms, 1.00 / 1.00 | 2, off by 0 | -0.03 | 8.4 Mb/s | 900, High |
+
+The restarted file being Main is the proof it came from the ladder's next entry. D1's Chrome supports all four entries at both sizes (`isConfigSupported`, read once), so case 8 is not skipped. The edited file's frames differ from the unedited one's at 3 s and 15.5 s: identical readings are not a sign the edit was lost.
+
+**Differs from the plan** (§17.5, §25 row 32 and the guide are corrected in this commit).
+- **Case 1: the first word after the pause may start 40 ms early.** The recognizer hears it at 9,960 ms, as `fixtures/speech/README.md` already recorded. "Moved earlier" is asserted directly: no word starts before the one before it has ended.
+- **Sparse: "lies inside a piece" judged starts, and allows a word that runs on.** Read: words at 980-2,000 and 2,020-5,880 ms, and all five phrases end past their piece's 300 ms. The recognizer stretches a phrase over room tone; nothing moved it. The prompt's error handling asks for this tightening. A word after a gap must start in a piece, so a word really moved earlier still fails.
+- **`forgetProgress` moves too,** not only `watchExport`. Without it case 8 would pass on the fall from the last export's 100 to this one's first value, whatever the restart did.
+- **Case 3 waits for "Play again"**, the button's name at the end, and also asserts the preview got to within 500 ms of the end.
+- **Case 9:** `exports/` reads `["tmp"]`, since the start of an export sweeps the file before it, and the case stays last: the worker keeps the fault's unused attempts.
+- **G 5.2** had only the header comment left: P130 did the rest.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| Each case alone, then the file once | All pass; the file 9 + 2 setup, 2.3 min |
+| `export-creator.spec.ts --grep "Creator export\|progress\|another key\|no token"` | 4 + 2 setup passed, with `watchExport` moved |
+| `pnpm check`, Vitest, frozen check | Exit 0; 201 passed; empty |
+| Media listed | 87 with setup |
+| Saved exports, `zz-` files | Deleted |
+
+**Not checked.** Rust is unchanged and was not run. Other machines: D1 only. Nothing of P130 to P133 has run in CI: P134 pushes.
+
+**Open.** Open item 1; known issues 2 to 6.

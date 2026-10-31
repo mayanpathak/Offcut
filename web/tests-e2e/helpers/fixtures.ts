@@ -234,6 +234,64 @@ export function expectAllChecks(verdict: Verdict, o: { flashes?: number } = {}):
   expect(verdict.status, verdict.output).toBe(0);
 }
 
+// --- What an export shows ------------------------------------------------------
+
+declare global {
+  interface Window {
+    /** The stage labels the export's progress showed, in order, each once. */
+    e2eStages?: string[];
+    /** Every value its bar took, in order. */
+    e2eExportBar?: string[];
+    /** How often the progress was on the page without the "rendering on your computer" line. */
+    e2eLocalLineMissing?: number;
+    /** How many times the failure of an export came onto the page. */
+    e2eExportFailures?: number;
+  }
+}
+
+/** Records what the export's progress shows, from before the page loads: "Saving" is on it for a moment. */
+export async function watchExport(page: Page): Promise<void> {
+  await page.addInitScript((localLine) => {
+    window.e2eStages = [];
+    window.e2eExportBar = [];
+    window.e2eLocalLineMissing = 0;
+    window.e2eExportFailures = 0;
+    let failureShown = false;
+    new MutationObserver(() => {
+      // The failure of the export before stays on the page until the next one starts: a new one is one that comes.
+      const failure = document.querySelector('[data-testid="export-failed"]') !== null;
+      if (failure && !failureShown) {
+        window.e2eExportFailures = (window.e2eExportFailures ?? 0) + 1;
+      }
+      failureShown = failure;
+      const progress = document.querySelector('[data-testid="export-progress"]');
+      if (progress === null) {
+        return;
+      }
+      const stage = progress.querySelector('[data-testid="export-stage"]')?.textContent ?? "";
+      if (stage !== window.e2eStages?.at(-1)) {
+        window.e2eStages?.push(stage);
+      }
+      const now = progress.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") ?? "";
+      if (now !== window.e2eExportBar?.at(-1)) {
+        window.e2eExportBar?.push(now);
+      }
+      if (!(progress.textContent ?? "").includes(localLine)) {
+        window.e2eLocalLineMissing = (window.e2eLocalLineMissing ?? 0) + 1;
+      }
+    }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
+  }, messages.export.renderingLocally);
+}
+
+/** Forgets what `watchExport` recorded of the exports before this one. */
+export async function forgetProgress(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.e2eStages = [];
+    window.e2eExportBar = [];
+    window.e2eLocalLineMissing = 0;
+  });
+}
+
 // --- The cache of the asset host's files -----------------------------------------
 
 function sha256Of(file: string): Promise<string> {

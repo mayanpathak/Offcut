@@ -1147,7 +1147,7 @@ Order within the group: no token, other key, Creator, progress, events, name, st
 
 | Case | Asserts |
 |---|---|
-| Words keep their times | From `readIndexedDb(page, "transcripts", clipId)`: every word's start and end lies outside the pause or at its edges; the first word after it starts at 10,000 ms or later; none is moved earlier. Word text is never printed (SAB rule 9) |
+| Words keep their times | From `readIndexedDb(page, "transcripts", clipId)`: every word's start and end lies outside the pause or at its edges; the first word after it starts at 10,000 ms or later, within the recognizer's 40 ms; none is moved earlier. Word text is never printed (SAB rule 9) |
 | Caption at its spoken time | Seek to that word's start + 60 ms: the caption mirror has it. Seek 1,000 ms before: it does not |
 | Preview's length | The scrub bar's `max` is the source's duration; played from 500 ms before the end, the play button returns and `previewAt` is at or under it |
 | Export is 20 s | Creator: `verifyMp4(file, "creator", 20_000, fixture)`, `expectAllChecks(verdict, { flashes: 2 })`; 600 frames (check 3 reads them) |
@@ -1161,7 +1161,7 @@ Order within the group: no token, other key, Creator, progress, events, name, st
 
 | Case | Asserts |
 |---|---|
-| Words stay in their pieces | Each word lies inside a piece placed at 0.5, 7.0, 13.5, 19.5 or 26.0 s (± 300 ms); at least three pieces hold a word |
+| Words stay in their pieces | Each word starts inside a piece placed at 0.5, 7.0, 13.5, 19.5 or 26.0 s (± 300 ms), or follows the word before it within 40 ms; at least three pieces hold a word |
 | Export is 30 s | `verifyMp4(file, "creator", 30_000, fixture)`, `expectAllChecks(..., { flashes: 2 })`; 900 frames |
 
 **`review-edit.spec.ts`:** section 6.3. **`model-download.spec.ts`:** D-236. **`cancel.spec.ts`:** unchanged; its "no cache entry" assertion, written in V4, now means something.
@@ -1429,6 +1429,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 30 | Reading the session during `attach_canvas` ended a good clip's preview; no suite saw it, since a warmed browser attaches quickly | V4's Prompt 124 | D-240 |
 | 29 | §7.2's flash numbers missed real white frames, and it said the reference clip has none; `not measured` for no white frame would fail `expectAllChecks` on any clip without one | V5 §7.2 | 225 and 30; two in the reference clip; `not compared` |
 | 31 | §10.3 relied on `frameAtBlocking(0)` as a jump back, untrue under 100 ms; `pickVideoConfig` had no caller left; `pipeline-preview.spec.ts`'s OPFS case lists a clip's files exactly | V5 §10.3, §4 | `VideoSource.rewind`; removed; the case names `prog48.f32` |
+| 32 | §17.5's word cases are stricter than the recognizer: it hears the first word after the long pause at 9,960 ms, and runs the sparse clip's phrases on over room tone (one word from 2,020 to 5,880 ms) | V5 §17.5 | 40 ms of slack; a word starts in a piece or follows the one before it. No word moves, and a moved one still fails |
 | 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 
 **To copy back at Prompt 136, from the code:** TS §5 (new files), §9 (C-7, C-9, C-10), §12.2's prose, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 item 14, §40.9 (S-8, S-9 as built). BP §7: "as built". Corrections to `verify/README.md`. V5 as built goes in a table in this document, as V4 §24.3 did.

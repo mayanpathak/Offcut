@@ -1,6 +1,6 @@
 // J9 and J10 in a real browser: the reference clip is exported and the file
-// is checked by the independent verifier, against the built app served with
-// the production headers. The build under test must have been made with the
+// is put through all 11 checks of the independent verifier, against the built
+// app served with the production headers. The build under test must have been made with the
 // test key (v2implementation D-24): a token is one the tests mint.
 //
 // The clip is processed once, and the cases export it in the order they are
@@ -21,6 +21,7 @@ import {
   dropClip,
   ensureModelCached,
   expectAllChecks,
+  forgetProgress,
   opfsList,
   patient,
   referenceClip,
@@ -28,20 +29,8 @@ import {
   sourceDurationMs,
   v3TestClip,
   verifyMp4,
+  watchExport,
 } from "./helpers/fixtures";
-
-declare global {
-  interface Window {
-    /** The stage labels the export's progress showed, in order, each once. */
-    e2eStages?: string[];
-    /** Every value its bar took, in order. */
-    e2eExportBar?: string[];
-    /** How often the progress was on the page without the "rendering on your computer" line. */
-    e2eLocalLineMissing?: number;
-    /** How many times the failure of an export came onto the page. */
-    e2eExportFailures?: number;
-  }
-}
 
 const UUID_MP4 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.mp4$/;
 /** Analytics sends what it has every 10 s; a case waits that long for an event, and a little more. */
@@ -57,48 +46,6 @@ type Recorded = { method: string; url: string };
 const canvas = (page: Page) => page.getByTestId("preview-canvas");
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const exportButton = (page: Page) => button(page, messages.export.button);
-
-/** Records what the export's progress shows, from before the page loads: "Saving" is on it for a moment. */
-async function watchExport(page: Page): Promise<void> {
-  await page.addInitScript((localLine) => {
-    window.e2eStages = [];
-    window.e2eExportBar = [];
-    window.e2eLocalLineMissing = 0;
-    window.e2eExportFailures = 0;
-    let failureShown = false;
-    new MutationObserver(() => {
-      // The failure of the export before stays on the page until the next one starts: a new one is one that comes.
-      const failure = document.querySelector('[data-testid="export-failed"]') !== null;
-      if (failure && !failureShown) {
-        window.e2eExportFailures = (window.e2eExportFailures ?? 0) + 1;
-      }
-      failureShown = failure;
-      const progress = document.querySelector('[data-testid="export-progress"]');
-      if (progress === null) {
-        return;
-      }
-      const stage = progress.querySelector('[data-testid="export-stage"]')?.textContent ?? "";
-      if (stage !== window.e2eStages?.at(-1)) {
-        window.e2eStages?.push(stage);
-      }
-      const now = progress.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") ?? "";
-      if (now !== window.e2eExportBar?.at(-1)) {
-        window.e2eExportBar?.push(now);
-      }
-      if (!(progress.textContent ?? "").includes(localLine)) {
-        window.e2eLocalLineMissing = (window.e2eLocalLineMissing ?? 0) + 1;
-      }
-    }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
-  }, messages.export.renderingLocally);
-}
-
-async function forgetProgress(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.e2eStages = [];
-    window.e2eExportBar = [];
-    window.e2eLocalLineMissing = 0;
-  });
-}
 
 test.describe("one clip, exported", () => {
   test.describe.configure({ mode: "serial" });

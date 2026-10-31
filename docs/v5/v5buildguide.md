@@ -720,7 +720,7 @@ Goal: BP §7's demo is a test. 20 s in, 20 s out, in sync on both sides.
 
 | Order | Case | Asserts | Added in |
 |---|---|---|---|
-| 1 | Words keep their times | From `readIndexedDb(page, "transcripts", clipId)` (`clipId` from `opfsList(page, "clips")`): every word's `start_ms` and `end_ms` lies outside the pause or at its edges; the first word after it starts at 10,000 ms or later | Here |
+| 1 | Words keep their times | From `readIndexedDb(page, "transcripts", clipId)` (`clipId` from `opfsList(page, "clips")`): every word's `start_ms` and `end_ms` lies outside the pause or at its edges, and no word starts before the one before it has ended; the first word after it starts at 10,000 ms or later, within the recognizer's 40 ms (it hears 9,960 ms, `fixtures/speech/README.md`) | Here |
 | 2 | Caption at its spoken time | Seek to that word's start + 60 ms: the caption mirror has it. 1,000 ms before: it does not | Here |
 | 3 | Preview's length | The scrub bar's `max` is the source's duration; played from 500 ms before the end, Play returns and `previewAt` is at or under it | Here |
 | 4 | Export is 20 s | Creator: `verifyMp4(file, "creator", 20_000, fixture)`, `expectAllChecks(verdict, { flashes: 2 })`; 600 frames (check 3 reads them) | Here |
@@ -734,7 +734,7 @@ Goal: BP §7's demo is a test. 20 s in, 20 s out, in sync on both sides.
 
 | Case | Asserts |
 |---|---|
-| Words stay in their pieces | Each word lies inside a piece placed at 0.5, 7.0, 13.5, 19.5 or 26.0 s (± 300 ms); at least three pieces hold a word |
+| Words stay in their pieces | Each word starts inside a piece placed at 0.5, 7.0, 13.5, 19.5 or 26.0 s (± 300 ms), or follows the word before it within 40 ms: the recognizer runs a phrase's last words on over the room tone. At least three pieces hold a word |
 | Export is 30 s | `verifyMp4(file, "creator", 30_000, fixture)`, `expectAllChecks(…, { flashes: 2 })`; 900 frames |
 
 Until Phase 6 a token must be seeded before each export; with the cache absent every export renders. `web/playwright.config.ts`: the spec joins `MEDIA_SUITES`. Its row in TS §5 exists since v1.1.
