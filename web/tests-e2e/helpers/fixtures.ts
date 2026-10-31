@@ -3,7 +3,8 @@
 // the speech model put on the browser's device without a download, what
 // the page keeps in its storage, and (v4implementation G 16.1) the editor's
 // controls driven as a person drives them, the preview's statistics, the
-// pixels of a screenshot and the accessibility scan.
+// pixels of a screenshot and the accessibility scan; and (v5implementation
+// §6.3) one processed clip shared by a suite's cases, made clean between them.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -14,10 +15,12 @@ import { pipeline } from "node:stream/promises";
 import { inflateSync } from "node:zlib";
 
 import AxeBuilder from "@axe-core/playwright";
-import { type BrowserContext, expect, type Page, type Route } from "@playwright/test";
+import { type Browser, type BrowserContext, expect, type Page, type Route, type TestInfo } from "@playwright/test";
 
+import { messages } from "../../src/copy/messages";
 import { paths } from "../../src/persistence/opfs";
 import { DB_NAME } from "../../src/persistence/schema";
+import { type FakeApi, installFakeApi } from "./fake-api";
 
 // FLUSH_INTERVAL_MS of src/analytics/client.ts, and API_TIMEOUT_MS of
 // src/net/http.ts: both 10 s. Neither file can be imported here: they read
@@ -705,6 +708,104 @@ export async function settled(page: Page, since: number): Promise<void> {
   await expect.poll(() => saves(page), { timeout: 30_000, message: "the change was written" }).toBeGreaterThan(since);
   await expect(page.getByText(SAVING, { exact: true })).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText(SAVED, { exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+// --- One processed clip, shared by a suite's cases (v5implementation §6.3) -------
+
+/** `clip-store.ts`'s `empty().edit`: what a clip's stored edit is when nothing was changed. */
+const EMPTY_EDIT = { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true };
+
+export type SharedClip = { context: BrowserContext; page: Page; api: FakeApi };
+
+/** Opens the editor on `page` and takes `fixture` to a paused, ready preview, through the cached model. */
+export async function openClip(page: Page, fixture: string): Promise<FakeApi> {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await ensureModelCached(page.context());
+  const api = await installFakeApi(page);
+  await routeAssets(page);
+  await trackSaves(page);
+  await page.goto("/app");
+  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+  await expectTestBuild(page);
+  await dropClip(page, fixture);
+  const canvas = page.getByTestId("preview-canvas");
+  await expect(canvas.or(page.getByTestId("clip-failed"))).toBeVisible({ timeout: patient(240_000) });
+  await expect(canvas, "the clip was processed").toBeVisible();
+  await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled({ timeout: 30_000 });
+  return api;
+}
+
+/** `openClip` on a context and a page of its own, which the suite closes when its cases are done. */
+export async function openShared(browser: Browser, info: TestInfo, fixture: string): Promise<SharedClip> {
+  const { baseURL } = info.project.use;
+  const context = await browser.newContext(baseURL === undefined ? {} : { baseURL });
+  const page = await context.newPage();
+  const api = await openClip(page, fixture);
+  return { context, page, api };
+}
+
+/**
+ * Sends what analytics holds now: the page is told it is hidden, on which
+ * `analytics/client.ts` flushes. `flushAnalytics` needs `page.clock`, and a fake
+ * clock on a shared page would touch every timer of every case. `PreviewPlayer`
+ * reads `document.hidden`, which this leaves alone, so nothing else reacts.
+ */
+export async function sendQueuedAnalytics(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    delete (document as unknown as { visibilityState?: string }).visibilityState;
+  });
+  // For the request to reach the route: it leaves at once, and the route is on this machine.
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Makes a shared clip what it was when it was processed: nothing open, nothing
+ * playing, every change undone, at the start, on the Captions tab, no toast,
+ * and nothing recorded by the fake API. Asserts it last: an unclean clip fails
+ * the case that finds it, by this name, and does not confuse the one after.
+ */
+export async function resetClip(page: Page, api: FakeApi): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(wordField(page)).toHaveCount(0);
+
+  // The transport has one button, whose name changes a moment after a press: a
+  // press on a Play that was just Pause starts it again, and the next try stops it.
+  const pause = page.getByRole("button", { name: messages.preview.pause, exact: true });
+  const play = page.getByRole("button", { name: messages.preview.play, exact: true });
+  await expect(async () => {
+    if (await pause.isVisible()) {
+      await pause.click();
+    }
+    await expect(play).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+
+  // The top bar's: the toast after a redo offers an Undo of its own.
+  const undo = page.getByRole("banner").getByRole("button", { name: messages.editor.undo, exact: true });
+  await expect(page.getByText(SAVING, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  while (await undo.isEnabled()) {
+    const since = await saves(page);
+    await undo.click();
+    await settled(page, since);
+  }
+
+  await seekTo(page, 0);
+  await expect.poll(() => previewAt(page)).toBe(0);
+  await openTab(page, "Captions");
+  // A toast does not time out while the pointer is on it. `ToastHost` renders nothing with none.
+  await page.mouse.move(0, 0);
+  await expect(page.getByTestId("toasts")).toHaveCount(0, { timeout: patient(30_000) });
+
+  // In this order: the events of the undo steps must not reach the next case's counts.
+  await sendQueuedAnalytics(page);
+  api.forget();
+
+  await expect(undo, "resetClip: every change is undone").toBeDisabled();
+  await expect(page.getByTestId("preview-failed"), "resetClip: no failure is on the page").toHaveCount(0);
+  const [clipId] = await opfsList(page, "clips");
+  const stored = (await readIndexedDb(page, "edits", clipId ?? "")) as { value?: { editState?: unknown } } | undefined;
+  expect(stored?.value?.editState, "resetClip: the stored edit is the empty one").toEqual(EMPTY_EDIT);
 }
 
 /** The scrub bar (D-148). */

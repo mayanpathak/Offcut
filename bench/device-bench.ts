@@ -1,5 +1,5 @@
 // The device benchmark (TS §30): how long this machine takes for each stage
-// of a clip. One run to warm up, then ten that are measured: each opens a
+// of a clip. One run to warm up, then BENCH_RUNS (ten unless told) that are measured: each opens a
 // page, drops the clip, waits for the preview, exports with a Creator token
 // and waits for the download. The times are the app's own, read from the
 // analytics events its fake API receives.
@@ -7,7 +7,7 @@
 // It runs as the Playwright project `bench`, headed, against `vite preview`
 // of a build made with the test key:
 //
-//   BENCH_DEVICE=<name> [BENCH_CLIP=reference|portrait|v3testclip] pnpm bench:device
+//   BENCH_DEVICE=<name> [BENCH_CLIP=reference|portrait|v3testclip] [BENCH_RUNS=<n>] pnpm bench:device
 //
 // and writes bench/results/<name>-<yyyy-mm-dd>-<clip>.json, so that two clips
 // can be benched on one day (v3implementation §19.19). The file holds numbers
@@ -34,7 +34,11 @@ declare global {
   }
 }
 
-const RUNS = 10;
+/** How many runs are measured (v5implementation D-200). */
+const RUNS = Number(process.env.BENCH_RUNS ?? "10");
+if (!Number.isInteger(RUNS) || RUNS < 1) {
+  throw new Error("BENCH_RUNS must be a whole number from 1");
+}
 // V3 cleans the voice before the recognizer hears it (v3implementation D-91).
 const STAGES = ["probe_audio", "audio_chain", "asr", "detect_scene", "render_encode", "mux"] as const;
 type Stage = (typeof STAGES)[number];
@@ -66,8 +70,8 @@ const READY_TIMEOUT_MS = 300_000;
 const EXPORT_TIMEOUT_MS = 300_000;
 /** Analytics sends what it has every 10 s. */
 const FLUSH_WAIT_MS = 30_000;
-/** A run is a pipeline and an export; eleven of them, with room for a slow machine. */
-const BENCH_TIMEOUT_MS = 120 * 60_000;
+/** A run is a pipeline and an export; the warm-up and the measured ones, with room for a slow machine. */
+const BENCH_TIMEOUT_MS = (RUNS + 1) * 11 * 60_000;
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -163,7 +167,7 @@ async function oneRun(context: BrowserContext, clip: string): Promise<Run> {
   }
 }
 
-test("device bench: one warm-up, then ten measured runs of the clip BENCH_CLIP names", async ({ context, browser }) => {
+test(`device bench: one warm-up, then ${String(RUNS)} measured runs of the clip BENCH_CLIP names`, async ({ context, browser }) => {
   test.setTimeout(BENCH_TIMEOUT_MS);
   const device = process.env.BENCH_DEVICE;
   if (device === undefined || !/^[a-z0-9]+$/.test(device)) {
@@ -203,6 +207,6 @@ test("device bench: one warm-up, then ten measured runs of the clip BENCH_CLIP n
   const file = path.join(ROOT, "bench/results", `${device}-${date}-${chosen}.json`);
   writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
   process.stdout.write(`      wrote ${path.relative(ROOT, file)}: total median ${String(result.total.median)} ms, p90 ${String(result.total.p90)} ms\n`);
-  // Every run of the ten used the same backend: a mix would make the medians mean nothing.
+  // Every measured run used the same backend: a mix would make the medians mean nothing.
   expect(new Set(runs.map((run) => run.asrBackend)).size).toBe(1);
 });

@@ -9,6 +9,11 @@
 # API, then the web app, always in that order. The server rejects fields it
 # does not know, so a new client must never reach an old server.
 #
+# A pull request that changes only documents runs the `changes` job and no
+# other (v5implementation D-199): the secret scan is in that job, so documents
+# are still scanned. A push to main always runs everything. A skipped job blocks
+# nothing: main has no required checks.
+#
 # Two builds of the web app are made. Step 8 builds the one the tests run
 # against, with the E2E test key. Step 13 builds the one that is deployed,
 # without it, and step 14 refuses to deploy a build that holds the key.
@@ -68,7 +73,53 @@ env:
   E2E_TEST_PUBLIC_KEY: mCydb6uLK58faqtJ0v3Ol8tnmNboOoH6t/RD6rcXxxM= # gitleaks:allow
 
 jobs:
+  # Whether the heavy jobs are needed, and the secret scan, which documents need too.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The whole history: for the secret scan, and for the diff against the base.
+          fetch-depth: 0
+
+      # Its archive is refused unless its checksum is the one above.
+      - name: Scan for secrets
+        run: |
+          set -eu
+          (
+            cd "$RUNNER_TEMP"
+            curl --fail --silent --show-error --location --retry 3 --output gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS_VERSION/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+            echo "$GITLEAKS_SHA256  gitleaks.tar.gz" | sha256sum --check --quiet -
+            tar -xzf gitleaks.tar.gz gitleaks
+          )
+          "$RUNNER_TEMP/gitleaks" version
+          "$RUNNER_TEMP/gitleaks" detect --source . --redact --no-banner
+
+      # A file under docs/, or any Markdown file, is a document. Anything else is code.
+      - name: Is anything but documents changed?
+        id: diff
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          others=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD" | grep -vE '^docs/|\.md$' || true)
+          if [ -n "$others" ]; then
+            echo code=true >> "$GITHUB_OUTPUT"
+          else
+            echo "Documents only: the heavy jobs are skipped."
+            echo code=false >> "$GITHUB_OUTPUT"
+          fi
+
   ci:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -88,12 +139,9 @@ jobs:
           --health-retries 12
 
     steps:
-      # --- 1. Checkout, caches, secret scan ---------------------------------
+      # --- 1. Checkout and caches (the secret scan is in `changes`) ----------
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          # The whole history, for the secret scan.
-          fetch-depth: 0
 
       # The tests of offcut-render build wgpu's native backends (v4implementation
       # D-134), and with the restored target/ the runner's disk ran out while
@@ -210,10 +258,6 @@ jobs:
           tar -xzf binaryen.tar.gz
           install "binaryen-$BINARYEN_VERSION/bin/wasm-opt" "$bin/wasm-opt"
 
-          fetch "https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS_VERSION/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks.tar.gz "$GITLEAKS_SHA256"
-          tar -xzf gitleaks.tar.gz gitleaks
-          install gitleaks "$bin/gitleaks"
-
           fetch "$FFMPEG_LINUX_URL" ffmpeg.tar.xz "$FFMPEG_LINUX_SHA256"
           tar -xJf ffmpeg.tar.xz --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
           install ffmpeg-*/bin/ffmpeg "$bin/ffmpeg"
@@ -222,11 +266,7 @@ jobs:
           wasm-bindgen --version
           cargo deny --version
           wasm-opt --version
-          gitleaks version
           ffmpeg -hide_banner -version | head -n 1
-
-      - name: Scan for secrets
-        run: gitleaks detect --source . --redact --no-banner
 
       - name: Install the web dependencies
         run: pnpm install --frozen-lockfile

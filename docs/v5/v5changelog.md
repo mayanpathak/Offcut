@@ -1,0 +1,112 @@
+# v5changelog.md - record of every change made while building V5
+
+**What this is.** A record of every change made while building V5: what was done, what differs from `v5implementation.md`, how it was checked, and what is still open. Entries are short (D-195) and in date order, oldest first. Every commit that changes the repository carries its entry. The two tables below are rewritten when an item opens or closes.
+
+**References.** `PS §n` is a section of `product.md`, `TS §n` of `technicalspec.md`, `BP §n` of `buildplan.md`, `V4 CL` is `docs/v4/v4changelog.md`.
+
+---
+
+## Open items
+| # | Item | Owner | Version |
+|---|---|---|---|
+| 1 | **Two V4 boxes only the founder can close** (V4 CL Entry 40): design review 2 and the five goldens, and whether the editor matches the reviewed screens. They do not block V5 | Founder | Any time |
+
+## Known issues
+| # | Issue | Where | Version |
+|---|---|---|---|
+| 1 | **An export reads about 3 LU over the target.** The chain measures its mono programme as one channel, and the export doubles it to two. The same PCM read -23.2 LUFS as one channel and -20.2 LUFS as two (`ffmpeg ebur128`, 2026-10-31), so an export should read about -11 LUFS, and check 7 would fail. D-204 fixes the product | `offcut-dsp/src/loudness.rs` | P130 |
+| 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
+| 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
+| 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
+| 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's queries, 2026-10-31). All are from 2026-10-29: the four within 71 s from 14:59:33 UTC, ten minutes after the deploy finished, and the crash at 15:29:00. None since, including the agent's three clips on the deployed site on 2026-10-31, so they do not reproduce on the sample and landscape clips. Which clip caused them is unknown: the rows carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
+| 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
+
+---
+
+## Entry 0 - 2026-10-31 - `v5implementation.md` written (outside a prompt)
+
+**What.** The plan for V5, at the founder's request of 2026-10-31, after reading BP §7, TS §12, §21, §27, §28, §40.9, V4's plan, changelog and hand-over, and the code at `0a8aa80`. One document holds the plan and the eight prompts (129 to 136), so V5 has no separate build guide or prompts file (D-195). The founder approved the speed rules and the five-run bench on the same day.
+
+**Files.** `docs/v5/v5implementation.md` and this file are new. `docs/technicalspec.md` §5: three rows for `docs/v5/`.
+
+**Found while reading, for the prompts named.** Known issue 1 above (P130). The cache key must use the worker's verified profile: with the page's unverified `planOf`, an expired Creator token would hit a stored 1080p file with no watermark (D-220, P134). `RENDERER_VERSION` exists nowhere in the code (D-223, P134). `export_done`'s `events_kept` counts a switched-off visual as kept (D-237, P135). Every fixture is encoded with `-bf 0`, so `ctts` needs a new one (D-212, P131). Dropping the same file again would hit the stored export unless the import clears `renderCache` (D-228, P134).
+
+**Checked.** Documents only: nothing was built and no test was run. The loudness reading above is the one measurement. Not committed: this session was asked for the document only, and `v5-build` does not exist yet.
+
+**Open.** Open items 1 to 3; known issues 1 to 4.
+
+## Entry 0.1 - 2026-10-31 - `v5buildguide.md` and `coding-promptsv5.md` written (outside a prompt)
+
+**What.** At the founder's request of the same day, after they said V4 is done: a build guide in `v4buildguide.md`'s structure (Phases 0 to 8, steps, a milestone per phase) and the prompts in `coding-promptsv4.md`'s structure (a Setup and 129 to 136). This replaces Entry 0's "no separate build guide or prompts file": D-195 is rewritten, and `v5implementation.md` §22 is now a one-table summary. The speed rules stand. Each phase is one prompt, and the guide's table "The problems V5 must fix" maps Entry 0's six findings and open items 1 to 3 to a step and a proof.
+
+**Files.** `docs/v5/v5buildguide.md`, `docs/v5/coding-promptsv5.md` are new. `docs/v5/v5implementation.md`: the plan's corrections below. `docs/technicalspec.md` §5: two more rows for `docs/v5/`, and one reworded.
+
+**Found while reading the code for these, and applied to the plan (§25 rows 20 to 25).**
+- `a_1khz_sine_of_peak_minus_20_reads_minus_23` in `loudness.rs` breaks under the stereo fix, and `pink_noise_reaches_the_target` may. The plan said the tests run unchanged. Both now have a stated rewrite (§8, P130).
+- With a shared clip, a reset's undo steps reach the next case through the 10 s analytics flush and fail its `toEqual`. `flushAnalytics` needs `page.clock`, which that page does not install. `resetClip` now sends the queue by `visibilitychange` (§6.3, P129).
+- `undo` has no test id; the reset finds it by role. The clean state reads the stored edit rather than opening the Style tab.
+- `check-hosts.mjs`'s `DEV_MARKERS` is an explicit list, so D-218's "already fails" was wrong: `devFailEncoder` joins it (P132).
+- `sourceHashPrefix` is in the clip's record, not the clip store; a miss's "cached bytes" had no reader, so `heldBytes` is added; the answered set moves to `export-store.ts` so no new use-case edge is needed; `fakeExportDone` is added for the done capture.
+- A `FAIL 11` names a tag's key, never its value: `testclips/v3testclip.mp4` carries a location.
+- Checked and unaffected: the recognizer hears `pcm16` from the media worker, not the chain, and prosody is z-scored, so the stereo fix moves no transcript or event. `main` has no branch protection, so a skipped CI job blocks nothing.
+
+**Checked.** Documents only: nothing was built and no test was run. `git ls-remote --tags origin v4` printed nothing on this date, so §1A box 1 stays open. Not committed: `v5-build` does not exist yet.
+
+**Open.** Open items 1 to 3; known issues 1 to 4.
+
+## Entry 1 - 2026-10-31 - Setup, first part: branch and baseline
+
+**What.** `v5-build` from `origin/main`, holding the V5 documents and the TS §5 rows, pushed so the founder can open the draft pull request. **Differs from the guide:** Setup is two commits, not one. V4's closing entry waits for the `v4` tag and the founder's answers (open items 1 and 2), and the branch did not need to wait for them. Prompt 129 still does not start until both are done.
+
+| Item | Value |
+|---|---|
+| Code baseline | `0a8aa80` |
+| `pnpm check`, `pnpm fixtures`, `pnpm build` | Exit 0 |
+| Rust | 646 passed, 0 failed, 4 ignored |
+| Vitest | 175 passed |
+| `pnpm e2e` | 12 passed |
+| `pnpm e2e:media` | 77 passed + 1 skip, carried from V4 CL Entry 39: the code is the merge's |
+| App shell | 337.3 kB gzip |
+| `verify_mp4.py`'s tools | NumPy 2.5.3 on Python 3.13, ffmpeg 9.0.2 (§1A box 6) |
+
+**V4's 35 open boxes, checked against the records on this date, for Entry 40.** 28 are shown by evidence and can be ticked when Entry 40 is written: the final gate of V4 CL Entry 39, this baseline, run 40889889605 (all four jobs, with the header check and `@smoke`, which reads `crossOriginIsolated`), `healthz` answering `0a8aa80`, `experiments.md` (14 decisions, none empty), 16 goldens, no untagged `TODO`, no `fetch(` outside the four files. `line_breaks.rs`'s rows are unchanged since `01f406f`: its diff removes only the header comment, an import and the `#[ignore]`. **7 wait for the founder:** `v4implementation.md` lines 1568 (tag; three styles on the deployed page), 1603 (the editor matches the reviewed screens), 1620 (the deployed walk-through), 1621 (the Neon rows), 1626 (design review 2 and five goldens; review 1 is recorded), 1630 (follows 1568) and 1631 (tag).
+
+**Open.** Open items 1 to 3; known issues 1 to 4.
+
+## Entry 2 - 2026-10-31 - Setup, second part: V4 closed, the pull request open
+
+**What.** At the founder's word ("you do all these"), the agent pushed the tag `v4` on `0a8aa80` (`c3bc239`) and opened draft pull request 8. It ran V4's deployed walk-through and wrote V4 CL Entry 40: 32 of 35 boxes ticked, 3 left for the founder. `§1A` boxes 1 and 4 ticked. **Differs from D-194:** the tag and the pull request are normally the founder's; this applies to these two only. The tag `v5`, the merge and `gh pr ready` stay the founder's.
+
+**Checked.** The walk-through passed, with what it did not assert named in Entry 40. Counts unchanged from Entry 1. CI of the pull request is not waited on; P129 reads it first (D-198).
+
+**Open.** Open item 1; known issues 1 to 4. Prompt 129 is next.
+
+## Entry 3 - 2026-10-31 - The Neon rows read by the founder
+
+**What.** The founder ran the query: enum props only, so V4's box is ticked (V4 CL Entry 40), and two V4 boxes remain. Known issue 5 opened for the five `client_error` rows. Documents only. Committed without a push: it goes with P129's (D-198).
+
+## Entry 4 - 2026-10-31 - P129: shared clip in review-edit, gates, docs-only CI skip
+
+**What.** `resetClip`, `openShared`, `sendQueuedAnalytics` and `FakeApi.forget()`; `openClip` moved from the spec to `helpers/fixtures.ts`, so both open a clip one way. `review-edit.spec.ts` in two groups. A `changes` job in `ci.yml` holds the secret scan and decides whether the heavy jobs run; `ci` lost the gitleaks lines and `fetch-depth: 0`. `BENCH_RUNS`. D-236's two waits (known issues 2 and 3 stay open until V5's CI runs are read at P136). `e2e-media.yml`'s stale comment. No file under `web/src` changed.
+
+**Differs from the plan** (its D-201, §6, §25 rows 26, 27, the guide and the prompts are corrected in this commit):
+- **5 clip loads, not 4: case 14 has its own** (D-201 allows it). The first full run read its style cards at 26 ms, against 56-62 ms in V4. The store keeps the last cards, so on a shared clip they show at once and the 400 ms budget measured nothing. Alone it read 118 ms, and 58 ms in the final run.
+- Undo is found inside `banner`: after a redo the toast offers an Undo of its own, which a page-wide locator would trip on after case 12.
+- `--repeat-each=2` on cases 1 and 12 was not run. It starts a new worker per repeat, so it loads a new clip and never resets twice. A run of the file resets 12 times.
+- The wait for toasts is `patient(30_000)`, not 10 s: it is an upper bound.
+- A backslash in `--grep` is doubled by `pnpm` on Windows and matches nothing, so the guide's patterns now use `[.]`.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `pnpm e2e:media review-edit.spec.ts`, final code | 18 passed (16 + 2 setup), 8.0 min; the file 6.6 min. Before: 16 clip loads at about a minute each, plus the cases |
+| Titles and bodies of the 16 cases against `0a8aa80` | All identical, apart from the lines that open a clip or read `shared` (a script compared them) |
+| Drill: no Undo loop in `resetClip`, cases 3 and 4 | Case 4 fails: "resetClip: every change is undone" |
+| Drill: no `sendQueuedAnalytics`, cases 1 and 13 | Case 13 fails: received `"undo"` beside `caption_position` |
+| The `diff` script | `code=true` with `ci.yml` changed; `code=false` for documents only |
+| `BENCH_RUNS` | `--list` names 5 with 5 and 10 by default; `x` throws |
+| Tier 3 | `pnpm check` exit 0; Rust 646 / 0 / 4; Vitest 175; `pnpm e2e` 12; frozen check empty. The first `pnpm test` aborted (known issue 6), and a re-run with no change passed |
+
+**Not checked.** `ci.yml`'s new job has not run yet: `actionlint` is not on D1 and no YAML parser was at hand, so this push is its first test, read at P130's start (D-198). A docs-only pull request has not been seen to skip. `model-download.spec.ts`'s waits run in CI's `e2e-media`.
+
+**Open.** Open item 1; known issues 1 to 6.

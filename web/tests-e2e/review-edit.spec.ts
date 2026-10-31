@@ -1,7 +1,10 @@
 // The editor in Chrome on D1 (v4implementation §20.4, G 16.3; D-145 to
 // D-147, D-169 to D-187, D-192): every control a creator uses, through the
-// gestures and keys they use, and an accessibility scan. Sixteen cases, each
-// with its own clip load through the cached model ("Gaps settled" item 4).
+// gestures and keys they use, and an accessibility scan. Sixteen cases on five
+// clip loads (v5implementation D-201): twelve share one processed clip, made
+// clean between them by `resetClip`; a landscape clip, a portrait clip, the case
+// that breaks a change on purpose and the one that times the first draw of the
+// style cards have their own.
 //
 // What the preview shows is read from the player's mirrors of the visible
 // caption (`data-caption-text`, `-colors`, `-position`), which the test build
@@ -12,30 +15,29 @@
 import { type Page, expect, test } from "@playwright/test";
 
 import { messages } from "../src/copy/messages";
-import { type FakeApi, installFakeApi } from "./helpers/fake-api";
+import type { FakeApi } from "./helpers/fake-api";
 import {
   axe,
   captionMirror,
   dragCaptions,
   dragVideo,
-  dropClip,
   editWord,
-  ensureModelCached,
-  expectTestBuild,
   genFixture,
   hoverPreview,
+  openClip,
+  openShared,
   openTab,
   openWord,
   patient,
   previewAt,
   referenceClip,
-  routeAssets,
+  resetClip,
   saves,
   seekTo,
   setStyle,
   settled,
+  type SharedClip,
   toggleItem,
-  trackSaves,
   transcriptWords,
   wordButton,
   wordField,
@@ -53,23 +55,6 @@ const BOTTOM_CENTRE = 1304 / 1920;
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const canvas = (page: Page) => page.getByTestId("preview-canvas");
 const failureCard = (page: Page) => page.getByTestId("preview-failed");
-
-/** Opens the editor and takes `fixture` to a paused, ready preview. Every case starts here. */
-async function openClip(page: Page, fixture: string): Promise<FakeApi> {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await ensureModelCached(page.context());
-  const api = await installFakeApi(page);
-  await routeAssets(page);
-  await trackSaves(page);
-  await page.goto("/app");
-  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
-  await expectTestBuild(page);
-  await dropClip(page, fixture);
-  await expect(canvas(page).or(page.getByTestId("clip-failed"))).toBeVisible({ timeout: patient(240_000) });
-  await expect(canvas(page), "the clip was processed").toBeVisible();
-  await expect(button(page, messages.preview.play)).toBeEnabled({ timeout: 30_000 });
-  return api;
-}
 
 /** The `review_action` events the fake API received, by their action. */
 async function reviewActions(api: FakeApi, atLeast: number): Promise<string[]> {
@@ -120,13 +105,27 @@ async function captionWhen(page: Page, accept: (text: string) => boolean, what: 
   return (await captionMirror(page)).text;
 }
 
-test.describe("the editor (review-edit)", () => {
-  test.beforeEach(() => {
+test.describe("the editor (review-edit), on one processed clip", () => {
+  // Not "serial": a failed case must not stop the others. Playwright starts a
+  // new worker after a failure, which runs beforeAll again: a new clip.
+  test.describe.configure({ timeout: patient(420_000) });
+  let shared: SharedClip;
+
+  test.beforeAll(async ({ browser }, info) => {
     test.setTimeout(patient(420_000));
+    shared = await openShared(browser, info, referenceClip());
   });
 
-  test("1. edit a number: 90 fixed to 9, the from-to's row reads 9 minutes, and the edit is counted", async ({ page }) => {
-    const api = await openClip(page, referenceClip());
+  test.afterAll(async () => {
+    await shared.context.close();
+  });
+
+  test.beforeEach(async () => {
+    await resetClip(shared.page, shared.api);
+  });
+
+  test("1. edit a number: 90 fixed to 9, the from-to's row reads 9 minutes, and the edit is counted", async () => {
+    const { page, api } = shared;
     const ninety = (await transcriptWords(page)).find((word) => word.text === "90");
     expect(ninety, "the reference clip's transcript has the word 90").toBeDefined();
     await openTab(page, "Visuals");
@@ -140,8 +139,8 @@ test.describe("the editor (review-edit)", () => {
     expect(await reviewActions(api, 1)).toEqual(["word_edit"]);
   });
 
-  test("2. hide a word: an empty commit takes it out of the caption, and the transcript strikes it through", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("2. hide a word: an empty commit takes it out of the caption, and the transcript strikes it through", async () => {
+    const { page } = shared;
     const word = await loneWord(page);
     await showWord(page, word.index);
     await captionWhen(page, (text) => tokens(text).includes(word.text.toLowerCase()), "the caption shows the word");
@@ -152,8 +151,8 @@ test.describe("the editor (review-edit)", () => {
     expect(struck).toContain("line-through");
   });
 
-  test("3. toggle a visual: the list off leaves its frame, stays off after a word edit elsewhere, and comes back on", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("3. toggle a visual: the list off leaves its frame, stays off after a word edit elsewhere, and comes back on", async () => {
+    const { page } = shared;
     await openTab(page, "Visuals");
     const row = page.locator('li[data-kind="list_reveal"]').first();
     const control = row.getByRole("switch");
@@ -185,8 +184,8 @@ test.describe("the editor (review-edit)", () => {
     expect((await canvas(page).screenshot()).equals(without), "the list is drawn again").toBe(false);
   });
 
-  test("4. style: Bold writes the caption in capitals", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("4. style: Bold writes the caption in capitals", async () => {
+    const { page } = shared;
     await showWord(page, (await loneWord(page)).index);
     const clean = await captionWhen(page, (text) => /\p{Ll}/u.test(text), "a caption in Clean, with small letters");
     await setStyle(page, "Bold");
@@ -194,28 +193,8 @@ test.describe("the editor (review-edit)", () => {
     expect(bold).toBe(clean.toUpperCase());
   });
 
-  test("5. crop on a landscape clip: the control exists, and a drag of the video to the right edge is one change", async ({ page }) => {
-    const api = await openClip(page, genFixture("speech/speech_60s_landscape.mp4"));
-    await openTab(page, "Framing");
-    const slider = page.getByTestId("crop-offset");
-    await expect(slider).toBeVisible();
-    expect(Number(await slider.inputValue())).toBe(0);
-    // Grabbing the video and moving it left shows its right part: past one width, the window is at the right edge.
-    await dragVideo(page, -1.15);
-    await expect.poll(async () => Number(await slider.inputValue())).toBe(1);
-    expect(await reviewActions(api, 1)).toEqual(["crop_offset"]);
-  });
-
-  test("6. no crop on a portrait clip: the control does not exist", async ({ page }) => {
-    // The reference clip is wider than 9:16 and has the control: the 60 s portrait fixture has none.
-    await openClip(page, genFixture("speech/speech_60s_portrait.mp4"));
-    await openTab(page, "Framing");
-    await expect(page.getByRole("radiogroup", { name: messages.framing.captionPosition })).toBeVisible();
-    await expect(page.getByTestId("crop-offset")).toHaveCount(0);
-  });
-
-  test("7. pause and restore: a change while playing pauses the preview and plays it again after", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("7. pause and restore: a change while playing pauses the preview and plays it again after", async () => {
+    const { page } = shared;
     await button(page, messages.preview.play).click();
     await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(1_000);
@@ -242,32 +221,8 @@ test.describe("the editor (review-edit)", () => {
     await button(page, messages.preview.pause).click();
   });
 
-  test("8. undo after a failed edit: the card offers Undo this change, which restores the edit before", async ({ page }) => {
-    await openClip(page, referenceClip());
-    const word = await loneWord(page);
-    await showWord(page, word.index);
-    const before = await captionWhen(page, (text) => text !== "", "a caption");
-    await openWord(page, word.index);
-    await wordField(page).fill("broken");
-    await page.evaluate(() => {
-      (window as unknown as { __offcutDev: { failNextSetScene(): void } }).__offcutDev.failNextSetScene();
-    });
-    await page.keyboard.press("Enter");
-    await expect(failureCard(page)).toBeVisible({ timeout: 10_000 });
-    await expect(failureCard(page)).toContainText(messages.errors.E_INTERNAL.title);
-    await expect(wordButton(page, word.index)).toHaveText(word.text);
-
-    await failureCard(page).getByRole("button", { name: messages.recovery.undoChange }).click();
-    await expect(failureCard(page)).toHaveCount(0, { timeout: 10_000 });
-    await expect(wordButton(page, word.index)).toHaveText(word.text);
-    expect((await captionMirror(page)).text).toBe(before);
-    // The editor takes changes again.
-    await editWord(page, word.index, "mended");
-    await expect(wordButton(page, word.index)).toHaveText("mended");
-  });
-
-  test("9. click a word in the transcript: the preview goes to it, paused; the field selects it; Tab commits and opens the next; Escape cancels", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("9. click a word in the transcript: the preview goes to it, paused; the field selects it; Tab commits and opens the next; Escape cancels", async () => {
+    const { page } = shared;
     await button(page, messages.preview.play).click();
     await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 30_000 });
     const words = await transcriptWords(page);
@@ -310,8 +265,8 @@ test.describe("the editor (review-edit)", () => {
     await expect(wordButton(page, next.index)).toBeFocused();
   });
 
-  test("10. click a caption word on the preview: the Captions tab opens on that word", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("10. click a caption word on the preview: the Captions tab opens on that word", async () => {
+    const { page } = shared;
     await showWord(page, (await loneWord(page)).index);
     await openTab(page, "Style");
     let hit = false;
@@ -335,8 +290,8 @@ test.describe("the editor (review-edit)", () => {
     expect(tokens((await captionMirror(page)).text)).toContain(tokens(opened)[0]);
   });
 
-  test("11. replace all: a word heard three times fixed once offers Change all 2; all three change; one undo gives all three back", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("11. replace all: a word heard three times fixed once offers Change all 2; all three change; one undo gives all three back", async () => {
+    const { page } = shared;
     const words = await transcriptWords(page);
     const groups = new Map<string, number[]>();
     for (const word of words) {
@@ -370,8 +325,8 @@ test.describe("the editor (review-edit)", () => {
     }
   });
 
-  test("12. undo and redo with the keyboard, across a word edit, a style change and a toggle", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("12. undo and redo with the keyboard, across a word edit, a style change and a toggle", async () => {
+    const { page } = shared;
     const word = await loneWord(page);
     await editWord(page, word.index, "edited");
     await setStyle(page, "Bold");
@@ -411,8 +366,8 @@ test.describe("the editor (review-edit)", () => {
     expect(await listOn()).toBe("false");
   });
 
-  test("13. drag the captions to the top: they snap at Top, and the move is one change", async ({ page }) => {
-    const api = await openClip(page, referenceClip());
+  test("13. drag the captions to the top: they snap at Top, and the move is one change", async () => {
+    const { page, api } = shared;
     await showWord(page, (await loneWord(page)).index);
     expect((await captionMirror(page)).position).toBe(1);
     await dragCaptions(page, "top");
@@ -422,53 +377,8 @@ test.describe("the editor (review-edit)", () => {
     expect(await reviewActions(api, 1)).toEqual(["caption_position"]);
   });
 
-  test("14. style cards and Highlight numbers: three images within 400 ms; Highlight numbers off takes the accent off the number; Bold applies", async ({ page }, testInfo) => {
-    await openClip(page, referenceClip());
-    const ninety = (await transcriptWords(page)).find((word) => word.text === "90");
-    await showWord(page, ninety?.index ?? -1);
-    await captionWhen(page, (text) => tokens(text).includes("90"), "the caption shows the number");
-
-    // The three images, timed from the tab's click in the page itself.
-    await page.evaluate(() => {
-      const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
-      new MutationObserver(() => {
-        if (w.e2eCardsAt === undefined && document.querySelectorAll('[data-testid="style-cards"] canvas').length === 3) {
-          w.e2eCardsAt = performance.now();
-        }
-      }).observe(document, { childList: true, subtree: true });
-      document.addEventListener("pointerdown", () => {
-        w.e2eTabAt ??= performance.now();
-      }, true);
-    });
-    await openTab(page, "Style");
-    await expect(page.getByTestId("style-cards").locator("canvas")).toHaveCount(3, { timeout: 5_000 });
-    const ms = Math.round(
-      await page.evaluate(() => {
-        const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
-        return (w.e2eCardsAt ?? Number.NaN) - (w.e2eTabAt ?? Number.NaN);
-      }),
-    );
-    testInfo.annotations.push({ type: "reading", description: `style cards: three images ${String(ms)} ms after the tab's click` });
-    process.stdout.write(`      style cards: three images ${String(ms)} ms after the tab's click (target ${String(THUMBNAILS_MS)})\n`);
-    expect(ms, `the three images came ${String(ms)} ms after the click`).toBeLessThanOrEqual(THUMBNAILS_MS);
-
-    const on = (await captionMirror(page)).colors;
-    const highlight = page.getByTestId("highlight-numbers");
-    await expect(highlight).toHaveAttribute("aria-checked", "true");
-    const since = await saves(page);
-    await highlight.click();
-    await settled(page, since);
-    await expect.poll(async () => (await captionMirror(page)).colors.join(" ")).not.toBe(on.join(" "));
-    const off = (await captionMirror(page)).colors;
-    const accent = on.filter((color) => !off.includes(color));
-    expect(accent.length, "a colour of the caption with numbers highlighted is gone without").toBeGreaterThan(0);
-
-    await setStyle(page, "Bold");
-    await captionWhen(page, (text) => text === text.toUpperCase() && /\p{Lu}/u.test(text), "Bold applied");
-  });
-
-  test("15. shortcuts: Space plays and pauses, types a space in a field; the arrows step one frame while paused", async ({ page }) => {
-    await openClip(page, referenceClip());
+  test("15. shortcuts: Space plays and pauses, types a space in a field; the arrows step one frame while paused", async () => {
+    const { page } = shared;
     await blur(page);
     await page.keyboard.press("Space");
     await expect(button(page, messages.preview.pause)).toBeVisible({ timeout: 10_000 });
@@ -502,8 +412,8 @@ test.describe("the editor (review-edit)", () => {
     await expect.poll(async () => Math.abs((await previewAt(page)) - at)).toBeLessThan(FRAME_MS);
   });
 
-  test("16. accessibility: no serious or critical axe violation, ready or editing; every control reachable by Tab with a visible focus ring", async ({ page }, testInfo) => {
-    await openClip(page, referenceClip());
+  test("16. accessibility: no serious or critical axe violation, ready or editing; every control reachable by Tab with a visible focus ring", async ({}, testInfo) => {
+    const { page } = shared;
     const ready = await axe(page);
     expect(ready.map((v) => `${v.id}: ${v.nodes.length} node(s)`), "axe on the ready state").toEqual([]);
     await openWord(page, (await loneWord(page)).index);
@@ -574,5 +484,100 @@ test.describe("the editor (review-edit)", () => {
       });
       expect(ringless, `${tab}: controls without a visible focus ring`).toEqual([]);
     }
+  });
+});
+
+test.describe("the editor (review-edit), on a clip of its own", () => {
+  test.describe.configure({ timeout: patient(420_000) });
+
+  test("5. crop on a landscape clip: the control exists, and a drag of the video to the right edge is one change", async ({ page }) => {
+    const api = await openClip(page, genFixture("speech/speech_60s_landscape.mp4"));
+    await openTab(page, "Framing");
+    const slider = page.getByTestId("crop-offset");
+    await expect(slider).toBeVisible();
+    expect(Number(await slider.inputValue())).toBe(0);
+    // Grabbing the video and moving it left shows its right part: past one width, the window is at the right edge.
+    await dragVideo(page, -1.15);
+    await expect.poll(async () => Number(await slider.inputValue())).toBe(1);
+    expect(await reviewActions(api, 1)).toEqual(["crop_offset"]);
+  });
+
+  test("6. no crop on a portrait clip: the control does not exist", async ({ page }) => {
+    // The reference clip is wider than 9:16 and has the control: the 60 s portrait fixture has none.
+    await openClip(page, genFixture("speech/speech_60s_portrait.mp4"));
+    await openTab(page, "Framing");
+    await expect(page.getByRole("radiogroup", { name: messages.framing.captionPosition })).toBeVisible();
+    await expect(page.getByTestId("crop-offset")).toHaveCount(0);
+  });
+
+  test("8. undo after a failed edit: the card offers Undo this change, which restores the edit before", async ({ page }) => {
+    await openClip(page, referenceClip());
+    const word = await loneWord(page);
+    await showWord(page, word.index);
+    const before = await captionWhen(page, (text) => text !== "", "a caption");
+    await openWord(page, word.index);
+    await wordField(page).fill("broken");
+    await page.evaluate(() => {
+      (window as unknown as { __offcutDev: { failNextSetScene(): void } }).__offcutDev.failNextSetScene();
+    });
+    await page.keyboard.press("Enter");
+    await expect(failureCard(page)).toBeVisible({ timeout: 10_000 });
+    await expect(failureCard(page)).toContainText(messages.errors.E_INTERNAL.title);
+    await expect(wordButton(page, word.index)).toHaveText(word.text);
+
+    await failureCard(page).getByRole("button", { name: messages.recovery.undoChange }).click();
+    await expect(failureCard(page)).toHaveCount(0, { timeout: 10_000 });
+    await expect(wordButton(page, word.index)).toHaveText(word.text);
+    expect((await captionMirror(page)).text).toBe(before);
+    // The editor takes changes again.
+    await editWord(page, word.index, "mended");
+    await expect(wordButton(page, word.index)).toHaveText("mended");
+  });
+
+  // On its own load: the store keeps the cards of the last time the tab was open, and
+  // on a shared clip they would show at once, and this time would measure nothing.
+  test("14. style cards and Highlight numbers: three images within 400 ms; Highlight numbers off takes the accent off the number; Bold applies", async ({ page }, testInfo) => {
+    await openClip(page, referenceClip());
+    const ninety = (await transcriptWords(page)).find((word) => word.text === "90");
+    await showWord(page, ninety?.index ?? -1);
+    await captionWhen(page, (text) => tokens(text).includes("90"), "the caption shows the number");
+
+    // The three images, timed from the tab's click in the page itself.
+    await page.evaluate(() => {
+      const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
+      new MutationObserver(() => {
+        if (w.e2eCardsAt === undefined && document.querySelectorAll('[data-testid="style-cards"] canvas').length === 3) {
+          w.e2eCardsAt = performance.now();
+        }
+      }).observe(document, { childList: true, subtree: true });
+      document.addEventListener("pointerdown", () => {
+        w.e2eTabAt ??= performance.now();
+      }, true);
+    });
+    await openTab(page, "Style");
+    await expect(page.getByTestId("style-cards").locator("canvas")).toHaveCount(3, { timeout: 5_000 });
+    const ms = Math.round(
+      await page.evaluate(() => {
+        const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
+        return (w.e2eCardsAt ?? Number.NaN) - (w.e2eTabAt ?? Number.NaN);
+      }),
+    );
+    testInfo.annotations.push({ type: "reading", description: `style cards: three images ${String(ms)} ms after the tab's click` });
+    process.stdout.write(`      style cards: three images ${String(ms)} ms after the tab's click (target ${String(THUMBNAILS_MS)})\n`);
+    expect(ms, `the three images came ${String(ms)} ms after the click`).toBeLessThanOrEqual(THUMBNAILS_MS);
+
+    const on = (await captionMirror(page)).colors;
+    const highlight = page.getByTestId("highlight-numbers");
+    await expect(highlight).toHaveAttribute("aria-checked", "true");
+    const since = await saves(page);
+    await highlight.click();
+    await settled(page, since);
+    await expect.poll(async () => (await captionMirror(page)).colors.join(" ")).not.toBe(on.join(" "));
+    const off = (await captionMirror(page)).colors;
+    const accent = on.filter((color) => !off.includes(color));
+    expect(accent.length, "a colour of the caption with numbers highlighted is gone without").toBeGreaterThan(0);
+
+    await setStyle(page, "Bold");
+    await captionWhen(page, (text) => text === text.toUpperCase() && /\p{Lu}/u.test(text), "Bold applied");
   });
 });

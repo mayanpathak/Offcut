@@ -110,14 +110,14 @@ async function openEditor(page: Page, assets: AssetOptions = {}): Promise<{ api:
   await watchPanel(page);
   await page.clock.install();
   await page.goto("/app");
-  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: patient(30_000) });
   return { api, assets: log };
 }
 
 /** The one `model_download` event of the session, once analytics has sent it. */
 async function modelDownloadEvent(page: Page, api: FakeApi): Promise<unknown> {
   await flushAnalytics(page);
-  await expect.poll(() => api.eventsOf("model_download").length).toBeGreaterThan(0);
+  await expect.poll(() => api.eventsOf("model_download").length, { timeout: patient(5_000) }).toBeGreaterThan(0);
   return api.eventsOf("model_download").at(-1);
 }
 
