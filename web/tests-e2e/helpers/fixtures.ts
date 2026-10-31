@@ -294,7 +294,8 @@ export async function forgetProgress(page: Page): Promise<void> {
 
 // --- The cache of the asset host's files -----------------------------------------
 
-function sha256Of(file: string): Promise<string> {
+/** The lower-case hex SHA-256 of a file on this machine. */
+export function sha256Of(file: string): Promise<string> {
   const hash = createHash("sha256");
   return pipeline(createReadStream(file), hash).then(() => hash.digest("hex"));
 }

@@ -2,7 +2,8 @@
 // (v4implementation D-178). V2 has no account and no counter: the button
 // starts an export with the token this device holds, and says so when it
 // holds none (v2implementation D-23). While something stands in the way, the
-// button is disabled and its tooltip says what.
+// button is disabled and its tooltip says what. An export the gate stopped
+// says why beside it, one action away from trying again (v5implementation D-231).
 
 import { messages } from "../../copy/messages";
 import { type BlockerCode, forExport } from "../../state/blockers";
@@ -22,6 +23,7 @@ function blockerText(code: BlockerCode): string | undefined {
 export function ExportButton() {
   const clipId = useClipStore((state) => state.clipId);
   const unavailable = useExportStore((state) => state.unavailable);
+  const stopped = useExportStore((state) => state.blocker);
   // Read so that the button is drawn again when what `forExport()` asks about changes.
   useClipStore((state) => state.status);
   useExportStore((state) => state.status);
@@ -31,7 +33,7 @@ export function ExportButton() {
   return (
     <div className={styles.exportPanel}>
       <p className={styles.exportStatus} role="status" data-testid="export-status">
-        {unavailable ? messages.export.unavailable : ""}
+        {unavailable ? messages.export.unavailable : stopped === undefined ? "" : blockerText(stopped)}
       </p>
       <Button
         variant="primary"

@@ -2,7 +2,8 @@
 // §27.1): nothing moves the words, the preview or the export off the time they
 // were recorded at. This is BP §7's demo as a test: 20 s in, 20 s out, the pause
 // intact, in sync on both sides, by all 11 checks of the independent verifier.
-// An encoder that fails starts the file again and costs no export.
+// The same edit again comes from the render cache, at once, and an encoder that
+// fails starts the file again and costs no export.
 //
 // Each group processes its clip once and its cases go in the order they are
 // written: a case's state is the previous one's. No word of a clip is printed,
@@ -28,9 +29,13 @@ import {
   patient,
   previewAt,
   readIndexedDb,
+  saves,
   scrubBar,
   seekTo,
+  sendQueuedAnalytics,
   setStyle,
+  settled,
+  sha256Of,
   toggleItem,
   verifyMp4,
   watchExport,
@@ -47,6 +52,9 @@ const FLASHES = 2;
  * (`fixtures/speech/README.md`).
  */
 const RECOGNIZER_SLACK_MS = 40;
+
+/** A hit reads one row and hands over one file (TS §21.4, "instantly"). */
+const HIT_LIMIT_MS = 2_000;
 
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 
@@ -89,6 +97,16 @@ async function exportAndSave(page: Page, api: FakeApi, scratch: string, name: st
   return file;
 }
 
+/** What the last `export_done` said, with what the page has queued sent first. */
+async function lastDone(page: Page, api: FakeApi): Promise<{ from_cache: boolean; total_ms: number }> {
+  await sendQueuedAnalytics(page);
+  const done = api.eventsOf("export_done").at(-1) as { props: { from_cache: boolean; total_ms: number } } | undefined;
+  if (done === undefined) {
+    throw new Error("no export_done arrived");
+  }
+  return done.props;
+}
+
 /** Tells the render worker to fail its video encoder at `frame`, on the next `times` attempts (D-218). */
 async function failEncoderAt(page: Page, frame: number, times: number): Promise<void> {
   await page.evaluate(
@@ -113,6 +131,8 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
   let downloads: Download[];
   /** The first word after the pause: read by the first case, used by the ones after it. */
   let firstAfter: { index: number; word: Word };
+  /** The file of the edit: the next case's hit must be these bytes. */
+  let editedFile: string;
 
   test.beforeAll(async ({ browser }, info) => {
     fixture = genFixture("speech/speech_20s_long_pause.mp4");
@@ -176,11 +196,52 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
     await toggleItem(page, "Big number", false);
     await setStyle(page, "Bold");
     expect(await scrubBar(page).getAttribute("max"), "the bar did not move").toBe(String(DURATION_MS));
-    const file = await exportAndSave(page, api, scratch, "edited.mp4");
+    editedFile = await exportAndSave(page, api, scratch, "edited.mp4");
+    expect(await lastDone(page, api), "the edit is a new render").toMatchObject({ from_cache: false });
+    expectAllChecks(verifyMp4(editedFile, "creator", DURATION_MS, fixture), { flashes: FLASHES });
+  });
+
+  test("The same edit again: the stored file, at once", async () => {
+    await sendQueuedAnalytics(page);
+    const startedBefore = api.eventsOf("export_started").length;
+    const timingsBefore = api.eventsOf("stage_timing").length;
+    const stored = await opfsList(page, "exports");
+    const file = await exportAndSave(page, api, scratch, "edited-again.mp4");
+    const done = await lastDone(page, api);
+    expect(done).toMatchObject({ from_cache: true });
+    expect(done.total_ms, "instant").toBeLessThan(HIT_LIMIT_MS);
+    expect(api.eventsOf("export_started"), "no export_started").toHaveLength(startedBefore);
+    expect(api.eventsOf("stage_timing"), "no stage_timing").toHaveLength(timingsBefore);
+    expect(await sha256Of(file), "the same bytes").toBe(await sha256Of(editedFile));
+    expect(await opfsList(page, "exports")).toEqual(stored);
+
+    // A change made and undone leaves the same clip: the words, the events and the plan come back as they were.
+    await editWord(page, firstAfter.index, "Again");
+    const undo = page.getByRole("banner").getByRole("button", { name: messages.editor.undo, exact: true });
+    const since = await saves(page);
+    await undo.click();
+    await settled(page, since);
+    const undone = await exportAndSave(page, api, scratch, "edited-undone.mp4");
+    expect(await lastDone(page, api), "undone is the same edit").toMatchObject({ from_cache: true });
+    expect(await sha256Of(undone)).toBe(await sha256Of(editedFile));
+  });
+
+  test("Undo everything, then export: a miss, and the file passes", async () => {
+    // One entry per clip (D-225): the edit's file is the one kept, so the clip as it came renders again.
+    const undo = page.getByRole("banner").getByRole("button", { name: messages.editor.undo, exact: true });
+    while (await undo.isEnabled()) {
+      const since = await saves(page);
+      await undo.click();
+      await settled(page, since);
+    }
+    const file = await exportAndSave(page, api, scratch, "undone.mp4");
+    expect(await lastDone(page, api)).toMatchObject({ from_cache: false });
     expectAllChecks(verifyMp4(file, "creator", DURATION_MS, fixture), { flashes: FLASHES });
   });
 
   test("The encoder fails", async () => {
+    // A change, or the render cache would answer and no encoder would run.
+    await setStyle(page, "Mono");
     await forgetProgress(page);
     const failuresBefore = await page.evaluate(() => window.e2eExportFailures ?? 0);
     await failEncoderAt(page, 30, 1);
@@ -197,6 +258,8 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
   // Last in the group: the ladder has fewer entries than this asks for, so the worker keeps the rest of the fault.
   test("Every entry fails", async () => {
     const downloadsBefore = downloads.length;
+    // A change, or the render cache would answer and no encoder would run.
+    await setStyle(page, "Bold");
     await failEncoderAt(page, 30, 9);
     await seedEntitlement(page, mintEntitlementToken());
     await button(page, messages.export.button).click();

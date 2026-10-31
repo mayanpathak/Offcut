@@ -256,6 +256,7 @@ export const messages = {
     B_PIPELINE_BUSY: "Offcut is still working on a clip. Add another when it has finished.",
     B_EXPORT_IN_PROGRESS: "An export is running. Wait until it has finished.",
     B_PIPELINE_NOT_READY: "The clip is not ready to export yet.",
+    B_STORAGE_LOW: "There is not enough room on this device for this video. Free some disk space, then try again.",
   },
 
   settings: {

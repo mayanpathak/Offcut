@@ -21,6 +21,7 @@
 | 5 | **Production `client_error` rows.** On 2026-10-29: `E_DECODE_VIDEO` at `preview` 4 times, within 71 s from 14:59:33 UTC, ten minutes after V4's deploy finished, which fits known issue 7 and cannot be proved from rows that hold no detail. `E_WORKER_CRASH` at `import` once, at 15:29:00, **still unexplained**. None since. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
 | 7 | ~~**A clip's preview could fail at once in a fresh browser with `E_DECODE_VIDEO`.**~~ Closed in Entry 6: 6 of 14 fresh starts before the fix, 0 of 24 after | `web/src/workers/render/` | Fixed; reaches production with the next merge |
+| 8 | **`pnpm e2e` is load-sensitive on a busy D1.** At the default 6 workers `the settings link ...` passes its 30 s limit, with the machine at about 60% before the run; at 2 workers all 12 pass in 22 s. Read CI's run of it. If it fails there too, the case needs a longer limit | `web/tests-e2e/landing.spec.ts` | P136 |
 
 ---
 
@@ -245,3 +246,39 @@ The restarted file being Main is the proof it came from the ladder's next entry.
 **Not checked.** Rust is unchanged and was not run. Other machines: D1 only. Nothing of P130 to P133 has run in CI: P134 pushes.
 
 **Open.** Open item 1; known issues 2 to 6.
+
+## Entry 10 - 2026-11-01 - P134 (S-9): render cache on the verified profile, the gate, `B_STORAGE_LOW`
+
+**What.** `render-cache-repo.ts`: SHA-256 over canonical JSON of the ten inputs. `__RENDERER_VERSION__`, computed by `vite.config.ts`. `startExport` in §13's twelve steps. `forExport(room?)`, `freeBytes`, `B_STORAGE_LOW`'s words, out of `COPY_PENDING`. The export store's `cacheHit`, `blockedBy`, `saved(summary, answered)`, `answered`, `hasAnswered`. A blocked export says why in `export-status`. `importClip` clears the cache. `export-machine.test.ts`, `blockers.test.ts`, `start-export.test.ts`. `export_done` keeps its placeholders except `from_cache`, until P135. **G problems 2, 3 and 6 closed.**
+
+**REOPENED CONTRACT** `RenderWorkerApi` + `exportProfile`, page and worker in this commit (D-220). `exportClip` still verifies the token itself.
+
+**Differs from the plan** (D-222, §17.5, §25 row 33, the guide and the prompts are corrected in this commit).
+- **Cases 8 and 9 each choose a new style first.** They follow exports of the same edit, so with the cache they would hit, no encoder would run, and the fault would never fire. The plan missed this.
+- **`word_edits` is not why the JSON is sorted.** Its keys are integers, and JavaScript orders those itself, so the plan's drill would not have fired there. `event_overrides` has string keys, in the order they were made: that is what the case and the drill use.
+- **`keyOf` gives no key while the clip is not `ready`.** A change that began between the click and the lock is not yet in the worker's scene: its file must not be stored under the new edit. Not in §13; a case holds it.
+- **The repository under test is the real one, over a fake `db`,** not a `vi.mock` of it. So a row without its file, one of another size and one of a newer build are the repository's own behaviour.
+- **Case 6 also makes a real change and undoes it, then expects a hit.** The plan had this in Vitest only, where nothing rebuilds the events or the plan. A real undo does, and it holds: the same key, the same bytes.
+- **`cancel.spec.ts --grep "export"` cannot run:** the group is serial and the case before it processes the clip, so the button stays disabled until the 10 min timeout. The grep now names both. The first attempt cost that 10 min.
+- `put` swallows by `.catch`, since the lint rule refuses an empty `catch`. `deliverStored` and `roomBlocker` are split out to keep `startExport` readable. The hit case's `sha256Of` is the helper `fixtures.ts` had, now exported.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `timeline-preserved.spec.ts`, whole | 11 + 2 setup passed, 2.8 min. The hit's case 1.0 s, of which most is hashing two files |
+| `export-creator.spec.ts`, the group to `expired` | 15 + 2 setup passed, 4.5 min: same token 1.4 s, forged, no room, expired verified as Free with the Free file's bytes and all 11 checks |
+| `cancel.spec.ts --grep "pipeline cancel\|export cancel"` | 2 + 2 setup passed: `renderCacheCount` 0 |
+| After the last code change (`put`) | Keyed build; `Words keep\|An edit leaves\|same edit`: passed |
+| Drills | `planOf` in the key: the two `Verified profile` cases fail. `JSON.stringify`: 3 fail, among them the hit in the other order. No clear in `importClip`: the `Import` case fails. No `clear()` in the catch: 3 fail, among them the refused token. Each restored; files compared |
+| `pnpm check`, `pnpm fixtures`, `pnpm test` | Exit 0. Rust 657 / 0 / 4 from that run's `pnpm test`; Vitest 327 |
+| Production build | No `__RENDERER_VERSION__`, `devFailEncoder` or `DevFault` in `web/dist`; app shell 338.7 kB gzip |
+| `check-copy-codes` | BLOCKER_CODES 5 of 8; pending 11 |
+| Frozen check | Empty |
+
+**Not green as written.** `pnpm e2e` at its default of 6 workers: 11 of 12, three runs out of three, on `the settings link leads to the table of what leaves the device`, past its 30 s. At `--workers=2`: **12 passed, 22.4 s**, that case 2 to 3 s; alone, 2.2 s. Nothing here changes that page. Known issue 8. CI's run of it at this push is what to read.
+
+**Not checked.** This push's CI: read at P135's start (D-198). §11.3's "new deploy" and "the stored file deleted by hand" are Vitest cases, not browser ones, as the prompt says. Other machines: D1 only.
+
+**Found, not fixed.** "Start over" (`dismissClip`) leaves the export file and its row until the next import clears them: harmless, as no other clip can reach them, and V7's `remove(clipId)` takes this over. `RENDERER_VERSION` hashes the three files D-223 names, so a change in `export-job.ts`, `opfs-sink.ts` or `video-source.ts` alone keeps old files valid: left as decided.
+
+**Open.** Open item 1; known issues 2 to 6, 8.

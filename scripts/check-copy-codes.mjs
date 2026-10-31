@@ -36,9 +36,7 @@ const COPY_PENDING = [
   "E_BILLING_PENDING",
   "E_ENTITLEMENT_INVALID",
   "E_ENTITLEMENT_EXPIRED",
-  // The four blockers no person can meet yet: the room on the device is
-  // due in V5, the account and the plan in V6.
-  "B_STORAGE_LOW",
+  // The three blockers no person can meet yet: the account and the plan, in V6.
   "B_NOT_SIGNED_IN",
   "B_ENTITLEMENT_EXPIRED",
   "B_NO_FREE_EXPORTS",

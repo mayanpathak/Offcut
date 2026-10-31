@@ -213,6 +213,16 @@ export function list(dir: string): Promise<readonly string[]> {
   });
 }
 
+/** What the browser says is left for this site, or `null` when it does not say (v5implementation D-229). */
+export async function freeBytes(): Promise<number | null> {
+  try {
+    const { quota, usage } = await navigator.storage.estimate();
+    return quota === undefined || usage === undefined ? null : quota - usage;
+  } catch {
+    return null;
+  }
+}
+
 /** Raw little-endian 32-bit floats, 48 kHz mono. */
 export function writeAudio(id: ClipId, out48: Float32Array<ArrayBuffer>): Promise<void> {
   return guarded(async () => {

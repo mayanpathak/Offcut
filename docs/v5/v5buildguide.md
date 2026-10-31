@@ -725,10 +725,10 @@ Goal: BP §7's demo is a test. 20 s in, 20 s out, in sync on both sides.
 | 3 | Preview's length | The scrub bar's `max` is the source's duration; played from 500 ms before the end, Play returns and `previewAt` is at or under it | Here |
 | 4 | Export is 20 s | Creator: `verifyMp4(file, "creator", 20_000, fixture)`, `expectAllChecks(verdict, { flashes: 2 })`; 600 frames (check 3 reads them) | Here |
 | 5 | An edit leaves the timeline alone | Fix a word, switch a visual off, choose Bold: `max` unchanged; export again; `expectAllChecks(…, { flashes: 2 })` | Here; `from_cache` in Phase 6; values and rows in Phase 7 |
-| 6 | The same edit again | | Phase 6 |
+| 6 | The same edit again | A hit, the same bytes, under 2 s; and again after a change made and undone | Phase 6 |
 | 7 | Undo everything, then export | | Phase 6 |
-| 8 | The encoder fails | `__offcutDev.failEncoderAt(30, 1)`: the bar falls back; the file passes the verifier; no failure card | Here |
-| 9 | Every entry fails | `failEncoderAt(30, 9)`: the card with `E_ENCODE_VIDEO`'s words, "Try again" and "Close"; no file in `exports/` or `exports/tmp/`; the preview plays again | Here |
+| 8 | The encoder fails | A new style first, from Phase 6 on, or the cache answers and no encoder runs. `__offcutDev.failEncoderAt(30, 1)`: the bar falls back; the file passes the verifier; no failure card | Here |
+| 9 | Every entry fails | A new style first, from Phase 6 on. `failEncoderAt(30, 9)`: the card with `E_ENCODE_VIDEO`'s words, "Try again" and "Close"; no file in `exports/` or `exports/tmp/`; the preview plays again | Here |
 
 `speech_30s_sparse.mp4`:
 
@@ -849,7 +849,7 @@ Replaces `startExport` and `renderAndDeliver`, in §13's twelve steps. The order
 | Temporary edit | Rule that must fire |
 |---|---|
 | `planOf(token)` in place of `profile.kind` in the key | The `Verified profile` group fails: this is problem 2 |
-| `JSON.stringify` in place of `canonicalJson` | The "order of `word_edits`' keys" case fails |
+| `JSON.stringify` in place of `canonicalJson` | The "order the keys were made in" case fails, on `event_overrides`: `word_edits`' integer keys order themselves |
 | `renderCacheRepo.clear()` removed from `importClip` | The `Import` case fails: problem 6 |
 | `clear()` left out of the catch for a refused token | The refused-token case: an illegal transition is reported |
 
@@ -864,7 +864,7 @@ pnpm --filter web exec vite build --mode test                # seconds
 grep -rl "__RENDERER_VERSION__" web/dist && echo LEFT || echo replaced   # expect: replaced
 pnpm e2e:media export-creator.spec.ts --grep "Free-plan|second export|same token|forged|no room|expired" --max-failures=1 2>&1 | tail -3
 pnpm e2e:media timeline-preserved.spec.ts --grep "An edit leaves|same edit|Undo everything" --max-failures=1 2>&1 | tail -3
-pnpm e2e:media cancel.spec.ts --grep "export" --max-failures=1 2>&1 | tail -3   # it reads renderCacheCount
+pnpm e2e:media cancel.spec.ts --grep "pipeline cancel|export cancel" --max-failures=1 2>&1 | tail -3   # it reads renderCacheCount; the group is serial, and the case before it processes the clip
 unset VITE_ENTITLEMENT_TEST_PUBLIC_KEY
 ```
 

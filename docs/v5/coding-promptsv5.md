@@ -1222,7 +1222,7 @@ exportProfile(p: { entitlementToken: string }): Promise<ExportProfile>;
 §13's twelve steps, in order; G 6.5's table says what to watch at each. `neededBytes = (profile.video_bitrate + profile.audio_bitrate) x clipInfo.duration / 8000`. `exportedAs = profile.kind === "creator" ? "creator" : "free"`.
 
 #### 2. `canonicalJson`
-Sorted by key at every depth; `undefined` left out, as JSON does; arrays keep their order. Required: `word_edits` holds its keys in the order they were edited, and the same edit reached by another route must give the same key.
+Sorted by key at every depth; `undefined` left out, as JSON does; arrays keep their order. Required: `event_overrides` holds its string keys in the order they were made (`word_edits`' integer keys order themselves), and the same edit reached by another route must give the same key.
 
 #### 3. `export-store.ts`
 `answered: boolean` is required in `Fields`, so `empty()` gives `answered: false`. **`exportCancelled` in `start-export.ts` replaces the whole state and must give it too**; `tsc` will say so. The set of answered ids is a module-level `Set<ExportId>`; `answered()` adds the current `exportId` and sets the field. The set survives `reset`, which is why a hit is not asked again; `saved` takes `hasAnswered` from the caller.
@@ -1282,7 +1282,7 @@ None. No request added; the hit makes none.
 `export-machine.test.ts`, `blockers.test.ts`, `start-export.test.ts` as §17.3's table. `vi.mock` the repos: Vitest has no IndexedDB. `crypto.subtle` is real. `document`, `URL.createObjectURL` are stubbed.
 
 #### Integration Tests
-The `export-creator` and `timeline-preserved` cases by `--grep`. `cancel.spec.ts --grep "export"` for `renderCacheCount`.
+The `export-creator` and `timeline-preserved` cases by `--grep`. `cancel.spec.ts --grep "pipeline cancel|export cancel"` for `renderCacheCount`: the case before it processes the clip.
 
 #### Failure-Path Tests
 G 6.8's four drills. The token-refused, storage-low, row-without-file, quota, worker-gone and cancel groups.

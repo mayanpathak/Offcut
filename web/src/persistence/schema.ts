@@ -5,6 +5,7 @@ import type { DBSchema } from "idb";
 
 import type {
   Bytes,
+  ChangeSummary,
   ClipId,
   ClipInfo,
   DetectedEvent,
@@ -60,6 +61,8 @@ export type RenderCacheRecord = {
   opfsPath: string;
   bytes: Bytes;
   createdAt: number;
+  /** What was changed: a hit does not reach the worker, so the row keeps it (v5implementation D-226). */
+  summary: ChangeSummary;
 };
 
 export type EntitlementRecord = { token: string; storedAt: number };

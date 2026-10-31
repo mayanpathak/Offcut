@@ -5,7 +5,8 @@
 //
 // The clip is processed once, and the cases export it in the order they are
 // written: with no token, with a token of another key, with a Creator token,
-// with a Free token. A case that fails stops the ones after it. The case of
+// with a Free token, then what the render cache does with what is stored
+// (v5implementation D-220, §17.5). A case that fails stops the ones after it. The case of
 // the founder's second recording runs on its own after them, on the
 // development machine only (D-99, D-100).
 
@@ -26,6 +27,8 @@ import {
   patient,
   referenceClip,
   routeAssets,
+  sendQueuedAnalytics,
+  sha256Of,
   sourceDurationMs,
   v3TestClip,
   verifyMp4,
@@ -40,6 +43,8 @@ const EXPORT_TIMEOUT_MS = patient(240_000);
 const OTHER_SEED = new Uint8Array(32).fill(7);
 /** The white frames of the reference clip, which check 8 compares (read in P130). */
 const REFERENCE_FLASHES = 2;
+/** A hit reads one row and hands over one file (TS §21.4, "instantly"). */
+const HIT_LIMIT_MS = 2_000;
 
 type Recorded = { method: string; url: string };
 
@@ -62,6 +67,8 @@ test.describe("one clip, exported", () => {
   const requests: Recorded[] = [];
   /** What the Creator export left for the cases that follow it. */
   let creator: { name: string; file: string; stored: string; requests: Recorded[]; startOverDisabled: boolean; playDisabled: boolean };
+  /** The Free export: the render cache's hits must be these bytes. */
+  let freeFile: string;
 
   /** Presses Export and waits for the file the browser is handed, saved where no report picks it up. */
   async function exportAndSave(name: string): Promise<{ download: Download; file: string; during: Recorded[] }> {
@@ -241,6 +248,7 @@ test.describe("one clip, exported", () => {
   test("Free-plan token: the file is 720 by 1280, as the token says", async () => {
     await seedEntitlement(page, mintEntitlementToken({ plan: "free" }));
     const { file } = await exportAndSave("free.mp4");
+    freeFile = file;
     expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
     // The same file is not a Creator's: its size and its watermark say so (INV-9).
     const asCreator = verifyMp4(file, "creator", durationMs, referenceClip());
@@ -257,6 +265,75 @@ test.describe("one clip, exported", () => {
     expect(names[0]).not.toBe(creator.stored);
     expect(await opfsList(page, "exports/tmp")).toEqual([]);
     expect(downloads).toHaveLength(2);
+  });
+
+  test("same token: the stored file, at once, with nothing rendered", async () => {
+    await sendQueuedAnalytics(page);
+    const startedBefore = api.eventsOf("export_started").length;
+    const timingsBefore = api.eventsOf("stage_timing").length;
+    const stored = await opfsList(page, "exports");
+    await forgetProgress(page);
+    const { download, file } = await exportAndSave("free-again.mp4");
+    await sendQueuedAnalytics(page);
+    const done = api.eventsOf("export_done").at(-1) as { props: { total_ms: number } };
+    expect(done.props).toMatchObject({ profile: "free", from_cache: true });
+    expect(done.props.total_ms, "instant").toBeLessThan(HIT_LIMIT_MS);
+    expect(api.eventsOf("export_started"), "no export_started").toHaveLength(startedBefore);
+    expect(api.eventsOf("stage_timing"), "no stage_timing").toHaveLength(timingsBefore);
+    const bar = (await page.evaluate(() => window.e2eExportBar ?? [])).map(Number);
+    expect(bar.every((value) => value === 0), "no frame was rendered").toBe(true);
+    expect(await sha256Of(file), "the Free file's bytes").toBe(await sha256Of(freeFile));
+    expect(await opfsList(page, "exports"), "the one file").toEqual(stored);
+    expect(download.suggestedFilename()).toMatch(/^offcut-\d{8}-\d{4}\.mp4$/);
+  });
+
+  test("forged token: refused before any lookup; no file given, and the stored one stays", async () => {
+    const stored = await opfsList(page, "exports");
+    const downloadsBefore = downloads.length;
+    await seedEntitlement(page, mintEntitlementToken({ plan: "free", seed: OTHER_SEED }));
+    await exportButton(page).click();
+    await expect(page.getByTestId("export-failed")).toContainText(messages.editor.failedStub, { timeout: 60_000 });
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("export_failed").at(-1)).toEqual({ name: "export_failed", props: { error_code: "E_ENTITLEMENT_INVALID", stage: "render_encode" } });
+    expect(downloads).toHaveLength(downloadsBefore);
+    expect(await opfsList(page, "exports")).toEqual(stored);
+  });
+
+  test("no room: the export says why, sweeps nothing, and the button stays ready", async () => {
+    const stored = await opfsList(page, "exports");
+    await sendQueuedAnalytics(page);
+    const startedBefore = api.eventsOf("export_started").length;
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.storage, "estimate", { value: () => Promise.resolve({ quota: 1_000, usage: 1_000 }), configurable: true });
+    });
+    try {
+      // A Creator token: a miss on the Free file that is stored.
+      await seedEntitlement(page, mintEntitlementToken());
+      await exportButton(page).click();
+      await expect(page.getByTestId("export-status")).toHaveText(messages.blockers.B_STORAGE_LOW, { timeout: 30_000 });
+    } finally {
+      await page.evaluate(() => {
+        delete (navigator.storage as unknown as { estimate?: unknown }).estimate;
+      });
+    }
+    await expect(page.getByTestId("export-progress")).toHaveCount(0);
+    await expect(page.getByTestId("export-failed")).toHaveCount(0);
+    await expect(exportButton(page)).toBeEnabled();
+    expect(await opfsList(page, "exports"), "nothing swept").toEqual(stored);
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("export_started"), "nothing began").toHaveLength(startedBefore);
+    await expect(button(page, messages.preview.play), "the preview is given back").toBeEnabled({ timeout: 30_000 });
+  });
+
+  test("expired Creator token: verified as Free, it hits the stored Free file, watermark and all (INV-9)", async () => {
+    await seedEntitlement(page, mintEntitlementToken({ periodEnd: Math.floor(Date.now() / 1000) - 3_600 }));
+    const { file } = await exportAndSave("expired.mp4");
+    await sendQueuedAnalytics(page);
+    expect((api.eventsOf("export_done").at(-1) as { props: unknown }).props).toMatchObject({ profile: "free", from_cache: true });
+    expect(await sha256Of(file)).toBe(await sha256Of(freeFile));
+    // 720 x 1280 with the watermark, by the verifier: what the token entitles it to, and not more.
+    expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
+    await expect(page.getByTestId("export-status")).toHaveText("");
   });
 });
 
