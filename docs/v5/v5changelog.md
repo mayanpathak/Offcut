@@ -18,7 +18,7 @@
 | 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
-| 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's query, 2026-10-31). The query did not read `ts`, so when they happened is unknown. The agent's walk-through showed no failure card, so they probably predate it, unproven. They carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
+| 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's queries, 2026-10-31). All are from 2026-10-29: the four within 71 s from 14:59:33 UTC, ten minutes after the deploy finished, and the crash at 15:29:00. None since, including the agent's three clips on the deployed site on 2026-10-31, so they do not reproduce on the sample and landscape clips. Which clip caused them is unknown: the rows carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 
 ---
 
