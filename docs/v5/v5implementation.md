@@ -100,10 +100,10 @@ Nothing from TS §36 is built. V5 adds no route, no server code and no dependenc
 
 Do not start Prompt 129 until every box is ticked.
 
-- [ ] 1. **V4 is closed and tagged.** The founder said on 2026-10-31 that V4 is closed. **When this plan was written the tag was not there:** `git ls-remote --tags origin` lists `v2` and `v3` only, `git tag` likewise; `v4implementation.md` still has 35 unticked boxes; `v4changelog.md` ends at Entry 39. Check: `git ls-remote --tags origin v4` prints a line. The closing entry and the boxes are the agent's (Prompt 128) once the founder has pushed the tag, and they go on `v4-build` or, since V4 is merged, in the first V5 commit (D-194).
+- [x] 1. **V4 is closed and tagged.** `v4` is on `origin` at `0a8aa80` since 2026-10-31. V4 CL Entry 40 closes it, with three boxes left for the founder that do not block V5. Check: `git ls-remote --tags origin v4` prints a line.
 - [x] 2. **V4 is merged and deployed.** `origin/main` is `0a8aa80`, the merge of PR 7. Its run 40889889605 was green in all four jobs. `healthz` answered `0a8aa80` on 2026-10-30.
 - [x] 3. **The branch exists.** `v5-build`, from `origin/main` at or after `0a8aa80`, pushed to `origin` (D-194). This plan, `v5buildguide.md`, `coding-promptsv5.md` and `v5changelog.md` are its first commit.
-- [ ] 4. **A draft pull request `v5-build` → `main` is open.** `ci.yml` runs on `pull_request`, so a pushed branch without one has no CI. As in V4, the founder opens it (V4 CL item 6).
+- [x] 4. **A draft pull request `v5-build` → `main` is open.** `ci.yml` runs on `pull_request`, so a pushed branch without one has no CI. As in V4, the founder opens it (V4 CL item 6).
 - [x] 5. **The baseline counts are read on D1** and written into Entry 1 of `v5changelog.md`. V4's final gate: Rust 646 passed, 0 failed, 4 ignored; Vitest 175; `pnpm e2e` 12; media 77 passed + 1 skip (D-78). No count may fall during V5, except the cases this plan rewrites by name (D-201).
 - [x] 6. **The verifier's tools are on D1.** `py -3.13 -c "import numpy"` reads 2.5.3; `ffmpeg` is 9.0.2. **Plain `python` on D1 is 3.9.13 and has no NumPy.** From Prompt 130 every command that runs the verifier puts Python 3.13 first on `PATH` (section 3.1).
 - [x] 7. **The fixtures exist.** `fixtures/.gen/speech/` holds both pause fixtures. White frames: `speech_20s_long_pause.mp4` at frames 60 and 450, `speech_30s_sparse.mp4` at 15 and 885, `speech_60s_portrait.mp4` at 150 and 1650 (`gen_fixtures.sh`).

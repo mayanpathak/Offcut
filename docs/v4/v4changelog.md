@@ -2947,3 +2947,20 @@ Every count is at or above Entry 1's baseline (Rust 461 / 0 / 3, Vitest 92, `pnp
 - "As built" notes are one table (§24.3) rather than a sentence in each decision's row.
 
 **Open.** For the founder (Prompt 128): `gh pr ready 7`, the merge, the deployed checks, design review 2 on the deployed editor, the Neon SQL, the tag.
+
+## Entry 40 - 2026-10-31 - V4 closed
+
+**What.** PR 7 merged as `0a8aa80`; run 40889889605 green in all four jobs; `healthz` answers `0a8aa80`. The founder said on 2026-10-31 that V4 is done, and told the agent to do the remaining steps, so the agent pushed the tag `v4` on `0a8aa80` at their word (usually a founder's step, D-115).
+
+**Final counts**, re-read on `v5-build` at `0a8aa80`: Rust 646 passed, 0 failed, 4 ignored; Vitest 175; `pnpm e2e` 12; media 77 passed + 1 skipped, from Entry 39.
+
+**The deployed walk-through (G 19.6), run by the agent** in Chrome on D1 against `https://offcut-one.vercel.app`, not by the founder, through a temporary Playwright spec since deleted: three passed in 3.5 min. `crossOriginIsolated` true and no `__offcutDev`; the reference clip previews; Clean, Bold and Mono each change the frame; 90 fixed to 9 changes the from-to's row (commit to saved 345 ms); Change all and undo; a list switched off changes the frame ("3 of 4 visuals on"); scrubbing; a caption drag snaps at Top; a landscape clip's crop drag reaches the edge; cancel during transcription gives "Process again". **Not asserted on the deployed page:** that the visuals move below the captions after the drag (`placement.rs` and the goldens hold that). Its analytics went to production as a visitor's would: real `review_action` and `job_cancelled` events.
+
+**Boxes.** 32 of the 35 open boxes of `v4implementation.md` ticked, each on the evidence listed in V5 CL Entry 1 or above. **Three stay unticked, and only the founder can close them:**
+- **§23 "The editor":** every state "matches the reviewed screens". Reachability, axe and the keyboard are proven; the match needs design review 2.
+- **§23 the Neon rows.** The agent's read-only query was refused by the permission check, which treats it as a production read, and nothing was retried. The rows should be there from the walk-through above, but nobody has read them.
+- **§23 "Design review 1 and design review 2":** review 1 is recorded (Entry 22). Review 2 and the five goldens of Entry 39 are not. They are a person's judgement, so the agent does not answer them.
+
+**Checked.** `git ls-remote --tags origin v4` prints the tag. Documents only otherwise.
+
+**Open.** The three boxes above; they do not block V5 (V5 CL open item 1).

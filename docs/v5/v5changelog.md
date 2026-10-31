@@ -9,9 +9,7 @@
 ## Open items
 | # | Item | Owner | Version |
 |---|---|---|---|
-| 1 | **Push the `v4` tag.** The founder said on 2026-10-31 that V4 is closed; on that date `git ls-remote --tags origin` listed `v2` and `v3` only. V5 §1A box 1 waits for it | Founder | Before P129 |
-| 2 | **V4's closing entry and boxes.** `v4changelog.md` ends at Entry 39 and `v4implementation.md` has 35 unticked boxes. The agent writes the entry and ticks what the founder vouches for once the tag exists; a box nobody can vouch for stays unticked and is named | Agent | Setup |
-| 3 | **Open a draft pull request `v5-build` → `main`** once the branch is pushed: `ci.yml` runs on pull requests | Founder | Setup |
+| 1 | **Three V4 boxes only the founder can close** (V4 CL Entry 40): design review 2 and the five goldens, whether the editor matches the reviewed screens, and the Neon rows. They do not block V5 | Founder | Any time |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -72,3 +70,11 @@
 **V4's 35 open boxes, checked against the records on this date, for Entry 40.** 28 are shown by evidence and can be ticked when Entry 40 is written: the final gate of V4 CL Entry 39, this baseline, run 40889889605 (all four jobs, with the header check and `@smoke`, which reads `crossOriginIsolated`), `healthz` answering `0a8aa80`, `experiments.md` (14 decisions, none empty), 16 goldens, no untagged `TODO`, no `fetch(` outside the four files. `line_breaks.rs`'s rows are unchanged since `01f406f`: its diff removes only the header comment, an import and the `#[ignore]`. **7 wait for the founder:** `v4implementation.md` lines 1568 (tag; three styles on the deployed page), 1603 (the editor matches the reviewed screens), 1620 (the deployed walk-through), 1621 (the Neon rows), 1626 (design review 2 and five goldens; review 1 is recorded), 1630 (follows 1568) and 1631 (tag).
 
 **Open.** Open items 1 to 3; known issues 1 to 4.
+
+## Entry 2 - 2026-10-31 - Setup, second part: V4 closed, the pull request open
+
+**What.** At the founder's word ("you do all these"), the agent pushed the tag `v4` on `0a8aa80` (`c3bc239`) and opened draft pull request 8. It ran V4's deployed walk-through and wrote V4 CL Entry 40: 32 of 35 boxes ticked, 3 left for the founder. `§1A` boxes 1 and 4 ticked. **Differs from D-194:** the tag and the pull request are normally the founder's; this applies to these two only. The tag `v5`, the merge and `gh pr ready` stay the founder's.
+
+**Checked.** The walk-through passed, with what it did not assert named in Entry 40. Counts unchanged from Entry 1. CI of the pull request is not waited on; P129 reads it first (D-198).
+
+**Open.** Open item 1; known issues 1 to 4. Prompt 129 is next.

@@ -1565,13 +1565,13 @@ Every cell is additive: a body, a file, an arm, a row. Where a later release tou
 
 ### 22.3 What must be true on V5's first morning
 
-- [ ] V4 is tagged `v4`, merged into `main` and deployed; the deployed page previews the reference clip in all three styles.
-- [ ] `docs/v4/experiments.md` holds section 21's readings and BP §6.2's decisions.
-- [ ] The 16 goldens and the snapshots are committed and pass in CI on lavapipe.
-- [ ] `program_identity.rs` passes: V5 can switch the export to `prog48` (S-8) knowing it equals `out48`.
-- [ ] `git grep -nE "\bV5\b" -- web/src crates` lists the places V5 fills: the export's audio source, the render cache, the verifier's checks 7-11, `ChangeSummary` on screen.
-- [ ] No `TODO` without a version tag.
-- [ ] Section 24's copy-back is applied.
+- [x] V4 is tagged `v4`, merged into `main` and deployed; the deployed page previews the reference clip in all three styles.
+- [x] `docs/v4/experiments.md` holds section 21's readings and BP §6.2's decisions.
+- [x] The 16 goldens and the snapshots are committed and pass in CI on lavapipe.
+- [x] `program_identity.rs` passes: V5 can switch the export to `prog48` (S-8) knowing it equals `out48`.
+- [x] `git grep -nE "\bV5\b" -- web/src crates` lists the places V5 fills: the export's audio source, the render cache, the verifier's checks 7-11, `ChangeSummary` on screen.
+- [x] No `TODO` without a version tag.
+- [x] Section 24's copy-back is applied.
 
 ### 22.4 What V5 to V6.7 inherit without further work
 
@@ -1592,43 +1592,43 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 
 **Code and checks**
 
-- [ ] `pnpm check` green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
-- [ ] `pnpm fixtures` then `pnpm test` green on D1 and in CI.
-- [ ] BP §6.3: `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` pass.
-- [ ] BP §6.3: `pipeline-preview.spec.ts` (all cases), `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts` pass on D1 on a keyed build.
-- [ ] BP §6.3: `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` pass.
-- [ ] BP §6.3 (v1.2): `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs` pass; the scene takes no `events` argument; no `TimeMs` reaches `frame_at`; the renderer has no crop parameter.
-- [ ] The identity proof of D-117 passed at S6 (its record in the changelog), and the temporary test is gone.
-- [ ] Caption intelligence: `line_breaks.rs` (the table unchanged since its commit, or each change logged), `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` pass.
+- [x] `pnpm check` green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
+- [x] `pnpm fixtures` then `pnpm test` green on D1 and in CI.
+- [x] BP §6.3: `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` pass.
+- [x] BP §6.3: `pipeline-preview.spec.ts` (all cases), `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts` pass on D1 on a keyed build.
+- [x] BP §6.3: `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` pass.
+- [x] BP §6.3 (v1.2): `timemap_identity.rs`, `plan_from_rules.rs`, `validate.rs`, `catalog_snapshot.rs`, `catalog_complete.rs`, `styles_use_theme.rs`, `program_identity.rs` pass; the scene takes no `events` argument; no `TimeMs` reaches `frame_at`; the renderer has no crop parameter.
+- [x] The identity proof of D-117 passed at S6 (its record in the changelog), and the temporary test is gone.
+- [x] Caption intelligence: `line_breaks.rs` (the table unchanged since its commit, or each change logged), `placement.rs`, `parity.rs`, `scene_cache.rs`, `hit.rs` pass.
 - [ ] The editor: every state of section 17.2 is reachable and matches the reviewed screens; the axe check passes; every control works by keyboard.
-- [ ] No source file over 700 lines, tests excluded; the four splits of D-150 are in place.
-- [ ] `git grep` finds no `fetch(` outside the four files, no network call added (D-164), and no cut, mix or non-identity map constructed outside tests.
-- [ ] Test counts at least the baseline's plus V4's (section 20.1); none fell except the cases D-160 names.
+- [x] No source file over 700 lines, tests excluded; the four splits of D-150 are in place.
+- [x] `git grep` finds no `fetch(` outside the four files, no network call added (D-164), and no cut, mix or non-identity map constructed outside tests.
+- [x] Test counts at least the baseline's plus V4's (section 20.1); none fell except the cases D-160 names.
 
 **Measurements**
 
-- [ ] Edit to preview ≤ 150 ms (90th percentile) on D1; style thumbnails ≤ 400 ms; the app shell within 400 kB gzip with the font.
-- [ ] Preview drift ≤ 80 ms over 60 s and late frames ≤ 5% on D1; first frame ≤ 500 ms; seek ≤ 300 ms (or recorded with the spinner).
-- [ ] `build_scene` ≤ 1 s and mean `frame_at` ≤ 2 ms natively.
-- [ ] The bench file of S15 committed; `render_encode` within E-4's line.
-- [ ] Golden similarity across adapters recorded.
-- [ ] BP §6.2's two decisions recorded.
+- [x] Edit to preview ≤ 150 ms (90th percentile) on D1; style thumbnails ≤ 400 ms; the app shell within 400 kB gzip with the font.
+- [x] Preview drift ≤ 80 ms over 60 s and late frames ≤ 5% on D1; first frame ≤ 500 ms; seek ≤ 300 ms (or recorded with the spinner).
+- [x] `build_scene` ≤ 1 s and mean `frame_at` ≤ 2 ms natively.
+- [x] The bench file of S15 committed; `render_encode` within E-4's line.
+- [x] Golden similarity across adapters recorded.
+- [x] BP §6.2's two decisions recorded.
 
 **Deployment**
 
-- [ ] `ci.yml` green on `main`; API (unchanged image) then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
-- [ ] On the deployed page on D1: the reference clip previews in the premium default; Bold and Mono switch from their cards; clicking a word on the preview and editing it changes the number at once; "Change all" and undo work; dragging the captions to the top moves the visuals below them; a list switched off disappears; the landscape clip's crop moves by dragging; scrubbing works; cancel during transcription returns to "Process again".
+- [x] `ci.yml` green on `main`; API (unchanged image) then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
+- [x] On the deployed page on D1: the reference clip previews in the premium default; Bold and Mono switch from their cards; clicking a word on the preview and editing it changes the number at once; "Change all" and undo work; dragging the captions to the top moves the visuals below them; a list switched off disappears; the landscape clip's crop moves by dragging; scrubbing works; cancel during transcription returns to "Process again".
 - [ ] `review_action`, `job_cancelled` and `client_error` rows appear in `analytics_events` with enum props only (the founder's SQL).
 
 **Records**
 
-- [ ] `docs/v4/experiments.md` written; every reading labelled `d1`.
+- [x] `docs/v4/experiments.md` written; every reading labelled `d1`.
 - [ ] Design review 1 (S10A) and design review 2 (S19) done by the founder on the captured screens at 1280 x 800 and 1920 x 1080, with the visual QA list of D-191 ticked; the founder has looked at five golden frames chosen at random and said whether each looks as intended.
-- [ ] The founder has read ten rows of `line_breaks.rs`'s table and said whether each break reads naturally.
-- [ ] Every (assumption) V4 measured is replaced in TS §39.3, or still listed.
-- [ ] `v4changelog.md` lists every pinned version (`insta`, `png`, the lavapipe package), every snapshot or golden change after its first commit, and the identity proof.
-- [ ] Section 22.3 fully ticked.
-- [ ] Tagged `v4`.
+- [x] The founder has read ten rows of `line_breaks.rs`'s table and said whether each break reads naturally.
+- [x] Every (assumption) V4 measured is replaced in TS §39.3, or still listed.
+- [x] `v4changelog.md` lists every pinned version (`insta`, `png`, the lavapipe package), every snapshot or golden change after its first commit, and the identity proof.
+- [x] Section 22.3 fully ticked.
+- [x] Tagged `v4`.
 
 ---
 
