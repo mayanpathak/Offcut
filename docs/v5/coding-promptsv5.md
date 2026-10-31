@@ -62,7 +62,7 @@ Docker Desktop must be running before `cargo test --workspace` (the server's tes
 | Tier | Runs | Used by |
 |---|---|---|
 | 1 | `pnpm check`; `cargo test -p` each crate touched; `pnpm --filter web exec vitest run` | Every prompt |
-| 2 | Tier 1, a build, and only the cases the prompt names: `pnpm e2e:media <spec> --grep "<case>" --max-failures=1`. Only `web/src` changed: `pnpm --filter web exec vite build --mode test`. Rust changed: `pnpm build:e2e` | 129, 130, 132, 133, 134, 135 |
+| 2 | Tier 1, a build, and only the cases the prompt names: `pnpm e2e:media <spec> --grep "<case>" --max-failures=1` (write `[.]`, never a backslash: `pnpm` doubles it on Windows). Only `web/src` changed: `pnpm --filter web exec vite build --mode test`. Rust changed: `pnpm build:e2e` | 129, 130, 132, 133, 134, 135 |
 | 3 | `pnpm check && pnpm fixtures && pnpm test`, `pnpm e2e` | 129, 134 |
 | 4 | Tier 3, then `pnpm e2e:media` in full on a keyed build, then CI, waited for | 136 |
 
@@ -340,7 +340,7 @@ V4 closed on the record, `v5-build` pushed, a draft pull request open, the floor
 
 ### Objective
 
-Make every later run faster, with no gate lost: `review-edit.spec.ts` shares one processed clip across 13 of its 16 cases, a pull request that changes only documents skips the heavy CI jobs while the secret scan still runs, the bench takes a run count, and known issues 33 and 36 get their one-line fixes.
+Make every later run faster, with no gate lost: `review-edit.spec.ts` shares one processed clip across 12 of its 16 cases, a pull request that changes only documents skips the heavy CI jobs while the secret scan still runs, the bench takes a run count, and known issues 33 and 36 get their one-line fixes.
 
 ### Project State Before This Prompt
 
@@ -359,7 +359,7 @@ The next seven prompts run `review-edit`-style cases and CI; speed compounds fro
 #### Implement
 
 - G 1.1: `FakeApi.forget()`; `sendQueuedAnalytics(page)`; `openShared(browser, info, fixture)`; `resetClip(page, api)`.
-- G 1.2: `review-edit.spec.ts` in two groups. Cases 1-4, 7, 9-16 on the shared clip; cases 5, 6, 8 on their own. Numbers, titles and what each asserts unchanged. Header comment rewritten.
+- G 1.2: `review-edit.spec.ts` in two groups. Cases 1-4, 7, 9-13, 15, 16 on the shared clip; cases 5, 6, 8, 14 on their own. Numbers, titles and what each asserts unchanged. Header comment rewritten.
 - G 1.3: D-236's two lines in `model-download.spec.ts`.
 - G 1.4: `ci.yml`'s `changes` job, `ci`'s `needs` and `if`, gitleaks moved, `fetch-depth` dropped from `ci`; `e2e-media.yml`'s stale "all 30 cases".
 - G 1.5: `BENCH_RUNS`.
@@ -425,13 +425,13 @@ await page.waitForTimeout(300);   // for the request to reach the route
 
 #### 2. `resetClip`, in this order (§6.3)
 1. Escape, for a word field; if Pause is visible, press it and wait for Play.
-2. `undo = page.getByRole("button", { name: messages.editor.undo, exact: true })`. While enabled: read `saves(page)`, click, `settled(page, since)`. It has no test id.
-3. `seekTo(page, 0)`; `openTab(page, "Captions")`; `page.mouse.move(0, 0)` (a hovered toast does not time out); wait until `getByTestId("toasts")` is gone (`ToastHost` renders nothing with no toast) within `patient(10_000)`.
+2. `undo = page.getByRole("banner").getByRole("button", { name: messages.editor.undo, exact: true })`: the toast after a redo offers an Undo of its own. While enabled: read `saves(page)`, click, `settled(page, since)`. It has no test id.
+3. `seekTo(page, 0)`; `openTab(page, "Captions")`; `page.mouse.move(0, 0)` (a hovered toast does not time out); wait until `getByTestId("toasts")` is gone (`ToastHost` renders nothing with no toast) within `patient(30_000)`.
 4. `sendQueuedAnalytics(page)`, then `api.forget()`.
 5. **Assert**: Undo disabled; `preview-failed` count 0; `readIndexedDb(page, "edits", clipId)`'s `value.editState` deep-equals the empty edit (`clipId` from `opfsList(page, "clips")`). Do not open the Style tab: it would start a thumbnail job.
 
 #### 3. The cases
-Move case 5, 6, 8 bodies unchanged into the second group, where `openClip` stays. In the first, each case begins `const { page, api } = shared;` and loses its `openClip` line. A case that used `const api = await openClip(…)` keeps the name.
+Move case 5, 6, 8, 14 bodies unchanged into the second group, where `openClip` stays. In the first, each case begins `const { page, api } = shared;` and loses its `openClip` line. A case that used `const api = await openClip(…)` keeps the name.
 
 #### 4. `changes`
 §19.1's YAML. gitleaks into `$RUNNER_TEMP`, by `GITLEAKS_VERSION` and `GITLEAKS_SHA256` of the workflow's `env`, refused unless its checksum matches, as "Install the build tools" does today. The step's comment names the reason.
@@ -470,7 +470,7 @@ None.
 None new (`tests-e2e` helpers have none).
 
 #### Integration Tests
-`pnpm e2e:media review-edit.spec.ts` once, whole. `--grep " (1|12)\. " --repeat-each=2` for the reset's repeatability. `model-download.spec.ts` is not re-run for one wait: its cases run in CI's `e2e-media`, which is what the issues are about.
+`pnpm e2e:media review-edit.spec.ts` once, whole. `model-download.spec.ts` is not re-run for one wait: its cases run in CI's `e2e-media`, which is what the issues are about.
 
 #### Failure-Path Tests
 G 1.7's two drills. The `diff` script on both kinds of diff (G 1.4).
@@ -486,7 +486,7 @@ git grep -c "gitleaks" -- .github/workflows/ci.yml                              
 
 ### Acceptance Criteria
 
-- [ ] All 16 cases pass in one run, on 4 clip loads; the file's time is in the entry against V4's.
+- [ ] All 16 cases pass in one run, on 5 clip loads; the file's time is in the entry against V4's.
 - [ ] Case numbers, titles and assertions are unchanged (`git diff` read), or a move to an own load is named.
 - [ ] `resetClip` failed by name in the drill; `sendQueuedAnalytics`'s drill failed case 13.
 - [ ] The `diff` script gives `code=true` and `code=false`.
@@ -1733,7 +1733,7 @@ V5 is deployed, measured, recorded and tagged. V6's first morning has every line
 | G problem 8 (V4's boxes) | Setup | Entry 40 | Named in the entry |
 | G problem 9 (no CI without a PR) | Setup | Human | `gh pr view` |
 | G problem 10 (thresholds are guesses) | 130, 136 | Offline tuning | `INFO` lines; TS §39.3 |
-| Speed rules | 129, every gate, 136 | D-196 to D-201 | 4 clip loads; one full run; docs-only skip |
+| Speed rules | 129, every gate, 136 | D-196 to D-201 | 5 clip loads; one full run; docs-only skip |
 | Known issues 33, 36, 37 | 129, 136 | D-236 | V5's runs; bench |
 | Spec copy-back | 136 | §25 | `check-file-tree`, G 8.3 |
 | Deployed, verified, tagged | 136 | Merge, deploy, checks | `healthz`, headers, `@smoke`, `ls-remote` |
@@ -1767,4 +1767,5 @@ Found while reading `v5implementation.md`, `v5buildguide.md` and the code togeth
 | 9 | `exportedAs` when `profile.kind` is `preview` | A token never verifies as `preview`; mapped to `free`, so the type holds | 134 |
 | 10 | Eight screen states at two widths become nine | 18 PNGs; only the done state's two go to `~/v5-review/` | 135 |
 | 11 | `pnpm test` needs Docker, the bench needs it closed | Bench first, Docker closed; then Docker on for Tier 4 | 136 |
+| 12a | Case 14's budget on a shared clip, an ambiguous `Undo`, `--repeat-each` in a shared group, a backslash in `--grep` (found running P129) | Plan §25 rows 26, 27 | 129 |
 | 12 | `v5-build` does not exist, and the documents are uncommitted on `v4-build` | They go in the Setup commit, with V4's Entry 40, since V4 is merged | Setup |

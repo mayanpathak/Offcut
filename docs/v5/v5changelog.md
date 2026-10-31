@@ -19,6 +19,7 @@
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
 | 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's queries, 2026-10-31). All are from 2026-10-29: the four within 71 s from 14:59:33 UTC, ten minutes after the deploy finished, and the crash at 15:29:00. None since, including the agent's three clips on the deployed site on 2026-10-31, so they do not reproduce on the sample and landscape clips. Which clip caused them is unknown: the rows carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
+| 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
 
 ---
 
@@ -83,3 +84,29 @@
 ## Entry 3 - 2026-10-31 - The Neon rows read by the founder
 
 **What.** The founder ran the query: enum props only, so V4's box is ticked (V4 CL Entry 40), and two V4 boxes remain. Known issue 5 opened for the five `client_error` rows. Documents only. Committed without a push: it goes with P129's (D-198).
+
+## Entry 4 - 2026-10-31 - P129: shared clip in review-edit, gates, docs-only CI skip
+
+**What.** `resetClip`, `openShared`, `sendQueuedAnalytics` and `FakeApi.forget()`; `openClip` moved from the spec to `helpers/fixtures.ts`, so both open a clip one way. `review-edit.spec.ts` in two groups. A `changes` job in `ci.yml` holds the secret scan and decides whether the heavy jobs run; `ci` lost the gitleaks lines and `fetch-depth: 0`. `BENCH_RUNS`. D-236's two waits (known issues 2 and 3 stay open until V5's CI runs are read at P136). `e2e-media.yml`'s stale comment. No file under `web/src` changed.
+
+**Differs from the plan** (its D-201, §6, §25 rows 26, 27, the guide and the prompts are corrected in this commit):
+- **5 clip loads, not 4: case 14 has its own** (D-201 allows it). The first full run read its style cards at 26 ms, against 56-62 ms in V4. The store keeps the last cards, so on a shared clip they show at once and the 400 ms budget measured nothing. Alone it read 118 ms, and 58 ms in the final run.
+- Undo is found inside `banner`: after a redo the toast offers an Undo of its own, which a page-wide locator would trip on after case 12.
+- `--repeat-each=2` on cases 1 and 12 was not run. It starts a new worker per repeat, so it loads a new clip and never resets twice. A run of the file resets 12 times.
+- The wait for toasts is `patient(30_000)`, not 10 s: it is an upper bound.
+- A backslash in `--grep` is doubled by `pnpm` on Windows and matches nothing, so the guide's patterns now use `[.]`.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `pnpm e2e:media review-edit.spec.ts`, final code | 18 passed (16 + 2 setup), 8.0 min; the file 6.6 min. Before: 16 clip loads at about a minute each, plus the cases |
+| Titles and bodies of the 16 cases against `0a8aa80` | All identical, apart from the lines that open a clip or read `shared` (a script compared them) |
+| Drill: no Undo loop in `resetClip`, cases 3 and 4 | Case 4 fails: "resetClip: every change is undone" |
+| Drill: no `sendQueuedAnalytics`, cases 1 and 13 | Case 13 fails: received `"undo"` beside `caption_position` |
+| The `diff` script | `code=true` with `ci.yml` changed; `code=false` for documents only |
+| `BENCH_RUNS` | `--list` names 5 with 5 and 10 by default; `x` throws |
+| Tier 3 | `pnpm check` exit 0; Rust 646 / 0 / 4; Vitest 175; `pnpm e2e` 12; frozen check empty. The first `pnpm test` aborted (known issue 6), and a re-run with no change passed |
+
+**Not checked.** `ci.yml`'s new job has not run yet: `actionlint` is not on D1 and no YAML parser was at hand, so this push is its first test, read at P130's start (D-198). A docs-only pull request has not been seen to skip. `model-download.spec.ts`'s waits run in CI's `e2e-media`.
+
+**Open.** Open item 1; known issues 1 to 6.

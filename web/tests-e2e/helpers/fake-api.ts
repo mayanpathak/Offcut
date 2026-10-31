@@ -14,6 +14,8 @@ export type FakeApi = {
   requests: RecordedRequest[];
   /** Every analytics event of that name, from all recorded `POST /events` bodies. */
   eventsOf(name: string): unknown[];
+  /** Forgets everything recorded so far: `eventsOf` counts from here (v5implementation §6.3). */
+  forget(): void;
 };
 
 export type FakeApiOptions = {
@@ -93,6 +95,9 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
         .filter((request) => request.path === "/events")
         .flatMap((request) => eventsIn(request.body))
         .filter((event) => typeof event === "object" && event !== null && "name" in event && event.name === name),
+    forget: () => {
+      requests.length = 0;
+    },
   };
 }
 

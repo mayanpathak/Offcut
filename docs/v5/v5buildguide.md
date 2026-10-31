@@ -37,7 +37,7 @@ Nine phases, numbered 0 to 8. Each has a goal, numbered steps, a "Prove the guar
 | Phase | Plan phase | Prompt | Covers | Agent time (estimate) | Milestone in one line |
 |---|---|---|---|---|---|
 | 0 Setup | - | Setup | §1A, §3 | 30 min | `v4` read on `origin`; V4's closing entry; `v5-build` with the V5 docs; baseline counts; draft pull request open |
-| 1 The speed work | A | 129 | §6, §19.1, D-196 to D-201, D-236 | 2-2.5 h | `review-edit.spec.ts` green on 4 clip loads; docs-only CI skip; `BENCH_RUNS`; push 1 |
+| 1 The speed work | A | 129 | §6, §19.1, D-196 to D-201, D-236 | 2-2.5 h | `review-edit.spec.ts` green on 5 clip loads; docs-only CI skip; `BENCH_RUNS`; push 1 |
 | 2 The verifier and the stereo fix | B | 130 | §7, §8, D-203 to D-210 | 2 h | 11 `PASS` lines on real Creator and Free exports; self-test proves each failure; -14 ± 1 LUFS read by `ffmpeg` |
 | 3 The muxer | B | 131 | §9, D-211, D-212 | 1 h | `ctts` and video `elst` on real B-frames; overflow tested; no reordering stays byte-identical |
 | 4 Program time and the ladder | B | 132 | §10, §16, D-213 to D-219, D-238 | 2 h | The loop reads `source_at` and `prog48.f32`; a failed encoder restarts; `export-loop.test.ts` green |
@@ -197,7 +197,8 @@ And the positive view: `git diff --name-only "$BASE" | sort` lists only files of
 | A prompt that fails a targeted run fixes it there, and does not widen to a full run | D-197 |
 | After the full run, a follow-up fix re-runs the affected spec, unless it touches the pipeline, a worker or the renderer | D-197 |
 | "Passes twice" is dropped, except for a timing suite whose code changed. V5 changes none | §6.1 |
-| `--repeat-each` on one case, never a whole suite | §6.1 |
+| `--repeat-each` on one case, never a whole suite. In a shared group each repeat loads a new clip | §6.1 |
+| Through `pnpm`, write `[.]` in `--grep`, not a backslash: `pnpm` doubles it on Windows and nothing matches | Found in P129 |
 
 ### Milestone 0
 
@@ -229,7 +230,7 @@ Goal: the next seven prompts and every later version test faster, with no gate l
 | 1 | `web/tests-e2e/helpers/fake-api.ts` | §6.3 | `FakeApi` gains `forget()`: `requests.length = 0` |
 | 2 | `web/tests-e2e/helpers/fixtures.ts` | §6.3 | `sendQueuedAnalytics(page)`: override `document.visibilityState` to `hidden` with `configurable: true`, dispatch `visibilitychange`, delete the override, wait 300 ms. `flushAnalytics` needs `page.clock`, which this page does not install (Read this first, item 3) |
 | 3 | `web/tests-e2e/helpers/fixtures.ts` | §6.3 | `openShared(browser, info, fixture)`: a context with `baseURL`, 1280 x 800, `ensureModelCached`, a page, `installFakeApi`, `routeAssets`, `trackSaves`, `/app`, `expectTestBuild`, `dropClip`, canvas visible, Play enabled. Exactly what `openClip` does, on a page of its own |
-| 4 | `web/tests-e2e/helpers/fixtures.ts` | §6.3 | `resetClip(page, api)`, the five steps of §6.3, in order. Undo is found by role and `messages.editor.undo`: it has no test id. Clean state asserted last: Undo disabled, no `preview-failed` card, and the stored edit (`readIndexedDb(page, "edits", clipId)`) equal to `clip-store`'s empty one. The Style tab is not opened: it would start a thumbnail job |
+| 4 | `web/tests-e2e/helpers/fixtures.ts` | §6.3 | `resetClip(page, api)`, the five steps of §6.3, in order. Undo is found by role and `messages.editor.undo` inside `banner`: it has no test id, and the toast after a redo offers an Undo of its own. Clean state asserted last: Undo disabled, no `preview-failed` card, and the stored edit (`readIndexedDb(page, "edits", clipId)`) equal to `clip-store`'s empty one. The Style tab is not opened: it would start a thumbnail job |
 
 ### Step 1.2 - `review-edit.spec.ts` on one clip (D-201)
 
@@ -240,16 +241,17 @@ test.describe("the editor (review-edit), on one processed clip", () => {
   test.beforeAll(async ({ browser }, info) => { shared = await openShared(browser, info, referenceClip()); });
   test.afterAll(async () => { await shared.context.close(); });
   test.beforeEach(async () => { await resetClip(shared.page, shared.api); });
-  // cases 1-4, 7, 9-16, with `page` and `api` read from `shared`
+  // cases 1-4, 7, 9-13, 15, 16, with `page` and `api` read from `shared`
 });
 
-test.describe("the editor (review-edit), on a clip of its own", () => { /* cases 5, 6, 8, as today */ });
+test.describe("the editor (review-edit), on a clip of its own", () => { /* cases 5, 6, 8, 14, as today */ });
 ```
 
 | Watch for | Why |
 |---|---|
 | Not `serial` | A failed case must not stop the others. Playwright starts a new worker after a failure, and `beforeAll` runs again: a new clip |
 | Case numbers and titles unchanged; what each asserts unchanged | D-201. A case that cannot share moves to its own load, and the changelog says which |
+| Case 14 on its own load | The store keeps the last cards, so on a shared clip they show at once and its 400 ms budget measures nothing (read 26 ms against a real 118 ms) |
 | Case 12's opening | Read on 2026-10-31: it makes three new changes first, and a new change drops the redo branch. It needs nothing |
 | The header comment ("Sixteen cases, each with its own clip load") | Rewrite it, naming the four loads |
 | No `{ page }` fixture in a shared case | It would open a second, empty page |
@@ -302,8 +304,7 @@ BENCH_RUNS=5 pnpm --filter web exec playwright test --project=bench --list | tai
 ```bash
 export VITE_ENTITLEMENT_TEST_PUBLIC_KEY=$(grep -E '^ +E2E_TEST_PUBLIC_KEY:' .github/workflows/ci.yml | awk '{print $2}')
 pnpm build:e2e
-pnpm e2e:media review-edit.spec.ts 2>&1 | tail -5            # in the background; expect: 16 passed. Note the time against V4's
-pnpm e2e:media review-edit.spec.ts --grep " (1|12)\. " --repeat-each=2 --max-failures=1 2>&1 | tail -3   # the reset works repeatedly
+pnpm e2e:media review-edit.spec.ts 2>&1 | tail -5            # in the background; expect: 16 passed (+2 setup). Note the time against V4's
 unset VITE_ENTITLEMENT_TEST_PUBLIC_KEY
 ```
 
@@ -318,14 +319,14 @@ unset VITE_ENTITLEMENT_TEST_PUBLIC_KEY
 | Temporary edit | Rule that must fire |
 |---|---|
 | Comment out the Undo loop of `resetClip`; run case 3 then case 4 | The clean-state assertion fails by name |
-| Comment out `sendQueuedAnalytics`; run case 1 then case 13 (`--grep " (1|13)\. "`) | Case 13's `toEqual(["caption_position"])` fails on case 1's late events |
+| Comment out `sendQueuedAnalytics`; run case 1 then case 13 (`--grep " (1|13)[.] "`) | Case 13's `toEqual(["caption_position"])` fails on case 1's late events |
 
 Undo both.
 
 ### Milestone 1
 
 ```bash
-grep -c "openShared\|openClip(page, " web/tests-e2e/review-edit.spec.ts   # read: 1 shared open plus 3 own loads
+grep -c "openShared(\|openClip(page, " web/tests-e2e/review-edit.spec.ts   # expect: 5, one shared open plus 4 own loads
 # Tier 3
 pnpm check && pnpm fixtures && pnpm test                     # expect: exit 0; counts equal Entry 1's
 pnpm e2e 2>&1 | tail -2                                      # expect: 12 passed
@@ -334,7 +335,7 @@ actionlint .github/workflows/ci.yml 2>/dev/null || true      # if at hand; other
 git push                                                     # do not wait (D-198)
 ```
 
-Pass: all 16 cases pass in one run on 4 clip loads, the `diff` script gives both answers, `BENCH_RUNS` lists both, and the suite's time is in the entry against V4's 41.8-54.9 min for the whole of media.
+Pass: all 16 cases pass in one run on 5 clip loads, the `diff` script gives both answers, `BENCH_RUNS` lists both, and the suite's time is in the entry against V4's 41.8-54.9 min for the whole of media.
 
 Commit: `"V5 P129: shared clip in review-edit, gates, docs-only CI skip"`. **Push, first of three. Do not wait.**
 

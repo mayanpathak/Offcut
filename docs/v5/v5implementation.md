@@ -65,7 +65,7 @@ Appendix D. Size estimate
 | Summary and question (J11) | `ChangeSummary` shows only the changes that were made; `PostExportQuestion` asks "Would you post this as is?" and sends `post_export_answer` |
 | Analytics | `export_done` carries the edit's real values (`word_edits`, `events_kept`, `events_disabled`, `style`, `crop_adjusted`, `from_cache`) instead of today's placeholders; `post_export_answer` starts (BP Appendix C) |
 | Tests | `export-creator.spec.ts` with all 11 checks, `timeline-preserved.spec.ts` on both pause fixtures, `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts`, `export-loop.test.ts`, the verifier self-test, the muxer's reorder and overflow tests |
-| Speed | `review-edit.spec.ts` shares one processed clip across 13 of its 16 cases; docs-only pull requests skip the heavy jobs; the bench takes a run count; known issues 33 and 36 get their one-line fixes |
+| Speed | `review-edit.spec.ts` shares one processed clip across 12 of its 16 cases; docs-only pull requests skip the heavy jobs; the bench takes a run count; known issues 33 and 36 get their one-line fixes |
 | Measurements | E-4 re-read on D1, `detect_scene` re-read on a quiet D1 (V4 CL known issue 37), the verifier's thresholds recorded in `docs/v5/experiments.md` and TS §39.3 item 14 |
 
 ### 1.2 Not in V5
@@ -129,7 +129,7 @@ Numbering continues from V4's D-193. Each is the smallest choice that gets V5's 
 | D-198 | **Three pushes before the merge:** at the end of Phases A, C and D (section 5). The agent does not wait on CI after the first two, reads the result when the next prompt starts, and fixes a red run before going further. It waits on the last | V4's waits cost about 25-35 min each. The risk: a CI-only failure surfaces later. A phase is short enough to afford that |
 | D-199 | **A pull request that changes only documents skips `ci` and `e2e-media`.** A small `changes` job decides, and the secret scan moves into it, so documents are still scanned. A push to `main` always runs everything | A skipped job counts as passed; deploys are unaffected. See section 19.1 |
 | D-200 | **The bench takes `BENCH_RUNS`**, default 10 as before. V5's reading uses 5, one warm-up plus five runs, with Docker closed | The founder's yes of 2026-10-31. A median of five is still meaningful; about 14 min instead of about 27 |
-| D-201 | **`review-edit.spec.ts` shares one processed reference clip** across cases 1-4, 7, 9-16; cases 5, 6 and 8 keep their own (section 6.3). The case names and what each asserts do not change | Twelve fewer clip loads, about 12-15 min of each full run, and it compounds as V6.x adds review cases |
+| D-201 | **`review-edit.spec.ts` shares one processed reference clip** across cases 1-4, 7, 9-13, 15, 16; cases 5, 6, 8 and 14 keep their own (section 6.3). The case names and what each asserts do not change | Eleven fewer clip loads, about 11-14 min of each full run, and it compounds as V6.x adds review cases |
 | D-202 | **D-69, D-74 and D-114 hold.** Every gate that names R1 is read on D1 and labelled `d1`; thresholds do not change | The founder's standing decision |
 
 ### 2.2 The verifier
@@ -352,7 +352,8 @@ Rules that go with them:
 - Long runs go in the background; only the tail and failures are read.
 - **Build cost.** Only `web/src` changed: `pnpm --filter web exec vite build --mode test` (seconds). Rust changed: `pnpm build:e2e`. The keyed variable is in the environment, as in V4.
 - **"Passes twice" is dropped,** except for a timing suite whose code changed. V5 changes no timing suite: `preview-sync.spec.ts` is untouched.
-- `--repeat-each` on one case, not a whole suite, to measure flakiness.
+- `--repeat-each` on one case, not a whole suite, to measure flakiness. It starts a new worker per repeat, so in a shared group it loads a new clip each time and does not exercise `resetClip` twice: a run of the file does that.
+- Through `pnpm`, a backslash in `--grep` is doubled on Windows and the pattern matches nothing: write `[.]`, not `\.`.
 
 ### 6.2 The verifier is tuned offline
 
@@ -370,7 +371,7 @@ test.describe("the editor (review-edit), on one processed clip", () => {
   test.beforeAll(async ({ browser }, info) => { shared = await openShared(browser, info, referenceClip()); });
   test.afterAll(async () => { await shared.context.close(); });
   test.beforeEach(async () => { await resetClip(shared.page, shared.api); });
-  // cases 1-4, 7, 9-16, with `page` and `api` read from `shared`
+  // cases 1-4, 7, 9-13, 15, 16, with `page` and `api` read from `shared`
 });
 ```
 
@@ -384,14 +385,15 @@ test.describe("the editor (review-edit), on one processed clip", () => {
 
 | Cases | Clip | Why |
 |---|---|---|
-| 1-4, 7, 9-16 | Shared reference clip | They undo cleanly |
+| 1-4, 7, 9-13, 15, 16 | Shared reference clip | They undo cleanly |
 | 5 | Own: `speech_60s_landscape.mp4` | Another clip |
 | 6 | Own: `speech_60s_portrait.mp4` | Another clip |
 | 8 | Own: reference | It breaks a change on purpose (`failNextSetScene`) |
+| 14 | Own: reference | It times the style cards' first draw. The store keeps the cards of the last time the tab was open, so on a shared clip they show at once (read 26 ms against a real 118 ms) and the 400 ms budget would measure nothing |
 
-Redo stays enabled after a reset. Case 12 does not assume otherwise: read on 2026-10-31, it makes three new changes first, and a new change drops the redo branch. Case 14's 400 ms budget and case 16's scans are unaffected. Observers that cases 7 and 14 leave on the shared page do nothing to later cases. `preview-sync` and `cancel` keep their own loads: they measure the first frame and kill workers.
+Redo stays enabled after a reset. Case 12 does not assume otherwise: read on 2026-10-31, it makes three new changes first, and a new change drops the redo branch. Case 16's scans are unaffected. Observers that cases 7 and 14 leave on the shared page do nothing to later cases. `preview-sync` and `cancel` keep their own loads: they measure the first frame and kill workers.
 
-**What this buys.** Twelve fewer clip loads. The suite was 41.8-54.9 min in V4; expect about 30-40 min with V5's additions (estimate).
+**What this buys.** Eleven fewer clip loads. The suite was 41.8-54.9 min in V4; expect about 30-40 min with V5's additions (estimate).
 
 ### 6.4 What a test tier does not replace
 
@@ -1360,7 +1362,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 
 **Speed**
 
-- [ ] `review-edit.spec.ts` makes 4 clip loads.
+- [ ] `review-edit.spec.ts` makes 5 clip loads.
 - [ ] A docs-only pull request skips `ci` and `e2e-media`; the scan still runs.
 - [ ] The full suite's time is recorded against V4's 41.8-54.9 min.
 - [ ] Full media runs in V5: one, or each extra one explained in the changelog.
@@ -1417,6 +1419,8 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 23 | `sourceHashPrefix` is in the clip's record, not the clip store; "the cached file's bytes" had no reader | V5 §12.2, §13 | `clipsRepo.get`, `heldBytes` |
 | 24 | The answered set in `answer-post-export.ts` needed a use-case edge from `start-export.ts` | V5 §14.5 | D-234: in `export-store.ts` |
 | 25 | `fakeExport` reaches `rendering` only; `screens.spec.ts`'s done state needs a hook | V5 §4 | `fakeExportDone` in `dev-hooks.ts` |
+| 26 | This plan said case 14's budget is unaffected by a shared clip; its reading fell to 26 ms on old cards | V5 §6.3, D-201 | Case 14 on its own load: 5 loads, as D-201 allows |
+| 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 
 **To copy back at Prompt 136, from the code:** TS §5 (new files), §9 (C-7, C-9, C-10), §12.2's prose, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 item 14, §40.9 (S-8, S-9 as built). BP §7: "as built". Corrections to `verify/README.md`. V5 as built goes in a table in this document, as V4 §24.3 did.
 
