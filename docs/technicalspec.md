@@ -856,6 +856,11 @@ offcut/
     ├── v4/coding-promptsv4.md         the 38 V4 coding prompts (91 to 128), run in order
     ├── v4/v4changelog.md              record of every change made while building V4 (opened by the v1.2 spec revision)
     ├── v4/experiments.md              outcome of every reading V4 takes (v4implementation §21) and BP §6.2's two decisions
+    ├── v5/v5implementation.md         plan for V5 (M1.6, the seams S-8 and S-9, the speed rules)
+    ├── v5/v5buildguide.md             step-by-step build guide for V5: phases, steps, milestones
+    ├── v5/coding-promptsv5.md         the V5 coding prompts (Setup, 129 to 136), run in order
+    ├── v5/v5changelog.md              record of every change made while building V5
+    ├── v5/experiments.md              outcome of every reading V5 takes (v5implementation section 20), from Prompt 136
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
 
