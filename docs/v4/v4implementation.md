@@ -1618,7 +1618,7 @@ V4 is done when every box is ticked (BP §1.2, BP §6.3, TS §28 M1.4-M1.5, TS �
 
 - [x] `ci.yml` green on `main`; API (unchanged image) then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
 - [x] On the deployed page on D1: the reference clip previews in the premium default; Bold and Mono switch from their cards; clicking a word on the preview and editing it changes the number at once; "Change all" and undo work; dragging the captions to the top moves the visuals below them; a list switched off disappears; the landscape clip's crop moves by dragging; scrubbing works; cancel during transcription returns to "Process again".
-- [ ] `review_action`, `job_cancelled` and `client_error` rows appear in `analytics_events` with enum props only (the founder's SQL).
+- [x] `review_action`, `job_cancelled` and `client_error` rows appear in `analytics_events` with enum props only (the founder's SQL).
 
 **Records**
 

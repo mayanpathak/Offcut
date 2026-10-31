@@ -9,7 +9,7 @@
 ## Open items
 | # | Item | Owner | Version |
 |---|---|---|---|
-| 1 | **Three V4 boxes only the founder can close** (V4 CL Entry 40): design review 2 and the five goldens, whether the editor matches the reviewed screens, and the Neon rows. They do not block V5 | Founder | Any time |
+| 1 | **Two V4 boxes only the founder can close** (V4 CL Entry 40): design review 2 and the five goldens, and whether the editor matches the reviewed screens. They do not block V5 | Founder | Any time |
 
 ## Known issues
 | # | Issue | Where | Version |
@@ -18,6 +18,7 @@
 | 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
+| 5 | **Production `client_error` rows, cause unknown:** `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once (the founder's query, 2026-10-31). The query did not read `ts`, so when they happened is unknown. The agent's walk-through showed no failure card, so they probably predate it, unproven. They carry no clip or browser detail. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 
 ---
 
@@ -78,3 +79,7 @@
 **Checked.** The walk-through passed, with what it did not assert named in Entry 40. Counts unchanged from Entry 1. CI of the pull request is not waited on; P129 reads it first (D-198).
 
 **Open.** Open item 1; known issues 1 to 4. Prompt 129 is next.
+
+## Entry 3 - 2026-10-31 - The Neon rows read by the founder
+
+**What.** The founder ran the query: enum props only, so V4's box is ticked (V4 CL Entry 40), and two V4 boxes remain. Known issue 5 opened for the five `client_error` rows. Documents only. Committed without a push: it goes with P129's (D-198).

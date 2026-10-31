@@ -2964,3 +2964,5 @@ Every count is at or above Entry 1's baseline (Rust 461 / 0 / 3, Vitest 92, `pnp
 **Checked.** `git ls-remote --tags origin v4` prints the tag. Documents only otherwise.
 
 **Open.** The three boxes above; they do not block V5 (V5 CL open item 1).
+
+**Added the same day: the Neon rows.** The founder ran the query and sent the result: 11 groups of `review_action` (`style` 6, `word_edit` 5, `caption_position` 5, `crop_offset` 4, `undo` 2, `replace_all` 2, `event_toggle` on and off for `list_reveal`, 1 each), `job_cancelled` (`asr` 2) and `client_error`. Props hold enums and booleans only. That box is ticked: 33 of 35, with two left, both waiting on design review 2. The rows also show `client_error` `E_DECODE_VIDEO` at `preview` 4 times and `E_WORKER_CRASH` at `import` once, not explained here (V5 CL known issue 5).
