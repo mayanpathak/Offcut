@@ -537,12 +537,12 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 
 ### 7.3 Exit checklist
 
-- [ ] `export-creator.spec.ts` passes with all 11 verifier checks.
-- [ ] `timeline-preserved.spec.ts` passes on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4`.
-- [ ] `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` pass.
-- [ ] Live-frame counter is 0 after an export and after a cancelled export (INV-11).
-- [ ] Render + encode on R1 re-measured and committed.
-- [ ] Tagged `v5`.
+- [x] `export-creator.spec.ts` passes with all 11 verifier checks.
+- [x] `timeline-preserved.spec.ts` passes on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4`.
+- [x] `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` pass.
+- [x] Live-frame counter is 0 after an export and after a cancelled export (INV-11).
+- [x] Render + encode on R1 re-measured and committed (read on D1, D-202).
+- [x] Tagged `v5`.
 
 **Not in V5.** The free-plan flow end to end (needs sign-in), checkout.
 

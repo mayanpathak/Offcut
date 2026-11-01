@@ -71,3 +71,10 @@ Method: `scripts/check-hosts.mjs`, printed by `pnpm build`.
 Numbers: d1 — 339.6 kB gzip on the plain production build. V4 read 337.3 kB at V5's baseline: V5 added 2.3 kB.
 Date: 2026-11-01
 Decision: Met.
+
+## Exports from the deployed build
+Question: Does the deployed build, with its own key, headers and hosts, make the file the local builds make?
+Method: A temporary spec on `https://offcut-one.vercel.app` at `354a706`, headed Chrome on D1, at the founder's word: tokens signed in the test's process with the production key, one hour long, never printed or written. Each file judged by `verify/verify_mp4.py`.
+Numbers: d1 — all 11 checks on every file. Reference clip, Creator: -14.3 LUFS, audio 1.3 / -1.7 ms at 0.95 / 0.99, watermark -0.05, 8.3 Mb/s, `total_ms` 28,809. Free: -14.3 LUFS, watermark 0.74, 4.1 Mb/s. Edited: -14.3 LUFS, watermark -0.04, 8.3 Mb/s, `total_ms` 32,846. Expired Creator token: Free, watermark 0.72. Long pause: -14.3 LUFS, audio -0.3 / 0.5 ms at 0.97 / 0.99, white frames off by 0. Hits 11 and 24 ms.
+Date: 2026-11-01
+Decision: Met: the same readings as the local builds. A person's real token waits for V6.

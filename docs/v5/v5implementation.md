@@ -1330,7 +1330,7 @@ V4's freezes stand except the two reopened by D-214 and D-220.
 
 ### 23.3 What must be true on V6's first morning
 
-- [ ] V5 is tagged `v5`, merged and deployed.
+- [x] V5 is tagged `v5`, merged and deployed.
 - [x] `verify_mp4.py` passes all 11 on a real export, and its self-test is in CI.
 - [x] `git grep -nE "\bV5\b" -- web/src crates verify` shows no marker of work to do.
 - [x] `start-export.ts` has one place where a new render is told from a cache hit, so V6's receipt goes there.
@@ -1381,8 +1381,8 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 
 **Deployment**
 
-- [ ] `ci.yml` green on `main`; API then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
-- [ ] On the deployed page: the reference clip previews; Export says the account line (BP §7.2).
+- [x] `ci.yml` green on `main`; API then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
+- [x] On the deployed page: the reference clip previews; Export says the account line (BP §7.2).
 - [x] Locally, with a minted token: the long-pause fixture exports at 20 s, and the second export is instant (BP §7's demo).
 
 **Records**
@@ -1390,9 +1390,9 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 - [x] `v5changelog.md` has an entry per prompt and closes the open items it can.
 - [x] Known issues 33 and 36: read against V5's CI runs; 37: read at the bench.
 - [x] Copy-back of section 25 applied.
-- [ ] The founder has looked at the done state, and heard an export.
-- [ ] Section 23.3 ticked.
-- [ ] Tagged `v5`.
+- [x] The founder has looked at the done state, and heard an export.
+- [x] Section 23.3 ticked.
+- [x] Tagged `v5`.
 
 ### 24.1 V5 as built
 
