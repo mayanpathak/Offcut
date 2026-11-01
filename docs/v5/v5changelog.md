@@ -15,8 +15,8 @@
 | # | Issue | Where | Version |
 |---|---|---|---|
 | 1 | ~~**An export reads about 3 LU over the target.**~~ Closed in Entry 5: -11.4 LUFS before the fix, -14.3 after, read by `ffmpeg` on real exports | `offcut-dsp/src/loudness.rs` | P130 |
-| 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
-| 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
+| 2 | ~~V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner~~ Closed in Entry 13: no such failure in V5's four runs | `web/tests-e2e/model-download.spec.ts` | Closed |
+| 3 | **V4 CL known issue 36 stays: `openEditor`'s wait for the drop zone on the hosted runner, after `page.clock.install()`.** D-236's `patient(30_000)` did not cure it. A first attempt failed in all four of V5's runs (41180419936, 41183840260, 41246761774, 41289198237; one or two cases each, not always the same) and passed on the retry, so CI is green. No other case of the suite shows it. Read for V6: whether the fake clock holds the capability check back there | `web/tests-e2e/model-download.spec.ts` | V6 |
 | 4 | V4 CL known issue 37: `detect_scene` on a quiet D1, read at P136: median 255 ms, p90 291 ms, 10 ms over its line of about 245 ms. Stages nobody changed are 16-22% slower than on V3's day too. Not a V5 blocker (section 20); carried with these numbers | `docs/v5/experiments.md` | V9 |
 | 5 | **Production `client_error` rows.** On 2026-10-29: `E_DECODE_VIDEO` at `preview` 4 times, within 71 s from 14:59:33 UTC, ten minutes after V4's deploy finished, which fits known issue 7 and cannot be proved from rows that hold no detail. `E_WORKER_CRASH` at `import` once, at 15:29:00, **still unexplained**. None since. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
@@ -343,3 +343,9 @@ The restarted file being Main is the proof it came from the ladder's next entry.
 **Not checked.** Other machines: D1 only, as D-202 says. R1 stays unread. A hardware encoder that reorders.
 
 **Open.** Open item 1; known issues 2 to 6.
+
+## Entry 13 - 2026-11-01 - P136: CI read before the merge
+
+**What.** Run 41289198237 on `06cd12f`, waited for: `changes`, `ci`, `e2e-media` all success; deploys skipped, as on a pull request. `pnpm e2e` 12 passed in 12.2 s, the settings link 1.6 s. Known issues read against V5's four runs: **issue 2 closed**, as no analytics poll failed; **issue 3 kept**, with its numbers in the table: `openEditor` fails a first attempt in every run and passes its retry. Three boxes of section 24 and section 23.3 that a script missed are ticked. Documents only, committed and **not pushed**: a push would run CI again, and the pull request's head stays the commit CI passed. It reaches `main` with the closing entry.
+
+**Open.** Open item 1; known issues 3 to 6. The founder's merge, look, listen and tag.
