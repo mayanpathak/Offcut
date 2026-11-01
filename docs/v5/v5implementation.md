@@ -1330,11 +1330,11 @@ V4's freezes stand except the two reopened by D-214 and D-220.
 
 ### 23.3 What must be true on V6's first morning
 
-- [ ] V5 is tagged `v5`, merged and deployed.
+- [x] V5 is tagged `v5`, merged and deployed.
 - [x] `verify_mp4.py` passes all 11 on a real export, and its self-test is in CI.
-- [ ] `git grep -nE "\bV5\b" -- web/src crates verify` shows no marker of work to do.
+- [x] `git grep -nE "\bV5\b" -- web/src crates verify` shows no marker of work to do.
 - [x] `start-export.ts` has one place where a new render is told from a cache hit, so V6's receipt goes there.
-- [ ] `docs/v5/experiments.md` holds section 20's readings.
+- [x] `docs/v5/experiments.md` holds section 20's readings.
 
 ### 23.4 What V6 to V6.7 inherit without further work
 
@@ -1353,7 +1353,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 **Code and checks**
 
 - [x] `pnpm check` green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
-- [ ] `pnpm fixtures` then `pnpm test` green on D1 and in CI.
+- [x] `pnpm fixtures` then `pnpm test` green on D1 and in CI.
 - [x] BP §7.3: `export-creator.spec.ts` passes with all 11 verifier checks.
 - [x] BP §7.3: `timeline-preserved.spec.ts` passes on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4` (600 and 900 frames).
 - [x] BP §7.3: `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` pass.
@@ -1375,24 +1375,24 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 
 **Measurements**
 
-- [ ] `bench/results/d1-<date>-portrait.json` committed (5 runs); `render_encode` within E-4's line.
+- [x] `bench/results/d1-<date>-portrait.json` committed (5 runs); `render_encode` within E-4's line.
 - [x] Section 20's readings in `docs/v5/experiments.md`, labelled `d1`.
 - [x] TS §39.3 item 14 holds the verifier's values.
 
 **Deployment**
 
-- [ ] `ci.yml` green on `main`; API then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
-- [ ] On the deployed page: the reference clip previews; Export says the account line (BP §7.2).
+- [x] `ci.yml` green on `main`; API then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
+- [x] On the deployed page: the reference clip previews; Export says the account line (BP §7.2).
 - [x] Locally, with a minted token: the long-pause fixture exports at 20 s, and the second export is instant (BP §7's demo).
 
 **Records**
 
 - [x] `v5changelog.md` has an entry per prompt and closes the open items it can.
-- [ ] Known issues 33 and 36: read against V5's CI runs; 37: read at the bench.
+- [x] Known issues 33 and 36: read against V5's CI runs; 37: read at the bench.
 - [x] Copy-back of section 25 applied.
-- [ ] The founder has looked at the done state, and heard an export.
-- [ ] Section 23.3 ticked.
-- [ ] Tagged `v5`.
+- [x] The founder has looked at the done state, and heard an export.
+- [x] Section 23.3 ticked.
+- [x] Tagged `v5`.
 
 ### 24.1 V5 as built
 
