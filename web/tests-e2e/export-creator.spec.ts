@@ -1,16 +1,16 @@
 // J9 and J10 in a real browser: the reference clip is exported and the file
-// is checked by the independent verifier, against the built app served with
-// the production headers. The build under test must have been made with the
+// is put through all 11 checks of the independent verifier, against the built
+// app served with the production headers. The build under test must have been made with the
 // test key (v2implementation D-24): a token is one the tests mint.
 //
 // The clip is processed once, and the cases export it in the order they are
 // written: with no token, with a token of another key, with a Creator token,
-// with a Free token. A case that fails stops the ones after it. The case of
+// with a Free token, then what the render cache does with what is stored
+// (v5implementation D-220, §17.5). A case that fails stops the ones after it. The case of
 // the founder's second recording runs on its own after them, on the
 // development machine only (D-99, D-100).
 
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -19,29 +19,22 @@ import { type BrowserContext, type Download, expect, type Page, test } from "@pl
 import { messages } from "../src/copy/messages";
 import { type FakeApi, installFakeApi, mintEntitlementToken, seedEntitlement } from "./helpers/fake-api";
 import {
+  axe,
   dropClip,
   ensureModelCached,
+  expectAllChecks,
+  forgetProgress,
   opfsList,
   patient,
   referenceClip,
   routeAssets,
+  sendQueuedAnalytics,
+  sha256Of,
   sourceDurationMs,
   v3TestClip,
   verifyMp4,
+  watchExport,
 } from "./helpers/fixtures";
-
-declare global {
-  interface Window {
-    /** The stage labels the export's progress showed, in order, each once. */
-    e2eStages?: string[];
-    /** Every value its bar took, in order. */
-    e2eExportBar?: string[];
-    /** How often the progress was on the page without the "rendering on your computer" line. */
-    e2eLocalLineMissing?: number;
-    /** How many times the failure of an export came onto the page. */
-    e2eExportFailures?: number;
-  }
-}
 
 const UUID_MP4 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.mp4$/;
 /** Analytics sends what it has every 10 s; a case waits that long for an event, and a little more. */
@@ -49,104 +42,16 @@ const FLUSH_WAIT_MS = 20_000;
 const EXPORT_TIMEOUT_MS = patient(240_000);
 /** A seed that is not the test key's: a token signed with it must be refused. */
 const OTHER_SEED = new Uint8Array(32).fill(7);
+/** The white frames of the reference clip, which check 8 compares (read in P130). */
+const REFERENCE_FLASHES = 2;
+/** A hit reads one row and hands over one file (TS §21.4, "instantly"). */
+const HIT_LIMIT_MS = 2_000;
 
 type Recorded = { method: string; url: string };
 
 const canvas = (page: Page) => page.getByTestId("preview-canvas");
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
 const exportButton = (page: Page) => button(page, messages.export.button);
-
-/** Records what the export's progress shows, from before the page loads: "Saving" is on it for a moment. */
-async function watchExport(page: Page): Promise<void> {
-  await page.addInitScript((localLine) => {
-    window.e2eStages = [];
-    window.e2eExportBar = [];
-    window.e2eLocalLineMissing = 0;
-    window.e2eExportFailures = 0;
-    let failureShown = false;
-    new MutationObserver(() => {
-      // The failure of the export before stays on the page until the next one starts: a new one is one that comes.
-      const failure = document.querySelector('[data-testid="export-failed"]') !== null;
-      if (failure && !failureShown) {
-        window.e2eExportFailures = (window.e2eExportFailures ?? 0) + 1;
-      }
-      failureShown = failure;
-      const progress = document.querySelector('[data-testid="export-progress"]');
-      if (progress === null) {
-        return;
-      }
-      const stage = progress.querySelector('[data-testid="export-stage"]')?.textContent ?? "";
-      if (stage !== window.e2eStages?.at(-1)) {
-        window.e2eStages?.push(stage);
-      }
-      const now = progress.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") ?? "";
-      if (now !== window.e2eExportBar?.at(-1)) {
-        window.e2eExportBar?.push(now);
-      }
-      if (!(progress.textContent ?? "").includes(localLine)) {
-        window.e2eLocalLineMissing = (window.e2eLocalLineMissing ?? 0) + 1;
-      }
-    }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
-  }, messages.export.renderingLocally);
-}
-
-type Tag = { where: string; key: string; value: string };
-
-/** Every tag of `file`, at format and stream level, as `ffprobe` reads them. */
-function tagsOf(file: string): Tag[] {
-  const probe = JSON.parse(
-    execFileSync("ffprobe", ["-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", file], { encoding: "utf8" }),
-  ) as { format?: { tags?: Record<string, string> }; streams?: { tags?: Record<string, string> }[] };
-  return [
-    ...Object.entries(probe.format?.tags ?? {}).map(([key, value]) => ({ where: "format", key, value })),
-    ...(probe.streams ?? []).flatMap((stream, index) =>
-      Object.entries(stream.tags ?? {}).map(([key, value]) => ({ where: `stream ${String(index)}`, key, value })),
-    ),
-  ];
-}
-
-/** The tags D-100 names: none of these may carry the source's value. */
-const SOURCE_TAGS = ["creation_time", "title", "comment", "encoder"];
-
-/**
- * What of `source`'s metadata `file` carries, as a list of problems; `[]` for
- * none (D-100, an early part of the verifier's check 11): no tag whose key
- * names a location, no `creation_time` but the muxer's epoch 0, no `title`,
- * `comment`, `encoder` or `creation_time` with the source's value, and
- * neither `©xyz` nor `ISO6709` anywhere in its bytes.
- */
-function metadataProblems(file: string, source: string): string[] {
-  const problems: string[] = [];
-  const ofSource = new Set(tagsOf(source).map((tag) => `${tag.key.toLowerCase()}=${tag.value}`));
-  for (const tag of tagsOf(file)) {
-    const key = tag.key.toLowerCase();
-    if (key.includes("location") || key.includes("iso6709")) {
-      problems.push(`${tag.where}: a location tag, ${tag.key}`);
-    }
-    if (key === "creation_time" && !tag.value.startsWith("1970-01-01T00:00:00")) {
-      problems.push(`${tag.where}: a creation_time other than the epoch, ${tag.value}`);
-    }
-    if (SOURCE_TAGS.includes(key) && ofSource.has(`${key}=${tag.value}`)) {
-      problems.push(`${tag.where}: the source's ${tag.key}`);
-    }
-  }
-  const bytes = readFileSync(file);
-  if (bytes.includes(Buffer.from([0xa9, 0x78, 0x79, 0x7a]))) {
-    problems.push("the bytes of a ©xyz atom");
-  }
-  if (bytes.includes(Buffer.from("ISO6709"))) {
-    problems.push("the bytes ISO6709");
-  }
-  return problems;
-}
-
-async function forgetProgress(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.e2eStages = [];
-    window.e2eExportBar = [];
-    window.e2eLocalLineMissing = 0;
-  });
-}
 
 test.describe("one clip, exported", () => {
   test.describe.configure({ mode: "serial" });
@@ -163,6 +68,8 @@ test.describe("one clip, exported", () => {
   const requests: Recorded[] = [];
   /** What the Creator export left for the cases that follow it. */
   let creator: { name: string; file: string; stored: string; requests: Recorded[]; startOverDisabled: boolean; playDisabled: boolean };
+  /** The Free export: the render cache's hits must be these bytes. */
+  let freeFile: string;
 
   /** Presses Export and waits for the file the browser is handed, saved where no report picks it up. */
   async function exportAndSave(name: string): Promise<{ download: Download; file: string; during: Recorded[] }> {
@@ -260,10 +167,7 @@ test.describe("one clip, exported", () => {
     creator = { name: download.suggestedFilename(), file, stored: "", requests: during, ...(await locked) };
 
     expect(statSync(file).size).toBeGreaterThan(1_000_000);
-    const verdict = verifyMp4(file, "creator", durationMs);
-    expect(verdict.output).toContain("PASS 6");
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
+    expectAllChecks(verifyMp4(file, "creator", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
   });
 
   test("progress: the stages in order, the bar, and the line that says where the work is done", async () => {
@@ -345,13 +249,13 @@ test.describe("one clip, exported", () => {
   test("Free-plan token: the file is 720 by 1280, as the token says", async () => {
     await seedEntitlement(page, mintEntitlementToken({ plan: "free" }));
     const { file } = await exportAndSave("free.mp4");
-    const verdict = verifyMp4(file, "free", durationMs);
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
-    // The same file is not a Creator's: its size is the one thing that differs (INV-9).
-    const asCreator = verifyMp4(file, "creator", durationMs);
+    freeFile = file;
+    expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
+    // The same file is not a Creator's: its size and its watermark say so (INV-9).
+    const asCreator = verifyMp4(file, "creator", durationMs, referenceClip());
     expect(asCreator.status).toBe(1);
     expect(asCreator.output).toContain("FAIL 2");
+    expect(asCreator.output).toContain("FAIL 9");
     await expect.poll(() => api.eventsOf("export_started").length, { timeout: FLUSH_WAIT_MS }).toBe(3);
     expect(api.eventsOf("export_started").at(-1)).toEqual({ name: "export_started", props: { profile: "free" } });
   });
@@ -362,6 +266,107 @@ test.describe("one clip, exported", () => {
     expect(names[0]).not.toBe(creator.stored);
     expect(await opfsList(page, "exports/tmp")).toEqual([]);
     expect(downloads).toHaveLength(2);
+  });
+
+  test("summary and the question: what was changed, only that, and one answer gives one event", async () => {
+    const outcome = page.getByTestId("export-outcome");
+    await expect(outcome.getByRole("heading", { name: messages.export.summary.title })).toBeVisible();
+    const rows = await outcome.getByRole("listitem").allTextContents();
+    expect(rows[0], "the chain always runs").toBe(messages.export.summary.voice);
+    // Each row names a number from one up: a zero is left out.
+    for (const row of rows.slice(1)) {
+      expect(row).toMatch(/^[1-9]\d* (words? emphasized|visual moments?)$/);
+    }
+    // The block is said once by the one live region, and takes no focus (D-192).
+    await expect(page.locator('[aria-live="polite"]')).toContainText(messages.export.question.title);
+    await expect(outcome.locator(":focus")).toHaveCount(0);
+    expect((await axe(page)).map((v) => `${v.id}: ${String(v.nodes.length)} node(s)`), "axe on the done state").toEqual([]);
+
+    await expect(outcome.getByText(messages.export.question.title)).toBeVisible();
+    await button(page, messages.export.question.smallEdits).click();
+    await expect(page.getByTestId("post-export-thanks")).toHaveText(messages.export.question.thanks);
+    await expect(button(page, messages.export.question.smallEdits)).toHaveCount(0);
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("post_export_answer")).toEqual([{ name: "post_export_answer", props: { answer: "small_edits" } }]);
+  });
+
+  test("same token: the stored file, at once, with nothing rendered", async () => {
+    await sendQueuedAnalytics(page);
+    const startedBefore = api.eventsOf("export_started").length;
+    const timingsBefore = api.eventsOf("stage_timing").length;
+    const stored = await opfsList(page, "exports");
+    await forgetProgress(page);
+    const { download, file } = await exportAndSave("free-again.mp4");
+    await sendQueuedAnalytics(page);
+    const done = api.eventsOf("export_done").at(-1) as { props: { total_ms: number } };
+    expect(done.props).toMatchObject({ profile: "free", from_cache: true });
+    expect(done.props.total_ms, "instant").toBeLessThan(HIT_LIMIT_MS);
+    expect(api.eventsOf("export_started"), "no export_started").toHaveLength(startedBefore);
+    expect(api.eventsOf("stage_timing"), "no stage_timing").toHaveLength(timingsBefore);
+    const bar = (await page.evaluate(() => window.e2eExportBar ?? [])).map(Number);
+    expect(bar.every((value) => value === 0), "no frame was rendered").toBe(true);
+    expect(await sha256Of(file), "the Free file's bytes").toBe(await sha256Of(freeFile));
+    expect(await opfsList(page, "exports"), "the one file").toEqual(stored);
+    expect(download.suggestedFilename()).toMatch(/^offcut-\d{8}-\d{4}\.mp4$/);
+    // It shares its export's id: the question stays answered, and no answer is sent again.
+    await expect(page.getByTestId("post-export-thanks")).toBeVisible();
+    expect(api.eventsOf("post_export_answer")).toHaveLength(1);
+  });
+
+  test("forged token: refused before any lookup; no file given, and the stored one stays", async () => {
+    const stored = await opfsList(page, "exports");
+    const downloadsBefore = downloads.length;
+    await seedEntitlement(page, mintEntitlementToken({ plan: "free", seed: OTHER_SEED }));
+    await exportButton(page).click();
+    await expect(page.getByTestId("export-failed")).toContainText(messages.editor.failedStub, { timeout: 60_000 });
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("export_failed").at(-1)).toEqual({ name: "export_failed", props: { error_code: "E_ENTITLEMENT_INVALID", stage: "render_encode" } });
+    expect(downloads).toHaveLength(downloadsBefore);
+    expect(await opfsList(page, "exports")).toEqual(stored);
+  });
+
+  test("no room: the export says why, sweeps nothing, and the button stays ready", async () => {
+    const stored = await opfsList(page, "exports");
+    await sendQueuedAnalytics(page);
+    const startedBefore = api.eventsOf("export_started").length;
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.storage, "estimate", { value: () => Promise.resolve({ quota: 1_000, usage: 1_000 }), configurable: true });
+    });
+    try {
+      // A Creator token: a miss on the Free file that is stored.
+      await seedEntitlement(page, mintEntitlementToken());
+      await exportButton(page).click();
+      await expect(page.getByTestId("export-status")).toHaveText(messages.blockers.B_STORAGE_LOW, { timeout: 30_000 });
+    } finally {
+      await page.evaluate(() => {
+        delete (navigator.storage as unknown as { estimate?: unknown }).estimate;
+      });
+    }
+    await expect(page.getByTestId("export-progress")).toHaveCount(0);
+    await expect(page.getByTestId("export-failed")).toHaveCount(0);
+    await expect(exportButton(page)).toBeEnabled();
+    expect(await opfsList(page, "exports"), "nothing swept").toEqual(stored);
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("export_started"), "nothing began").toHaveLength(startedBefore);
+    await expect(button(page, messages.preview.play), "the preview is given back").toBeEnabled({ timeout: 30_000 });
+  });
+
+  test("expired Creator token: verified as Free, it hits the stored Free file, watermark and all (INV-9)", async () => {
+    await seedEntitlement(page, mintEntitlementToken({ periodEnd: Math.floor(Date.now() / 1000) - 3_600 }));
+    const { file } = await exportAndSave("expired.mp4");
+    await sendQueuedAnalytics(page);
+    expect((api.eventsOf("export_done").at(-1) as { props: unknown }).props).toMatchObject({ profile: "free", from_cache: true });
+    expect(await sha256Of(file)).toBe(await sha256Of(freeFile));
+    // 720 x 1280 with the watermark, by the verifier: what the token entitles it to, and not more.
+    expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
+    await expect(page.getByTestId("export-status")).toHaveText("");
+  });
+
+  test("close: the outcome goes, and the tabs under it stay", async () => {
+    await page.getByTestId("export-outcome").getByRole("button", { name: messages.export.summary.close, exact: true }).click();
+    await expect(page.getByTestId("export-outcome")).toHaveCount(0);
+    await expect(page.getByTestId("export-done")).toHaveText(messages.export.done);
+    await expect(page.getByRole("tab", { name: messages.panel.captions })).toBeEnabled();
   });
 });
 
@@ -397,11 +402,10 @@ test("no metadata: an export of the second recording carries none of the source'
     await (await arriving).saveAs(file);
     await expect(page.getByTestId("export-done")).toHaveText(messages.export.done, { timeout: 30_000 });
 
-    expect(metadataProblems(file, source)).toEqual([]);
-    const verdict = verifyMp4(file, "creator", sourceDurationMs(source));
-    expect(verdict.output).toContain("PASS 6");
-    expect(verdict.output).not.toContain("FAIL");
-    expect(verdict.status, verdict.output).toBe(0);
+    // Check 11, against what this source carries (D-100, D-208).
+    const verdict = verifyMp4(file, "creator", sourceDurationMs(source), source);
+    expect(verdict.output).toContain("PASS 11");
+    expectAllChecks(verdict);
   } finally {
     await context.close();
     rmSync(scratch, { recursive: true, force: true });

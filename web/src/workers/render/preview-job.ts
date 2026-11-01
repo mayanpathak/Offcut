@@ -244,7 +244,7 @@ export async function styleThumbnails(
   const canvas = new OffscreenCanvas(p.width, p.height);
   const bitmaps: ImageBitmap[] = [];
   try {
-    await state.session.attach_canvas(canvas, profile.width, profile.height);
+    await state.source.whileSessionHeld(() => state.session.attach_canvas(canvas, profile.width, profile.height));
     for (const style of THUMBNAIL_STYLES) {
       state.session.set_scene({ ...scene, edit: { ...scene.edit, style }, profile });
       state.session.render_frame(frame, t);
@@ -259,7 +259,7 @@ export async function styleThumbnails(
     // The preview as it was: its scene, its canvas, its frame (as the export's switch back).
     const back = previewProfile(state);
     state.session.set_scene({ ...scene, profile: back });
-    await state.session.attach_canvas(previewCanvas, back.width, back.height);
+    await state.source.whileSessionHeld(() => state.session.attach_canvas(previewCanvas, back.width, back.height));
     await drawStill(w);
   }
   return bitmaps;

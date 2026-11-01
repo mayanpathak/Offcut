@@ -12,6 +12,7 @@ import { fetchAsset, SAMPLE_CLIP_PATH } from "../net/asset-fetch";
 import * as clipsRepo from "../persistence/clips-repo";
 import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
+import * as renderCacheRepo from "../persistence/render-cache-repo";
 import * as transcriptRepo from "../persistence/transcript-repo";
 import { forImport } from "../state/blockers";
 import * as clipStore from "../state/clip-store";
@@ -134,10 +135,12 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
 
   // 4. V7: `quota.ensureFree` takes this sweep's place (v2implementation §25).
   //    Until then one clip is kept (D-40), and so are its records: those of the
-  //    clip before go with its files (v3implementation §23, item 26). A failure
-  //    is ignored: step 7 reports a full disk, step 9 a database that fails.
+  //    clip before go with its files (v3implementation §23, item 26), and the
+  //    cached export with them, or the same file dropped again would hit it
+  //    (v5implementation D-228). A failure is ignored: step 7 reports a full
+  //    disk, step 9 a database that fails.
   await opfs.remove(opfs.paths.clipsRoot()).catch(() => undefined);
-  await Promise.all([clipsRepo.clear(), transcriptRepo.clear(), editsRepo.clear()]).catch(() => undefined);
+  await Promise.all([clipsRepo.clear(), transcriptRepo.clear(), editsRepo.clear(), renderCacheRepo.clear()]).catch(() => undefined);
 
   // 5. `probe_audio` and the total are counted from here (D-35).
   startTimer(clipId);

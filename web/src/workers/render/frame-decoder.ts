@@ -40,6 +40,8 @@ export type FrameSink = {
   failed(): boolean;
   /** Whether too few frames are decoded ahead of the time asked for. */
   wantsMore(): boolean;
+  /** Whether a call that holds the session is waiting: then it cannot be read, and nothing is fed. */
+  sessionHeld(): boolean;
   /** The decoder must be configured anew (D-70): decoding starts again at the time asked for last. */
   startAgain(): void;
 };
@@ -197,7 +199,7 @@ export class FrameDecoder {
   /** Gives the decoder samples while it has room and too few frames are decoded ahead. */
   feed(): void {
     const decoder = this.#decoder;
-    if (decoder === undefined || decoder.state !== "configured" || this.#sink.failed()) {
+    if (decoder === undefined || decoder.state !== "configured" || this.#sink.failed() || this.#sink.sessionHeld()) {
       return;
     }
     while (this.#next < this.#count && decoder.decodeQueueSize < DECODE_QUEUE_MAX && this.#sink.wantsMore()) {

@@ -1,26 +1,28 @@
-// The export: every output frame of the clip drawn and encoded once, and the
-// clip's audio beside it, written as one MP4 through the sink (TS §21.3).
-// The loop goes over the clip's own timeline: output frame n shows the source
-// at n / 30 s, whatever the audio holds. No frame is left out or shown twice
-// and no sample of the audio is removed (INV-5, INV-8, INV-10).
+// The export: every output frame of the program drawn and encoded once, and
+// the program's audio beside it, written as one MP4 through the sink (TS §21.3,
+// §40.9 S-8). The loop goes over the program's timeline, and the scene says what
+// of the recording each frame shows. No frame is left out or shown twice and no
+// sample of the audio is removed (INV-5, INV-8, INV-10). An encoder that fails
+// starts the file again on the next entry of the ladder (TS §21.4).
 //
 // The frames are captured with method A of TS §21.4, `new VideoFrame(canvas)`
 // straight after the draw. TE-3 chose it over a readback of the pixels, which
 // took 2.8 times as long and wrote full-range brightness into a stream that
 // does not say so. The choice is this file's alone.
 
-import { type Bytes, type ExportProfile, LIMITS, type OutMs, type TimeMs } from "../../gen/domain";
+import { type Bytes, type ExportProfile, LIMITS, type OutMs } from "../../gen/domain";
 import { loadRender, type Mp4MuxerHandle, type RenderSession } from "../../wasm/load-render";
 import { toAppFailure } from "../rpc";
-import { WorkerFailure } from "../rpc-worker";
+import { DEV_FAULTS, takeEncoderFault, WorkerFailure } from "../rpc-worker";
 import {
   AAC_ENCODE_CONFIG,
   AAC_PRIMING_SAMPLES,
   ENCODE_QUEUE_MAX,
   KEYFRAME_INTERVAL_FRAMES,
-  pickVideoConfig,
+  supportedConfigs,
 } from "./encoders";
 import type { OpfsSink } from "./opfs-sink";
+import { recorded } from "./preview-loop";
 import { liveFrames, type VideoSource } from "./video-source";
 
 const MICROS_PER_SEC = 1_000_000;
@@ -170,8 +172,9 @@ class Writer {
   video(chunk: EncodedVideoChunk, metadata: EncodedVideoChunkMetadata | undefined): void {
     this.#avcc ??= describedBy(metadata?.decoderConfig);
     const data = bytesOf(chunk);
-    // The frame's number is read from its timestamp: a chunk that comes out
-    // of its turn is refused by the muxer (`E_MUX`), not written in the wrong place.
+    // The frame's number is read from its timestamp: an encoder with B-frames
+    // gives a chunk before the frames shown ahead of it, and the muxer places it
+    // by this number (v5implementation D-211).
     const frame = Math.round((chunk.timestamp * LIMITS.OUTPUT_FPS) / MICROS_PER_SEC);
     const key = chunk.type === "key";
     this.#write((muxer) => {
@@ -228,26 +231,27 @@ class Writer {
   }
 }
 
-/**
- * Renders, encodes and writes the whole clip. `canvas` is the one the session
- * draws to. `onEncoded` is called once, when everything is encoded and before
- * the file is made whole: what comes after it is the `mux` stage. The sink and
- * the frames of `source` stay the caller's. A failure is thrown as it was
- * reported: a `WorkerFailure`, or the sink's own error.
- */
-export async function runExport(a: {
+type ExportArgs = {
   session: RenderSession;
   source: VideoSource;
   profile: ExportProfile;
-  out48: Float32Array;
+  prog48: Float32Array;
   sink: OpfsSink;
   canvas: OffscreenCanvas;
   onProgress: (done: number, total: number) => void;
   onEncoded: () => void;
   isCancelled: () => boolean;
-}): Promise<{ bytes: Bytes } | { cancelled: true }> {
+};
+
+type ExportResult = { bytes: Bytes } | { cancelled: true };
+
+/**
+ * Renders, encodes and writes the whole clip with this video configuration.
+ * The encoders, the muxer and what watches them are this attempt's, and are
+ * gone when it ends, however it ends. The file is given empty.
+ */
+async function attempt(a: ExportArgs, config: VideoEncoderConfig): Promise<ExportResult> {
   const render = await loadRender();
-  const config = await pickVideoConfig(a.profile);
   const total = a.session.frame_count();
   const watch = new Watch();
   // Why the sink refused a write is kept: the muxer reports such a write as
@@ -288,7 +292,7 @@ export async function runExport(a: {
 
   // The audio is padded with silence to the end of the last video frame,
   // which is less than one frame of it. No sample is ever removed.
-  const samples = Math.max(a.out48.length, total * SAMPLES_PER_FRAME);
+  const samples = Math.max(a.prog48.length, total * SAMPLES_PER_FRAME);
   const audioFrames = Math.ceil(samples / AAC_FRAME_SAMPLES);
   let fed = 0;
   /** Gives the audio encoder its frames up to number `until`. `false` when the job was cancelled. */
@@ -304,9 +308,9 @@ export async function runExport(a: {
       }
       const start = fed * AAC_FRAME_SAMPLES;
       const count = Math.min(AAC_FRAME_SAMPLES, samples - start);
-      // One plane for each channel, the mono voice in every one.
+      // One plane for each channel, the mono program in every one.
       const planes = new Float32Array(count * AUDIO_CHANNELS);
-      planes.set(a.out48.subarray(start, start + count));
+      planes.set(a.prog48.subarray(start, start + count));
       for (let channel = 1; channel < AUDIO_CHANNELS; channel += 1) {
         planes.copyWithin(channel * count, 0, count);
       }
@@ -331,6 +335,7 @@ export async function runExport(a: {
   };
 
   try {
+    a.source.rewind();
     encoding("E_ENCODE_VIDEO", () => {
       venc.configure(config);
     });
@@ -347,20 +352,27 @@ export async function runExport(a: {
       }
       watch.check();
       // Output frame n is the program at n x 1000 / 30 ms, in whole
-      // milliseconds; its own timestamp is the same in microseconds. V4's
-      // map is the identity, so it shows the recording at the same time
-      // (D-129; V5 reads it from `source_at`).
-      const t = Math.floor((n * 1000) / LIMITS.OUTPUT_FPS);
+      // milliseconds; its own timestamp is the same in microseconds. The scene
+      // says what of the recording it shows (TS §40.9 S-8): with the identity
+      // map, the same time.
+      const t = Math.floor((n * 1000) / LIMITS.OUTPUT_FPS) as OutMs;
       const timestamp = Math.floor((n * MICROS_PER_SEC) / LIMITS.OUTPUT_FPS);
+      const pos = a.session.source_at(t);
+      if (pos === null) {
+        throw new WorkerFailure("E_INTERNAL", "NoScene");
+      }
       // The frame stays the source's: it is not closed here.
-      const frame = await a.source.frameAtBlocking(t as TimeMs);
-      a.session.render_frame(frame, t as OutMs);
+      const frame = await a.source.frameAtBlocking(recorded(pos));
+      a.session.render_frame(frame, t);
       const vf = encoding("E_ENCODE_VIDEO", () => new VideoFrame(a.canvas, { timestamp, duration: FRAME_DURATION_US }));
       liveFrames.count += 1;
       try {
         while (venc.encodeQueueSize > ENCODE_QUEUE_MAX) {
           await watch.woken();
           watch.check();
+        }
+        if (DEV_FAULTS && takeEncoderFault(n)) {
+          throw new WorkerFailure("E_ENCODE_VIDEO", "DevFault");
         }
         encoding("E_ENCODE_VIDEO", () => {
           venc.encode(vf, { keyFrame: n % KEYFRAME_INTERVAL_FRAMES === 0 });
@@ -396,4 +408,39 @@ export async function runExport(a: {
     writer.free();
     watch.wake();
   }
+}
+
+/**
+ * Exports the whole clip. `canvas` is the one the session draws to. `onEncoded`
+ * is called once, when everything is encoded and before the file is made whole:
+ * what comes after it is the `mux` stage. The sink and the frames of `source`
+ * stay the caller's. A video encoder that fails starts the file again on the
+ * next entry of the ladder, and an audio encoder that fails, once more on the
+ * same entry (TS §11, §21.4). Anything else is not the encoder's to mend, and is
+ * thrown as it was reported: a `WorkerFailure`, or the sink's own error.
+ */
+export async function runExport(a: ExportArgs): Promise<ExportResult> {
+  let lastFailure: unknown = new WorkerFailure("E_ENCODE_VIDEO", "NoSupportedConfig");
+  let audioRetried = false;
+  for await (const config of supportedConfigs(a.profile)) {
+    for (;;) {
+      try {
+        return await attempt(a, config);
+      } catch (thrown) {
+        const code = thrown instanceof WorkerFailure ? thrown.code : undefined;
+        if (code !== "E_ENCODE_VIDEO" && (code !== "E_ENCODE_AUDIO" || audioRetried)) {
+          throw thrown;
+        }
+        lastFailure = thrown;
+        // The partial file goes (TS §21.4), and the bar says the work started again.
+        a.sink.reset();
+        a.onProgress(0, a.session.frame_count());
+        if (code === "E_ENCODE_VIDEO") {
+          break;
+        }
+        audioRetried = true;
+      }
+    }
+  }
+  throw lastFailure;
 }

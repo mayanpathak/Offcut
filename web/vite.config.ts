@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -73,11 +74,32 @@ function copyOrt(): Plugin {
   };
 }
 
+// What draws and encodes an export: a new version of any of them gives every
+// file a new key in the render cache (v5implementation D-223). `pnpm build`
+// builds the WASM first, so a production build always has it.
+const RENDERER_FILES = ["src/wasm/pkg/render/offcut_render_bg.wasm", "src/workers/render/export-loop.ts", "src/workers/render/encoders.ts"];
+
+/** 16 hex digits of the SHA-256 of those files; `"none"` before the WASM has been built. */
+function rendererVersion(): string {
+  const files = RENDERER_FILES.map((file) => fileURLToPath(new URL(`./${file}`, import.meta.url)));
+  if (!files.every((file) => existsSync(file))) {
+    return "none";
+  }
+  const hash = createHash("sha256");
+  for (const file of files) {
+    hash.update(readFileSync(file));
+  }
+  return hash.digest("hex").slice(0, 16);
+}
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), copyOrt()],
-  // Whether the workers take the development hooks' faults (workers/rpc-worker.ts):
-  // the workers may not read `import.meta.env`, and a production build folds this to `false`.
-  define: { __OFFCUT_DEV_FAULTS__: JSON.stringify(mode !== "production") },
+  define: {
+    // Whether the workers take the development hooks' faults (workers/rpc-worker.ts):
+    // the workers may not read `import.meta.env`, and a production build folds this to `false`.
+    __OFFCUT_DEV_FAULTS__: JSON.stringify(mode !== "production"),
+    __RENDERER_VERSION__: JSON.stringify(rendererVersion()),
+  },
   resolve: {
     // ONNX Runtime has a build that holds no reference to its own `.wasm`
     // file. Without this condition the bundler follows that reference and

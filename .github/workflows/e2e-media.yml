@@ -12,7 +12,7 @@
 # graphics processor (TE-10, docs/v2/experiments.md). So the cases that need
 # a processed clip, the pipeline with its preview and the export with the
 # verifier, are not run here: `pnpm e2e:media` on the development machine,
-# all 30 cases, is the gate for them before every merge (v2implementation
+# every case, is the gate for them before every merge (v2implementation
 # D-72).
 #
 # ci.yml calls this once its own steps have passed, and before any deploy. It

@@ -90,6 +90,10 @@ vi.mock("../models/model-manager", () => ({
   ModelFailure: class ModelFailure extends Error {},
 }));
 vi.mock("../persistence/opfs", () => ({
+  writeProgram: () => {
+    m.calls.push("opfs.writeProgram");
+    return Promise.resolve();
+  },
   writeAudio: () => {
     m.calls.push("opfs.writeAudio");
     return Promise.resolve();
@@ -212,8 +216,9 @@ describe("runPipeline", () => {
       "render.detect",
       "render.rulesPlan",
       "render.setScene",
-      "opfs.writeAudio", // F: the export's copy first (D-127)
+      "opfs.writeAudio", // F: kept before it is handed on (D-127)
       "audio.assemble",
+      "opfs.writeProgram", // the audio the export encodes (TS 40.9 S-8)
       "transcriptRepo.put",
       "editsRepo.put",
     ]);

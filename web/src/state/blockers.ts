@@ -39,19 +39,28 @@ export function forImport(): BlockerCode | null {
   return null;
 }
 
+/** A file may take this much more than its bitrate and length say (TS §12.5). */
+const STORAGE_MARGIN = 1.2;
+
+/** The room on the device, in bytes, and what an export needs: read by the use-case, since it takes a wait (v5implementation D-229). */
+export type ExportRoom = { freeBytes: number; neededBytes: number };
+
 /**
  * The first thing that stands in the way of an export, or `null`. It is
- * asked while the export is still `idle`.
- *
- * V2 has the two conditions that need nothing but the stores. V5 adds the
- * room on the device, and V6 the account and the plan.
+ * asked while the export is still `idle` or, with `room`, in `gating` after a
+ * cache miss. V6 adds the account and the plan.
  */
-export function forExport(): BlockerCode | null {
-  if (EXPORT_RUNNING.includes(useExportStore.getState().status)) {
+export function forExport(room?: ExportRoom): BlockerCode | null {
+  const { status } = useExportStore.getState();
+  // Gating with room is this export's own gate, not another one running.
+  if (EXPORT_RUNNING.includes(status) && !(room !== undefined && status === "gating")) {
     return "B_EXPORT_IN_PROGRESS";
   }
   if (useClipStore.getState().status !== "ready") {
     return "B_PIPELINE_NOT_READY";
+  }
+  if (room !== undefined && room.freeBytes < room.neededBytes * STORAGE_MARGIN) {
+    return "B_STORAGE_LOW";
   }
   return null;
 }

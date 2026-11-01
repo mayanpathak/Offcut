@@ -4,7 +4,6 @@
 // touches a browser API when the module loads.
 
 import { type BitsPerSec, type ExportProfile, LIMITS, type Px } from "../../gen/domain";
-import { WorkerFailure } from "../rpc-worker";
 
 export type VideoLadderEntry = {
   codec: string;
@@ -61,12 +60,12 @@ export const ENCODE_QUEUE_MAX = 4;
 export const AAC_PRIMING_SAMPLES: number = 0; // TE-4: measured
 
 /**
- * The configuration an export of this profile is encoded with: the first
- * entry of the ladder the browser supports at the profile's size and
- * bitrate. The size and the bitrate come from the profile and from nowhere
- * else (D-26). No entry supported: `E_ENCODE_VIDEO`.
+ * The configurations an export of this profile may try, in order: the entries
+ * of the ladder the browser supports at the profile's size and bitrate. The
+ * next is taken when an encoder fails (TS §21.4). The size and the bitrate
+ * come from the profile and from nowhere else (D-26).
  */
-export async function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig> {
+export async function* supportedConfigs(profile: ExportProfile): AsyncGenerator<VideoEncoderConfig> {
   for (const entry of VIDEO_ENCODE_LADDER) {
     const config = videoConfigFor(entry, profile.width, profile.height, profile.video_bitrate);
     let supported = false;
@@ -78,8 +77,7 @@ export async function pickVideoConfig(profile: ExportProfile): Promise<VideoEnco
       supported = false;
     }
     if (supported) {
-      return config;
+      yield config;
     }
   }
-  throw new WorkerFailure("E_ENCODE_VIDEO", "NoSupportedConfig");
 }

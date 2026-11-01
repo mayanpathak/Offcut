@@ -11,7 +11,7 @@ import type { ErrorCode } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
-import { crashWorker, failNextSetScene, hangWorker } from "../usecases/dev-faults";
+import { crashWorker, failEncoderAt, failNextSetScene, hangWorker } from "../usecases/dev-faults";
 import { wordAt } from "../usecases/replace-all";
 
 type WorkerKind = Parameters<typeof crashWorker>[0];
@@ -20,6 +20,9 @@ type WorkerKind = Parameters<typeof crashWorker>[0];
 const FAKE_EXPORT_FRAMES = 1000;
 /** How long the fake export has been running: its start, as a real one keeps it. */
 const FAKE_EXPORT_ELAPSED_MS = 12_000;
+/** The fake done state's summary: enough for every row to show, in the plural. */
+const FAKE_EMPHASIZED = 3;
+const FAKE_VISUALS = 2;
 
 export type DevHooks = {
   /** Opens word `i` of the transcript in its field, on the Captions tab. */
@@ -28,12 +31,16 @@ export type DevHooks = {
   failClip(code: ErrorCode): void;
   /** Shows an export rendering, `fraction` (0 to 1) of the way through. Nothing is rendered. */
   fakeExport(fraction: number): void;
+  /** Shows the done state with a summary. Nothing was exported (v5implementation D-235). */
+  fakeExportDone(): void;
   /** Worker `kind` crashes, as a worker killed from DevTools would (D-153). */
   crash(kind: WorkerKind): void;
   /** The next scene the render worker builds fails: the next review change fails (D-190). */
   failNextSetScene(): void;
   /** Worker `kind` stops answering for good: a cancel restarts it after 2 s (D-152). */
   hangWorker(kind: WorkerKind): void;
+  /** The video encoder fails at `frame`, the next `times` attempts (v5implementation D-218). */
+  failEncoderAt(frame: number, times: number): void;
 };
 
 declare global {
@@ -65,8 +72,16 @@ export function installDevHooks(): void {
         startedAt: Date.now() - FAKE_EXPORT_ELAPSED_MS,
       });
     },
+    fakeExportDone: () => {
+      useExportStore.setState({
+        status: "done",
+        summary: { voice_cleaned: true, captions_emphasized: FAKE_EMPHASIZED, visual_moments: FAKE_VISUALS },
+        answered: false,
+      });
+    },
     crash: crashWorker,
     failNextSetScene,
     hangWorker,
+    failEncoderAt,
   };
 }

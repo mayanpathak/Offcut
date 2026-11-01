@@ -58,8 +58,8 @@ export type ClipState = {
   cancelled: boolean;
   /**
    * The program's audio at 48 kHz, for the preview, while the clip is
-   * `ready` (D-127). The export reads the cleaned voice from the device,
-   * `out48.f32` (v2implementation D-51, D-129).
+   * `ready` (D-127). The export reads its own copy from the device,
+   * `prog48.f32` (v2implementation D-51; v5implementation D-213).
    */
   prog48: Float32Array | null;
 };

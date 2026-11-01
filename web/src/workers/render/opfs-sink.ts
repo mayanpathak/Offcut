@@ -61,6 +61,18 @@ export class OpfsSink {
     }
   }
 
+  /** Empties the file: what a failed attempt wrote goes, and the next one writes from the start (TS §21.4). */
+  reset(): void {
+    if (this.#handle === undefined) {
+      throw new OpfsError("io", new Error("the sink is closed"));
+    }
+    try {
+      this.#handle.truncate(0);
+    } catch (error) {
+      throw tagged(error);
+    }
+  }
+
   /** Makes what was written durable and gives the handle back. The file stays. */
   close(): Promise<void> {
     const handle = this.#handle;

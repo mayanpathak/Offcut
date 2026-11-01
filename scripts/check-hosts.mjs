@@ -161,7 +161,7 @@ if (cspHosts.length !== 1 || cspHosts[0] !== assetOrigin) {
 // The hooks of ui/dev-hooks.ts and the player's caption mirrors are behind
 // `DEV_HOOKS` (config/env.ts), which a production build compiles out. One of
 // these strings in web/dist means a hook reached the production bundle.
-const DEV_MARKERS = ["__offcutDev", "data-caption-text", "data-caption-colors", "data-caption-position"];
+const DEV_MARKERS = ["__offcutDev", "devFailEncoder", "data-caption-text", "data-caption-colors", "data-caption-position"];
 const devProblems = [];
 for (const file of files) {
   const text = readFileSync(file, "latin1");

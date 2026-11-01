@@ -4,7 +4,7 @@
 
 ## What it shares with the product
 
-Nothing. It imports no code from `crates/` or `web/` and no library either of them uses. It runs the `ffprobe` and `ffmpeg` command-line tools as separate programs and reads the top-level boxes of the file itself. Neither tool is part of the product, which contains no ffmpeg code (`technicalspec.md` §36).
+Nothing. It imports no code from `crates/` or `web/` and no library either of them uses. It runs the `ffprobe` and `ffmpeg` command-line tools as separate programs, reads the top-level boxes of the file itself, and does its arithmetic with NumPy. None of these is part of the product, which contains no ffmpeg code (`technicalspec.md` §36). `watermark_mask_720.png` is drawn by a tool of its own from the font file, not by the renderer.
 
 ## How to run it
 
@@ -13,13 +13,13 @@ python verify/verify_mp4.py <file> --profile free|creator --expected-duration-ms
 pnpm verify <file> --profile creator --expected-duration-ms N
 ```
 
-`N` is the duration of the source clip in milliseconds: an export is never shorter than its recording. `--source` is accepted and not used before V5.
+`N` is how long the export should be, in milliseconds, worked out by the test. `--source` is what checks 8 and 11 compare with; the two are separate, because from V6.2 they differ. Without `--source` those parts are reported as not measured.
 
-It prints one line per check, `PASS <n>` or `FAIL <n>: <reason>`, then one line that names the checks this version does not make. The exit status is 0 only when every check that is made passes, 1 when one fails, and 2 when a tool is missing or the arguments are wrong.
+It prints one line per check, `PASS <n>` or `FAIL <n>: <reason>`. A line `INFO <n>: <reading>` reports a number and judges nothing. A reason names a tag's key, never its value. The exit status is 0 only when every check passes, 1 when one fails, and 2 when a tool or NumPy is missing or the arguments are wrong.
 
 ## The checks
 
-The list is `technicalspec.md` §27.2. This version makes the first six.
+The list is `technicalspec.md` §27.2.
 
 | # | Check |
 |---|---|
@@ -29,7 +29,26 @@ The list is `technicalspec.md` §27.2. This version makes the first six.
 | 4 | Audio: AAC-LC, 48,000 Hz, 2 channels |
 | 5 | The video is within one frame (33.4 ms) of `N`; the audio is within one AAC frame (21.34 ms) of the video |
 | 6 | `ffmpeg` decodes both streams from start to end and reports no error |
-| 7 to 11 | Loudness, sync and timeline against the source, watermark, bitrate, metadata: V5 |
+| 7 | `ffmpeg`'s integrated loudness of the stereo stream is within 1 LU of -14 LUFS |
+| 8 | Against the source: the audio's 10 ms envelope within 20 ms over the first and the last 5 s, so a removed pause anywhere between fails; white frames within one frame |
+| 9 | What stays still over 15 frames correlates with `watermark_mask_720.png` at least 0.5 for `free`, at most 0.2 for `creator` |
+| 10 | The video's bitrate over the clip is at most 12 Mb/s for `creator`, 6 Mb/s for `free` |
+| 11 | No title, comment, description, artist, album or location; `creation_time` absent or the epoch; no tag carrying the source's value; neither `©xyz` nor `ISO6709` in the file's bytes |
+
+The thresholds of checks 8 and 9 are assumptions, read on real exports (`docs/v5/experiments.md`, `technicalspec.md` §39.3 item 14). One moves only while `free` and `creator` stay well apart, and never to make one file pass.
+
+## Its own test
+
+```text
+python verify/test_verify_mp4.py
+pnpm verify:test
+```
+
+It makes a good file and one bad file per failure with `ffmpeg` from a generated fixture, in a temporary directory it deletes, and each bad file must fail its own check and pass every other. It needs `pnpm fixtures`, and runs in CI, which cannot make a real export.
+
+## The mask
+
+`make_watermark_mask.py` drew `watermark_mask_720.png`, with Pillow, which is the tool's alone and is not in `requirements.txt`. Run it again only when `watermark.rs` or `safe_area.rs` moves the text.
 
 ## What it needs
 
@@ -37,7 +56,7 @@ The list is `technicalspec.md` §27.2. This version makes the first six.
 |---|---|
 | Python | 3.13.5 |
 | `ffprobe`, `ffmpeg` | 9.0.2, on the `PATH` |
-| NumPy | 2.5.3 (`requirements.txt`). Not imported before V5, which uses it for checks 7 to 9 |
+| NumPy | 2.5.3 (`requirements.txt`), for checks 8 and 9 |
 
 ```text
 python -m pip install -r verify/requirements.txt

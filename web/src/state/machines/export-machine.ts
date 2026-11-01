@@ -1,9 +1,9 @@
 // One export (TS §12.2): idle → gating → rendering → muxing → saving → done.
 // A new export starts from `idle`, with a new id.
 //
-// The whole table is here from V2 on. V2 never fires `cache_hit`, `cancel`,
-// `cancel_done` or `retry`: they belong to the render cache, the cancel and
-// the retry of later versions.
+// The whole table is here from V2 on. `cache_hit` is the render cache's, from
+// V5 on, and `cancel` and `cancel_done` the cancel's, from V4 on. `retry` is
+// never fired: "Try again" starts a new export through `reset` (D-153).
 
 import type { MachineDef } from "./transition";
 

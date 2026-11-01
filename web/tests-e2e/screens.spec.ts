@@ -1,5 +1,5 @@
 // The design reviews' captures (v4implementation D-191, G 10.8): the eight
-// states of §17.2 at the two reference widths, written to
+// states of §17.2 and V5's done state (D-235) at the two reference widths, written to
 // test-results/screens/<state>-<width>x<height>.png. D1 only: `pnpm screens`
 // builds the page in development mode first, so that it has its development
 // hooks (`__offcutDev`, D-155), and CI never runs this project. Each picture
@@ -15,7 +15,7 @@ import { type AssetOptions, dropClip, ensureModelCached, modelManifest, patient,
 declare global {
   interface Window {
     /** The page's development hooks (`web/src/ui/dev-hooks.ts`), in a development build only. */
-    __offcutDev?: { openWordField(i: number): void; failClip(code: string): void; fakeExport(fraction: number): void };
+    __offcutDev?: { openWordField(i: number): void; failClip(code: string): void; fakeExport(fraction: number): void; fakeExportDone(): void };
   }
 }
 
@@ -79,7 +79,7 @@ for (const size of WIDTHS) {
       await picture(page, "model-download");
     });
 
-    test("empty, processing, ready, editing a word, style tab, exporting, error", async ({ page }) => {
+    test("empty, processing, ready, editing a word, style tab, exporting, done, error", async ({ page }) => {
       await ensureModelCached(page.context());
       await openEditor(page);
       await picture(page, "empty");
@@ -123,6 +123,10 @@ for (const size of WIDTHS) {
       await page.evaluate((fraction) => window.__offcutDev?.fakeExport(fraction), EXPORT_FRACTION);
       await expect(page.getByTestId("export-progress")).toBeVisible();
       await picture(page, "exporting");
+
+      await page.evaluate(() => window.__offcutDev?.fakeExportDone());
+      await expect(page.getByTestId("export-outcome")).toBeVisible();
+      await picture(page, "done");
 
       await page.evaluate((code) => window.__offcutDev?.failClip(code), ERROR_CODE);
       await expect(page.getByTestId("clip-failed")).toBeVisible();

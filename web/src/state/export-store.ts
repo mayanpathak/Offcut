@@ -3,8 +3,9 @@
 
 import { create } from "zustand";
 
-import type { ExportId } from "../gen/domain";
+import type { ChangeSummary, ExportId } from "../gen/domain";
 import type { AppFailure } from "../workers/protocol";
+import type { BlockerCode } from "./blockers";
 import { EXPORT_MACHINE, type ExportEvent, type ExportStatus } from "./machines/export-machine";
 import { transition } from "./machines/transition";
 
@@ -22,6 +23,12 @@ export type ExportState = {
    * accounts exist nothing can fetch one (v2implementation D-23).
    */
   unavailable: boolean;
+  /** Why the last start did not go on (v5implementation D-231): the next start clears it. */
+  blocker?: BlockerCode;
+  /** What this export changed, once it is done. */
+  summary?: ChangeSummary;
+  /** Whether this export's question has been answered (D-234). */
+  answered: boolean;
 };
 
 /** What a state holds beside its status. */
@@ -29,8 +36,14 @@ type Fields = Omit<ExportState, "status">;
 
 /** No export. */
 function empty(): Fields {
-  return { done: 0, total: 0, unavailable: false };
+  return { done: 0, total: 0, unavailable: false, answered: false };
 }
+
+/**
+ * The exports whose question was answered, in this tab (D-234). It outlives
+ * `reset`: a cache hit shares its export's id, and is not asked again.
+ */
+const answeredIds = new Set<ExportId>();
 
 export const useExportStore = create<ExportState>(() => ({ status: "idle", ...empty() }));
 
@@ -59,9 +72,19 @@ export function blocked(): void {
   apply("blocked", empty);
 }
 
+/** gating → idle, saying why (D-231). */
+export function blockedBy(code: BlockerCode): void {
+  apply("blocked", () => ({ ...empty(), blocker: code }));
+}
+
 /** gating → rendering */
 export function clear(): void {
   apply("clear");
+}
+
+/** gating → saving: the file of an earlier export, under its id (TS §21.4). */
+export function cacheHit(original: ExportId): void {
+  apply("cache_hit", (current) => ({ ...current, exportId: original }));
 }
 
 /** How far the rendering is. Not a change of state; kept only while it runs. */
@@ -81,9 +104,23 @@ export function finalized(): void {
   apply("finalized");
 }
 
-/** saving → done */
-export function saved(): void {
-  apply("saved");
+/** saving → done, with what was changed. */
+export function saved(summary: ChangeSummary, alreadyAnswered: boolean): void {
+  apply("saved", (current) => ({ ...current, summary, answered: alreadyAnswered }));
+}
+
+/** The question was answered for this export (D-234). Not a change of state. */
+export function answered(): void {
+  const { exportId } = useExportStore.getState();
+  if (exportId !== undefined) {
+    answeredIds.add(exportId);
+    useExportStore.setState({ answered: true });
+  }
+}
+
+/** Whether this export's question has been answered, in this tab (D-234). */
+export function hasAnswered(id: ExportId): boolean {
+  return answeredIds.has(id);
 }
 
 /** rendering | muxing | saving → failed */

@@ -15,6 +15,7 @@ import type {
   DetectedEvent,
   EditPlan,
   EditState,
+  ExportProfile,
   Prosody,
   SentenceIdx,
   TimeMap,
@@ -201,8 +202,7 @@ async function setScene(p: {
 async function attachPreview(p: { canvas: OffscreenCanvas }): Promise<void> {
   const state = opened();
   const size = previewProfile(state);
-  // No other call on the session until this has answered.
-  await state.session.attach_canvas(p.canvas, size.width, size.height);
+  await state.source.whileSessionHeld(() => state.session.attach_canvas(p.canvas, size.width, size.height));
   previewCanvas = p.canvas;
   await drawStill(worker);
 }
@@ -237,6 +237,20 @@ const worker: WorkerState = {
     opened().api.exportProfileFromToken(entitlementToken, ENTITLEMENT_PUBLIC_KEYS, now()),
 };
 
+/**
+ * The profile a token gives now, for the render cache's key (v5implementation
+ * D-220). `exportClip` still verifies the token itself: the worker trusts
+ * nothing the page says about a profile.
+ */
+function exportProfile(p: { entitlementToken: string }): Promise<ExportProfile> {
+  try {
+    return Promise.resolve(worker.exportProfile(p.entitlementToken));
+  } catch (thrown) {
+    // The stage of a refused token, as an export reports it.
+    throw staged(thrown, "render_encode");
+  }
+}
+
 const handlers: Handlers<RenderWorkerApi> = {
   openSession,
   detect,
@@ -251,6 +265,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   hitTest: (p: Parameters<typeof hitTest>[0]) => hitTest(p, worker),
   captionMirror: (p: Parameters<typeof captionMirror>[0]) => captionMirror(p, worker),
   styleThumbnails: (p: Parameters<typeof styleThumbnails>[0]) => styleThumbnails(p, worker),
+  exportProfile,
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
 };

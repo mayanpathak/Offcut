@@ -3,21 +3,24 @@
 // the speech model put on the browser's device without a download, what
 // the page keeps in its storage, and (v4implementation G 16.1) the editor's
 // controls driven as a person drives them, the preview's statistics, the
-// pixels of a screenshot and the accessibility scan.
+// pixels of a screenshot and the accessibility scan; and (v5implementation
+// §6.3) one processed clip shared by a suite's cases, made clean between them.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync } from "node:fs";
+import { closeSync, copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { inflateSync } from "node:zlib";
 
 import AxeBuilder from "@axe-core/playwright";
-import { type BrowserContext, expect, type Page, type Route } from "@playwright/test";
+import { type Browser, type BrowserContext, expect, type Page, type Route, type TestInfo } from "@playwright/test";
 
+import { messages } from "../../src/copy/messages";
 import { paths } from "../../src/persistence/opfs";
 import { DB_NAME } from "../../src/persistence/schema";
+import { type FakeApi, installFakeApi } from "./fake-api";
 
 // FLUSH_INTERVAL_MS of src/analytics/client.ts, and API_TIMEOUT_MS of
 // src/net/http.ts: both 10 s. Neither file can be imported here: they read
@@ -180,15 +183,36 @@ export function sourceDurationMs(fixture: string): number {
   return Math.round(seconds * 1000);
 }
 
+export type Verdict = { status: number | null; output: string };
+
+/** The checks of `verify/verify_mp4.py` (TS §27.2). */
+const VERIFIER_CHECKS = 11;
+
 /**
  * Runs the independent verifier on an exported file (TS §27.2) and gives its
- * exit status and what it printed: 0 only when every check it makes passes.
- * `python` is the one on PATH, which must be the Python of `verify/README.md`.
+ * exit status and what it printed: 0 only when every check passes. The test
+ * works out the expected duration, and gives it apart from the source
+ * (v5implementation D-210). `python` is the one on PATH, which must be the
+ * Python of `verify/README.md`.
  */
-export function verifyMp4(file: string, profile: "free" | "creator", expectedDurationMs: number): { status: number | null; output: string } {
+export function verifyMp4(file: string, profile: "free" | "creator", expectedDurationMs: number, source?: string): Verdict {
+  // A directory outside the repository, for tuning the verifier on real exports
+  // offline (v5implementation §6.2). Never set in CI; emptied when the tuning ends.
+  const keep = process.env.OFFCUT_KEEP_EXPORTS;
+  if (keep !== undefined) {
+    copyFileSync(file, path.join(keep, path.basename(file)));
+  }
   const run = spawnSync(
     "python",
-    [path.join(ROOT, "verify/verify_mp4.py"), file, "--profile", profile, "--expected-duration-ms", String(expectedDurationMs)],
+    [
+      path.join(ROOT, "verify/verify_mp4.py"),
+      file,
+      "--profile",
+      profile,
+      "--expected-duration-ms",
+      String(expectedDurationMs),
+      ...(source === undefined ? [] : ["--source", source]),
+    ],
     { encoding: "utf8" },
   );
   if (run.error !== undefined) {
@@ -197,9 +221,81 @@ export function verifyMp4(file: string, profile: "free" | "creator", expectedDur
   return { status: run.status, output: `${run.stdout}${run.stderr}` };
 }
 
+/** Every check passed and none was not measured. `flashes`: how many white frames were compared. */
+export function expectAllChecks(verdict: Verdict, o: { flashes?: number } = {}): void {
+  for (let check = 1; check <= VERIFIER_CHECKS; check += 1) {
+    expect(verdict.output).toContain(`PASS ${String(check)}`);
+  }
+  expect(verdict.output).not.toContain("FAIL");
+  expect(verdict.output).not.toContain("not measured");
+  if (o.flashes !== undefined) {
+    expect(verdict.output).toContain(`INFO 8: ${String(o.flashes)} flashes compared`);
+  }
+  expect(verdict.status, verdict.output).toBe(0);
+}
+
+// --- What an export shows ------------------------------------------------------
+
+declare global {
+  interface Window {
+    /** The stage labels the export's progress showed, in order, each once. */
+    e2eStages?: string[];
+    /** Every value its bar took, in order. */
+    e2eExportBar?: string[];
+    /** How often the progress was on the page without the "rendering on your computer" line. */
+    e2eLocalLineMissing?: number;
+    /** How many times the failure of an export came onto the page. */
+    e2eExportFailures?: number;
+  }
+}
+
+/** Records what the export's progress shows, from before the page loads: "Saving" is on it for a moment. */
+export async function watchExport(page: Page): Promise<void> {
+  await page.addInitScript((localLine) => {
+    window.e2eStages = [];
+    window.e2eExportBar = [];
+    window.e2eLocalLineMissing = 0;
+    window.e2eExportFailures = 0;
+    let failureShown = false;
+    new MutationObserver(() => {
+      // The failure of the export before stays on the page until the next one starts: a new one is one that comes.
+      const failure = document.querySelector('[data-testid="export-failed"]') !== null;
+      if (failure && !failureShown) {
+        window.e2eExportFailures = (window.e2eExportFailures ?? 0) + 1;
+      }
+      failureShown = failure;
+      const progress = document.querySelector('[data-testid="export-progress"]');
+      if (progress === null) {
+        return;
+      }
+      const stage = progress.querySelector('[data-testid="export-stage"]')?.textContent ?? "";
+      if (stage !== window.e2eStages?.at(-1)) {
+        window.e2eStages?.push(stage);
+      }
+      const now = progress.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") ?? "";
+      if (now !== window.e2eExportBar?.at(-1)) {
+        window.e2eExportBar?.push(now);
+      }
+      if (!(progress.textContent ?? "").includes(localLine)) {
+        window.e2eLocalLineMissing = (window.e2eLocalLineMissing ?? 0) + 1;
+      }
+    }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true });
+  }, messages.export.renderingLocally);
+}
+
+/** Forgets what `watchExport` recorded of the exports before this one. */
+export async function forgetProgress(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.e2eStages = [];
+    window.e2eExportBar = [];
+    window.e2eLocalLineMissing = 0;
+  });
+}
+
 // --- The cache of the asset host's files -----------------------------------------
 
-function sha256Of(file: string): Promise<string> {
+/** The lower-case hex SHA-256 of a file on this machine. */
+export function sha256Of(file: string): Promise<string> {
   const hash = createHash("sha256");
   return pipeline(createReadStream(file), hash).then(() => hash.digest("hex"));
 }
@@ -705,6 +801,104 @@ export async function settled(page: Page, since: number): Promise<void> {
   await expect.poll(() => saves(page), { timeout: 30_000, message: "the change was written" }).toBeGreaterThan(since);
   await expect(page.getByText(SAVING, { exact: true })).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText(SAVED, { exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+// --- One processed clip, shared by a suite's cases (v5implementation §6.3) -------
+
+/** `clip-store.ts`'s `empty().edit`: what a clip's stored edit is when nothing was changed. */
+const EMPTY_EDIT = { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true };
+
+export type SharedClip = { context: BrowserContext; page: Page; api: FakeApi };
+
+/** Opens the editor on `page` and takes `fixture` to a paused, ready preview, through the cached model. */
+export async function openClip(page: Page, fixture: string): Promise<FakeApi> {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await ensureModelCached(page.context());
+  const api = await installFakeApi(page);
+  await routeAssets(page);
+  await trackSaves(page);
+  await page.goto("/app");
+  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+  await expectTestBuild(page);
+  await dropClip(page, fixture);
+  const canvas = page.getByTestId("preview-canvas");
+  await expect(canvas.or(page.getByTestId("clip-failed"))).toBeVisible({ timeout: patient(240_000) });
+  await expect(canvas, "the clip was processed").toBeVisible();
+  await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled({ timeout: 30_000 });
+  return api;
+}
+
+/** `openClip` on a context and a page of its own, which the suite closes when its cases are done. */
+export async function openShared(browser: Browser, info: TestInfo, fixture: string): Promise<SharedClip> {
+  const { baseURL } = info.project.use;
+  const context = await browser.newContext(baseURL === undefined ? {} : { baseURL });
+  const page = await context.newPage();
+  const api = await openClip(page, fixture);
+  return { context, page, api };
+}
+
+/**
+ * Sends what analytics holds now: the page is told it is hidden, on which
+ * `analytics/client.ts` flushes. `flushAnalytics` needs `page.clock`, and a fake
+ * clock on a shared page would touch every timer of every case. `PreviewPlayer`
+ * reads `document.hidden`, which this leaves alone, so nothing else reacts.
+ */
+export async function sendQueuedAnalytics(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    delete (document as unknown as { visibilityState?: string }).visibilityState;
+  });
+  // For the request to reach the route: it leaves at once, and the route is on this machine.
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Makes a shared clip what it was when it was processed: nothing open, nothing
+ * playing, every change undone, at the start, on the Captions tab, no toast,
+ * and nothing recorded by the fake API. Asserts it last: an unclean clip fails
+ * the case that finds it, by this name, and does not confuse the one after.
+ */
+export async function resetClip(page: Page, api: FakeApi): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(wordField(page)).toHaveCount(0);
+
+  // The transport has one button, whose name changes a moment after a press: a
+  // press on a Play that was just Pause starts it again, and the next try stops it.
+  const pause = page.getByRole("button", { name: messages.preview.pause, exact: true });
+  const play = page.getByRole("button", { name: messages.preview.play, exact: true });
+  await expect(async () => {
+    if (await pause.isVisible()) {
+      await pause.click();
+    }
+    await expect(play).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+
+  // The top bar's: the toast after a redo offers an Undo of its own.
+  const undo = page.getByRole("banner").getByRole("button", { name: messages.editor.undo, exact: true });
+  await expect(page.getByText(SAVING, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  while (await undo.isEnabled()) {
+    const since = await saves(page);
+    await undo.click();
+    await settled(page, since);
+  }
+
+  await seekTo(page, 0);
+  await expect.poll(() => previewAt(page)).toBe(0);
+  await openTab(page, "Captions");
+  // A toast does not time out while the pointer is on it. `ToastHost` renders nothing with none.
+  await page.mouse.move(0, 0);
+  await expect(page.getByTestId("toasts")).toHaveCount(0, { timeout: patient(30_000) });
+
+  // In this order: the events of the undo steps must not reach the next case's counts.
+  await sendQueuedAnalytics(page);
+  api.forget();
+
+  await expect(undo, "resetClip: every change is undone").toBeDisabled();
+  await expect(page.getByTestId("preview-failed"), "resetClip: no failure is on the page").toHaveCount(0);
+  const [clipId] = await opfsList(page, "clips");
+  const stored = (await readIndexedDb(page, "edits", clipId ?? "")) as { value?: { editState?: unknown } } | undefined;
+  expect(stored?.value?.editState, "resetClip: the stored edit is the empty one").toEqual(EMPTY_EDIT);
 }
 
 /** The scrub bar (D-148). */

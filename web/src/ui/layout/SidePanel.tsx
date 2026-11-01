@@ -1,5 +1,6 @@
 // The side panel (v4implementation D-178, §17.3): a failed export's card
-// (D-190; the progress is the top bar's pill, D-189), then four tabs, Captions · Style · Visuals · Framing, the choice
+// (D-190; the progress is the top bar's pill, D-189) or a finished one's outcome
+// (v5implementation D-232), then four tabs, Captions · Style · Visuals · Framing, the choice
 // kept in the interface store. While the clip is on its way the tabs are
 // disabled and hold a placeholder. On a ready clip each tab has one job:
 // the transcript editor (D-182), the style cards (D-186), the suggested
@@ -8,6 +9,7 @@
 import { messages } from "../../copy/messages";
 import { type Tab, useUiStore } from "../../state/ui-store";
 import { CaptionEditor } from "../components/CaptionEditor";
+import { ExportOutcome } from "../components/ChangeSummary";
 import { ExportFailure } from "../components/ExportProgress";
 import { FramingPanel } from "../components/FramingPanel";
 import { PlanItemList } from "../components/PlanItemList";
@@ -52,6 +54,7 @@ export function SidePanel({ ready }: { ready: boolean }) {
     <div className={styles.panel}>
       <div className={styles.export}>
         <ExportFailure />
+        <ExportOutcome />
       </div>
       <div className={styles.tabs}>
         <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label={messages.panel.label} disabled={!ready}>

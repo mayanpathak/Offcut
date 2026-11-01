@@ -13,6 +13,7 @@ import type {
   ErrorCode,
   EventKind,
   ExportId,
+  ExportProfile,
   FailureStage,
   JobId,
   Lufs,
@@ -131,10 +132,13 @@ export interface RenderWorkerApi {
   styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
   /** The caption shown at `at` as drawn; asked by development and test builds only (D-155). */
   captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;
+  /** The profile a token gives now, verified here (INV-9, v5implementation D-220). Keeps nothing. */
+  exportProfile(p: { entitlementToken: string }): Promise<ExportProfile>;
   exportClip(p: {
     exportId: ExportId;
     entitlementToken: string;
-    out48: Float32Array;
+    /** The program's audio; transferred (TS §40.9 S-8). */
+    prog48: Float32Array;
   }): Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
 }

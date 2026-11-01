@@ -123,7 +123,19 @@ function throttledProgress(jobId: JobId, send: (p: Progress) => void): {
 // is; absent where no bundler ran (the e2e suites import worker files in Node).
 declare const __OFFCUT_DEV_FAULTS__: boolean | undefined;
 /** The faults exist in development builds only: a production build folds this to `false` and drops them. */
-const DEV_FAULTS = typeof __OFFCUT_DEV_FAULTS__ !== "undefined" && __OFFCUT_DEV_FAULTS__;
+export const DEV_FAULTS = typeof __OFFCUT_DEV_FAULTS__ !== "undefined" && __OFFCUT_DEV_FAULTS__;
+
+/** The fault `devFailEncoder` asked for: the frame it comes at, and how many attempts it fails yet. */
+let encoderFault = { at: -1, times: 0 };
+
+/** Whether a development fault fails the encoder at this frame. `false` in a production build. */
+export function takeEncoderFault(n: number): boolean {
+  if (!DEV_FAULTS || n !== encoderFault.at || encoderFault.times <= 0) {
+    return false;
+  }
+  encoderFault = { at: encoderFault.at, times: encoderFault.times - 1 };
+  return true;
+}
 
 /** Blocks the worker's thread for good: only a restart ends it (`pool.restartWorker`). */
 function hang(): never {
@@ -136,7 +148,9 @@ function hang(): never {
  * The development faults, one-way messages of any worker (`ui/dev-hooks.ts`):
  * `devCrash` throws where nothing catches it, which the page sees as the
  * worker's crash; `devHang` blocks the thread; `devFailNext` makes the next
- * call of `params.method` fail. `true` when `method` was one of them.
+ * call of `params.method` fail; `devFailEncoder` makes an export's video encoder
+ * fail at frame `params.at`, on the next `params.times` attempts. `true` when
+ * `method` was one of them.
  */
 function devFault(method: string, params: unknown, failNext: Set<string>): boolean {
   switch (method) {
@@ -152,6 +166,11 @@ function devFault(method: string, params: unknown, failNext: Set<string>): boole
       if (typeof target === "string") {
         failNext.add(target);
       }
+      return true;
+    }
+    case "devFailEncoder": {
+      const fault = params as { at: number; times: number };
+      encoderFault = { at: fault.at, times: fault.times };
       return true;
     }
     default:

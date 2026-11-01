@@ -16,6 +16,11 @@ export function hangWorker(kind: WorkerKind): void {
   pool[kind].notify("devHang", {});
 }
 
+/** An export's video encoder fails at `frame`, on the next `times` attempts (v5implementation D-218). */
+export function failEncoderAt(frame: number, times: number): void {
+  pool.render.notify("devFailEncoder", { at: frame, times });
+}
+
 /** The render worker's next `setScene` fails: a review change then fails as one can (D-190). */
 export function failNextSetScene(): void {
   pool.render.notify("devFailNext", { method: "setScene" });

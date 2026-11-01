@@ -54,6 +54,11 @@ function useTimeLeft(done: number, total: number, rendering: boolean): number | 
       setShown(null);
       return;
     }
+    // An encoder failed and the frames started again: what was counted says nothing now (D-238).
+    if (first.current !== undefined && done < first.current.done) {
+      first.current = undefined;
+      setShown(null);
+    }
     const now = performance.now();
     first.current ??= { at: now, done };
     const start = first.current;

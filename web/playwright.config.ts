@@ -19,6 +19,7 @@ const MEDIA_SUITES = [
   "model-download.spec.ts",
   "pipeline-preview.spec.ts",
   "export-creator.spec.ts",
+  "timeline-preserved.spec.ts",
   "rejections.spec.ts",
   "preview-sync.spec.ts",
   "review-edit.spec.ts",
