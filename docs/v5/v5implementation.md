@@ -1369,7 +1369,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 **Speed**
 
 - [x] `review-edit.spec.ts` makes 5 clip loads.
-- [ ] A docs-only pull request skips `ci` and `e2e-media`; the scan still runs.
+- [x] A docs-only pull request skips `ci` and `e2e-media`; the scan still runs.
 - [x] The full suite's time is recorded against V4's 41.8-54.9 min.
 - [x] Full media runs in V5: one, or each extra one explained in the changelog.
 
