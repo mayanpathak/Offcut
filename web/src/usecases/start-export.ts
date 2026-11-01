@@ -11,14 +11,14 @@
 
 import { track } from "../analytics/client";
 import type { ExportedAs } from "../gen/api";
-import type { ChangeSummary, ClipId, ExportId, ExportProfile, ProfileKind } from "../gen/domain";
+import type { ChangeSummary, ClipId, DetectedEvent, ExportId, ExportProfile, ProfileKind } from "../gen/domain";
 import * as clipsRepo from "../persistence/clips-repo";
 import * as entitlementRepo from "../persistence/entitlement-repo";
 import * as opfs from "../persistence/opfs";
 import * as renderCacheRepo from "../persistence/render-cache-repo";
 import type { RenderCacheRecord } from "../persistence/schema";
 import { type BlockerCode, forExport } from "../state/blockers";
-import { useClipStore } from "../state/clip-store";
+import { type ClipState, useClipStore } from "../state/clip-store";
 import * as exportStore from "../state/export-store";
 import { EXPORT_MACHINE } from "../state/machines/export-machine";
 import { transition } from "../state/machines/transition";
@@ -300,23 +300,28 @@ function renderWorkerGone(error: unknown): boolean {
   return error instanceof WorkerCallError && error.failure.code === "E_WORKER_CRASH";
 }
 
+/**
+ * The edit as analytics reports it, in counts and an enum (INV-18): read when
+ * the export starts, not when it ends, as the person may keep editing. A visual
+ * that was switched off is not kept (v5implementation D-237).
+ */
+function editValues(clip: ClipState) {
+  const on = (event: DetectedEvent) => clip.edit.event_overrides[event.id] ?? event.enabled;
+  const kept = clip.events.filter(on).length;
+  return {
+    word_edits: Math.min(MAX_COUNT, Object.keys(clip.edit.word_edits).length),
+    events_kept: Math.min(MAX_COUNT, kept),
+    events_disabled: Math.min(MAX_COUNT, clip.events.length - kept),
+    style: clip.edit.style,
+    crop_adjusted: clip.edit.crop_offset !== 0,
+  };
+}
+
 /** The export is over and its file was handed over: analytics says so. */
-function exportDone(profile: ExportedAs, startedAt: number, fromCache: boolean): void {
-  const kept = useClipStore.getState().events.filter((event) => event.enabled).length;
-  // V5: P135 puts the edit's own values in the place of `word_edits`, `events_disabled`,
-  // `style` and `crop_adjusted`, and shows the summary (ChangeSummary, PS §10 J11).
+function exportDone(values: ReturnType<typeof editValues>, profile: ExportedAs, startedAt: number, fromCache: boolean): void {
   track({
     name: "export_done",
-    props: {
-      total_ms: capMs(performance.now() - startedAt),
-      profile,
-      word_edits: 0,
-      events_kept: Math.min(MAX_COUNT, kept),
-      events_disabled: 0,
-      style: "clean",
-      crop_adjusted: false,
-      from_cache: fromCache,
-    },
+    props: { ...values, total_ms: capMs(performance.now() - startedAt), profile, from_cache: fromCache },
   });
 }
 
@@ -355,6 +360,7 @@ export async function startExport(clipId: ClipId): Promise<void> {
   exportStore.start(exportId);
   const signal = signalFor("export");
   const startedAt = performance.now();
+  const values = editValues(useClipStore.getState());
 
   // 4. The preview stops and stays locked until the export is over (TS §12.4).
   //    Before the gate: the worker takes one job at a time, and a playing
@@ -382,7 +388,7 @@ export async function startExport(clipId: ClipId): Promise<void> {
       started = true;
       await deliverStored(clipId, hit);
       unlockAfterExport();
-      exportDone(exportedAs, startedAt, true);
+      exportDone(values, exportedAs, startedAt, true);
       return;
     }
 
@@ -447,7 +453,7 @@ export async function startExport(clipId: ClipId): Promise<void> {
   // 12.
   exportStore.saved(summary, false);
   unlockAfterExport();
-  exportDone(exportedAs, startedAt, false);
+  exportDone(values, exportedAs, startedAt, false);
 }
 
 /**

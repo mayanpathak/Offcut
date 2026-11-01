@@ -19,6 +19,7 @@ import { type BrowserContext, type Download, expect, type Page, test } from "@pl
 import { messages } from "../src/copy/messages";
 import { type FakeApi, installFakeApi, mintEntitlementToken, seedEntitlement } from "./helpers/fake-api";
 import {
+  axe,
   dropClip,
   ensureModelCached,
   expectAllChecks,
@@ -267,6 +268,28 @@ test.describe("one clip, exported", () => {
     expect(downloads).toHaveLength(2);
   });
 
+  test("summary and the question: what was changed, only that, and one answer gives one event", async () => {
+    const outcome = page.getByTestId("export-outcome");
+    await expect(outcome.getByRole("heading", { name: messages.export.summary.title })).toBeVisible();
+    const rows = await outcome.getByRole("listitem").allTextContents();
+    expect(rows[0], "the chain always runs").toBe(messages.export.summary.voice);
+    // Each row names a number from one up: a zero is left out.
+    for (const row of rows.slice(1)) {
+      expect(row).toMatch(/^[1-9]\d* (words? emphasized|visual moments?)$/);
+    }
+    // The block is said once by the one live region, and takes no focus (D-192).
+    await expect(page.locator('[aria-live="polite"]')).toContainText(messages.export.question.title);
+    await expect(outcome.locator(":focus")).toHaveCount(0);
+    expect((await axe(page)).map((v) => `${v.id}: ${String(v.nodes.length)} node(s)`), "axe on the done state").toEqual([]);
+
+    await expect(outcome.getByText(messages.export.question.title)).toBeVisible();
+    await button(page, messages.export.question.smallEdits).click();
+    await expect(page.getByTestId("post-export-thanks")).toHaveText(messages.export.question.thanks);
+    await expect(button(page, messages.export.question.smallEdits)).toHaveCount(0);
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("post_export_answer")).toEqual([{ name: "post_export_answer", props: { answer: "small_edits" } }]);
+  });
+
   test("same token: the stored file, at once, with nothing rendered", async () => {
     await sendQueuedAnalytics(page);
     const startedBefore = api.eventsOf("export_started").length;
@@ -285,6 +308,9 @@ test.describe("one clip, exported", () => {
     expect(await sha256Of(file), "the Free file's bytes").toBe(await sha256Of(freeFile));
     expect(await opfsList(page, "exports"), "the one file").toEqual(stored);
     expect(download.suggestedFilename()).toMatch(/^offcut-\d{8}-\d{4}\.mp4$/);
+    // It shares its export's id: the question stays answered, and no answer is sent again.
+    await expect(page.getByTestId("post-export-thanks")).toBeVisible();
+    expect(api.eventsOf("post_export_answer")).toHaveLength(1);
   });
 
   test("forged token: refused before any lookup; no file given, and the stored one stays", async () => {
@@ -334,6 +360,13 @@ test.describe("one clip, exported", () => {
     // 720 x 1280 with the watermark, by the verifier: what the token entitles it to, and not more.
     expectAllChecks(verifyMp4(file, "free", durationMs, referenceClip()), { flashes: REFERENCE_FLASHES });
     await expect(page.getByTestId("export-status")).toHaveText("");
+  });
+
+  test("close: the outcome goes, and the tabs under it stay", async () => {
+    await page.getByTestId("export-outcome").getByRole("button", { name: messages.export.summary.close, exact: true }).click();
+    await expect(page.getByTestId("export-outcome")).toHaveCount(0);
+    await expect(page.getByTestId("export-done")).toHaveText(messages.export.done);
+    await expect(page.getByRole("tab", { name: messages.panel.captions })).toBeEnabled();
   });
 });
 

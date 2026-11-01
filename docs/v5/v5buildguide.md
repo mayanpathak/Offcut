@@ -903,7 +903,7 @@ First: read CI of Phase 6 (`gh pr checks <pr>`). Red: fix it now.
 | 1 | `web/src/usecases/answer-post-export.ts` | §14.5 | Needs `state` and `analytics` only. Once per `ExportId` |
 | 2 | `web/src/ui/components/PostExportQuestion.tsx` | §14.1 | Three `Button`s (`secondary`, `sm`), `PostExportAnswer` from the generated type; the thank-you line after an answer |
 | 3 | `web/src/ui/components/ChangeSummary.tsx` | §14.1, §14.2 | `summaryRows(summary)`, one row per field, zero absent; `ExportOutcome`, shown when `status === "done"` and not closed; closing is local, keyed by `exportId`. A `section` with `aria-labelledby`, announced through the editor's one live region (D-192). Focus does not move when it appears |
-| 4 | `web/src/ui/layout/SidePanel.tsx` | D-232 | `.export` gains `<ExportOutcome />`, under `ExportFailure`. Nothing else on the page moves |
+| 4 | `web/src/ui/layout/SidePanel.tsx`, `ui/layout/EditorLayout.tsx` | D-232, §14.4 | `.export` gains `<ExportOutcome />`, under `ExportFailure`. Nothing else on the page moves. The live region's `Announcement` says the outcome |
 | 5 | `web/src/ui/styles/components.module.css` | §14.1 | Tokens only; nothing new in `tokens.css` |
 
 ### Step 7.3 - The real values (D-237, §15, problem 4)
@@ -953,7 +953,7 @@ pnpm check                                                   # expect: exit 0
 pnpm --filter web exec vitest run 2>&1 | grep -E "Tests +[0-9]"   # expect: above Phase 6's
 export VITE_ENTITLEMENT_TEST_PUBLIC_KEY=$(grep -E '^ +E2E_TEST_PUBLIC_KEY:' .github/workflows/ci.yml | awk '{print $2}')
 pnpm --filter web exec vite build --mode test
-pnpm e2e:media export-creator.spec.ts --grep "Creator export|events:|summary and the question" --max-failures=1 2>&1 | tail -3
+pnpm e2e:media export-creator.spec.ts --grep "another key|Creator export|events:|summary and the question" --max-failures=1 2>&1 | tail -3   # "events:" counts the refused export too
 unset VITE_ENTITLEMENT_TEST_PUBLIC_KEY
 git grep -nE "\bV5\b" -- web/src crates verify               # expect: no marker of work to do; a file's history may stay
 # the frozen check                                           # expect: no output

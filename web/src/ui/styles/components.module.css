@@ -454,6 +454,64 @@
   white-space: nowrap;
 }
 
+/* What the export changed and the one question (v5implementation D-232): the
+   section brings its own padding, so it takes back the slot's. */
+.outcome {
+  position: relative;
+  margin: calc(var(--sp-4) * -1);
+}
+
+.outcomeClose {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+}
+
+.outcomeRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+  list-style: none;
+}
+
+.outcomeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.outcomeRow > svg {
+  flex: none;
+  color: var(--ok);
+}
+
+.outcomeQuestion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.outcomeAsk,
+.outcomeThanks {
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+}
+
+.outcomeThanks {
+  color: var(--text-2);
+}
+
+.outcomeAnswers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
 /* Read by assistive technology only. */
 .srOnly {
   position: absolute;

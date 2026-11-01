@@ -274,6 +274,7 @@ web/src/
   ui/components/ExportButton.tsx                 shows the blocker's words
   ui/components/ExportProgress.tsx               time left restarts (D-238)
   ui/layout/SidePanel.tsx                        mounts the outcome
+  ui/layout/EditorLayout.tsx                     the live region says the outcome (section 14.4)
   ui/styles/components.module.css                the outcome's rules
   workers/protocol.ts                            exportProfile; exportClip's prog48
   workers/rpc-worker.ts                          devFailEncoder, takeEncoderFault
@@ -1431,6 +1432,7 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 | 31 | §10.3 relied on `frameAtBlocking(0)` as a jump back, untrue under 100 ms; `pickVideoConfig` had no caller left; `pipeline-preview.spec.ts`'s OPFS case lists a clip's files exactly | V5 §10.3, §4 | `VideoSource.rewind`; removed; the case names `prog48.f32` |
 | 32 | §17.5's word cases are stricter than the recognizer: it hears the first word after the long pause at 9,960 ms, and runs the sparse clip's phrases on over room tone (one word from 2,020 to 5,880 ms) | V5 §17.5 | 40 ms of slack; a word starts in a piece or follows the one before it. No word moves, and a moved one still fails |
 | 33 | D-222 gave `word_edits`' key order as why the JSON is sorted, but integer keys order themselves in JavaScript; the case that bites is `event_overrides`. And §17.5's cases 8 and 9 follow exports of the same edit, so with the cache they would hit and no encoder would run | V5 D-222, §17.5 | Drill and test on `event_overrides`; a new style before each of the two cases |
+| 34 | §14.4 has the outcome said by the one live region, and §4 did not list `EditorLayout.tsx`, which holds it; the prompt's grep for the summary case left out the refused export `events:` counts | V5 §4, §14.4 | `outcomeAnnouncement`; the grep names `another key` |
 | 27 | `Undo` is also a toast's action after a redo, so a page-wide locator is ambiguous; `--repeat-each` does not repeat a reset; a backslash in `--grep` does not survive `pnpm` on Windows | V5 §6.1, §6.3 | The top bar's button by landmark; a run of the file; `[.]` |
 
 **To copy back at Prompt 136, from the code:** TS §5 (new files), §9 (C-7, C-9, C-10), §12.2's prose, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 item 14, §40.9 (S-8, S-9 as built). BP §7: "as built". Corrections to `verify/README.md`. V5 as built goes in a table in this document, as V4 §24.3 did.

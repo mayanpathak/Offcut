@@ -21,7 +21,7 @@
 | 5 | **Production `client_error` rows.** On 2026-10-29: `E_DECODE_VIDEO` at `preview` 4 times, within 71 s from 14:59:33 UTC, ten minutes after V4's deploy finished, which fits known issue 7 and cannot be proved from rows that hold no detail. `E_WORKER_CRASH` at `import` once, at 15:29:00, **still unexplained**. None since. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
 | 7 | ~~**A clip's preview could fail at once in a fresh browser with `E_DECODE_VIDEO`.**~~ Closed in Entry 6: 6 of 14 fresh starts before the fix, 0 of 24 after | `web/src/workers/render/` | Fixed; reaches production with the next merge |
-| 8 | **`pnpm e2e` is load-sensitive on a busy D1.** At the default 6 workers `the settings link ...` passes its 30 s limit, with the machine at about 60% before the run; at 2 workers all 12 pass in 22 s. Read CI's run of it. If it fails there too, the case needs a longer limit | `web/tests-e2e/landing.spec.ts` | P136 |
+| 8 | **`pnpm e2e` is load-sensitive on a busy D1.** At the default 6 workers `the settings link ...` passes its 30 s limit, with the machine at about 60% before the run; at 2 workers all 12 pass in 22 s. CI's run at `3145e7f`, read at P135: 12 passed in 12.5 s, that case 1.9 s, which fits load. Read again at P136's Tier 3 on a quiet D1 | `web/tests-e2e/landing.spec.ts` | P136 |
 
 ---
 
@@ -280,5 +280,35 @@ The restarted file being Main is the proof it came from the ladder's next entry.
 **Not checked.** This push's CI: read at P135's start (D-198). §11.3's "new deploy" and "the stored file deleted by hand" are Vitest cases, not browser ones, as the prompt says. Other machines: D1 only.
 
 **Found, not fixed.** "Start over" (`dismissClip`) leaves the export file and its row until the next import clears them: harmless, as no other clip can reach them, and V7's `remove(clipId)` takes this over. `RENDERER_VERSION` hashes the three files D-223 names, so a change in `export-job.ts`, `opfs-sink.ts` or `video-source.ts` alone keeps old files valid: left as decided.
+
+**Open.** Open item 1; known issues 2 to 6, 8.
+
+## Entry 11 - 2026-11-01 - P135: `ChangeSummary`, the question, real `export_done` values
+
+**What.** `summaryRows` and `ExportOutcome` in `ChangeSummary.tsx`, `PostExportQuestion.tsx`, `answer-post-export.ts`, `messages.export.summary` and `.question`. The outcome sits in the side panel's `.export` slot while the export is `done`. `editValues` is read when the export starts and goes into `export_done` on a render and on a hit, with the last V5 marker gone. `fakeExportDone`; the done state in `screens.spec.ts`. **G problem 4 closed.** P134's CI, run 41246761774 on `3145e7f`, was green in all three jobs, so there was nothing to fix first. No design skill was available; V4's tokens and primitives are used as they are.
+
+**Differs from the plan** (the guide, the prompts and §4 are corrected in this commit).
+- **The prompt's `--grep "Creator export|events:|summary and the question"` cannot pass:** `events:` counts the refused export's `export_started` and `export_failed`. It now names `another key` too. Likewise a run of `An edit leaves` needs `Words keep`, which finds its word.
+- **`EditorLayout.tsx` changes, and the file list missed it:** §14.4 has the outcome said by the one live region, which is there. `outcomeAnnouncement` gives the block's words, then the thanks once answered.
+- **`PanelSection` has no place for a close button,** so a wrapper holds it in the corner and takes back the slot's padding, leaving the primitive alone.
+- **`close`, a case beyond §17.5,** last in the group: the outcome goes, the done line and the tabs stay. So the group grows by two cases, not one.
+- **`answerPostExport` and `summaryRows`' zero are proved where they can fail:** the first in Vitest (the buttons are gone after one click, so no browser can answer twice), the second on the long-pause clip, which emphasizes no word: `Voice cleaned; 2 visual moments`, then `Voice cleaned; 1 visual moment` with its Big number off. Those rows are pinned in `timeline-preserved.spec.ts`.
+- **A closed outcome stays closed on a hit of the same export,** which shares its id, as "keyed by `exportId`" says. The file still downloads; a new render shows it again.
+
+**Checked** (`d1`).
+| Check | Result |
+|---|---|
+| `export-creator.spec.ts`, the group | 17 + 2 setup passed, 4.2 min. Axe on the done state: no serious or critical violation. "With small edits": one `post_export_answer { answer: "small_edits" }`, the thanks line, and the hit after it sends none |
+| `timeline-preserved.spec.ts`, whole | 11 + 2 setup passed, 3.0 min. Case 5: `word_edits` 1, `events_disabled` 1, one fewer kept, `style: "bold"`, all 11 checks |
+| After the rows were pinned | `Words keep|Export is 20 s|An edit leaves`: 3 + 2 setup passed. `another key|Creator export|events:|summary and the question`: 4 + 2 setup passed |
+| Drills | `kept` from `event.enabled` alone: 3 `real values` cases fail. **The first attempt did not fire:** the test's three events gave 2 kept and 1 disabled under either rule, so it now has four, which tell them apart. A row for a zero: `Export is 20 s` fails on `0 words emphasized`. `answered()` without the check: 2 cases fail. Each restored; files compared |
+| The panel under the outcome, 1280 x 720, Captions tab, a temporary case | Scrolls: 423 px shown of 2,224, `scrollTop` 200 taken, its foot at the window's, the outcome does not move, the aside does not overflow. Deleted |
+| `pnpm screens` | 18 PNGs. `done-1280x800.png`, `done-1920x1080.png` in `~/v5-review/`, looked at: on the grid, nothing clipped, the tabs usable below |
+| `pnpm check`, Vitest | Exit 0; 336 passed, up from 327 |
+| Production build, `check-hosts` | No `__offcutDev` or `fakeExportDone` in `web/dist`; app shell 339.6 kB gzip |
+| `git grep "V5"` under `web/src`, `verify` | Two history notes (`export-machine.ts`, `video-source.test.ts`); no work to do. `crates` holds none, beyond two font files' bytes |
+| Frozen check, temporary files | Empty; none |
+
+**Not checked.** Rust is unchanged and was not run (Tier 2). A screen reader: the live region's words are read by a test, not heard. This commit's CI: P136 pushes. The founder's look: P136.
 
 **Open.** Open item 1; known issues 2 to 6, 8.

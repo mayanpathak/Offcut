@@ -12,6 +12,7 @@ import { cacheKey, canonicalJson, RENDERER_VERSION } from "../persistence/render
 import { useCapabilityStore } from "../state/capability-store";
 import { useClipStore } from "../state/clip-store";
 import * as exportStore from "../state/export-store";
+import { answerPostExport } from "./answer-post-export";
 import { cancelJob } from "./cancel-job";
 import { importClip } from "./import-clip";
 import { dismissExport, downloadAgain, startExport } from "./start-export";
@@ -747,6 +748,101 @@ describe("cancel", () => {
     expect(named("export_done")).toEqual([]);
     expect(named("job_cancelled")).toHaveLength(1);
     expect(has("unlock")).toBe(true);
+  });
+});
+
+describe("real values in export_done (D-237, §15)", () => {
+  // Reading `enabled` alone would give 3 kept and 1 disabled: the counts tell the two rules apart.
+  const FOUR = [
+    { id: "on", enabled: true },
+    { id: "off-by-hand", enabled: true },
+    { id: "off-too", enabled: true },
+    { id: "back-on", enabled: false },
+  ] as unknown as DetectedEvent[];
+  const CHANGED = {
+    word_edits: { 3: "a", 7: "b" },
+    event_overrides: { "off-by-hand": false, "off-too": false, "back-on": true },
+    style: "bold",
+    crop_offset: 0.5,
+  } as unknown as Partial<EditState>;
+  const REPORTED = { word_edits: 2, events_kept: 2, events_disabled: 2, style: "bold", crop_adjusted: true };
+
+  it("an unedited clip reads as one", async () => {
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ word_edits: 0, events_kept: 1, events_disabled: 0, style: "clean", crop_adjusted: false });
+  });
+
+  it("the edit's own values on a new render: a switched-off visual is not kept", async () => {
+    useClipStore.setState({ events: FOUR });
+    editIs(CHANGED);
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ ...REPORTED, from_cache: false });
+  });
+
+  it("the edit's own values on a hit", async () => {
+    useClipStore.setState({ events: FOUR });
+    editIs(CHANGED);
+    await exportNow();
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ ...REPORTED, from_cache: true });
+  });
+
+  it("is read when the export starts: a change made while it runs is not this export's", async () => {
+    useClipStore.setState({ events: FOUR });
+    editIs(CHANGED);
+    const answer = m.answers.get("render.exportClip");
+    m.answers.set("render.exportClip", (params: never) => {
+      editIs({ style: "tech" });
+      return answer === undefined ? Promise.reject(new Error("no answer")) : answer(params);
+    });
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject(REPORTED);
+  });
+
+  it("carries counts and an enum, and no word of the clip", async () => {
+    editIs({ word_edits: { 3: "secret" } as EditState["word_edits"] });
+    await exportNow();
+    expect(JSON.stringify(named("export_done"))).not.toContain("secret");
+  });
+});
+
+describe("the question after an export (D-234)", () => {
+  const answers = () => named("post_export_answer");
+
+  it("one answer, one event", async () => {
+    await exportNow();
+    answerPostExport("small_edits");
+    answerPostExport("no");
+    expect(answers()).toEqual([{ name: "post_export_answer", props: { answer: "small_edits" } }]);
+    expect(store().answered).toBe(true);
+  });
+
+  it("an answer before the export is done sends nothing", () => {
+    answerPostExport("yes");
+    exportStore.start("not-done" as never);
+    answerPostExport("yes");
+    expect(answers()).toEqual([]);
+    expect(store().answered).toBe(false);
+  });
+
+  it("a hit on an answered export is not asked again, and its answer is not sent twice", async () => {
+    await exportNow();
+    answerPostExport("yes");
+    await exportNow();
+    expect(has("render.exportClip"), "a hit").toBe(false);
+    expect(store().answered).toBe(true);
+    answerPostExport("no");
+    expect(answers()).toEqual([]);
+  });
+
+  it("a new render is a new export, and is asked", async () => {
+    await exportNow();
+    answerPostExport("yes");
+    editIs({ style: "bold" });
+    await exportNow();
+    expect(store().answered).toBe(false);
+    answerPostExport("no");
+    expect(answers()).toEqual([{ name: "post_export_answer", props: { answer: "no" } }]);
   });
 });
 

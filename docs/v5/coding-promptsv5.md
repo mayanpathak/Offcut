@@ -1363,7 +1363,7 @@ It reads what P134 stored. It comes last before the gate so the capture and the 
 
 ### Files To Modify
 
-- `web/src/copy/messages.ts`; `web/src/usecases/start-export.ts`, `start-export.test.ts`; `web/src/ui/layout/SidePanel.tsx`, `ui/styles/components.module.css`, `ui/dev-hooks.ts`; `web/tests-e2e/export-creator.spec.ts`, `timeline-preserved.spec.ts`, `screens.spec.ts`; `docs/v5/v5changelog.md`.
+- `web/src/copy/messages.ts`; `web/src/usecases/start-export.ts`, `start-export.test.ts`; `web/src/ui/layout/SidePanel.tsx`, `ui/layout/EditorLayout.tsx` (the one live region says the outcome), `ui/styles/components.module.css`, `ui/dev-hooks.ts`; `web/tests-e2e/export-creator.spec.ts`, `timeline-preserved.spec.ts`, `screens.spec.ts`; `docs/v5/v5changelog.md`.
 
 ### Architecture Requirements
 
@@ -1459,7 +1459,7 @@ G 7.6's drills.
 ```bash
 pnpm --filter web exec vitest run 2>&1 | grep -E "Tests +[0-9]"   # above P134's
 pnpm --filter web exec vite build --mode test
-pnpm e2e:media export-creator.spec.ts --grep "Creator export|events:|summary and the question" --max-failures=1 2>&1 | tail -3
+pnpm e2e:media export-creator.spec.ts --grep "another key|Creator export|events:|summary and the question" --max-failures=1 2>&1 | tail -3   # "events:" counts the refused export too
 git grep -nE "\bV5\b" -- web/src crates verify                    # no marker of work to do
 pnpm screens && ls web/test-results/screens | wc -l               # 18
 ```

@@ -141,6 +141,13 @@ export const messages = {
     timeLeft: (seconds: number) => `About ${waitText(seconds)} left`, downloadAgain: "Download again",
     // The pill's name for assistive technology (D-189).
     label: "Export",
+    // What the person is told once the file is theirs (PS §10 J11; v5implementation §14).
+    summary: {
+      title: "What we changed", close: "Close", voice: "Voice cleaned",
+      emphasized: (n: number) => (n === 1 ? "1 word emphasized" : `${String(n)} words emphasized`),
+      visuals: (n: number) => (n === 1 ? "1 visual moment" : `${String(n)} visual moments`),
+    },
+    question: { title: "Would you post this as is?", yes: "Yes", smallEdits: "With small edits", no: "No", thanks: "Thanks for telling us." },
   },
 
   // The one action of an error card, chosen by where the failure happened (D-190).

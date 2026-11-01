@@ -42,6 +42,7 @@ import {
 } from "./helpers/fixtures";
 
 type Word = { text: string; start_ms: number; end_ms: number };
+type Done = { from_cache: boolean; total_ms: number; word_edits: number; events_kept: number; events_disabled: number; style: string; crop_adjusted: boolean };
 
 const EXPORT_TIMEOUT_MS = patient(240_000);
 /** Each fixture holds two white frames, which check 8 compares (`gen_fixtures.sh`). */
@@ -98,13 +99,18 @@ async function exportAndSave(page: Page, api: FakeApi, scratch: string, name: st
 }
 
 /** What the last `export_done` said, with what the page has queued sent first. */
-async function lastDone(page: Page, api: FakeApi): Promise<{ from_cache: boolean; total_ms: number }> {
+async function lastDone(page: Page, api: FakeApi): Promise<Done> {
   await sendQueuedAnalytics(page);
-  const done = api.eventsOf("export_done").at(-1) as { props: { from_cache: boolean; total_ms: number } } | undefined;
+  const done = api.eventsOf("export_done").at(-1) as { props: Done } | undefined;
   if (done === undefined) {
     throw new Error("no export_done arrived");
   }
   return done.props;
+}
+
+/** The rows of "What we changed", as the person reads them. */
+function outcomeRows(page: Page): Promise<string[]> {
+  return page.getByTestId("export-outcome").getByRole("listitem").allTextContents();
 }
 
 /** Tells the render worker to fail its video encoder at `frame`, on the next `times` attempts (D-218). */
@@ -133,6 +139,8 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
   let firstAfter: { index: number; word: Word };
   /** The file of the edit: the next case's hit must be these bytes. */
   let editedFile: string;
+  /** What the unedited export reported: the edit's values are read against it. */
+  let unedited: Done;
 
   test.beforeAll(async ({ browser }, info) => {
     fixture = genFixture("speech/speech_20s_long_pause.mp4");
@@ -189,6 +197,9 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
   test("Export is 20 s", async () => {
     const file = await exportAndSave(page, api, scratch, "long-pause.mp4");
     expectAllChecks(verifyMp4(file, "creator", DURATION_MS, fixture), { flashes: FLASHES });
+    unedited = await lastDone(page, api);
+    // This clip emphasizes no word: a zero has no row (D-233).
+    expect(await outcomeRows(page)).toEqual([messages.export.summary.voice, messages.export.summary.visuals(2)]);
   });
 
   test("An edit leaves the timeline alone", async () => {
@@ -197,7 +208,12 @@ test.describe("the long pause: 20 s in, 20 s out", () => {
     await setStyle(page, "Bold");
     expect(await scrubBar(page).getAttribute("max"), "the bar did not move").toBe(String(DURATION_MS));
     editedFile = await exportAndSave(page, api, scratch, "edited.mp4");
-    expect(await lastDone(page, api), "the edit is a new render").toMatchObject({ from_cache: false });
+    const done = await lastDone(page, api);
+    expect(done, "the edit is a new render").toMatchObject({ from_cache: false });
+    // The edit's own values (D-237): the visual switched off is not kept.
+    expect(unedited).toMatchObject({ word_edits: 0, events_disabled: 0, style: "clean" });
+    expect(done).toMatchObject({ word_edits: 1, events_disabled: 1, events_kept: unedited.events_kept - 1, style: "bold", crop_adjusted: false });
+    expect(await outcomeRows(page), "the rows follow the edit").toEqual([messages.export.summary.voice, messages.export.summary.visuals(1)]);
     expectAllChecks(verifyMp4(editedFile, "creator", DURATION_MS, fixture), { flashes: FLASHES });
   });
 
