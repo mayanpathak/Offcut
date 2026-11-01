@@ -35,7 +35,7 @@ The list is `technicalspec.md` §27.2.
 | 10 | The video's bitrate over the clip is at most 12 Mb/s for `creator`, 6 Mb/s for `free` |
 | 11 | No title, comment, description, artist, album or location; `creation_time` absent or the epoch; no tag carrying the source's value; neither `©xyz` nor `ISO6709` in the file's bytes |
 
-The thresholds of checks 8 and 9 are assumptions, read on real exports (`docs/v5/experiments.md`). One moves only while `free` and `creator` stay well apart, and never to make one file pass.
+The thresholds of checks 8 and 9 are assumptions, read on real exports (`docs/v5/experiments.md`, `technicalspec.md` §39.3 item 14). One moves only while `free` and `creator` stay well apart, and never to make one file pass.
 
 ## Its own test
 

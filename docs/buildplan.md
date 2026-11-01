@@ -528,6 +528,8 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 | `web/tests-e2e/export-creator.spec.ts` complete, `timeline-preserved.spec.ts` | All 11 checks; INV-5 and INV-10 on both pause fixtures (600 and 900 frames) |
 | v1.2 seams S-8, S-9 (TS §40.9) | The export loop runs over `OutMs`, reads source frames at `scene.source_at(t)`, encodes `prog48`, takes `frame_count` from `out_duration`; the test writes the expected duration beside each export and `verify_mp4.py` checks 5 and 8 compare against it; the render-cache key adds plan, time-map, theme and music hashes |
 
+**As built** (`docs/v5/v5implementation.md`, its section "V5 as built"; `docs/v5/v5changelog.md`). All of the above, on D1 (D-202). The cache key has ten inputs, the profile kind from the token the worker verified (D-220). The test passes the expected duration as an argument, with no file beside the export (D-210). `blockers.ts` evaluates five of the eight codes; V6 appends the other three. Beyond the table: the verifier's self-test in CI (D-209), the stereo loudness fix (D-204), an encoder failure restarting on the next ladder entry (D-216), and `VideoSource.whileSessionHeld` (D-240). R1 stays unread: the render reading is `d1`.
+
 ### 7.2 Things to know about V5
 
 - Sign-in does not exist until V6. In V5, tokens come from `helpers/fake-api.ts` in tests and local development, so the deployed V5 can preview but cannot export for a real visitor. That is expected.

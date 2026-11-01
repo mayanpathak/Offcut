@@ -108,7 +108,7 @@ Do not start Prompt 129 until every box is ticked.
 - [x] 6. **The verifier's tools are on D1.** `py -3.13 -c "import numpy"` reads 2.5.3; `ffmpeg` is 9.0.2. **Plain `python` on D1 is 3.9.13 and has no NumPy.** From Prompt 130 every command that runs the verifier puts Python 3.13 first on `PATH` (section 3.1).
 - [x] 7. **The fixtures exist.** `fixtures/.gen/speech/` holds both pause fixtures. White frames: `speech_20s_long_pause.mp4` at frames 60 and 450, `speech_30s_sparse.mp4` at 15 and 885, `speech_60s_portrait.mp4` at 150 and 1650 (`gen_fixtures.sh`).
 - [x] 8. **The V4 hand-over markers are where they should be.** `start-export.ts` lines 161 and 305, `export-loop.ts` line 352, `blockers.ts` line 46, `mux_roundtrip.rs` line 439, `verify_mp4.py` (`NOT_IMPLEMENTED`). Check: `git grep -nE "\bV5\b" -- web/src crates verify`.
-- [ ] 9. **The D1 machine is quiet for the bench only.** Docker Desktop is closed at Prompt 136 (V4 CL known issue 37). Nothing else in V5 needs it.
+- [x] 9. **The D1 machine is quiet for the bench only.** Docker Desktop is closed at Prompt 136 (V4 CL known issue 37). Nothing else in V5 needs it.
 
 **Carried over from V4.** Known issue 30 and open items 1 to 4 stay with V6.1 and the founder. Known issues 33, 36 and 37 are V5's (D-236).
 
@@ -1331,9 +1331,9 @@ V4's freezes stand except the two reopened by D-214 and D-220.
 ### 23.3 What must be true on V6's first morning
 
 - [ ] V5 is tagged `v5`, merged and deployed.
-- [ ] `verify_mp4.py` passes all 11 on a real export, and its self-test is in CI.
+- [x] `verify_mp4.py` passes all 11 on a real export, and its self-test is in CI.
 - [ ] `git grep -nE "\bV5\b" -- web/src crates verify` shows no marker of work to do.
-- [ ] `start-export.ts` has one place where a new render is told from a cache hit, so V6's receipt goes there.
+- [x] `start-export.ts` has one place where a new render is told from a cache hit, so V6's receipt goes there.
 - [ ] `docs/v5/experiments.md` holds section 20's readings.
 
 ### 23.4 What V6 to V6.7 inherit without further work
@@ -1352,47 +1352,69 @@ V5 is done when every box is ticked (BP §1.2, BP §7.3, TS §28 M1.6, TS §40.9
 
 **Code and checks**
 
-- [ ] `pnpm check` green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
+- [x] `pnpm check` green: fmt, clippy, deny, ESLint, both `tsc` programs, `check-file-tree`, `check-gen-clean`, `check-copy-codes`.
 - [ ] `pnpm fixtures` then `pnpm test` green on D1 and in CI.
-- [ ] BP §7.3: `export-creator.spec.ts` passes with all 11 verifier checks.
-- [ ] BP §7.3: `timeline-preserved.spec.ts` passes on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4` (600 and 900 frames).
-- [ ] BP §7.3: `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` pass.
-- [ ] BP §7.3: the live-frame counter is 0 after an export and after a cancelled export (INV-11).
-- [ ] `export-loop.test.ts`, `mux_reorder.rs`, `test_verify_mp4.py` pass; the last in CI.
-- [ ] S-8: the loop reads `source_at`; `prog48.f32` is encoded; `git grep "out48" web/src/workers/render` prints nothing.
-- [ ] S-9: `start-export.test.ts`'s `render-cache` group covers all ten inputs.
-- [ ] A file reads -14 ± 1 LUFS as stereo (`ffmpeg`, not the product's meter).
-- [ ] No goldens or display-list snapshots changed.
-- [ ] No source file over 700 lines. No `fetch(` outside the four files; no request added.
-- [ ] Test counts at least the baseline's plus V5's; none fell except cases this plan rewrites by name.
+- [x] BP §7.3: `export-creator.spec.ts` passes with all 11 verifier checks.
+- [x] BP §7.3: `timeline-preserved.spec.ts` passes on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4` (600 and 900 frames).
+- [x] BP §7.3: `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` pass.
+- [x] BP §7.3: the live-frame counter is 0 after an export and after a cancelled export (INV-11).
+- [x] `export-loop.test.ts`, `mux_reorder.rs`, `test_verify_mp4.py` pass; the last in CI.
+- [x] S-8: the loop reads `source_at`; `prog48.f32` is encoded; `git grep "out48" web/src/workers/render` prints nothing.
+- [x] S-9: `start-export.test.ts`'s `render-cache` group covers all ten inputs.
+- [x] A file reads -14 ± 1 LUFS as stereo (`ffmpeg`, not the product's meter).
+- [x] No goldens or display-list snapshots changed.
+- [x] No source file over 700 lines. No `fetch(` outside the four files; no request added.
+- [x] Test counts at least the baseline's plus V5's; none fell except cases this plan rewrites by name.
 
 **Speed**
 
-- [ ] `review-edit.spec.ts` makes 5 clip loads.
+- [x] `review-edit.spec.ts` makes 5 clip loads.
 - [ ] A docs-only pull request skips `ci` and `e2e-media`; the scan still runs.
-- [ ] The full suite's time is recorded against V4's 41.8-54.9 min.
-- [ ] Full media runs in V5: one, or each extra one explained in the changelog.
+- [x] The full suite's time is recorded against V4's 41.8-54.9 min.
+- [x] Full media runs in V5: one, or each extra one explained in the changelog.
 
 **Measurements**
 
 - [ ] `bench/results/d1-<date>-portrait.json` committed (5 runs); `render_encode` within E-4's line.
-- [ ] Section 20's readings in `docs/v5/experiments.md`, labelled `d1`.
-- [ ] TS §39.3 item 14 holds the verifier's values.
+- [x] Section 20's readings in `docs/v5/experiments.md`, labelled `d1`.
+- [x] TS §39.3 item 14 holds the verifier's values.
 
 **Deployment**
 
 - [ ] `ci.yml` green on `main`; API then web deployed; header check and `@smoke` pass; `crossOriginIsolated === true`.
 - [ ] On the deployed page: the reference clip previews; Export says the account line (BP §7.2).
-- [ ] Locally, with a minted token: the long-pause fixture exports at 20 s, and the second export is instant (BP §7's demo).
+- [x] Locally, with a minted token: the long-pause fixture exports at 20 s, and the second export is instant (BP §7's demo).
 
 **Records**
 
-- [ ] `v5changelog.md` has an entry per prompt and closes the open items it can.
+- [x] `v5changelog.md` has an entry per prompt and closes the open items it can.
 - [ ] Known issues 33 and 36: read against V5's CI runs; 37: read at the bench.
-- [ ] Copy-back of section 25 applied.
+- [x] Copy-back of section 25 applied.
 - [ ] The founder has looked at the done state, and heard an export.
 - [ ] Section 23.3 ticked.
 - [ ] Tagged `v5`.
+
+### 24.1 V5 as built
+
+What changed while V5 was built, from `docs/v5/v5changelog.md`. Where this section and a row above disagree, this section is V5 as built. Rows 26 to 34 of section 25 hold the rest.
+
+| Decision or section | As built | Entry |
+|---|---|---|
+| D-195 | Three documents, not one; section 22 is a summary | 0.1 |
+| D-201 | 5 clip loads in `review-edit.spec.ts`: case 14 has its own, or its 400 ms budget measures old cards | 4 |
+| Section 6.1 | `--repeat-each` does not repeat a reset; a run of the file does. A `--grep` through `pnpm` on Windows writes `[.]`. A `--grep` on a serial spec names the cases later ones read from | 4, 10, 11 |
+| Section 7 | `pcm` fills a late audio start (a phone's 0.305 s read as a 305 ms offset). Flashes 225 and 30. `not compared` for a source with no white frame. The self-test also has a good creator file, a no-source case and a 3 LU over case | 5 |
+| Section 8 | `..._reads_minus_23` rewritten by name; `pink_noise_reaches_the_target` did not fire and is unchanged | 5 |
+| D-240 (not in the first plan) | `VideoSource.whileSessionHeld`: `attach_canvas` holds the session across an await. 6 of 14 fresh starts failed before, 0 of 24 after. Three files left the frozen list at the founder's word | 6 |
+| Section 9.2 | `a_reserve_with_under_8_bytes_left_is_refused` needs no search: `moov` is an odd length, so 8 left is accepted, 4 refused, 0 accepted | 7 |
+| Section 10.3 | `VideoSource.rewind()`: `frameAtBlocking(0)` is no jump back under 100 ms. `pickVideoConfig` removed. `DEV_FAULTS && takeEncoderFault(n)`, or the call stays in the production bundle | 8 |
+| Section 17.5 | The first word after the long pause may start 40 ms early; the sparse clip's words start in a piece or follow the one before. `forgetProgress` moves with `watchExport`. Cases 8 and 9 choose a new style first, or the cache answers. Case 6 also makes a change and undoes it. `export-creator` has a `close` case too | 9, 10, 11 |
+| D-222 | `event_overrides`, not `word_edits`, is why the JSON is sorted: integer keys order themselves | 10 |
+| Section 13 | `keyOf` gives no key while the clip is not `ready`: a change that began before the lock is not yet in the worker's scene. `exportClip` still verifies the token itself | 10 |
+| Section 14.1 | A wrapper holds the close button, since `PanelSection` has no place for one. A closed outcome stays closed on a hit of the same export | 11 |
+| Section 14.4 | `EditorLayout.tsx`'s live region says the outcome, through `outcomeAnnouncement` | 11 |
+| Section 20 | Hits read on the reference clip's 79 MB file, not the pause fixtures: the larger file is the harder case. `detect_scene` missed by 10 ms, carried to V9 | 12 |
+| Left as decided | `RENDERER_VERSION` hashes the three files D-223 names, so a change in `export-job.ts`, `opfs-sink.ts` or `video-source.ts` alone keeps old files valid. "Start over" leaves the export file until the next import clears it; V7's `remove(clipId)` takes that over. `readAudio` has no caller; it stays for V6.2 | 8, 10 |
 
 ---
 

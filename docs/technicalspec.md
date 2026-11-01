@@ -1120,13 +1120,15 @@ no edit changes the audio, the clip duration or any timestamp
 <ExportButton> shows messages.exportCounter(remaining) from entitlement.effective()   (before the click)
 <ExportButton onClick> → startExport(clipId)
   → blockers.forExport()
-      B_PIPELINE_NOT_READY | B_EXPORT_IN_PROGRESS | B_STORAGE_LOW → <ErrorPanel>, stop
+      B_PIPELINE_NOT_READY | B_EXPORT_IN_PROGRESS → the button is disabled, its tooltip says why, stop
       B_NOT_SIGNED_IN       → <SignInDialog> with Free/Creator limits copy (C-8), stop
       B_ENTITLEMENT_EXPIRED → apiClient.getEntitlement()  ✓ continue  ✗ <ErrorPanel E_ENTITLEMENT_EXPIRED>
       B_NO_FREE_EXPORTS     → <UpgradePrompt placement=limit_reached>           [evt upgrade_prompt]
   remaining == 1 on Free → confirm dialog messages.LAST_FREE_EXPORT (PS §11) before proceeding
   → C-9
 ```
+
+As built in V5 (v5implementation §13, D-229, D-231): the sign-in and limit arms are V6's. `B_STORAGE_LOW` is evaluated inside C-9, after a cache miss, by `forExport({ freeBytes, neededBytes })`, since `navigator.storage.estimate()` is asynchronous and the button reads `forExport()` while drawing. A blocked export returns to `idle` and says why in the `export-status` line beside the button, with nothing swept: it is not an `ErrorPanel`, as nothing failed.
 
 **C-8. Magic-link sign-in (J9)**
 ```text
@@ -1148,16 +1150,25 @@ original tab closed: /app in the new tab → restoreClip() (C-13)
 
 **C-9. Render and export (J10)**
 ```text
-startExport (after gate)
-  → exportId = newExportId()                  UUIDv7
-  → renderCacheRepo.lookup(cacheKey)          ✓ hit → skip to C-10 with the cached file and its original exportId
-  → exportStore.begin(exportId)               ⇒ export: idle → rendering       [evt export_started]
-  → controlPreview.pause()                    preview is locked while exporting (§12.4)
-  → pool.render.exportClip({exportId, entitlementToken, out48})
-      → export_profile_from_token(token)      verify signature → ExportProfile (size, watermark)
-      → setScene(profile) → encoders.configure(profile)
-      → export-loop.runExport(): for n in 0..frames: source frame at frame n's own time → render_frame → VideoFrame → encode → mux
-      → AAC encode of out48 → mux             ⇒ rendering → muxing
+startExport (after gate; as built in V5, v5implementation §13)
+  → exportId = newExportId()                  UUIDv7; ⇒ export: idle → gating
+  → values = editValues(clip)                 what export_done reports, read now: the person may keep editing
+  → controlPreview.lockForExport()            before the worker is called: it takes one job at a time (D-221)
+  → pool.render.exportProfile({entitlementToken})   verify signature → ExportProfile; refused ⇒ gating → rendering → failed (D-230)
+  → key = cacheKey(ten inputs, profile.kind)  no key while the clip is not `ready`, or its record cannot be read: no cache
+  → renderCacheRepo.lookup(key)               ✓ hit: ⇒ gating → saving → done, the stored file under today's name and its original
+                                                 exportId; unlock  [evt export_done from_cache=true]; no export_started, no stage_timing
+  → forExport({freeBytes + heldBytes, neededBytes})   B_STORAGE_LOW ⇒ gating → idle, says why, nothing swept
+  → exportStore.clear()                       ⇒ gating → rendering             [evt export_started]
+  → renderCacheRepo.clear(); opfs.remove(exports)     the row, then the file (§23.3)
+  → prog48 = opfs.readProgram(clipId)
+  → pool.render.exportClip({exportId, entitlementToken, prog48})
+      → export_profile_from_token(token)      verified again: the worker trusts nothing the page says of a profile
+      → setScene(profile) → encoders.supportedConfigs(profile)
+      → export-loop.runExport(): for each supported entry, attempt: for n in 0..frames: scene.source_at(t) → source frame →
+        render_frame → VideoFrame → encode → mux
+        E_ENCODE_VIDEO: sink.reset(), next entry from frame 0; E_ENCODE_AUDIO: once more on the same entry
+      → AAC encode of prog48 → mux            ⇒ rendering → muxing
       → Mp4Muxer.finalize() → opfs-sink.close()
       ✓ {opfsPath, summary, stageTimings}     ⇒ muxing → saving                [evt stage_timing stage=render_encode, mux]
       ✗ ⇒ failed(code)                        [evt export_failed] → <ErrorPanel> (C-14)
@@ -1171,7 +1182,7 @@ deliverExport(exportId, opfsPath, summary)
   → renderCacheRepo.put(cacheKey, exportId, opfsPath)
   → receiptOutbox.enqueue(exportId)           (skipped when the file came from the render cache)
                                               ⇒ export: saving → done          [evt export_done]  ← activation event (PS §10)
-  → <ChangeSummary summary> + <PostExportQuestion>
+  → <ExportOutcome>: summaryRows(summary) + <PostExportQuestion>   (as built in V5; the question once per exportId, D-234)
   → receiptOutbox.flushOutbox()
       → apiClient.postUsageReceipt({export_id})  ✓ new token → entitlementStore.setToken; outbox.remove
                                                  ✗ kept; retried with backoff and on next app start
@@ -1685,6 +1696,8 @@ Stores hold no derived data that another store owns. `entitlement/entitlement.ts
 | failed → gating | user retry |
 | done, failed → idle | dismiss, new export, new clip |
 
+As built in V5 (v5implementation D-230, D-231): the table is unchanged. A token refused in `gating` goes `gating → rendering → failed`, announced with `export_started` then `export_failed`, as there is no `gating → failed`. A cancel that lands in `gating` goes `gating → idle`, as there is no `gating → cancelled`. A blocked export's code stays in the store until the next start. `failed → gating` is not fired yet (v4implementation D-153).
+
 **Auth:** `unknown → anonymous | anonymous_offline | signed_in`
 
 | From → To | Trigger |
@@ -1717,7 +1730,7 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 ### 12.4 Cross-machine rules
 
 - Capability `!= supported` blocks import, processing and export. It does not block landing, sign-in, account or settings pages.
-- Export in `rendering` or `muxing` locks the preview (`locked`), disables every review control, and blocks import and `clearLocalData`.
+- Export in `rendering` or `muxing` locks the preview (`locked`), disables every review control, and blocks import and `clearLocalData`. As built in V5 the lock is taken when `gating` starts, since the render worker takes one job at a time and a playing preview would refuse `exportProfile`; a cache hit or a blocker unlocks at once (v5implementation D-221).
 - Clip in `importing` or `processing` blocks a second import; the user cancels first (C-12).
 - Model `downloading` blocks only the ASR stage; import, audio extraction and the voice chain proceed.
 - The ASR session and the render session are never loaded together: `run-pipeline.ts` awaits `pool.asr.unload()` before `pool.render.openSession()` (§31).
@@ -1741,6 +1754,8 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 | `B_NO_FREE_EXPORTS` | export | `plan == Free` and `effective().freeExportsRemaining == 0` |
 
 `B_MODEL_NOT_READY` is not a blocker: the pipeline waits in `processing(waitingModel = true)`.
+
+As built in V5 (v5implementation D-229): `forExport(room?)`. Without `room` it leaves `B_STORAGE_LOW` out, so the button is not disabled by a reading that may be stale; with `{ freeBytes, neededBytes }` it evaluates `freeBytes < neededBytes x 1.2`. `startExport` calls it after a cache miss, the cached file's bytes counted as free. A browser that gives no estimate is not blocked. V6 appends the last three codes.
 
 ---
 
@@ -1785,13 +1800,13 @@ runCapabilityCheck(): Promise<CapabilityReport>          // platform/capability.
 
 ### 13.3 Key components
 
-As built in V4 (the editor of the V4 plan's §17, D-178 to D-192). Components that later versions add (`SignInDialog`, `ChangeSummary`, `PostExportQuestion`, `UpgradePrompt`, `RecentClips`) keep their rows of the version that builds them.
+As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two rows. Components that later versions add (`SignInDialog`, `UpgradePrompt`, `RecentClips`) keep their rows of the version that builds them.
 
 | Component | Reads | Calls |
 |---|---|---|
 | `CapabilityGate` | capability store | none |
 | `DropZone` (`landing` and `stage` variants) | clip store, blockers | `importClip` |
-| `EditorLayout` → `TopBar`, `Stage`, `SidePanel` | ui store, clip store | none; holds the `aria-live` region and the `ToastHost` (D-192) |
+| `EditorLayout` → `TopBar`, `Stage`, `SidePanel` | ui store, clip store, export store | none; holds the `aria-live` region, which also says a finished export's outcome, and the `ToastHost` (D-192) |
 | `TopBar` | clip store (length, save state), history | `undo`, `redo`; holds `ExportButton` or `ExportProgress` |
 | `Stage` | clip store, preview store | holds `DropZone`, `ModelDownloadPanel`, `ProcessingCard`, `PreviewPlayer`, `RejectionPanel` or `ErrorPanel` by state |
 | `ModelDownloadPanel` | model store | `cancelJob("model")` |
@@ -1804,6 +1819,8 @@ As built in V4 (the editor of the V4 plan's §17, D-178 to D-192). Components th
 | `FramingPanel` → `CropOffsetControl` | clip store | `setCaptionPosition`, `setCropOffset` |
 | `ExportButton` | export store, `entitlement.effective()`, blockers | `startExport` |
 | `ExportProgress` (the pill, D-189) | export store | `cancelJob("export")` |
+| `ChangeSummary`'s `ExportOutcome`, in `SidePanel`'s slot above the tabs (v5implementation D-232) | export store | none; closing is local, keyed by `exportId` |
+| `PostExportQuestion` (D-234) | export store | `answerPostExport` |
 | `ShortcutsSheet` (opened with `?`, D-185) | ui store | none |
 | `ToastHost` (a stack of at most three) | ui store | the toast's action: replace-all, hide, undo |
 | `WhatLeavesTable` | `gen/api.ts::ANALYTICS_EVENT_DOCS` | none |
@@ -1859,7 +1876,7 @@ export type AppFailure = { code: ErrorCode; stage: FailureStage; retryable: bool
 
 ### 14.2 Methods
 
-As built in V4 (copied from `web/src/workers/protocol.ts`; v4implementation D-124, D-126 to D-128, D-155, D-174, D-182, D-186):
+As built in V4 and V5 (copied from `web/src/workers/protocol.ts`; v4implementation D-124, D-126 to D-128, D-155, D-174, D-182, D-186; v5implementation D-214, D-220):
 
 ```ts
 export interface MediaWorkerApi {
@@ -1899,8 +1916,9 @@ export interface RenderWorkerApi {
   styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
                                                                                      // V4 (D-186): Clean, Bold, Mono of `at`, paused only; transferred
   captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;                    // development and test builds only (D-155)
-  exportClip(p: { exportId: ExportId; entitlementToken: string; out48: Float32Array }):
-    Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
+  exportProfile(p: { entitlementToken: string }): Promise<ExportProfile>;            // V5 (D-220): verified here; keeps nothing
+  exportClip(p: { exportId: ExportId; entitlementToken: string; prog48: Float32Array }):
+    Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;   // V5 (D-214): the program's audio, transferred
   closeSession(): Promise<void>;
 }
 export type ClockSync = { audioMs: OutMs; epochMs: number };   // program time (D-126); epochMs = performance.timeOrigin + performance.now()
@@ -1913,7 +1931,7 @@ export type CaptionMirror = { text: string; colors: string[] };                 
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };
 ```
 
-The development builds' fault messages (`devCrash`, `devHang`, `devFailNext`, `ui/dev-hooks.ts`) are compiled out of production (`__OFFCUT_DEV_FAULTS__`, §20.4 of the V4 plan).
+The development builds' fault messages (`devCrash`, `devHang`, `devFailNext`, `devFailEncoder`, `ui/dev-hooks.ts`) are compiled out of production (`__OFFCUT_DEV_FAULTS__`, §20.4 of the V4 plan).
 
 ### 14.3 Lifecycle, cancellation, backpressure
 
@@ -2304,8 +2322,9 @@ run_chain (blocks of 1 s; cancel check per block):
   1 high-pass      2nd-order Butterworth at HPF_HZ
   2 denoise        RNNoise-class, 10 ms frames, wet mix DENOISE_MIX           (skipped when cfg.denoise == false)
   3 compressor     feed-forward, soft knee
-  4 loudness       integrated loudness (BS.1770 gating) → gain to TARGET_LOUDNESS, gain capped at MAX_GAIN_DB;
-                   measured loudness below ABSOLUTE_SILENCE → gain 0 dB
+  4 loudness       integrated loudness (BS.1770 gating), measured as dual mono: the mono programme as it will sound on
+                   two loudspeakers, so -14 means a stereo file (v5implementation D-204) → gain to TARGET_LOUDNESS,
+                   gain capped at MAX_GAIN_DB; measured loudness below ABSOLUTE_SILENCE → gain 0 dB
   5 limiter        look-ahead, ceiling LIMIT_CEILING
   6 re-measure     if |loudness - TARGET| > 0.5 LU → one corrective gain pass + limiter
   every stage is length-preserving and delay-compensated: the denoiser's frame delay and the limiter's look-ahead
@@ -2604,15 +2623,16 @@ original video timeline + enhanced audio of the same duration + transcript / eve
 ```ts
 // workers/render/export-loop.ts
 export function runExport(a: { session: RenderSession; source: VideoSource; profile: ExportProfile;
-                               out48: Float32Array; sink: OpfsSink; onProgress: (done: number, total: number) => void;
+                               prog48: Float32Array; sink: OpfsSink; canvas: OffscreenCanvas;
+                               onProgress: (done: number, total: number) => void; onEncoded: () => void;
                                isCancelled: () => boolean }): Promise<{ bytes: Bytes } | { cancelled: true }>;
 // workers/render/encoders.ts  [ONLY]
 export const VIDEO_ENCODE_LADDER: readonly VideoLadderEntry[];
 export const AAC_ENCODE_CONFIG: AudioEncoderConfig;
-export function pickVideoConfig(profile: ExportProfile): Promise<VideoEncoderConfig>;   // first supported entry, else E_ENCODE_VIDEO; bitrate from profile.video_bitrate (v2implementation D-26)
+export function supportedConfigs(profile: ExportProfile): AsyncGenerator<VideoEncoderConfig>;   // the supported entries, in order: what an export may try; bitrate from profile.video_bitrate (v2implementation D-26)
 // workers/render/opfs-sink.ts
 export class OpfsSink { static open(path: string): Promise<OpfsSink>; writeAt(offset: Bytes, data: Uint8Array): void;
-                        close(): Promise<void>; abort(): Promise<void>; }
+                        reset(): void; close(): Promise<void>; abort(): Promise<void>; }   // reset empties the file: a failed attempt's output goes
 ```
 
 ```rust
@@ -2622,7 +2642,7 @@ pub struct VideoTrackSpec { pub width: Px, pub height: Px, pub avcc: Vec<u8>, pu
 pub struct AudioTrackSpec { pub sample_rate: Hz, pub channels: u32, pub asc: Vec<u8> }
 impl<S: MuxSink> Mp4Muxer<S> {
     pub fn new(sink: S, video: VideoTrackSpec, audio: AudioTrackSpec) -> Result<Mp4Muxer<S>, MuxError>;
-    pub fn add_video_sample(&mut self, data: &[u8], frame: FrameIdx, is_keyframe: bool) -> Result<(), MuxError>;
+    pub fn add_video_sample(&mut self, data: &[u8], frame: FrameIdx, is_keyframe: bool) -> Result<(), MuxError>;   // V5 (D-211): samples in decode order; frame is the one shown
     pub fn add_audio_sample(&mut self, data: &[u8], pts: Micros, duration: Micros) -> Result<(), MuxError>;
     pub fn finalize(self) -> Result<Bytes, MuxError>;          // total file size
 }
@@ -2648,31 +2668,41 @@ pub fn export_profile(claims: Option<&EntitlementClaims>, now: UnixSecs) -> Expo
 ### 21.3 Algorithm
 
 ```text
-exportClip(exportId, token, out48):
+exportClip(exportId, token, prog48):
   claims  = verify_token(token, PUBLIC_KEY)                    // Err → E_ENTITLEMENT_INVALID
   profile = export_profile(Some(claims), now)
   session.set_scene(scene input with profile); session.attach_canvas(exportCanvas, profile.width, profile.height)
-  vcfg = pickVideoConfig(profile); venc = VideoEncoder(vcfg); aenc = AudioEncoder(AAC_ENCODE_CONFIG)
-  sink = OpfsSink.open("exports/tmp/<exportId>.mp4"); mux created on the first video chunk (needs avcC)
-  N = session.frame_count()                                    // ceil(clip duration x 30 / 1000): 2,700 for a 90 s clip
-  for n in 0..N:
-     if isCancelled() → abort (close frames, encoders; sink.abort()) → {cancelled}
-     t     = FrameIdx(n).to_out_ms()                           // as built in V4 (D-125); identity map: source time (INV-5)
-     frame = await source.frameAtBlocking(t)                   // waits for decode; never skips
-     session.render_frame(frame, t)
-     vf = new VideoFrame(exportCanvas, { timestamp: FrameIdx(n).to_micros(), duration: 33_333 })
-     while venc.encodeQueueSize > ENCODE_QUEUE_MAX (4): await dequeue event
-     venc.encode(vf, { keyFrame: n % 60 == 0 }); vf.close()
-     onProgress(n + 1, N)
-  await venc.flush()
-  audio: pad out48 with zeros to N * 1600 samples (48,000 / 30; less than one frame of padding, and no sample
-         is ever removed); feed AudioData in 1,024-sample frames; await aenc.flush()
-  encoder outputs → mux.add_video_sample / add_audio_sample (in arrival order per track)
-  size = mux.finalize(); sink.close(); move tmp → "exports/<exportId>.mp4"
+  sink = OpfsSink.open("exports/tmp/<exportId>.mp4")
+  for each vcfg of supportedConfigs(profile):                  // none supported: E_ENCODE_VIDEO
+   attempt:                                                    // V5 (D-216): encoders, muxer and what watches them are the attempt's
+     venc = VideoEncoder(vcfg); aenc = AudioEncoder(AAC_ENCODE_CONFIG); source.rewind(); mux created on the first video chunk (needs avcC)
+     N = session.frame_count()                                 // ceil(out_duration x 30 / 1000): 2,700 for a 90 s clip
+     for n in 0..N:
+        if isCancelled() → abort (close frames, encoders; sink.abort()) → {cancelled}
+        t     = FrameIdx(n).to_out_ms()                        // program time
+        pos   = session.source_at(t)                           // null → E_INTERNAL NoScene; V5 (D-215)
+        frame = await source.frameAtBlocking(recorded(pos))    // waits for decode; never skips
+        session.render_frame(frame, t)
+        vf = new VideoFrame(exportCanvas, { timestamp: FrameIdx(n).to_micros(), duration: 33_333 })
+        while venc.encodeQueueSize > ENCODE_QUEUE_MAX (4): await dequeue event
+        venc.encode(vf, { keyFrame: n % 60 == 0 }); vf.close()
+        onProgress(n + 1, N)
+     await venc.flush()
+     audio: pad prog48 with zeros to N * 1600 samples (48,000 / 30; less than one frame of padding, and no sample
+            is ever removed); feed AudioData in 1,024-sample frames; await aenc.flush()
+     encoder outputs → mux.add_video_sample / add_audio_sample (in arrival order per track)
+     size = mux.finalize()
+   E_ENCODE_VIDEO: sink.reset(), onProgress(0, N), next entry from frame 0; none left: the last failure
+   E_ENCODE_AUDIO: sink.reset(), onProgress(0, N), once more on this entry; twice: thrown (D-217)
+   a sink error, E_GPU_LOST, E_MUX and a cancel are never restarted
+  sink.close(); move tmp → "exports/<exportId>.mp4"
   return { opfsPath, summary: session.summary(), stageTimings }
 
 Mp4Muxer layout: ftyp | free(MOOV_RESERVE = 256 KiB) | mdat …   finalize(): write moov into the reserved space,
    pad with free; moov larger than the reserve → MuxError::MoovOverflow (cannot occur at ≤ 90 s; guarded by test)
+Reordered frames (V5, D-211): samples are written in decode order, each with the frame it is shown as, at most
+   MAX_REORDER = 16 ahead of its turn; finalize refuses a gap. When a frame came out of order, moov writes ctts
+   version 0 after stts and a video elst starting at the largest delay. Otherwise neither: the file is byte-identical
 AAC priming: the first audio chunk's timestamp/duration and the encoder's reported delay become an edit list (elst)
    so that audio presentation time 0 equals video frame 0 (TE-4 verifies offset ≤ one video frame)
 ```
@@ -2683,10 +2713,10 @@ AAC priming: the first audio chunk's timestamp/duration and the encoder's report
 - **Duration.** Output duration equals `time_map.out_duration()` to within one video frame; with the identity map that is the source duration, for any amount of silence in the clip. `timeline-preserved.spec.ts` (identity) and `cuts_applied.spec.ts` (V6.2), verifier checks 5 and 8 against the expected duration the test supplies.
 - **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end. The counter runs in every build, since E2E runs production builds: a non-zero count at the end of an export or after a preview stop fails that call with `E_INTERNAL` (v2implementation D-45).
 - **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`. TE-3 picked method A on 2026-10-09: a readback was 2.8 times slower, and a frame made from a buffer of RGBA bytes is encoded with full-range brightness that the stream does not declare (`docs/v2/experiments.md`; read on the development machine, v2implementation D-69).
-- **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted.
+- **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted. An audio encoder failure gets one more try on the same entry. `useTimeLeft` starts again when the frames fall back (v5implementation D-216 to D-238).
 - **GPU device lost.** `E_GPU_LOST`; the user retries; no partial resume.
-- **Encoder emits reordered frames.** The muxer writes composition offsets (`ctts`) when chunk timestamps are not monotonic.
-- **Render cache.** Key = SHA-256 over (source file hash prefix, `Transcript`, events, `EditState`, `ProfileKind`, `RENDERER_VERSION`), computed in `start-export.ts` through `hash_api`. v1.2 (V5): the stored plan, the `TimeMap`, the theme and the music id join the key (§40.9 S-9). A hit re-downloads the stored file under its original `ExportId` and sends no new receipt.
+- **Encoder emits reordered frames.** The muxer writes composition offsets (`ctts`), read back on real B-frames by `mux_reorder.rs` through `ffprobe` and `ffmpeg`. D1's encoder never reorders; phone playback of such a file is V10's checklist.
+- **Render cache (S-9, as built in V5, §40.9).** Key = lower-case hex SHA-256, by `crypto.subtle` on the main thread, over a canonical JSON (sorted by key at every depth, `undefined` left out, arrays in their order) of ten inputs: source file hash prefix, `Transcript`, events, `EditState`, plan, `TimeMap`, theme (`"default"` until V6.7), music id (`null` until V6.3), the `ProfileKind` **of the token the worker verified** (never one the page read itself, INV-9) and `RENDERER_VERSION`, which `vite.config.ts` computes from `offcut_render_bg.wasm`, `export-loop.ts` and `encoders.ts` (16 hex; `"test"` where no bundler ran). One entry per clip: a miss deletes the row, then the file, then renders; so a hit is "the same edit as the last export", and undoing back to an earlier one misses until V7. An import clears the cache. A hit re-downloads the stored file under its original `ExportId`, renders nothing and sends no new receipt, `export_started` or `stage_timing`. A row without its file, one of another size or of a newer build is a miss; a failed lookup is a miss; a failed `put` is swallowed.
 - **Download name.** `offcut-<yyyymmdd-hhmm>.mp4`; never derived from the source file name.
 
 **Acceptance.** Render + encode at most 90 s and mux at most 2 s for the reference clip on R1 (PS §20.2, E-4). `verify_mp4.py` passes on every export in `export-free.spec.ts`, `export-creator.spec.ts` and the corpus run (§27.2). Creator output is 1080x1920 without watermark; Free output is 720x1280 with watermark (PS §20.1). Manual at M2.5: plays in the default gallery apps on one Android and one iOS phone and uploads to at least two target platforms (PS §20.1).
@@ -2876,6 +2906,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 |---|---|---|
 | `clips/<clipId>/source` | The imported file, byte-identical | `media.worker` |
 | `clips/<clipId>/out48.f32` | Enhanced audio (raw f32, 48 kHz mono), same length as the decoded source audio | main, after `measureProsody` |
+| `clips/<clipId>/prog48.f32` | The program's audio, what the export encodes (v5implementation D-213). `out48.f32` stays: V6.2 and V6.3 rebuild this from it | main, after `assemble` |
 | `exports/tmp/<exportId>.mp4` | Export in progress | `render.worker` |
 | `exports/<exportId>.mp4` | Finished export (render cache) | `render.worker` |
 | `models/<modelId>/<file>.part`, `models/<modelId>/<file>` | Model download in progress / verified | `models/download.ts` |
@@ -2888,7 +2919,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 | `transcripts` | `clipId` | `{ transcript, prosody }` |
 | `events` | `clipId` | `DetectedEvent[]`. No writer and no repo file in V3: on a restore the events are recomputed by `detect` from the stored transcript and prosody, which gives the same events and ids (INV-7), and toggles live in `EditState.event_overrides`, keyed by `EventId` (v3implementation D-82). V7 gives the store a writer or removes it here and from `schema.ts` through a version-2 migration |
 | `edits` | `clipId` | `{ editState }` |
-| `renderCache` | cache key (hex) | `{ clipId, exportId, opfsPath, bytes, createdAt }` |
+| `renderCache` | cache key (hex) | `{ clipId, exportId, opfsPath, bytes, createdAt, summary }` (a hit skips the worker, so the summary comes from the row, v5implementation D-226). Only `persistence/render-cache-repo.ts` writes it |
 | `entitlement` | `"current"` | `{ token, storedAt }` |
 | `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts }` |
 | `meta` | string | `anonId`, `persistRequested` |
@@ -3206,8 +3237,8 @@ The generator takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs
 | `review-edit.spec.ts` | J8: word edit re-detects its sentence; toggles persist across re-detection by `EventId`; style switch; crop control only for landscape; no control named or behaving like "tighten pauses" / "remove silence" exists; clip duration and audio are identical before and after every edit |
 | `signin.spec.ts` | J9/C-8: limits shown before sign-in; link flow in a second tab signs in the first via broadcast; expired and invalid links show their messages |
 | `export-free.spec.ts` | J9-J12: counter visible before click; 720x1280 output with watermark passes the verifier; counter decrements; last-export warning before the third; fourth attempt shows the upgrade prompt and does not render |
-| `export-creator.spec.ts` | 1080x1920 output without watermark passes the verifier; no prompt; render-cache hit sends no receipt |
-| `timeline-preserved.spec.ts` | INV-5, INV-10 on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4`: transcript word timestamps after a pause are not moved earlier; the caption for the first word after the 5 s pause appears at its spoken time in the preview; the preview ends at the source duration; the export has `ceil(duration x 30 / 1000)` frames (600 and 900); the verifier passes with `--source`, including check 8 at the start and at the end of each clip |
+| `export-creator.spec.ts` | 1080x1920 output without watermark passes the verifier; no prompt; render-cache hit sends no receipt. As built in V5: all 11 checks on a Creator and a Free file; the summary and the question; the same token hits at once with the same bytes; a forged token is refused before any lookup; no room says why and sweeps nothing; an expired Creator token verifies as Free and hits the Free file (INV-9) |
+| `timeline-preserved.spec.ts` | INV-5, INV-10 on `speech_20s_long_pause.mp4` and `speech_30s_sparse.mp4`: transcript word timestamps after a pause are not moved earlier (the recognizer may start a word 40 ms early, and runs a phrase on over room tone; v5implementation §25 row 32); the caption for the first word after the 5 s pause appears at its spoken time in the preview; the preview ends at the source duration; the export has `ceil(duration x 30 / 1000)` frames (600 and 900); the verifier passes with `--source`, including check 8 at the start and at the end of each clip. As built in V5, on the long pause: an edit's values and rows, its hit, a miss after undoing everything, and an encoder that fails once (a restart, on the ladder's next entry) and on every entry |
 | `checkout.spec.ts` | J12/C-11: navigation to the provider URL; return polling activates Creator; timeout shows `E_BILLING_PENDING`; portal link opens |
 | `cancel.spec.ts` | C-12 during import, processing, model download and export; temp files removed; state returns as specified; no receipt after a cancelled export |
 | `restore.spec.ts` | C-13: reload at `ready` restores without re-transcription; reload mid-export discards the temp file; `clips` store holds no file name |
@@ -3219,7 +3250,7 @@ The generator takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs
 
 ### 27.2 Independent verifier (`verify/verify_mp4.py`)
 
-Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothing from `crates/` or `web/`, and no library that those use. Invocation: `verify_mp4.py <file> --profile free|creator --expected-duration-ms N [--source <fixture>]`. `N` is always the duration of the source clip: an export is never shorter than its recording.
+Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothing from `crates/` or `web/`, and no library that those use. Invocation: `verify_mp4.py <file> --profile free|creator --expected-duration-ms N [--source <fixture>]`. `N` is the duration the map says, which the test works out and passes apart from the source: with the identity map it is the source's, and from V6.2 the two differ (v5implementation D-210). A file `verify/test_verify_mp4.py` makes with `ffmpeg` shows each check telling good from bad, in CI, where no real export can be made (D-209). Lines `INFO <n>: …` report a reading and judge nothing; a reason names a tag's key, never its value.
 
 | # | Check |
 |---|---|
@@ -3229,11 +3260,11 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 | 4 | Audio: AAC-LC, 48,000 Hz, 2 channels |
 | 5 | Durations: video within one frame of expected (the source duration); audio within one AAC frame (21.3 ms) of video |
 | 6 | Full decode of both streams reports zero errors |
-| 7 | Loudness: integrated loudness (ffmpeg `ebur128`) within ±1 LU of -14 LUFS |
-| 8 | A/V sync and timeline (with `--source`): audio offset by envelope cross-correlation against the source within 20 ms, measured separately over the first 5 s and the last 5 s, so a removed or shortened pause anywhere in between fails; video offset by white-flash frame positions within one frame |
-| 9 | Watermark: normalized correlation of the watermark region with `watermark_mask_720.png` at least 0.5 for `free`; at most 0.2 for `creator` (thresholds are (assumption), M1.6) |
-| 10 | Video bitrate at most 1.5x the profile target |
-| 11 | Metadata: no title, comment, location or source-derived tags; no creation time copied from the source |
+| 7 | Loudness: integrated loudness (ffmpeg `ebur128`) of the stereo stream as it is, within ±1 LU of -14 LUFS |
+| 8 | A/V sync and timeline (with `--source`): audio offset by envelope cross-correlation against the source within 20 ms, measured separately over the first 5 s and the last 5 s (10 ms RMS envelopes, lags within ±1 s, correlation at least 0.5; a window with no sound in the source is reported, a late audio start filled with silence), so a removed or shortened pause anywhere in between fails; video offset by white-flash frame positions within one frame (a flash is at least 225 of mean brightness, and 30 above the 30 frames around it) |
+| 9 | Watermark: normalized correlation, over the mean of 15 evenly spaced frames scaled to 720x1280 and high-passed by a 9 x 9 box blur, of the watermark region with `watermark_mask_720.png` at least 0.5 for `free`; at most 0.2 for `creator` (thresholds read in V5, §39.3 item 14) |
+| 10 | Video bitrate, by packet sizes over the stream's duration, at most 1.5x the profile target: 12 Mb/s `creator`, 6 Mb/s `free` |
+| 11 | Metadata: no title, comment, description, artist, album or location tag; `creation_time` absent or the epoch; no source-derived tags (with `--source`); neither `©xyz` nor `ISO6709` in the file's bytes |
 
 ---
 
@@ -3407,9 +3438,14 @@ Disk: source up to 500 MB (PS §9.4), model up to 260 MB (PS §10 J4), audio 17.
 | `pnpm corpus` | `corpus/fetch_corpus.sh` (checks the local clips of `OFFCUT_CORPUS_DIR` against the manifest's SHA-256) + `corpus/run_corpus.ts`, run as Playwright project `corpus` (v3implementation D-88). Options go straight after the script name (`pnpm corpus --grep founder-02`): after a `--`, Playwright ignores them |
 | `pnpm bench:device` | `bench/device-bench.ts` (Playwright project `bench`), writes `bench/results/<device>-<date>-<clip>.json` with six stages, `audio_chain` included (v3implementation D-91) |
 | `pnpm verify <file>` | `verify/verify_mp4.py` |
+| `pnpm verify:test` | `verify/test_verify_mp4.py`: each check against a good file and a bad one, with no browser (v5implementation D-209) |
+
+`bench:device` takes `BENCH_RUNS`, default 10 (v5implementation D-200).
 
 **CI pipeline, in order (`ci.yml` unless noted)**
-1. Checkout; restore Cargo and pnpm caches; secret scan.
+
+First, on every event, the job `changes`: the secret scan, and whether code changed. A pull request that changes only documents skips `ci` and `e2e-media`, the scan still run; a push to `main` always runs everything (v5implementation D-199). A skipped job blocks nothing: `main` has no branch protection. `node scripts/check-file-tree.mjs` by hand before pushing an edit of §5, which a documents-only pull request does not run. After step 4 the Linux job runs the verifier's own test.
+1. Checkout; restore Cargo and pnpm caches.
 2. `cargo fmt --check`; `cargo clippy --workspace -D warnings`; `cargo deny check`.
 3. `pnpm gen:types`; `scripts/check-gen-clean.sh`.
 4. `cargo test --workspace` (Postgres service container for the server; software GPU adapter for `golden_frames.rs`). Before it, the Linux job installs a pinned static ffmpeg 9.0.2 build (archive URL and SHA-256 in `ci.yml`'s `env`, refused on mismatch), restores `fixtures/.cache/` (the reference clip, by the hash in its name) and runs `pnpm fixtures`, so the six fixture-reading test files run, not skip. No fixture is cached between runs (v3implementation D-94).
@@ -3854,7 +3890,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 11. Loudness target -14 LUFS and every DSP constant, including `ALIGN_TOLERANCE` (§18.3) — M1.2, TE-13, E-2. Measured in V3 (docs/v3/experiments.md): the denoiser's delay is 480 samples, constant, and compensated exactly; TE-13 passes on D1 (not R1) with denoise on.
 12. Safe-area insets, zones, style values, event timings, emoji fallback font (§19) — E-2, M1.4.
 13. Watermark text, size, opacity, placement (§19.6; PS §19 minor) — alpha.
-14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6. Measured in V4 (docs/v4/experiments.md, D1 and CI): the 16 goldens read 1.0000 on D1's WARP and 0.9994-1.0000 on the runner's lavapipe, the parity cases at least 0.9994: one folder serves both, at 0.98 (and 0.99 for parity); the verifier's thresholds are V5's (M1.6).
+14. Golden similarity 0.98; verifier thresholds for watermark and sync (§19, §27.2) — M1.4, M1.6. Measured in V4 (docs/v4/experiments.md, D1 and CI): the 16 goldens read 1.0000 on D1's WARP and 0.9994-1.0000 on the runner's lavapipe, the parity cases at least 0.9994: one folder serves both, at 0.98 (and 0.99 for parity). Measured in V5 (docs/v5/experiments.md, D1 only): watermark correlation 0.74 on a Free file and -0.05 to -0.01 on Creator files, against 0.5 and 0.2, which stand; audio offset at most 1.7 ms against 20 ms, at a correlation of at least 0.95 against 0.5; white frames within one frame, a flash being at least 225 of mean brightness and 30 above the frames around it; -14.3 LUFS on every export against -14 ± 1; video 8.3-8.4 Mb/s Creator and 4.1 Mb/s Free against 12 and 6.
 15. Preview size, queue length, late-frame and first-frame targets, seek target (§20) — M1.5. Measured in V4 on D1 (not R1, D-114): first frame 76-94 ms after `ready` (500 ms), seek 78-94 ms (300 ms), drift at most 26.9 ms over 60 s with 0% late frames (80 ms, 5%), never downscaled; the queue of 6 and the 360 x 640 downscale size are kept.
 16. Video and audio bitrates, keyframe interval, 2-channel audio, encoder ladder order (§21.2) — TE-4.
 17. `CANCEL_TIMEOUT`; `API_TIMEOUT`; `API_COLD_START_BUDGET` (§14.3, §22.9) — M1.5, TE-11. Measured in V4 on D1: a hung render worker's run is back at `accepted` 2.4-2.5 s after Cancel; `CANCEL_TIMEOUT_MS = 2000` kept.
@@ -3864,7 +3900,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
-24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). R1 and M2.4 re-read them.
+24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
@@ -4112,8 +4148,8 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 | S-5 | V4 | `FontKey` + `FontSet`; `Theme` roles; `StyleSpec.motion`; zone table | Closed `FontId` enum (v2implementation D-29); `EVENT_ZONE`/`CAPTION_ZONE` constants | `styles_use_theme.rs`; goldens unchanged |
 | S-6 | V4 | `offcut-dsp::program::assemble` (identity, no music), `silence_profile`, `AudioWorkerApi.assemble`; preview plays `prog48` | Preview playing `out48` directly | `program_identity.rs` |
 | S-7 | V4 | Review UI generic over plan items (`PlanItemList`), a cuts section that renders nothing when the plan has no cuts | `EventToggleList` | `review-edit.spec.ts` |
-| S-8 | V5 | Export loop over `OutMs` reading `to_src`; encodes `prog48`; `frame_count` from `out_duration`; the test writes the expected duration beside the export and `verify_mp4.py` checks 5 and 8 compare against it (the verifier still shares no code with the product) | Export reading `TimeMs` and `out48` | `timeline-preserved.spec.ts` (identity case) unchanged in outcome |
-| S-9 | V5 | Render-cache key adds the plan hash, time-map hash, theme hash and music id | §21.4 cache key | `render-cache` case in `start-export.test.ts` |
+| S-8 | V5, built | Export loop over `OutMs`: `session.source_at(t)`, then `frameAtBlocking(recorded(pos))`; encodes `prog48`, read from `clips/<id>/prog48.f32` beside `out48.f32`; `frame_count` from `out_duration`; the test passes the expected duration as an argument apart from the source, with no sidecar file (v5implementation D-210), and `verify_mp4.py` checks 5 and 8 compare against it (the verifier still shares no code with the product) | Export reading `TimeMs` and `out48` | `timeline-preserved.spec.ts` (identity case) unchanged in outcome; the seam case of `export-loop.test.ts` (a map that jumps and holds), which no browser can reach while `set_scene` refuses other maps |
+| S-9 | V5, built | Render-cache key: canonical JSON of ten inputs (§21.4), with the plan, the time map, a theme string and a music id as they are rather than hashes of each, since the whole is hashed; the profile kind from the token the worker verified (v5implementation D-220 to D-224) | §21.4 cache key | The `render-cache` group of `start-export.test.ts`, a case per input |
 | S-10 | V6 | Account delete and export iterate a list of per-user tables, so `plan_usage` is one more entry | Hard-coded table list | `account_delete.rs` |
 
 Nothing else is reserved, except the plan's wire format, fixed at `PLAN_FORMAT = 1` in V4 (D-119, D-163): from V6.1 a stored or sent plan is a contract, and fixing it once costs less than changing it. Each later variant (`ItemKind` codes 4+, `Cut` arms used, `VideoSlot` members, masks) is added by the release that draws or applies it.

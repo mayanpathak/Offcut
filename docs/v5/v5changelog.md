@@ -17,11 +17,11 @@
 | 1 | ~~**An export reads about 3 LU over the target.**~~ Closed in Entry 5: -11.4 LUFS before the fix, -14.3 after, read by `ffmpeg` on real exports | `offcut-dsp/src/loudness.rs` | P130 |
 | 2 | V4 CL known issue 33: a flake of `model-download.spec.ts`'s analytics poll on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
 | 3 | V4 CL known issue 36: `openEditor`'s 30 s wait on the hosted runner | `web/tests-e2e/model-download.spec.ts` | P129 |
-| 4 | V4 CL known issue 37: re-read `detect_scene` on a quiet D1 | `bench/results/` | P136 |
+| 4 | V4 CL known issue 37: `detect_scene` on a quiet D1, read at P136: median 255 ms, p90 291 ms, 10 ms over its line of about 245 ms. Stages nobody changed are 16-22% slower than on V3's day too. Not a V5 blocker (section 20); carried with these numbers | `docs/v5/experiments.md` | V9 |
 | 5 | **Production `client_error` rows.** On 2026-10-29: `E_DECODE_VIDEO` at `preview` 4 times, within 71 s from 14:59:33 UTC, ten minutes after V4's deploy finished, which fits known issue 7 and cannot be proved from rows that hold no detail. `E_WORKER_CRASH` at `import` once, at 15:29:00, **still unexplained**. None since. P136 reads them again after the merge; a code that keeps appearing gets its own investigation | Production `analytics_events` | P136 |
 | 6 | **`golden_frames` can abort when D1 is short of memory.** One `pnpm test` straight after two browser runs ended with "memory allocation of 2073600 bytes failed" in that test (exit `0xc0000409`), with two `rust-analyzer` processes holding about 7 GB of commit. The same tests, unchanged, then passed. Not seen in CI. If it comes back, run that test with `--test-threads=1` | `crates/offcut-render/tests/golden_frames.rs` | Watch |
 | 7 | ~~**A clip's preview could fail at once in a fresh browser with `E_DECODE_VIDEO`.**~~ Closed in Entry 6: 6 of 14 fresh starts before the fix, 0 of 24 after | `web/src/workers/render/` | Fixed; reaches production with the next merge |
-| 8 | **`pnpm e2e` is load-sensitive on a busy D1.** At the default 6 workers `the settings link ...` passes its 30 s limit, with the machine at about 60% before the run; at 2 workers all 12 pass in 22 s. CI's run at `3145e7f`, read at P135: 12 passed in 12.5 s, that case 1.9 s, which fits load. Read again at P136's Tier 3 on a quiet D1 | `web/tests-e2e/landing.spec.ts` | P136 |
+| 8 | ~~**`pnpm e2e` is load-sensitive on a busy D1.**~~ Closed in Entry 12: load, as it looked. At the default 6 workers on a quieter D1, 12 passed in 23.6 s, that case 9.0 s; in CI at `3145e7f` 12 passed, that case 1.9 s. The limit stays | `web/tests-e2e/landing.spec.ts` | Closed |
 
 ---
 
@@ -312,3 +312,34 @@ The restarted file being Main is the proof it came from the ladder's next entry.
 **Not checked.** Rust is unchanged and was not run (Tier 2). A screen reader: the live region's words are read by a test, not heard. This commit's CI: P136 pushes. The founder's look: P136.
 
 **Open.** Open item 1; known issues 2 to 6, 8.
+
+## Entry 12 - 2026-11-01 - P136: bench, experiments, copy-back, final gate
+
+**What.** `bench/results/d1-2026-11-01-portrait.json`, five runs, Docker stopped. `docs/v5/experiments.md`, a section per row of section 20. The copy-back of section 25 into TS §9 (C-7, C-9, C-10), §12.2, §12.4, §12.5, §13.3, §14.2, §18.2, §21.1, §21.3, §21.4, §23.1, §27.1, §27.2, §33, §39.3 items 14 and 24, §40.9 (S-8, S-9), BP §7, `verify/README.md`; TS §5 was kept right as V5 went. Section 24.1, "V5 as built". V4 CL known issue 37 reworded and carried to V9. **Known issue 8 closed.** No product code changed. This entry goes before the merge; the closing entry goes after the tag.
+
+**Differs from the plan.**
+- **Hits were read on the reference clip's 79 MB file,** not the pause fixtures: the larger file is the harder case. Five hits, 12 to 43 ms.
+- **`detect_scene` missed by 10 ms on a quiet D1:** 255 ms against about 245 ms. Stages nobody changed were 16-22% slower than on V3's day too, so the machine has drifted. Section 20's rule: carried to V9, no V5 blocker.
+- **94 passed against the estimate of 93,** the `close` case of P135.
+- **"A docs-only pull request skips" cannot be seen on pull request 8,** which changes code. The closing entry's pull request shows it, so that box stays open until then.
+- **Docker Desktop was stopped and started by the agent,** by `docker desktop stop` and `start`: no container was running. It is stopped now.
+
+**The final gate** (`d1`, Tier 4, once).
+| Check | Result |
+|---|---|
+| `pnpm install --frozen-lockfile`, `pnpm check`, `pnpm fixtures` | Exit 0 |
+| Rust | 657 passed, 0 failed, 4 ignored (floor: 646 / 0 / 4) |
+| Vitest | 336 passed in 13 files (floor: 175) |
+| `pnpm e2e` | 12 passed, 23.6 s, at the default 6 workers |
+| `python verify/test_verify_mp4.py` | 16 passed, 69.9 s |
+| **`pnpm e2e:media`, keyed `pnpm build:e2e`, the one full run of V5** | **94 passed, 1 skipped, 30.6 min, none retried** (V4: 41.8-54.9 min, 22 runs). The skip is `REJECT_DECODE_UNSUPPORTED`, as in V4: Chrome decodes that fixture |
+| Plain `pnpm build`, `check-hosts` | Exit 0; no `__offcutDev`, `fakeExportDone` or `devFailEncoder` in `web/dist`; app shell 339.6 kB gzip |
+| `fetch(` outside the four files; goldens and snapshots against `0a8aa80`; frozen check; `zz-` files; key in the environment | None; none; empty; none; unset |
+
+**Readings** (`docs/v5/experiments.md`). `render_encode` 30.9 s per 60 s (90), `mux` 21 ms (2 s). All four exports -14.3 LUFS; audio within 1.7 ms at a correlation of at least 0.95; watermark 0.74 Free, -0.05 to -0.01 Creator; 8.3-8.4 and 4.1 Mb/s. `cacheKey` 0.4-1.6 ms.
+
+**Founder's steps next.** The pull request made ready and merged; one look at `~/v5-review/done-*.png`; one listen to `~/v5-review/listen-creator.mp4`, an export of the reference clip that stays on D1; the tag `v5`.
+
+**Not checked.** Other machines: D1 only, as D-202 says. R1 stays unread. A hardware encoder that reorders.
+
+**Open.** Open item 1; known issues 2 to 6.
