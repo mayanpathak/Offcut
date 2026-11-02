@@ -8,11 +8,14 @@ publish = false
 workspace = true
 
 [dependencies]
+async-trait = { workspace = true }
 axum = { workspace = true }
 base64 = { workspace = true }
 ed25519-dalek = { workspace = true }
+lettre = { workspace = true }
 offcut-api-types = { workspace = true }
 offcut-types = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

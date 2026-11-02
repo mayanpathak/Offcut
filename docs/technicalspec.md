@@ -568,7 +568,7 @@ offcut/
 │   │   │   └── notify.rs
 │   │   ├── mail/
 │   │   │   ├── mod.rs                 Mailer trait
-│   │   │   ├── http_mailer.rs         the chosen provider's adapter (TE-8)
+│   │   │   ├── smtp_mailer.rs         SMTP over STARTTLS through the chosen provider (TE-8)
 │   │   │   └── templates.rs           magic-link email
 │   │   ├── plan/                      (V6.2, V6.4, V6.9) the only code that calls the AI provider
 │   │   │   ├── mod.rs

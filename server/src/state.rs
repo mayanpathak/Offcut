@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
+use crate::billing::provider::BillingProvider;
 use crate::config::Config;
+use crate::mail::Mailer;
 use crate::rate_limit::RateLimiter;
 
 #[derive(Clone)]
@@ -10,4 +12,6 @@ pub struct AppState {
     pub db: sqlx::PgPool,
     pub config: Arc<Config>,
     pub limiter: Arc<RateLimiter>,
+    pub mailer: Arc<dyn Mailer>,
+    pub billing: Arc<dyn BillingProvider>,
 }

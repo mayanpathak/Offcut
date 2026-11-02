@@ -1,5 +1,8 @@
 //! Email normalization (TS §22.2). The magic-link flow itself arrives in V6.
 
+/// How long a sign-in link works (TS §22.2, an assumption of M1.7).
+pub const MAGIC_LINK_TTL_MINUTES: i64 = 15;
+
 const MIN_EMAIL_BYTES: usize = 3;
 const MAX_EMAIL_BYTES: usize = 254;
 

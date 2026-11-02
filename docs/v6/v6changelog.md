@@ -14,7 +14,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
-| 9 | One real send from the Render free service: TCP on 2525 is proven, STARTTLS and login from there are not | Founder, at the deployed checks | Entry 1, G 14.6 |
+| 9 | P138's three human boxes: read the real mail (subject "Your Offcut sign-in link", link host `example.invalid`); one real send from Render (G 2.4); mailboxes for TE-8, and counting them (G 2.5). A failure of the second or a TE-8 below 95% stops the mail work (D-253, D-256) | Founder | Entry 6 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
@@ -192,3 +192,23 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **What this proves and does not.** The same commit and email deploy while public and are blocked while private, so visibility decides it today. It does not say why: every merge on `main` since 2026-10-07 has this same noreply address, and the founder recalls deploys working while private around V3. Vercel may have tightened the check, which its forum suggests; nobody here can read that from its side.
 
 **Going private again.** The next merge to `main` will meet the same block, and private Actions minutes ran out once already (2026-10-29), at about 50-75 minutes a push. `vercel-email-check` holds one docs commit, ready to test merging with the Gmail address while private. That is untested.
+
+## Entry 6 - 2026-11-02 - P138: mail through lettre, config, fakes
+
+**Changed.** `mail/{mod,smtp_mailer,templates}.rs`: the `Mailer` trait, `lettre` over STARTTLS with an 8 s limit, and one template with one link, no image and no tracking. `billing/{mod,provider}.rs`: the trait of V6 section 10.1 with `UnconfiguredBilling` (D-298). `AppState` holds both; `main.rs` installs `ring` once and builds them. `Config`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `BILLING_API_BASE_URL`; `MAIL_API_KEY` gone, also from `render.yaml`; `.env` names changed, 19 now, with placeholder values. `tests/common/mod.rs`: `FakeMailer`, `FakeBilling`. `deny.toml`: `0BSD`. TS §5: `smtp_mailer.rs`.
+
+**Differs from the plan.**
+
+| Point | What and why |
+|---|---|
+| Dependencies | Only what this prompt uses: `lettre`, `rustls`, `async-trait`. `getrandom` comes with P139, and `reqwest`, `hmac`, `webpki-roots` with P144, each with its `deny.toml` line and its re-read of `cargo tree` |
+| `MAIL_FROM` | `Config` also checks that it parses as an address, so a bad value stops the boot by name |
+| `SMTP_USERNAME` | Redacted in `Debug`, as a login is half a credential |
+| `FakeBilling` | `verify_signature` and `parse_event` are stubs until P143 |
+| Fakes as plain data | Public fields and one read in `TestApp::drop`: the repository has no `#[allow(dead_code)]`, and each test binary uses a different part of `common` |
+
+**Read on D1.** `cargo deny check`: advisories, bans, licenses, sources ok. `cargo tree -p offcut-api` holds no `native-tls`, `openssl` or `aws-lc`. `Config` tests: each of the 19 missing or empty names itself, `SMTP_PORT` malformed names itself, no value in an error, 7 redactions in `Debug`. Mailer tests: nothing listening and a server that never answers are each `Unavailable`. **One real mail through the real `SmtpMailer`**, from a temporary example since deleted, on port 2525 at 16:25 UTC: `Ok`, to `MAIL_FROM`.
+
+**Counts.** Rust 666 / 0 / 4, up from 657; Vitest 336; `pnpm check` exit 0; frozen check no output. Not pushed: the first push is P142.
+
+**Open: the three human boxes of open item 9.** Not ticked. Until they are, nothing proves mail from Render with a login, or delivery beyond one Gmail address.

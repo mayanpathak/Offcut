@@ -27,6 +27,8 @@ allow = [
   # A permissive license for data. `webpki-roots` (through sqlx's rustls) is
   # Mozilla's list of root certificates and holds no code under it.
   "CDLA-Permissive-2.0",
+  # `quoted_printable`, which `lettre` writes mail with (v6implementation D-250).
+  "0BSD",
 ]
 confidence-threshold = 0.8
 exceptions = []

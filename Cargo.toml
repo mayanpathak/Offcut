@@ -63,6 +63,12 @@ time = "0.3.55"
 sha2 = "0.11.0"
 base64 = "0.23.1"
 ed25519-dalek = "3.0.0"
+# Mail over SMTP (v6implementation D-249). Without default features: no native
+# TLS, since the server uses rustls, and an async transport.
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "hostname", "tokio1-rustls", "ring", "webpki-roots"] }
+# One crypto provider in the tree, `ring`, which `sqlx` brings too (D-281).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+async-trait = "0.1"
 # No TLS: the server tests call the API on 127.0.0.1 over plain HTTP.
 reqwest = { version = "0.13.5", default-features = false }
 # Exact: must equal the installed wasm-bindgen CLI (scripts/build-wasm.sh checks it).

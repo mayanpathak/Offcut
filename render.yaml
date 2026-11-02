@@ -29,9 +29,17 @@ services:
         sync: false
       - key: ACCESS_TOKEN_SIGNING_KEY
         sync: false
-      - key: MAIL_API_KEY
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
         sync: false
       - key: MAIL_FROM
+        sync: false
+      - key: BILLING_API_BASE_URL
         sync: false
       - key: BILLING_API_KEY
         sync: false
