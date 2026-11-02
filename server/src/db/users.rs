@@ -24,6 +24,14 @@ pub async fn find_or_create(
     Ok(UserId::new(row.id))
 }
 
+/// The user, if still there, held until the transaction ends: a delete waits.
+pub async fn lock(conn: &mut PgConnection, user: UserId) -> Result<Option<UserId>, sqlx::Error> {
+    let row = sqlx::query!("SELECT id FROM users WHERE id = $1 FOR SHARE", user.get())
+        .fetch_optional(conn)
+        .await?;
+    Ok(row.map(|row| UserId::new(row.id)))
+}
+
 /// The address of a user, or `None` when the account is gone.
 pub async fn email(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::Error> {
     let row = sqlx::query!("SELECT email FROM users WHERE id = $1", user.get())

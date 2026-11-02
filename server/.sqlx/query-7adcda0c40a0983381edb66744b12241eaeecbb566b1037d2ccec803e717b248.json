@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO subscriptions (user_id, provider_customer_id, provider_subscription_id, plan,\n           billing_interval, status, cancel_at_period_end, current_period_end, last_event_at)\n         VALUES ($1, $2, $3, 'creator', $4, $5, $6, $7, $8)\n         ON CONFLICT (user_id) DO UPDATE SET\n           provider_customer_id = EXCLUDED.provider_customer_id,\n           provider_subscription_id = EXCLUDED.provider_subscription_id,\n           billing_interval = EXCLUDED.billing_interval,\n           status = EXCLUDED.status,\n           cancel_at_period_end = EXCLUDED.cancel_at_period_end,\n           current_period_end = EXCLUDED.current_period_end,\n           last_event_at = EXCLUDED.last_event_at,\n           updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7adcda0c40a0983381edb66744b12241eaeecbb566b1037d2ccec803e717b248"
+}

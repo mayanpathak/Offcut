@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::rate_limit::{RouteGroup, by_ip};
 use crate::state::AppState;
-use crate::{account, analytics, auth, entitlement, headers, log, usage};
+use crate::{account, analytics, auth, billing, entitlement, headers, log, usage};
 
 const KB: usize = 1024;
 /// Every route, unless its row in the table says otherwise (TS §22.1).
@@ -64,7 +64,10 @@ pub fn build(state: AppState) -> Router {
         .route("/usage/receipts", post(usage::post_receipt).layer(body(KB)))
         // POST /billing/checkout   1 kB     Checkout
         // GET  /billing/portal     none     Portal
-        // POST /billing/webhook    64 kB    Webhook
+        .route(
+            "/billing/webhook",
+            post(billing::webhook::handle).layer((body(64 * KB), ip(RouteGroup::Webhook))),
+        )
         .route(
             "/events",
             post(analytics::ingest).layer(ip(RouteGroup::Events)),

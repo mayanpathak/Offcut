@@ -9,13 +9,15 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use axum::http::HeaderMap;
 use ed25519_dalek::SigningKey;
-use offcut_api::billing::provider::{BillingError, BillingEvent, BillingProvider};
+use offcut_api::billing::provider::{
+    BillingError, BillingEvent, BillingEventKind, BillingProvider, EventOwner,
+};
 use offcut_api::config::Config;
 use offcut_api::mail::{MailError, Mailer};
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
 use offcut_api::{db, router};
-use offcut_api_types::Offer;
+use offcut_api_types::{BillingInterval, Offer};
 use offcut_types::{UnixSecs, UserId};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{AssertSqlSafe, ConnectOptions, Connection, PgPool};
@@ -43,8 +45,9 @@ impl Mailer for FakeMailer {
     }
 }
 
-/// A merchant that records its cancels. With `fail` set every call is refused.
-/// The webhook's two functions grow with `billing/webhook.rs` (Prompt 143).
+/// A merchant that records its cancels. With `fail` set its API calls are
+/// refused. Its webhook is believed with the header `FAKE_SIGNATURE: good`, and
+/// its body is `FakeEvent` as JSON, or `{"ignore": true}` for an event of no interest.
 #[derive(Default)]
 pub struct FakeBilling {
     pub cancelled: Mutex<Vec<String>>,
@@ -93,20 +96,88 @@ impl BillingProvider for FakeBilling {
 
     fn verify_signature(
         &self,
-        _headers: &HeaderMap,
+        headers: &HeaderMap,
         _raw_body: &[u8],
         _now: UnixSecs,
     ) -> Result<(), BillingError> {
-        self.answer(())
+        match headers.get(FAKE_SIGNATURE) {
+            Some(value) if value == "good" => Ok(()),
+            Some(_) | None => Err(BillingError::BadSignature),
+        }
     }
 
     fn parse_event(
         &self,
         _headers: &HeaderMap,
-        _raw_body: &[u8],
+        raw_body: &[u8],
     ) -> Result<Option<BillingEvent>, BillingError> {
-        self.answer(None)
+        let value: serde_json::Value =
+            serde_json::from_slice(raw_body).map_err(|_| BillingError::BadEvent)?;
+        if value.get("ignore").is_some() {
+            return Ok(None);
+        }
+        let event: FakeEvent = serde_json::from_value(value).map_err(|_| BillingError::BadEvent)?;
+        let owner = match (event.user, event.customer_owner) {
+            (Some(user), _) => EventOwner::User(UserId::new(user)),
+            (None, Some(customer)) => EventOwner::Customer(customer),
+            (None, None) => return Err(BillingError::BadEvent),
+        };
+        Ok(Some(BillingEvent {
+            provider_event_id: event.id,
+            owner,
+            customer_id: event.customer,
+            subscription_id: event.subscription,
+            kind: event.kind,
+            interval: event.interval,
+            current_period_end: event.period_end.map(UnixSecs::new),
+            occurred_at: UnixSecs::new(event.at),
+        }))
     }
+}
+
+/// The header the fake's webhook is signed with.
+pub const FAKE_SIGNATURE: &str = "x-fake-signature";
+
+/// The fake merchant's webhook body: `BillingEvent`, as plain JSON.
+#[derive(serde::Deserialize)]
+struct FakeEvent {
+    id: String,
+    user: Option<Uuid>,
+    customer_owner: Option<String>,
+    customer: String,
+    subscription: Option<String>,
+    #[serde(deserialize_with = "kind_of")]
+    kind: BillingEventKind,
+    #[serde(default)]
+    interval: Option<BillingInterval>,
+    period_end: Option<i64>,
+    at: i64,
+}
+
+fn kind_of<'de, D: serde::Deserializer<'de>>(reader: D) -> Result<BillingEventKind, D::Error> {
+    let text: String = serde::Deserialize::deserialize(reader)?;
+    match text.as_str() {
+        "activated" => Ok(BillingEventKind::Activated),
+        "renewed" => Ok(BillingEventKind::Renewed),
+        "past_due" => Ok(BillingEventKind::PastDue),
+        "cancel_scheduled" => Ok(BillingEventKind::CancelScheduled),
+        "canceled" => Ok(BillingEventKind::Canceled),
+        "refunded" => Ok(BillingEventKind::Refunded),
+        "resumed" => Ok(BillingEventKind::Resumed),
+        "plan_changed" => Ok(BillingEventKind::PlanChanged),
+        other => Err(serde::de::Error::custom(other.to_owned())),
+    }
+}
+
+/// A webhook from the fake merchant, signed.
+pub async fn webhook(app: &TestApp, body: &serde_json::Value) -> reqwest::Response {
+    app.client
+        .post(format!("{}/billing/webhook", app.base_url))
+        .header(FAKE_SIGNATURE, "good")
+        .json(body)
+        .send()
+        .await
+        .unwrap()
 }
 
 pub struct TestApp {
@@ -173,9 +244,10 @@ impl TestApp {
 /// be shutting down, so this runs on a thread with a runtime of its own.
 impl Drop for TestApp {
     fn drop(&mut self) {
-        // Each test binary reads what it needs of these. This one read keeps
-        // the ones a binary does not use from being called dead.
+        // Each test binary reads what it needs of these. These reads keep the
+        // ones a binary does not use from being called dead.
         let _ = (&self.pool, &self.mailer, &self.billing);
+        let _: fn(&'static TestApp, &'static serde_json::Value) -> _ = webhook;
         let drop_database = format!(
             r#"DROP DATABASE IF EXISTS "{}" WITH (FORCE)"#,
             self.database

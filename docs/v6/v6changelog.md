@@ -291,3 +291,24 @@ The four race and grace cases then ran 12 times: no failure.
 **Noted for P144.** A cancel that succeeded at the merchant, followed by a crash before the delete commits, leaves a row still `active` until the webhook lands. A retry then cancels a subscription already cancelled, so `adapter.rs` must answer that as a success. If it does not, the person cannot delete their account.
 
 **Tier 3.** `pnpm check` exit 0; `pnpm fixtures` up to date; `pnpm test`: Rust 758 / 0 / 4, up from 734, Vitest 336; `pnpm e2e` 16; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. **Push 1:** P137's CI passed earlier; this one carries P138 to P142, and P143 reads it first.
+
+## Entry 11 - 2026-11-03 - P143: billing core on a fake provider
+
+**Before it.** Push 1's CI (run 41502704869): media failed on known issue 3, its first attempt and its retry; a re-run of the failed job passed, with the same case flaky first. No web or CI file had changed since the run before. See the known issue.
+
+**Changed.** `billing/webhook.rs`: signature, then one transaction with the dedupe insert and the change. `next()`, pure, is TS §22.5's table with D-276's and D-301's rows. `billing/offers.rs`: offer to product and back. `db/subscriptions.rs`: `for_update`, `upsert`, `user_of_customer`. `db/webhook_events.rs`: `record`. `db/users.rs`: `lock`, so a delete cannot take a user from under a change. `POST /billing/webhook`, 64 kB, by address. `FakeBilling` reads its webhook from a plain JSON body. `no_media_routes.rs`, `rate_limit.rs` and `log_redaction.rs` meet the route.
+
+**Tests first.** `billing_events.rs` 10: **all 32 cells**, 8 kinds by 4 starting states, 17 applied and 15 ignored, against rows written by hand apart from the code; an ignored cell changes nothing. Then older events, the same second, another subscription (D-299), a refund naming no subscription, a customer-only owner (D-275), an unknown customer (D-284), missing fields. `webhook_idempotency.rs` 11: bad signature; applied, and the next token says Creator; replay; two deliveries at once; of no interest; unreadable; **a `Canceled` for a deleted user is 200 with the event kept**; **a forced failure in the change leaves no event row, and the retry applies it**; 64 kB read and one over refused.
+
+**The tests were tried against the bugs they guard, then restored.**
+
+| Bug put back | Caught by |
+|---|---|
+| Older events apply | `an_event_older_than_the_last_one_applied_is_ignored` |
+| Another subscription's event applies (D-299) | `an_event_for_another_subscription_is_ignored_except_activated` |
+| A recovery from past due is ignored (D-276) | `every_cell_of_the_table` |
+| The event row commits before the change | `a_failed_apply_leaves_no_event_row_and_the_retry_applies_it` |
+
+**Decided where the plan leaves it open.** `Canceled` and `PlanChanged` with no date keep the date there is: an event with no date must not end paid time. `Resumed` on a row with no scheduled cancel still applies, and changes only `last_event_at`. A signed body that cannot be read is 400, so the merchant retries while it is fixed; unknown types are 200 in `adapter.rs`.
+
+**Counts.** Rust 782 / 0 / 4, up from 758; Vitest 336; `pnpm check` exit 0. Not pushed: the next push is P148.

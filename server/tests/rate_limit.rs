@@ -5,8 +5,8 @@
     clippy::indexing_slicing
 )]
 //! TS §22.1's limits, end to end through the real routes. `rate_limit.rs`'s own
-//! tests hold the table and the bucket. The three billing routes join in
-//! Prompts 143 and 144.
+//! tests hold the table and the bucket. The two billing routes of a session join
+//! in Prompt 144.
 
 mod common;
 
@@ -113,6 +113,11 @@ async fn the_routes_limited_by_address_hold_to_their_limits() {
         let request = from(app.client.post(url("/auth/magic-link")), "203.0.113.4");
         let body = json!({ "email": format!("n{n}@example.com") });
         request.json(&body).send().map_ok()
+    })
+    .await;
+    holds_to("/billing/webhook", 120, |_| {
+        let request = from(app.client.post(url("/billing/webhook")), "203.0.113.8");
+        request.json(&json!({})).send().map_ok()
     })
     .await;
     holds_to("/auth/verify", 10, |_| {

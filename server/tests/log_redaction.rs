@@ -5,8 +5,8 @@
     clippy::indexing_slicing
 )]
 //! What the logs never hold (TS §24.4). The flows run with marker values, at a
-//! level louder than production's, and none may appear. The webhook joins in
-//! Prompt 143. This binary has one test, as a log subscriber is process-wide.
+//! level louder than production's, and none may appear. This binary has one
+//! test, as a log subscriber is process-wide.
 
 mod common;
 
@@ -14,7 +14,7 @@ use std::io::Write;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use common::TestApp;
+use common::{TestApp, webhook};
 use ed25519_dalek::SigningKey;
 use offcut_api::auth::access_token;
 use offcut_api::log::user_tag;
@@ -229,6 +229,34 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
         StatusCode::NOT_FOUND
     );
 
+    // A webhook applied, one ignored, and one with a bad signature.
+    let customer = "cus_markercustomer";
+    let subscription = "sub_markersubscription";
+    let event_id = "evt_markerevent";
+    markers.push(("a merchant's customer", customer.to_owned()));
+    markers.push(("a merchant's subscription", subscription.to_owned()));
+    markers.push(("a merchant's event", event_id.to_owned()));
+    let event = json!({
+        "id": event_id,
+        "user": claims.sub.get(),
+        "customer": customer,
+        "subscription": subscription,
+        "kind": "activated",
+        "interval": "monthly",
+        "period_end": now.get() + 1000,
+        "at": now.get(),
+    });
+    assert_eq!(webhook(&app, &event).await.status(), StatusCode::OK);
+    let mut ignored = event.clone();
+    ignored["id"] = json!("evt_markerignored");
+    markers.push(("an ignored event", "evt_markerignored".to_owned()));
+    assert_eq!(webhook(&app, &ignored).await.status(), StatusCode::OK);
+    let unsigned = app.client.post(url("/billing/webhook")).json(&event);
+    assert_eq!(
+        unsigned.send().await.unwrap().status(),
+        StatusCode::UNAUTHORIZED
+    );
+
     // Deleting the account.
     app.billing.fail.store(false, Ordering::SeqCst);
     let request = app.client.post(url("/account/delete")).bearer_auth(&access);
@@ -247,4 +275,5 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
     assert!(text.contains("/api/v1/auth/verify"), "{text}");
     assert!(text.contains("/api/v1/me"), "{text}");
     assert!(text.contains(&user_tag(claims.sub)), "{text}");
+    assert!(text.contains("billing_event_ignored"), "{text}");
 }

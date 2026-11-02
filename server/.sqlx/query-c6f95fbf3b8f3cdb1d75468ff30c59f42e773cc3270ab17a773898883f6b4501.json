@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO webhook_events (provider_event_id, event_type) VALUES ($1, $2)\n         ON CONFLICT (provider_event_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6f95fbf3b8f3cdb1d75468ff30c59f42e773cc3270ab17a773898883f6b4501"
+}
