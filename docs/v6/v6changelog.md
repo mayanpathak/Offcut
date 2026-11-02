@@ -22,7 +22,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner. Run 41502704869 failed it and its retry, so the run went red with no web change since the run before. Now its message speaks: on the retry the page said `UNSUPPORTED_STORAGE`, "Your browser will not let Offcut keep files on this device". On the first attempt the drop zone's words were on the page only as the 90 s ended. The storage check has 2 s, and a check that has not answered counts as a no, as `requestAdapter` once did (the comment on `PER_CHECK_TIMEOUT_MS`). Likely: a slow disk just after the case before, on the runner. Not proven. If so, a person on a busy machine could be told the same, wrongly. Founder's call, see the reply of 2026-11-03 | Founder, then P145 |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain | Next CI runs |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -312,3 +312,15 @@ The four race and grace cases then ran 12 times: no failure.
 **Decided where the plan leaves it open.** `Canceled` and `PlanChanged` with no date keep the date there is: an event with no date must not end paid time. `Resumed` on a row with no scheduled cancel still applies, and changes only `last_event_at`. A signed body that cannot be read is 400, so the merchant retries while it is fixed; unknown types are 200 in `adapter.rs`.
 
 **Counts.** Rust 782 / 0 / 4, up from 758; Vitest 336; `pnpm check` exit 0. Not pushed: the next push is P148.
+
+## Entry 12 - 2026-11-03 - The storage check's second try (outside a prompt, founder's decision)
+
+**Why.** Known issue 3's new message showed a capable browser told "Your browser will not let Offcut keep files". The check has 2 s, and no answer counted as a no. A person on a busy laptop could be told the same, wrongly, and go looking for a setting that is not there.
+
+**Changed.** `platform/capability.ts`: `storageAnswer`. A check that has not answered is asked once more, and either try's answer counts. A no or a rejection is final at once. Only this check; the others keep one wait.
+
+**Trade-off, accepted by the founder.** With a slow disk the run can take up to 4 s, past PS §9.3's 3 s. A normal run is unchanged. P150 copies this to TS §13.2.
+
+**Tests first.** 8 cases in `capability.test.ts`; 4 failed before the code. Two existing cases used `storageOk` as their example of a check that hangs, and now use `aacEncode`, or leave storage out, with the same assertions: this is not a weakened test, as the storage check's own rule has its own cases now. One case caught a real bug in the first version, which read a rejection as no answer yet and asked again.
+
+**Counts.** Rust 782 / 0 / 4; Vitest 344, up from 336; `pnpm e2e` 16; `pnpm check` exit 0.

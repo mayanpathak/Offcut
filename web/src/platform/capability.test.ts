@@ -96,7 +96,7 @@ describe("a check that never answers", () => {
   it("has failed after PER_CHECK_TIMEOUT_MS, and the run ends inside the 3 s budget", async () => {
     vi.useFakeTimers();
     let report: Awaited<ReturnType<typeof runCapabilityCheck>> | undefined;
-    void runCapabilityCheck(probe({ storageOk: never })).then((done) => {
+    void runCapabilityCheck(probe({ aacEncode: never })).then((done) => {
       report = done;
     });
 
@@ -104,14 +104,13 @@ describe("a check that never answers", () => {
     expect(report).toBeUndefined();
     await vi.advanceTimersByTimeAsync(1);
     expect(report?.result).toBe("fail");
-    expect(report?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+    expect(report?.unsupported_reason).toBe("UNSUPPORTED_AAC_ENCODE");
     expect(PER_CHECK_TIMEOUT_MS).toBeLessThanOrEqual(LIMITS.CAPABILITY_CHECK_BUDGET);
   });
 
   it("still ends after one timeout when every slow check hangs, because they run together", async () => {
     vi.useFakeTimers();
     const hanging = probe({
-      storageOk: never,
       gpuVendor: never,
       h264Decode: never,
       h264Encode: never,
@@ -124,8 +123,8 @@ describe("a check that never answers", () => {
     });
 
     await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS);
-    // Six checks timed out, in one second and not in six.
-    expect(report?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+    // Five checks timed out, in one timeout and not in five.
+    expect(report?.unsupported_reason).toBe("UNSUPPORTED_WEBGPU");
     expect(report?.gpu_vendor).toBe("unknown");
   });
 
@@ -219,6 +218,122 @@ describe("a check that throws", () => {
     await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS * 3);
     // Vitest fails the run on an unhandled rejection; reaching here is the proof.
     await expect(report).resolves.toMatchObject({ unsupported_reason: "UNSUPPORTED_AAC_ENCODE" });
+  });
+});
+
+// A slow disk is not a browser that refuses to keep files, so the storage check
+// alone gets a second try (founder, 2026-11-03; V6 CL known issue 3). A real "no"
+// is still a no at once.
+describe("the storage check", () => {
+  type Report = Awaited<ReturnType<typeof runCapabilityCheck>>;
+
+  function run(storageOk: PlatformProbe["storageOk"]): { report: () => Report | undefined } {
+    let report: Report | undefined;
+    void runCapabilityCheck(probe({ storageOk })).then((done) => {
+      report = done;
+    });
+    return { report: () => report };
+  }
+
+  it("that says no fails at once, with no second try", async () => {
+    vi.useFakeTimers();
+    const asked = vi.fn(() => Promise.resolve(false));
+    const { report } = run(asked);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(report()?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("that rejects fails at once, with no second try", async () => {
+    vi.useFakeTimers();
+    const asked = vi.fn(() => Promise.reject(new Error("no")));
+    const { report } = run(asked);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(report()?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("that answers in time is asked once", async () => {
+    vi.useFakeTimers();
+    const asked = vi.fn(() => Promise.resolve(true));
+    const { report } = run(asked);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(report()?.result).toBe("pass");
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("that never answers is asked again, and fails only after the second wait", async () => {
+    vi.useFakeTimers();
+    const asked = vi.fn(never<boolean>);
+    const { report } = run(asked);
+
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS);
+    expect(report()).toBeUndefined();
+    expect(asked).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS - 1);
+    expect(report()).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(report()?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+    expect(asked).toHaveBeenCalledTimes(2);
+  });
+
+  it("that is slow the first time and quick the second passes", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const { report } = run(() => {
+      calls += 1;
+      return calls === 1 ? never<boolean>() : Promise.resolve(true);
+    });
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS);
+    expect(report()?.result).toBe("pass");
+  });
+
+  it("whose first answer arrives during the second wait passes", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const { report } = run(() => {
+      calls += 1;
+      if (calls > 1) {
+        return never<boolean>();
+      }
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(true);
+        }, PER_CHECK_TIMEOUT_MS + 500);
+      });
+    });
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS + 500);
+    expect(report()?.result).toBe("pass");
+  });
+
+  it("whose second try says no fails", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const { report } = run(() => {
+      calls += 1;
+      return calls === 1 ? never<boolean>() : Promise.resolve(false);
+    });
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS);
+    expect(report()?.unsupported_reason).toBe("UNSUPPORTED_STORAGE");
+  });
+
+  it("causes no unhandled rejection when its first try rejects during the second", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const { report } = run(() => {
+      calls += 1;
+      if (calls > 1) {
+        return Promise.resolve(true);
+      }
+      return new Promise((_resolve, reject) => {
+        setTimeout(() => {
+          reject(new Error("too late"));
+        }, PER_CHECK_TIMEOUT_MS * 3);
+      });
+    });
+    await vi.advanceTimersByTimeAsync(PER_CHECK_TIMEOUT_MS * 4);
+    expect(report()?.result).toBe("pass");
   });
 });
 

@@ -622,6 +622,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 | TS §12.2, §12.3 | Auth machine's rows (D-295) |
 | TS §22.1 | Magic link's 503 beside "always 202" (D-254); checkout's 403 (D-300) |
 | TS §12.5 | Button split (D-290) |
+| TS §13.2, PS §9.3 | The storage check's second try, past 3 s on a slow disk only (V6 CL Entry 12) |
 | TS §22.2; PS §16 | `users.email` normalized (D-260); rotation in the grace, the lock (D-258, D-297) |
 | TS §22.5 | Trait, `EventOwner`, table rows, new kinds, subscription id, refusal (D-274 to D-276, D-299 to D-301) |
 | TS §22.8 | Variables (D-251, D-273) |
