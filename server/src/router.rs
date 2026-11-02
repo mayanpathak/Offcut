@@ -35,8 +35,7 @@ pub fn build(state: AppState) -> Router {
     // Layer 6, per route: a body limit other than the default.
     let body = DefaultBodyLimit::max;
 
-    // The table of TS §22.1, in its order. The routes still to come in
-    // V6 are comments: route, body limit, rate limit group.
+    // The table of TS §22.1, in its order.
     let api = Router::new()
         .route("/healthz", get(healthz).layer(ip(RouteGroup::Healthz)))
         // `MagicLinkEmail`, the other limit of this route, is checked in its
@@ -62,8 +61,9 @@ pub fn build(state: AppState) -> Router {
         // These two are limited per user in their handlers.
         .route("/entitlement", get(entitlement::get_entitlement))
         .route("/usage/receipts", post(usage::post_receipt).layer(body(KB)))
-        // POST /billing/checkout   1 kB     Checkout
-        // GET  /billing/portal     none     Portal
+        // These two are limited per user in their handlers.
+        .route("/billing/checkout", post(billing::checkout).layer(body(KB)))
+        .route("/billing/portal", get(billing::portal))
         .route(
             "/billing/webhook",
             post(billing::webhook::handle).layer((body(64 * KB), ip(RouteGroup::Webhook))),

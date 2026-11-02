@@ -25,3 +25,14 @@ Decision: `lettre` over SMTP on 2525 stands (D-252). D-253's stop is not met.
 **What this does not prove.** Nothing was sent to Outlook, Yahoo or any other provider, and Brevo marks this sender "Freemail domain is not recommended" (D-256). A person on another provider may not get a sign-in link, and V6 has no other way in. The pass of BP §8.2 is not met; the founder accepted that. Read it again with real sign-ups, from the alpha on: a rise in `signin_step` `link_requested` with no `completed` is the sign. The remedy stays a domain, the founder's call.
 
 Quota: Brevo's free plan, 300 a day against the 100 the pass asks.
+
+## TE-9: the merchant. Dodo Payments, test mode, 2026-11-03
+
+| Reading | Result |
+|---|---|
+| Hosted checkout with `metadata`; a customer portal | Both work, through `adapter.rs` |
+| `Activated`, `Renewed`, `PastDue`, `CancelScheduled`, `Canceled`, `Refunded` | All six observed, from real deliveries |
+| A timed-out webhook retried | A 500 is retried after about 6 s, with the same `webhook-id` |
+| A test purchase updates the row and the next token says Creator | Through the fake provider only so far. Read on the deployed site at G 14.6 |
+
+Approval for live mode is not part of this: it belongs to the founding release (`buildplan.md` §8A.6).

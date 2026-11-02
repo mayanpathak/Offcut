@@ -119,6 +119,17 @@ pub async fn live_id(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx
     Ok(row.map(|row| row.provider_subscription_id))
 }
 
+/// The merchant's id of the user's customer, if they have ever subscribed.
+pub async fn customer_id(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::Error> {
+    let row = sqlx::query!(
+        "SELECT provider_customer_id FROM subscriptions WHERE user_id = $1",
+        user.get(),
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|row| row.provider_customer_id))
+}
+
 /// The user's subscription, as `GET /me` shows it. A column value outside its
 /// `CHECK` is an error, since the database cannot hold one.
 pub async fn summary(

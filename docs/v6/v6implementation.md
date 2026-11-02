@@ -187,9 +187,8 @@ All are **(V6 decision)** unless they say otherwise.
 | Crate | Version | Features | For |
 |---|---|---|---|
 | `lettre` | 0.11 | D-249 | Mail |
-| `reqwest` (moves from dev-only) | 0.13.5 | `json`, `rustls-no-provider` | Provider API |
+| `reqwest` (moves from dev-only) | 0.13.5 | `json`, `query`, `rustls-no-provider` | Provider API. Trust roots from the image's `ca-certificates` (read at P144) |
 | `rustls` | 0.23 | `ring`, `std`, no default | One provider, installed in `main.rs` |
-| `webpki-roots` | 1 | | Reqwest's trust roots **(read at P144: `rustls-no-provider` may need them set explicitly)** |
 | `hmac` | 0.13 | | Webhook signature |
 | `getrandom` | 0.4 | | Tokens |
 | `async-trait` | 0.1 | | `dyn Mailer`, `dyn BillingProvider` (TS §22.5) |

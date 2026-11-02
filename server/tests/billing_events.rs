@@ -376,3 +376,15 @@ async fn a_cancel_or_a_plan_change_that_does_not_say_a_date_keeps_the_one_there_
     let row = row_of(&app, user).await.unwrap();
     assert_eq!((row.status.as_str(), row.period_end), ("canceled", OLD_END));
 }
+
+/// `subscription.updated` fires on any change. With no cancel scheduled it says
+/// nothing, and must not move `last_event_at`.
+#[tokio::test]
+async fn resumed_with_no_scheduled_cancel_changes_nothing_at_all() {
+    let app = TestApp::spawn().await;
+    let user = new_user(&app).await;
+    let before = seeded("active", false);
+    seed(&app, user, &before).await;
+    send(&app, &event(user, "resumed")).await;
+    assert_eq!(row_of(&app, user).await.unwrap(), before);
+}

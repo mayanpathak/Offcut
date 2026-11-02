@@ -54,7 +54,21 @@ pub async fn handle(
         Some(user) => {
             let row = subscriptions::for_update(&mut tx, user).await?;
             match next(row.as_ref(), &event) {
-                Some(changed) => subscriptions::upsert(&mut tx, user, &changed).await?,
+                Some(changed) => {
+                    subscriptions::upsert(&mut tx, user, &changed).await?;
+                    // A refund does not stop the subscription at the merchant (read
+                    // in test mode), and the policy says it ends the plan. Inside
+                    // the transaction: if this fails, nothing is recorded, and the
+                    // merchant's retry tries again.
+                    if event.kind == BillingEventKind::Refunded && row.as_ref().is_some_and(is_live)
+                    {
+                        state
+                            .billing
+                            .cancel_subscription(&changed.subscription_id)
+                            .await
+                            .map_err(|_| AppError::BillingUnavailable)?;
+                    }
+                }
                 None => ignored(event.kind),
             }
         }
@@ -97,6 +111,10 @@ fn kind_text(kind: BillingEventKind) -> &'static str {
     }
 }
 
+fn is_live(row: &SubscriptionRow) -> bool {
+    row.status == SubscriptionStatus::Active || row.status == SubscriptionStatus::PastDue
+}
+
 fn time_of(secs: UnixSecs) -> Option<OffsetDateTime> {
     OffsetDateTime::from_unix_timestamp(secs.get()).ok()
 }
@@ -122,9 +140,7 @@ fn next(from: Option<&SubscriptionRow>, event: &BillingEvent) -> Option<Subscrip
         }
     }
 
-    let live = from.filter(|row| {
-        row.status == SubscriptionStatus::Active || row.status == SubscriptionStatus::PastDue
-    });
+    let live = from.filter(|row| is_live(row));
     let changed = |change: &dyn Fn(&mut SubscriptionRow), row: &SubscriptionRow| {
         let mut row = row.clone();
         row.last_event_at = occurred;
@@ -168,7 +184,13 @@ fn next(from: Option<&SubscriptionRow>, event: &BillingEvent) -> Option<Subscrip
         BillingEventKind::CancelScheduled => {
             Some(changed(&|row| row.cancel_at_period_end = true, live?))
         }
-        BillingEventKind::Resumed => Some(changed(&|row| row.cancel_at_period_end = false, live?)),
+        // `subscription.updated` fires on any change, and carries this flag each
+        // time (read in test mode). With no cancel scheduled it says nothing, and
+        // must not move `last_event_at`, or it would hide a retried older event.
+        BillingEventKind::Resumed => {
+            let scheduled = live.filter(|row| row.cancel_at_period_end)?;
+            Some(changed(&|row| row.cancel_at_period_end = false, scheduled))
+        }
         BillingEventKind::Canceled => Some(changed(
             &|row| {
                 row.status = SubscriptionStatus::Canceled;

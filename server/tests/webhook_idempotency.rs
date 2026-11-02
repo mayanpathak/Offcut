@@ -9,6 +9,8 @@
 
 mod common;
 
+use std::sync::atomic::Ordering;
+
 use common::{FAKE_SIGNATURE, TestApp, webhook};
 use ed25519_dalek::SigningKey;
 use offcut_api::entitlement::issue::issue;
@@ -266,4 +268,83 @@ async fn the_routes_own_answers_never_echo_the_body() {
         .await
         .unwrap();
     assert!(!response.text().await.unwrap().contains("echo-me"));
+}
+
+fn refund(id: &str, user: Uuid) -> Value {
+    json!({
+        "id": id,
+        "user": null,
+        "customer_owner": format!("cus_{user}"),
+        "customer": format!("cus_{user}"),
+        "subscription": null,
+        "kind": "refunded",
+        "interval": null,
+        "period_end": null,
+        "at": AT + 1,
+    })
+}
+
+/// A refund does not stop the subscription at the merchant, and the policy says
+/// it ends the plan. Without this the person goes on being charged, as Free.
+#[tokio::test]
+async fn a_refund_cancels_the_subscription_at_the_merchant() {
+    let app = TestApp::spawn().await;
+    let user = new_user(&app).await;
+    assert_eq!(
+        webhook(&app, &activated("evt_1", user)).await.status(),
+        StatusCode::OK
+    );
+
+    assert_eq!(
+        webhook(&app, &refund("evt_2", user)).await.status(),
+        StatusCode::OK
+    );
+    let cancelled = app.billing.cancelled.lock().unwrap().clone();
+    assert_eq!(cancelled, [format!("sub_{user}")]);
+
+    // Its replay does not cancel again.
+    assert_eq!(
+        webhook(&app, &refund("evt_2", user)).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(app.billing.cancelled.lock().unwrap().len(), 1);
+
+    // A later refund of an ended subscription has nothing to stop.
+    assert_eq!(
+        webhook(&app, &refund("evt_3", user)).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(app.billing.cancelled.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_refund_whose_cancel_fails_leaves_nothing_and_the_retry_does_it() {
+    let app = TestApp::spawn().await;
+    let user = new_user(&app).await;
+    assert_eq!(
+        webhook(&app, &activated("evt_1", user)).await.status(),
+        StatusCode::OK
+    );
+
+    app.billing.fail.store(true, Ordering::SeqCst);
+    let failed = webhook(&app, &refund("evt_2", user)).await;
+    assert_eq!(failed.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(events(&app).await, ["evt_1"]);
+    let status: String = sqlx::query_scalar("SELECT status FROM subscriptions")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "active");
+
+    app.billing.fail.store(false, Ordering::SeqCst);
+    assert_eq!(
+        webhook(&app, &refund("evt_2", user)).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(app.billing.cancelled.lock().unwrap().len(), 1);
+    let status: String = sqlx::query_scalar("SELECT status FROM subscriptions")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "canceled");
 }

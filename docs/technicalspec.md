@@ -595,6 +595,9 @@ offcut/
 │       ├── usage_receipts.rs
 │       ├── webhook_idempotency.rs
 │       ├── billing_events.rs
+│       ├── billing_routes.rs          checkout and the portal, on the fake merchant
+│       ├── dodo_adapter.rs            the adapter, from fixtures/dodo/, with no network
+│       ├── fixtures/dodo/             real test-mode deliveries, with people's details and ids replaced
 │       ├── analytics_allowlist.rs
 │       ├── rate_limit.rs
 │       ├── account_delete.rs

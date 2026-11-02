@@ -71,8 +71,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 async-trait = "0.1"
 # 32 random bytes for a link or a refresh token. The server only (v6implementation D-257).
 getrandom = "0.4"
-# No TLS: the server tests call the API on 127.0.0.1 over plain HTTP.
+# The server's calls to the merchant. TLS is turned on in `server/Cargo.toml`.
 reqwest = { version = "0.13.5", default-features = false }
+hmac = "0.13"
 # Exact: must equal the installed wasm-bindgen CLI (scripts/build-wasm.sh checks it).
 wasm-bindgen = "=0.2.129"
 # The releases that go with that wasm-bindgen. For the binding crates only.

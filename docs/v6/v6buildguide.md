@@ -240,7 +240,7 @@ Agent reads `GET /` of the endpoint, scrubs email, name and ids into `server/tes
 | 14.1 | Agent | `git grep -nE "\bV6\b" -- web/src crates server`: no marker of work to do. Copy-back §21. BP §8A.0's estimate |
 | 14.2 | Agent | Tier 4, once. V6 changes no render path, so **no bench** |
 | 14.3 | Agent | Push 3; `gh pr checks <pr> --watch`, in the background |
-| 14.4 | **Founder** | Render: add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `BILLING_API_BASE_URL`, real `BILLING_*`. Keep `MAIL_API_KEY` until the deploy is healthy, then remove it |
+| 14.4 | **Founder** | Render: add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `BILLING_API_BASE_URL`, real `BILLING_*`. `BILLING_WEBHOOK_SECRET` must be a real `whsec_` value already, or the server stops at boot: use the test-mode one of `.env.deploy`, and Step 14.6 replaces it. Keep `MAIL_API_KEY` until the deploy is healthy, then remove it |
 | 14.5 | **Founder** | `gh pr ready`, merge, watch the `main` run |
 | 14.6 | **Founder** | Register the webhook URL for test mode, and put its secret in Render. On the live site: real mail signs in; Free export; test purchase; Creator export; refund; delete a test account. The founder saves both exports outside the repository and the agent runs `verify_mp4.py` on them (§20). Founder reads `subscriptions` in production. BP §8.3's checkout row, and any TE-9 row left |
 | 14.7 | Agent | `healthz` shows the merge; header check; closing entry |

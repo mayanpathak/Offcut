@@ -4,7 +4,8 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use offcut_api::billing::provider::UnconfiguredBilling;
+use offcut_api::billing::adapter::DodoBilling;
+use offcut_api::billing::provider::BillingError;
 use offcut_api::config::Config;
 use offcut_api::mail::MailError;
 use offcut_api::mail::smtp_mailer::SmtpMailer;
@@ -52,6 +53,8 @@ enum ServeError {
     Migrate(#[from] sqlx::migrate::MigrateError),
     #[error("cannot set up mail: {0}")]
     Mail(#[from] MailError),
+    #[error("cannot set up billing: {0}")]
+    Billing(#[from] BillingError),
     #[error("cannot listen or serve: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -65,13 +68,14 @@ async fn serve(config: Config) -> Result<(), ServeError> {
 
     let mailer = Arc::new(SmtpMailer::new(&config)?);
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
+    let config = Arc::new(config);
+    let billing = Arc::new(DodoBilling::new(config.clone())?);
     let state = AppState {
         db: pool,
-        config: Arc::new(config),
+        config,
         limiter: Arc::new(RateLimiter::new(RATE_LIMIT_MAX_KEYS)),
         mailer,
-        // The merchant's adapter replaces this in Prompt 144.
-        billing: Arc::new(UnconfiguredBilling),
+        billing,
         fair_use: Arc::default(),
     };
     // The rate limiter needs the peer address of each connection.

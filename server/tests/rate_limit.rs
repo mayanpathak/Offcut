@@ -5,8 +5,7 @@
     clippy::indexing_slicing
 )]
 //! TS §22.1's limits, end to end through the real routes. `rate_limit.rs`'s own
-//! tests hold the table and the bucket. The two billing routes of a session join
-//! in Prompt 144.
+//! tests hold the table and the bucket.
 
 mod common;
 
@@ -191,6 +190,25 @@ async fn the_routes_limited_by_user_hold_to_their_limits_for_each_user() {
         let request = app.client.post(url("/usage/receipts")).bearer_auth(&access);
         request
             .json(&json!({ "export_id": Uuid::now_v7() }))
+            .send()
+            .map_ok()
+    })
+    .await;
+    holds_to("/billing/checkout", 10, |_| {
+        let request = app
+            .client
+            .post(url("/billing/checkout"))
+            .bearer_auth(&access);
+        request
+            .json(&json!({ "offer": "creator_monthly" }))
+            .send()
+            .map_ok()
+    })
+    .await;
+    holds_to("/billing/portal", 10, |_| {
+        app.client
+            .get(url("/billing/portal"))
+            .bearer_auth(&access)
             .send()
             .map_ok()
     })

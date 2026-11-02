@@ -1,0 +1,82 @@
+{
+  "business_id": "bus_test",
+  "data": {
+    "billing": {
+      "city": "Test City",
+      "country": "US",
+      "state": "CA",
+      "street": "1 Test Street",
+      "zipcode": "94000"
+    },
+    "brand_id": "bus_test",
+    "business_id": "bus_test",
+    "card_exp_month": "06",
+    "card_exp_year": "32",
+    "card_holder_name": null,
+    "card_issuing_country": "GB",
+    "card_last_four": "4242",
+    "card_network": "visa",
+    "card_type": "credit",
+    "charge_type": "new",
+    "checkout_session_id": "cks_test",
+    "created_at": "2026-11-02T22:05:05.302724Z",
+    "currency": "USD",
+    "custom_field_responses": null,
+    "customer": {
+      "customer_id": "cus_test",
+      "email": "test@example.com",
+      "metadata": {},
+      "name": "Test Person",
+      "phone_number": null
+    },
+    "digital_products_delivered": false,
+    "discount_id": null,
+    "discounts": null,
+    "disputes": [],
+    "error_code": null,
+    "error_message": null,
+    "includes_usage": false,
+    "invoice_id": null,
+    "invoice_url": null,
+    "is_multi_subscription": false,
+    "is_update_payment_method": false,
+    "metadata": {
+      "user_id": "0190f3a2-7b1c-7def-8a55-0123456789ab"
+    },
+    "payload_type": "Payment",
+    "payment_id": "pay_test",
+    "payment_link": null,
+    "payment_method": "card",
+    "payment_method_id": "pm_test",
+    "payment_method_type": "credit",
+    "payment_provider": "dodo",
+    "product_cart": null,
+    "refund_status": null,
+    "refunds": [],
+    "retry_attempt": 0,
+    "service_periods": [
+      {
+        "ends_at": "2026-12-02T22:05:55.594801Z",
+        "proration_factor": "1",
+        "starts_at": "2026-11-02T22:05:05.302724Z",
+        "subscription_id": "sub_test"
+      }
+    ],
+    "settlement_amount": 1500,
+    "settlement_currency": "USD",
+    "settlement_tax": 0,
+    "status": "succeeded",
+    "subscription_id": "sub_test",
+    "subscription_ids": [
+      "sub_test"
+    ],
+    "tax": 0,
+    "three_ds_flow": null,
+    "three_ds_status": null,
+    "three_ds_version": null,
+    "total_amount": 1500,
+    "updated_at": null
+  },
+  "timestamp": "2026-11-02T22:05:55.565714Z",
+  "type": "payment.succeeded"
+}

@@ -17,6 +17,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
+| 16 | Delete the webhook logger on Render, and its endpoint in Dodo's test mode. The endpoint for the deployed site is registered at G 14.6 | Founder | Entry 13 |
 
 ## Known issues for later prompts
 
@@ -309,7 +310,7 @@ The four race and grace cases then ran 12 times: no failure.
 | A recovery from past due is ignored (D-276) | `every_cell_of_the_table` |
 | The event row commits before the change | `a_failed_apply_leaves_no_event_row_and_the_retry_applies_it` |
 
-**Decided where the plan leaves it open.** `Canceled` and `PlanChanged` with no date keep the date there is: an event with no date must not end paid time. `Resumed` on a row with no scheduled cancel still applies, and changes only `last_event_at`. A signed body that cannot be read is 400, so the merchant retries while it is fixed; unknown types are 200 in `adapter.rs`.
+**Decided where the plan leaves it open.** `Canceled` and `PlanChanged` with no date keep the date there is: an event with no date must not end paid time. A signed body that cannot be read is 400, so the merchant retries while it is fixed; unknown types are 200 in `adapter.rs`.
 
 **Counts.** Rust 782 / 0 / 4, up from 758; Vitest 336; `pnpm check` exit 0. Not pushed: the next push is P148.
 
@@ -324,3 +325,47 @@ The four race and grace cases then ran 12 times: no failure.
 **Tests first.** 8 cases in `capability.test.ts`; 4 failed before the code. Two existing cases used `storageOk` as their example of a check that hangs, and now use `aacEncode`, or leave storage out, with the same assertions: this is not a weakened test, as the storage check's own rule has its own cases now. One case caught a real bug in the first version, which read a rejection as no answer yet and asked again.
 
 **Counts.** Rust 782 / 0 / 4; Vitest 344, up from 336; `pnpm e2e` 16; `pnpm check` exit 0.
+
+## Entry 13 - 2026-11-03 - P144: the provider's adapter, from real payloads
+
+**Founder's steps.** Three test-mode products, tax-inclusive (the founder's decision: the price on the page is what a person pays), an API key, and a throwaway logging endpoint for webhooks. Payments and a refund by hand. **Still the founder's:** delete the logger service on Render, and remove its webhook endpoint from Dodo's test mode (open item 16).
+
+**What real deliveries answered, 64 of them (V6 §10.2's questions).**
+
+| Question | Reading |
+|---|---|
+| Does `metadata.user_id` reach subscription events? | **Yes**, and payment events. D-280's stop is not met |
+| Is `webhook-id` the same on a retry? | **Yes**: the same id with a new timestamp. No stop |
+| Do real signatures verify? | **Yes**, 64 of 64 through the Rust adapter, with the real secret |
+| A first payment | `subscription.active`, `renewed` and `updated` in one second, in either order |
+| A renewal | `subscription.renewed`, with the new `next_billing_date` |
+| A declined renewal | `payment.failed`, then `subscription.on_hold`. **`next_billing_date` has already moved forward**, so the paid period is read only from kinds that say a period was paid |
+| Recovery | `renewed` and `active` together. D-276 is real, and either alone recovers |
+| A scheduled cancel, and taking it back | `subscription.updated`, with its flag |
+| A cancel | `subscription.cancelled` and `updated`, `next_billing_date` kept as the paid time |
+| A refund | `refund.succeeded`: `is_partial`, the customer, **no metadata, no subscription id**. D-275 is real |
+| A second cancel | 200, so a retried delete cannot stick (Entry 10's note) |
+| A partial refund, `plan_changed`, `past_due` | Not produced. Mapped from the documents and fixtures edited to match. **G 14.6 reads them if they occur** |
+
+**Two things only the real payloads showed, and the code changed for them.**
+
+1. **A refund does not stop the subscription at the merchant.** With the plan as written, the row said `canceled` while Dodo went on charging monthly, the renewals ignored from `canceled`: a person paying and on Free. The webhook now cancels at the merchant, inside the transaction, so a failure leaves no event row and the retry does it. The Refund policy on the live site says a refund ends the plan, which is now true.
+2. **`subscription.updated` fires on nearly every change.** Mapped to `Resumed`, 28 of 64 deliveries, each moved `last_event_at` and could have hidden a retried older event. `Resumed` now applies only to a row with a cancel scheduled. Entry 11's line saying otherwise is removed.
+
+**Changed.** `billing/adapter.rs`; `POST /billing/checkout`, with D-300's refusal; `GET /billing/portal`; `db/subscriptions.rs`'s `customer_id`; `main.rs` builds the real provider, and a secret that is not a `whsec_` value stops the boot, so G 14.4 says so. `reqwest`, `hmac` join the server. `UnconfiguredBilling` goes: nothing uses it now.
+
+**Differs from the plan.** `webpki-roots` is not added: the image has `ca-certificates`. Fixtures replace the real address and phone though the founder did not mind, because the repository is public and a fixture does not need them; the script checked 20 real values absent from all 11 files. `past_due` from `subscription.on_hold` is the same kind as `subscription.past_due`.
+
+**Tests.** `dodo_adapter.rs` 18, including Standard Webhooks' published vector and one-byte, wrong-secret, old-timestamp and missing-header refusals. `billing_routes.rs` 8. `webhook_idempotency.rs` +2, on the refund's cancel. `billing_events.rs` +1. **Against the real thing, from a temporary program since deleted:** every real delivery parsed, with no error; a real checkout and portal link; a cancel of a cancelled subscription; a bad id and an unknown subscription each refused.
+
+**The tests were tried against the bugs they guard, then restored.**
+
+| Bug put back | Caught by |
+|---|---|
+| A refund does not cancel at the merchant | `a_refund_cancels_the_subscription_at_the_merchant`, and the retry case |
+| The signature is not compared | The one-byte, wrong-secret and vector cases |
+| A declined renewal moves the paid period | `subscription_on_hold_is_past_due_and_does_not_move_the_paid_period` |
+
+**Open.** A refund names only the customer, so a refund of an old payment also ends the current plan. The founder issues refunds, so this is known and left. No live-mode call has been made.
+
+**Counts.** Rust 812 / 0 / 4, up from 782; Vitest 344, as nothing under `web/` changed; `pnpm check` exit 0; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P148.
