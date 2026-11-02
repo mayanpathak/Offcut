@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_subscription_id FROM subscriptions\n         WHERE user_id = $1 AND status IN ('active', 'past_due')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_subscription_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "provider_subscription_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "70176923f3d6a53a37c5bd15d5b392597e105f8f974923bed96788bcc49fca0a"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM magic_links WHERE email_normalized = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "724dfa5f333d1027e05ba45ff46968f873c343af5f7dd26b61aeb5d14dba9ff0"
+}

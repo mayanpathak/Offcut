@@ -11,6 +11,11 @@ pub mod sessions;
 pub mod subscriptions;
 pub mod usage_receipts;
 pub mod users;
+pub mod webhook_events;
+
+/// Every table with a row per user (v6implementation D-270, S-10). Deletion and
+/// export each have a test that fails on a table left out: a new one goes here.
+pub const USER_TABLES: &[&str] = &["sessions", "subscriptions", "usage_receipts"];
 
 /// The free database tier allows few connections (TS §22.9).
 const MAX_CONNECTIONS: u32 = 5;

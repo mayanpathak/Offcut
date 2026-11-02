@@ -1,6 +1,7 @@
 //! The `users` table.
 
-use offcut_types::UserId;
+use offcut_api_types::ExportedUser;
+use offcut_types::{UnixSecs, UserId};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -29,4 +30,25 @@ pub async fn email(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::
         .fetch_optional(pool)
         .await?;
     Ok(row.map(|row| row.email))
+}
+
+/// Removes the user. The foreign keys take the rows of `USER_TABLES` with it.
+pub async fn delete(conn: &mut PgConnection, user: UserId) -> Result<(), sqlx::Error> {
+    sqlx::query!("DELETE FROM users WHERE id = $1", user.get())
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
+pub async fn exported(pool: &PgPool, user: UserId) -> Result<Option<ExportedUser>, sqlx::Error> {
+    let row = sqlx::query!(
+        "SELECT email, created_at FROM users WHERE id = $1",
+        user.get()
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|row| ExportedUser {
+        email: row.email,
+        created_at: UnixSecs::new(row.created_at.unix_timestamp()),
+    }))
 }

@@ -1,7 +1,7 @@
 //! The `platform_waitlist` table: who asked to be told about what.
 
 use offcut_api_types::Wanted;
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 
 /// Adds the pair if it is not there yet. The caller cannot tell which
 /// happened, so the waitlist cannot be probed for an address.
@@ -17,6 +17,19 @@ pub async fn upsert(
         wanted_text(wanted),
     )
     .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_for_email(
+    conn: &mut PgConnection,
+    email_normalized: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM platform_waitlist WHERE email_normalized = $1",
+        email_normalized,
+    )
+    .execute(conn)
     .await?;
     Ok(())
 }

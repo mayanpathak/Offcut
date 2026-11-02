@@ -1,3 +1,5 @@
-//! The account routes. V1 has the waitlist only; deletion and export arrive in V6.
+//! The account routes: the waitlist, and a person's deletion and export.
 
+pub mod delete;
+pub mod export;
 pub mod notify;

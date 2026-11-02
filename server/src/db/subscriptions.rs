@@ -20,6 +20,18 @@ pub async fn period_end(
     Ok(row.map(|row| row.current_period_end))
 }
 
+/// The merchant's id of a subscription that would go on charging, if any.
+pub async fn live_id(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::Error> {
+    let row = sqlx::query!(
+        "SELECT provider_subscription_id FROM subscriptions
+         WHERE user_id = $1 AND status IN ('active', 'past_due')",
+        user.get(),
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|row| row.provider_subscription_id))
+}
+
 /// The user's subscription, as `GET /me` shows it. A column value outside its
 /// `CHECK` is an error, since the database cannot hold one.
 pub async fn summary(

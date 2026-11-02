@@ -72,9 +72,13 @@ pub fn build(state: AppState) -> Router {
         .route(
             "/notify-me",
             post(account::notify::notify_me).layer((body(KB), ip(RouteGroup::NotifyMe))),
-        );
-    // POST /account/delete     0        AccountDelete
-    // GET  /account/export     none     AccountExport
+        )
+        // These two are limited per user in their handlers.
+        .route(
+            "/account/delete",
+            post(account::delete::delete_account).layer(body(0)),
+        )
+        .route("/account/export", get(account::export::export_account));
 
     let app = Router::new()
         .nest("/api/v1", api)

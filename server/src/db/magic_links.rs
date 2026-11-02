@@ -63,3 +63,28 @@ pub async fn consume(conn: &mut PgConnection, token_hash: &[u8]) -> Result<(), s
     .await?;
     Ok(())
 }
+
+pub async fn delete_for_email(
+    conn: &mut PgConnection,
+    email_normalized: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM magic_links WHERE email_normalized = $1",
+        email_normalized,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// Deletes the links made more than `days` days ago and returns how many.
+pub async fn purge_older_than(pool: &PgPool, days: u32) -> Result<u64, sqlx::Error> {
+    let days = i32::try_from(days).unwrap_or(i32::MAX);
+    let deleted = sqlx::query!(
+        "DELETE FROM magic_links WHERE created_at < now() - make_interval(days => $1)",
+        days,
+    )
+    .execute(pool)
+    .await?;
+    Ok(deleted.rows_affected())
+}

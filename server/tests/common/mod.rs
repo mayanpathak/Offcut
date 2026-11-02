@@ -173,9 +173,9 @@ impl TestApp {
 /// be shutting down, so this runs on a thread with a runtime of its own.
 impl Drop for TestApp {
     fn drop(&mut self) {
-        // Each test binary reads what it needs of these two. This one read
-        // keeps the ones a binary does not use from being called dead.
-        let _ = (&self.mailer, &self.billing);
+        // Each test binary reads what it needs of these. This one read keeps
+        // the ones a binary does not use from being called dead.
+        let _ = (&self.pool, &self.mailer, &self.billing);
         let drop_database = format!(
             r#"DROP DATABASE IF EXISTS "{}" WITH (FORCE)"#,
             self.database

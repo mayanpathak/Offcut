@@ -266,3 +266,28 @@ The four race and grace cases then ran 12 times: no failure.
 **Differs from the plan.** None. D-268's server half is that a receipt needs a session: without one it is 401, and the client's outbox waits (P145).
 
 **Counts.** Rust 734 / 0 / 4, up from 713; Vitest 336, as nothing under `web/` changed; `pnpm check` exit 0. Not pushed: the next push is P142.
+
+## Entry 10 - 2026-11-03 - P142: account, S-10, retention, the guard tests
+
+**Changed.** `POST /account/delete`: the merchant first, 502 and nothing deleted if it refuses, then one transaction; 204 and a cleared cookie, also for an account already gone. `GET /account/export`: the user, session times, the subscription's summary, receipts oldest first; no hash and no merchant id. `USER_TABLES` in `db/mod.rs` (S-10). `purge_once` also takes links over a day old, webhook events over 90 days and sessions revoked or expired. `db/webhook_events.rs`, so far its purge only.
+
+**Tests.** `account_delete.rs` 9, `account_export.rs` 6, `rate_limit.rs` 3, `no_media_routes.rs` 3, `log_redaction.rs` 1, and one retention case in `analytics_allowlist.rs`.
+
+- `no_media_routes.rs` reads its routes from `router.rs`, so a new route is walked with nobody remembering. A new POST route fails until it is named as reading a body or not. P143 and P144 meet this.
+- `log_redaction.rs` runs at `DEBUG`, louder than production. It carries 16 markers through sign-in, refresh, `/me`, a receipt, the export, analytics, the waitlist, a failed mail, a bad body, an unmatched path and the delete. It also asserts that the request lines are there, with the route's template and the user's tag, so an empty log cannot pass. The webhook joins in P143.
+- `rate_limit.rs` covers 13 of the 16 groups through the real routes. The three billing groups join in P143 and P144.
+
+**The tests were tried against the bugs they guard, then restored.**
+
+| Bug put back | Caught by |
+|---|---|
+| `usage_receipts` left out of `USER_TABLES` | `user_tables_names_every_table_with_a_user_id_column` |
+| A handler logs the address | `no_flow_writes_a_secret_or_a_person_to_the_log` |
+| The export leaves out the receipts | `a_row_of_every_listed_table_appears_in_the_export`, and the shape case |
+| A delete that skips the merchant | `a_live_subscription_is_cancelled_at_the_merchant`, and the refusal case |
+
+**Differs from the plan.** `users.email` serves as the normalized address in the delete, since D-260 makes them the same.
+
+**Noted for P144.** A cancel that succeeded at the merchant, followed by a crash before the delete commits, leaves a row still `active` until the webhook lands. A retry then cancels a subscription already cancelled, so `adapter.rs` must answer that as a success. If it does not, the person cannot delete their account.
+
+**Tier 3.** `pnpm check` exit 0; `pnpm fixtures` up to date; `pnpm test`: Rust 758 / 0 / 4, up from 734, Vitest 336; `pnpm e2e` 16; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. **Push 1:** P137's CI passed earlier; this one carries P138 to P142, and P143 reads it first.

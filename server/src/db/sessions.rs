@@ -1,6 +1,7 @@
 //! The `sessions` table. It holds hashes of refresh tokens, never a token.
 
-use offcut_types::UserId;
+use offcut_api_types::ExportedSession;
+use offcut_types::{UnixSecs, UserId};
 use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -111,4 +112,32 @@ pub async fn revoke_by_token(pool: &PgPool, token_hash: &[u8]) -> Result<(), sql
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// A person's sessions, for their export: times only, no hash.
+pub async fn exported(pool: &PgPool, user: UserId) -> Result<Vec<ExportedSession>, sqlx::Error> {
+    let rows = sqlx::query!(
+        "SELECT created_at, last_used_at, expires_at FROM sessions
+         WHERE user_id = $1 ORDER BY created_at",
+        user.get(),
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| ExportedSession {
+            created_at: UnixSecs::new(row.created_at.unix_timestamp()),
+            last_used_at: UnixSecs::new(row.last_used_at.unix_timestamp()),
+            expires_at: UnixSecs::new(row.expires_at.unix_timestamp()),
+        })
+        .collect())
+}
+
+/// Deletes the sessions that can never be used again and returns how many.
+pub async fn purge_finished(pool: &PgPool) -> Result<u64, sqlx::Error> {
+    let deleted =
+        sqlx::query!("DELETE FROM sessions WHERE revoked_at IS NOT NULL OR expires_at < now()")
+            .execute(pool)
+            .await?;
+    Ok(deleted.rows_affected())
 }
