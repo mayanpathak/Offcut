@@ -878,7 +878,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **The founding release, right after `v6.6` (founder's decision of 2026-11-02; moved from V9, TS §22.5, E-5).** No new version number: a deploy, with its own commits, on the branch of V6.7. It adds no product feature. Early paying strangers test the price directly.
 
-- [ ] `/legal/:doc`: Terms of Service, Privacy Policy, Refund and Cancellation Policy (14 days), moved here from V8 and V10, written as §10.3 says. Public pricing and a contact route. Dodo's FAQ says its review reads these on the live site.
+- [ ] `/legal/:doc`: Terms of Service, Privacy Policy, Refund and Cancellation Policy (14 days), written as §10.3 says, with public pricing and a contact route. **Built ahead of V6 on 2026-11-02** (`site-pages`), since Dodo's FAQ says its review reads these on the live site. This box: re-read them against what is built by then, and add the seller's name if the founder chooses.
 - [ ] Dodo approves live payments, and tax settings are confirmed.
 - [ ] Vercel's plan terms are recorded, and the founder accepts the non-commercial-terms risk in writing (TS §29), since real money now passes through the site. V9 listed this; it comes first now.
 - [ ] Copy says only what BP §10.3 allows. `privacy-network.spec.ts` is V8's, so before it exists the founder reads one network capture of a clip on the live site, as V5 did, and records it. PS §17 ties the claim to that test.

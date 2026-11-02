@@ -253,6 +253,7 @@ Counts never fall below the previous entry's; the floor is D-244's. Add a short 
 - [ ] `COPY_PENDING` empty; its check and every analytics allowlist test pass.
 - [ ] `checkout.spec.ts` as §15.4. `UpgradePrompt`'s placement type has two members; it is non-modal, outside `export-outcome`, and takes no focus. `export-creator`'s case "summary and the question" passes unchanged in Tier 2.
 - [ ] Axe at 0; every control works by keyboard.
+- [ ] The three legal pages and the pricing section (V6 CL Entry 3) re-read against what V6 built; each "when accounts open" that is now true says so, for the founder to read.
 - [ ] Tier 3 green. **Push 2, not waited on.** **Human:** one look.
 
 ## Prompt 149 (V6 13/14) — TE-9, the M1 list's local rows

@@ -576,7 +576,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 |---|---|
 | Port 2525 blocked on Render | Read open. A login or send failing from Render is D-253's stop, read before the merge (D-304) |
 | V6 fails after the merge, with no flag to turn off | Roll back: Render's previous deploy and Vercel's previous production deploy, then `git revert -m 1` in a pull request. No migration, so the old binary runs on the same database. A session made in between waits for the next merge |
-| Dodo holds the verification over the site | Its FAQ says the live site must show pricing, Terms, Privacy, Refund and Cancellation Policy, and a contact route. Test mode and V6's gate are unaffected. V6 CL open item 14 |
+| Dodo holds the verification over the site | Its FAQ says the live site must show pricing, Terms, Privacy, Refund and Cancellation Policy, and a contact route. They ship ahead of V6 from `site-pages` (V6 CL Entry 3). Test mode and V6's gate are unaffected |
 | Gmail sender goes to spam | D-256: domain, founder's call |
 | A mail scanner runs the link's script and spends the token | The page POSTs only after load; a scanner that runs script could. Watch `link_invalid` in `client_error`. If real, verify on a click. Not built now |
 | `metadata` does not reach webhooks | D-280 |

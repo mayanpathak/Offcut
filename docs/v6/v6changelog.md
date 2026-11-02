@@ -16,7 +16,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 9 | One real send from the Render free service: TCP on 2525 is proven, STARTTLS and login from there are not | Founder, at the deployed checks | Entry 1, G 14.6 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
-| 14 | Dodo's FAQ says the live site must publicly show pricing, Terms, Privacy, Refund and Cancellation Policy, and a contact route during its review, and those pages are planned for the founding release. Verification may be held until then. Test mode and V6's gate are unaffected. Ask Dodo, or bring the pages forward | Founder | V6 §18, BP §8A.6 |
+| 14 | Read the three legal pages, then open and merge the pull request from `site-pages` (founder). Then tell Dodo the pages are live, and check its product form's description against them | Founder | Entry 3 |
 
 ## Known issues for later prompts
 
@@ -158,3 +158,13 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **Tested.** The two new probes ran on D1 as plain argument lists: the webhook log answered 500, 200 and 500 for a first delivery, a retry and another event, and served its log; the mail probe sent "Offcut mail test 2" to the sender's own address. Not run: anything on Render, any call to Dodo with a key.
 
 **Counted once.** Thirteen new decisions make D-241 to D-305. Fourteen prompts stay; P138 and P144 grow.
+
+## Entry 3 - 2026-11-02 - Pricing and legal pages, ahead of V6 (outside a prompt)
+
+**Founder's decisions.** Pricing, Terms, Privacy, Refund and contact go live now, since Dodo's FAQ says its review reads them on the live site, and there is little harm in showing them. Dodo's form holds no price, so the site shows the plan's: Free $0, Creator $15/month or $144/year. The contact is the Brevo sender's address. The pages name "Offcut" only, for now.
+
+**Built on `site-pages`, from `origin/main`,** not on this branch: V6 will not merge for days. A section on the landing page with no way to buy, saying "not on sale yet" and listing only export limits; `config/pricing.ts`; `ui/pages/LegalPage.tsx` at `/legal/:doc`, both already in TS §5; a footer; all copy in `messages.ts`. No request, no event, no change to the clip path, so the exported file is untouched. This branch takes it by merging `origin/main` once the founder has merged it, before P146 touches `routes.tsx` and `messages.ts`.
+
+**What this moves.** BP §8A.6's first box is done early, apart from a re-read when accounts open. Those pages say what happens "when accounts open", so P148 re-reads them against what V6 built.
+
+**Read on D1.** `pnpm check` exit 0; Vitest 336; `pnpm e2e` 16 passed, up from 12; the new pages looked at. CI not read: it needs the founder's pull request. **Not lawyer-reviewed:** BP §10.3's known gap. The founder reads them before merging.
