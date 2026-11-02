@@ -22,7 +22,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner and passes on the retry. Cause not proven. Its failure now says what the page showed | The first CI run that shows it |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner. Run 41502704869 failed it and its retry, so the run went red with no web change since the run before. Now its message speaks: on the retry the page said `UNSUPPORTED_STORAGE`, "Your browser will not let Offcut keep files on this device". On the first attempt the drop zone's words were on the page only as the 90 s ended. The storage check has 2 s, and a check that has not answered counts as a no, as `requestAdapter` once did (the comment on `PER_CHECK_TIMEOUT_MS`). Likely: a slow disk just after the case before, on the runner. Not proven. If so, a person on a busy machine could be told the same, wrongly. Founder's call, see the reply of 2026-11-03 | Founder, then P145 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
