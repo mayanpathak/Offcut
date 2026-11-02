@@ -7,7 +7,8 @@
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { messages } from "../src/copy/messages";
+import { PRICES_USD } from "../src/config/pricing";
+import { LEGAL_DOCS, messages } from "../src/copy/messages";
 import { ANALYTICS_EVENT_DOCS, type CheckResult, type GpuVendor, type MemoryBucket, type Platform } from "../src/gen/api";
 import { LIMITS, UNSUPPORTED_REASONS } from "../src/gen/domain";
 import { installFakeApi } from "./helpers/fake-api";
@@ -313,4 +314,46 @@ test("@smoke the page is isolated and the WASM bundle compiles under the CSP", a
 
   expect(await page.evaluate(() => fetch("/api/v1/healthz").then((answer) => answer.status))).toBe(200);
   expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
+});
+
+test("pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+
+  const pricing = page.getByTestId("pricing");
+  await expect(pricing.getByRole("heading", { name: messages.pricing.heading })).toBeVisible();
+  await expect(pricing.getByText(messages.pricing.notOnSale)).toBeVisible();
+  await expect(pricing.getByText(messages.pricing.free.price(PRICES_USD.free), { exact: true })).toBeVisible();
+  await expect(pricing.getByText(messages.pricing.creator.price(PRICES_USD.creatorMonthly, PRICES_USD.creatorAnnual))).toBeVisible();
+  for (const feature of [...messages.pricing.free.features(LIMITS), ...messages.pricing.creator.features]) {
+    await expect(pricing.getByText(feature)).toBeVisible();
+  }
+  await expect(pricing.getByRole("button")).toHaveCount(0);
+  await expect(pricing.getByRole("link")).toHaveCount(0);
+});
+
+test("the footer reaches each legal page, and each has its title, its date and a contact link", async ({ page }) => {
+  await installFakeApi(page);
+  for (const doc of LEGAL_DOCS) {
+    const copy = messages.legal.docs[doc];
+    await page.goto("/");
+    await page.getByTestId("site-footer").getByRole("link", { name: copy.linkLabel, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/legal/${doc}$`));
+    await expect(page.getByRole("heading", { name: copy.title, level: 1 })).toBeVisible();
+    await expect(page.getByText(messages.legal.updated)).toBeVisible();
+    await expect(page.getByRole("link", { name: messages.legal.contactEmail })).toHaveAttribute("href", `mailto:${messages.legal.contactEmail}`);
+  }
+});
+
+test("the footer's contact link writes to the contact address", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  await expect(page.getByTestId("site-footer").getByRole("link", { name: messages.legal.footerContact })).toHaveAttribute("href", `mailto:${messages.legal.contactEmail}`);
+});
+
+test("a legal document that does not exist goes back to the landing page", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/legal/nothing");
+  await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
 });

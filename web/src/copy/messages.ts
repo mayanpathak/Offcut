@@ -9,6 +9,11 @@ import type { AnalyticsEvent, Wanted } from "../gen/api";
 import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
 
 type EventName = AnalyticsEvent["name"];
+
+/** The documents of `/legal/:doc`, in the footer's order. */
+export const LEGAL_DOCS = ["terms", "privacy", "refunds"] as const;
+export type LegalDoc = (typeof LEGAL_DOCS)[number];
+
 type ErrorCopy = { title: string; body: string; action: string };
 /**
  * The error codes that can reach a person: the six of V1, the three of the
@@ -264,6 +269,122 @@ export const messages = {
     B_EXPORT_IN_PROGRESS: "An export is running. Wait until it has finished.",
     B_PIPELINE_NOT_READY: "The clip is not ready to export yet.",
     B_STORAGE_LOW: "There is not enough room on this device for this video. Free some disk space, then try again.",
+  },
+
+  // The landing page's prices (PS §11). Nothing is on sale until accounts open,
+  // so the section says so and has no way to buy. It lists only what the plans
+  // will hold when they do.
+  pricing: {
+    heading: "Pricing",
+    notOnSale: "Not on sale yet. These plans start when accounts open: leave your email below to hear when they do.",
+    free: {
+      name: "Free",
+      price: (usd: number) => `$${String(usd)}`,
+      features: (limits: Pick<typeof LIMITS, "FREE_EXPORTS_PER_MONTH">) => [
+        `${String(limits.FREE_EXPORTS_PER_MONTH)} exports a month`,
+        "720p, with a small watermark",
+      ],
+    },
+    creator: {
+      name: "Creator",
+      price: (monthlyUsd: number, annualUsd: number) => `$${String(monthlyUsd)}/month or $${String(annualUsd)}/year`,
+      features: ["Unlimited exports", "1080p, no watermark"],
+    },
+    merchant: "Prices are in US dollars. Dodo Payments, our merchant of record, will handle payment and tax.",
+  },
+
+  // Written to match what the app does today, and read by the founder before
+  // each change (buildplan.md §10.3). Not reviewed by a lawyer. The wording rules
+  // at the top of this file apply.
+  legal: {
+    updated: "Last updated 2 November 2026.",
+    contactLead: "Questions? Write to",
+    contactEmail: "ranupathak1986@gmail.com",
+    footerContact: "Contact",
+    docs: {
+      terms: {
+        title: "Terms of Service",
+        linkLabel: "Terms",
+        sections: [
+          {
+            heading: "These terms",
+            body: ["These terms cover your use of Offcut, a tool that turns a talking-head video into a finished vertical short. By using Offcut you agree to them. Offcut is in development, and parts of it are not open yet."],
+          },
+          {
+            heading: "Your videos",
+            body: ["Your videos and the shorts you make stay yours. Offcut processes them on your computer. You are responsible for having the right to use what you put in and what you publish."],
+          },
+          {
+            heading: "Plans and payment",
+            body: [
+              "The plans and prices are on the home page. They start when accounts open, and until then nothing can be bought.",
+              "Dodo Payments will be the merchant of record: it sells the subscription to you, takes the payment and handles tax. A subscription renews at the end of each period until you cancel it. The Refund and Cancellation Policy says what happens then.",
+              "The limits of a plan are part of how it is priced. We may change plans or prices for the future, and we will tell subscribers before a change reaches them.",
+            ],
+          },
+          {
+            heading: "Fair use",
+            body: ["Do not use Offcut to break the law, to harm others, or to attack or overload the service. We may suspend an account that does."],
+          },
+          {
+            heading: "No guarantee",
+            body: ["Offcut is provided as it is. Captions and visuals are made automatically and can be wrong, so check a short before you publish it. As far as the law allows, we are not liable for indirect or consequential loss, and our total liability is limited to what you paid us in the 12 months before the claim."],
+          },
+          {
+            heading: "Changes",
+            body: ["We may update these terms, and this page will show the date of the latest version. If you keep using Offcut after a change, the new terms apply."],
+          },
+        ],
+      },
+      privacy: {
+        title: "Privacy Policy",
+        linkLabel: "Privacy",
+        sections: [
+          {
+            heading: "Your video",
+            body: ["Your video is not uploaded to our servers. Offcut processes it in your browser, on your computer, and keeps the video, audio, transcript, captions and edits in that browser's storage. You can remove them by clearing this site's data in your browser."],
+          },
+          {
+            heading: "What we collect today",
+            body: [
+              "If you join the waitlist: your email address and what you are waiting for. We use it only to tell you when Offcut opens. Write to us to have it removed.",
+              "Anonymous usage events from a fixed list, such as how long a stage took or which error occurred, with a random id kept in your browser. They hold no file name, no words from your video and no account link, and we delete them after 90 days. The whole list is on the \"What leaves your device\" page.",
+              "To limit abuse, the server reads your IP address while it answers a request. We do not store it with these events or write it to our logs. Our hosting providers may keep their own short-lived logs.",
+            ],
+          },
+          {
+            heading: "What we will collect when accounts open",
+            body: ["Your email address, your plan and subscription status, and a count of your exports, with no content. You will be able to export this data or delete your account from your account page. Dodo Payments will handle payment, so we will not see your card details, and it may keep its own billing records for tax reasons."],
+          },
+          {
+            heading: "Who handles it",
+            body: ["We use Vercel to serve the site, Render to run the server, Neon for the database and Cloudflare to serve the files the app downloads. When accounts open, Brevo will send sign-in emails and Dodo Payments will handle payment. We do not sell your data, show ads or use third-party trackers."],
+          },
+          {
+            heading: "Changes",
+            body: ["We will update this page before any new kind of data leaves your computer."],
+          },
+        ],
+      },
+      refunds: {
+        title: "Refund and Cancellation Policy",
+        linkLabel: "Refunds",
+        sections: [
+          {
+            heading: "Before accounts open",
+            body: ["Nothing can be bought yet, so nothing can be charged. This policy applies once plans go on sale."],
+          },
+          {
+            heading: "Refunds",
+            body: ["If Offcut is not right for you, write to us within 14 days of a payment and we will refund that payment in full. A refund ends your paid plan. Dodo Payments, the merchant of record, returns the money to your original payment method. After 14 days a payment is not refundable, except where the law says otherwise."],
+          },
+          {
+            heading: "Cancelling",
+            body: ["You can cancel at any time from your account page. You keep your paid plan until the end of the period you paid for, then your account moves to the Free plan. Nothing is charged after that."],
+          },
+        ],
+      },
+    },
   },
 
   settings: {
