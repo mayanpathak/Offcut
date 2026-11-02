@@ -274,7 +274,7 @@ The four race and grace cases then ran 12 times: no failure.
 **Tests.** `account_delete.rs` 9, `account_export.rs` 6, `rate_limit.rs` 3, `no_media_routes.rs` 3, `log_redaction.rs` 1, and one retention case in `analytics_allowlist.rs`.
 
 - `no_media_routes.rs` reads its routes from `router.rs`, so a new route is walked with nobody remembering. A new POST route fails until it is named as reading a body or not. P143 and P144 meet this.
-- `log_redaction.rs` runs at `DEBUG`, louder than production. It carries 16 markers through sign-in, refresh, `/me`, a receipt, the export, analytics, the waitlist, a failed mail, a bad body, an unmatched path and the delete. It also asserts that the request lines are there, with the route's template and the user's tag, so an empty log cannot pass. The webhook joins in P143.
+- `log_redaction.rs` runs at `DEBUG`, louder than production. It carries 18 markers through sign-in, refresh, `/me`, a receipt, the export, analytics, the waitlist, a failed mail, a bad body, an unmatched path and the delete. It also asserts that the request lines are there, with the route's template and the user's tag, so an empty log cannot pass. The webhook joins in P143.
 - `rate_limit.rs` covers 13 of the 16 groups through the real routes. The three billing groups join in P143 and P144.
 
 **The tests were tried against the bugs they guard, then restored.**
