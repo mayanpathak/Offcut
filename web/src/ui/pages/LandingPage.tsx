@@ -6,7 +6,9 @@
 import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 
-import { messages } from "../../copy/messages";
+import { PRICES_USD } from "../../config/pricing";
+import { LEGAL_DOCS, type LegalDoc, messages } from "../../copy/messages";
+import { LIMITS } from "../../gen/domain";
 import { assetUrl, DEMO_VIDEO_PATH } from "../../net/asset-fetch";
 import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
 import { useClipStore } from "../../state/clip-store";
@@ -25,9 +27,18 @@ function capabilityLine(state: CapabilityState): { text: string; supported: bool
   return { text: messages.capability.checking, supported: false };
 }
 
-export function LandingPage({ settingsPath, appPath }: { settingsPath: string; appPath: string }) {
+export function LandingPage({
+  settingsPath,
+  appPath,
+  legalPath,
+}: {
+  settingsPath: string;
+  appPath: string;
+  legalPath: (doc: LegalDoc) => string;
+}) {
   const capability = capabilityLine(useCapabilityStore());
   const copy = messages.landing;
+  const pricing = messages.pricing;
   const navigate = useNavigate();
   const clipStatus = useClipStore((state) => state.status);
   const lastClipStatus = useRef(clipStatus);
@@ -76,10 +87,47 @@ export function LandingPage({ settingsPath, appPath }: { settingsPath: string; a
 
       <DropZone />
 
+      <section className={styles.section} aria-labelledby="pricing-heading" data-testid="pricing">
+        <h2 className={styles.heading} id="pricing-heading">
+          {pricing.heading}
+        </h2>
+        <p className={styles.text}>{pricing.notOnSale}</p>
+        <div className={styles.plans}>
+          <div className={styles.plan}>
+            <h3 className={styles.planName}>{pricing.free.name}</h3>
+            <p className={styles.text}>{pricing.free.price(PRICES_USD.free)}</p>
+            <ul className={styles.planFeatures}>
+              {pricing.free.features(LIMITS).map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+          </div>
+          <div className={styles.plan}>
+            <h3 className={styles.planName}>{pricing.creator.name}</h3>
+            <p className={styles.text}>{pricing.creator.price(PRICES_USD.creatorMonthly, PRICES_USD.creatorAnnual)}</p>
+            <ul className={styles.planFeatures}>
+              {pricing.creator.features.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <p className={styles.muted}>{pricing.merchant}</p>
+      </section>
+
       <section className={styles.section}>
         <h2 className={styles.heading}>{copy.waitlistHeading}</h2>
         <NotifyMeForm wanted={["launch"]} />
       </section>
+
+      <footer className={styles.footer} data-testid="site-footer">
+        {LEGAL_DOCS.map((doc) => (
+          <Link key={doc} to={legalPath(doc)}>
+            {messages.legal.docs[doc].linkLabel}
+          </Link>
+        ))}
+        <a href={`mailto:${messages.legal.contactEmail}`}>{messages.legal.footerContact}</a>
+      </footer>
     </main>
   );
 }
