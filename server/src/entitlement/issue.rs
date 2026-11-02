@@ -19,15 +19,33 @@ pub struct Issued {
     pub plan: Plan,
 }
 
+/// The plan of a user at `now`: the only place it is worked out. A canceled or
+/// past-due subscription keeps Creator until its period ends (TS §22.3).
+pub async fn plan_now(pool: &PgPool, user: UserId, now: OffsetDateTime) -> Result<Plan, AppError> {
+    let paid = paid_until(pool, user, now).await?;
+    Ok(if paid.is_some() {
+        Plan::Creator
+    } else {
+        Plan::Free
+    })
+}
+
+async fn paid_until(
+    pool: &PgPool,
+    user: UserId,
+    now: OffsetDateTime,
+) -> Result<Option<OffsetDateTime>, AppError> {
+    let period = subscriptions::period_end(pool, user).await?;
+    Ok(period.filter(|end| now <= *end))
+}
+
 pub async fn issue(
     pool: &PgPool,
     key: &SigningKey,
     user: UserId,
     now: OffsetDateTime,
 ) -> Result<Issued, AppError> {
-    let period = subscriptions::period_end(pool, user).await?;
-    let paid_until = period.filter(|end| now <= *end);
-    let (plan, remaining, period_end) = match paid_until {
+    let (plan, remaining, period_end) = match paid_until(pool, user, now).await? {
         Some(end) => (Plan::Creator, 0, end),
         None => {
             let (start, end) = utc_month(now).ok_or(AppError::Internal)?;
@@ -53,7 +71,7 @@ pub async fn issue(
 }
 
 /// The first instant of the UTC month of `now`, and the last second of it.
-fn utc_month(now: OffsetDateTime) -> Option<(OffsetDateTime, OffsetDateTime)> {
+pub fn utc_month(now: OffsetDateTime) -> Option<(OffsetDateTime, OffsetDateTime)> {
     let now = now.to_offset(time::UtcOffset::UTC);
     let start = now.date().replace_day(1).ok()?;
     // `next()` goes from December to January, so the year follows it.

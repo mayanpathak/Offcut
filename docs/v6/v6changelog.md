@@ -254,3 +254,15 @@ The four race and grace cases then ran 12 times: no failure.
 **What holds after this, and what does not.** The lock of D-297 arrives with P145; until then only these tests stand behind the concurrent case. A session ends 60 days after its sign-in however active it is, as section 7.3 assumes, so a daily user signs in again every 60 days. It is one line to make it slide, and a founder's call if that proves annoying. The cookie through Vercel's rewrite and a real `Origin` are first read at G 14.6.
 
 **Counts.** Rust 713 / 0 / 4, up from 691; Vitest 336; `pnpm check` exit 0; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P142.
+
+## Entry 9 - 2026-11-02 - P141: the token and receipts
+
+**Founder's decision.** A session ends 60 days after its sign-in, however active the person is: kept as section 7.3 assumes (Entry 8's question).
+
+**Changed.** `GET /entitlement`, `POST /usage/receipts`, `usage/mod.rs` with `FairUseLog` (D-269), which `AppState` holds. `issue.rs`: `plan_now`, so a receipt's `plan_at_export` and a token's plan come from one place; `utc_month` is public for the fair-use count. `db/usage_receipts.rs`: `record`, `creator_used_since`.
+
+**Tests.** `entitlement_rules.rs` 12: 3, 2, 1, 0 and floored; the seven fields; only Free exports count, and only one's own; the first instant of a month and of a year, by a clock passed in; a UTC month read from another offset; active, past due and canceled each Creator to the second their period ends, and Free the next; a refund; both route refusals. `usage_receipts.rs` 8: the row under the plan of now; Creator spends no Free count; a repeat and another user's id change nothing; **over the limit accepted, with a token**; no session and a gone user; a bad body; fair use logged once, at 101 and not 100, with the user's tag.
+
+**Differs from the plan.** None. D-268's server half is that a receipt needs a session: without one it is 401, and the client's outbox waits (P145).
+
+**Counts.** Rust 734 / 0 / 4, up from 713; Vitest 336, as nothing under `web/` changed; `pnpm check` exit 0. Not pushed: the next push is P142.

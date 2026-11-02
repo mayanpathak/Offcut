@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO usage_receipts (export_id, user_id, plan_at_export) VALUES ($1, $2, $3)\n         ON CONFLICT (export_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9401307e69cf571bea4377993db3101e14e50090b2dfd6f637ddb4b2ab777cc"
+}

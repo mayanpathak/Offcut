@@ -150,6 +150,7 @@ impl TestApp {
             limiter: Arc::new(RateLimiter::new(50_000)),
             mailer: mailer.clone(),
             billing: billing.clone(),
+            fair_use: Arc::default(),
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();

@@ -72,6 +72,7 @@ async fn serve(config: Config) -> Result<(), ServeError> {
         mailer,
         // The merchant's adapter replaces this in Prompt 144.
         billing: Arc::new(UnconfiguredBilling),
+        fair_use: Arc::default(),
     };
     // The rate limiter needs the peer address of each connection.
     let app = router::build(state).into_make_service_with_connect_info::<SocketAddr>();
