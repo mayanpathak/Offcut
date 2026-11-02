@@ -64,7 +64,7 @@ Counts never fall below the previous entry's; the floor is D-244's. Add a short 
 |---|---|
 | Before Setup | Done on 2026-11-02 (G 0.1) |
 | Setup | Open the draft pull request (G 0.6) |
-| P138 | The port probe on Render (G 2.1); read one real mail (G 2.3) |
+| P138 | Read one real mail (G 2.3) |
 | P144 | Test-mode products, key and secret in `.env.deploy` (G 8.1); one test purchase, cancel, refund (G 8.2); webhook bodies (G 8.3) |
 | P148 | One look at `~/v6-review/` |
 | P149 | Mailboxes for TE-8, and counting them; the M1 walk (G 13) |
@@ -109,7 +109,7 @@ Counts never fall below the previous entry's; the floor is D-244's. Add a short 
 
 **Effort: High.**
 
-**Before.** **Human:** G 2.1's three lines. **`2525: blocked`: stop and ask (D-253), writing nothing.**
+**Before.** G 2.1 is done: 2525 is open from Render (§6.2).
 
 **Implement.** §3, §6, D-248 to D-256, G 2.2, G 2.3. `Mailer`, `MailError`, `smtp_mailer.rs`, `templates.rs`. `Config` per §3.2, with `Debug` redaction and its tests. `AppState` per §6.1, built in `main.rs`, with `rustls`'s `ring` provider installed once. `FakeMailer` in `tests/common/mod.rs`. `render.yaml`. `.env` names, values untouched. TS §5's `smtp_mailer.rs` row.
 
@@ -118,7 +118,7 @@ Counts never fall below the previous entry's; the floor is D-244's. Add a short 
 **Acceptance.**
 - [ ] `cargo deny check` clean; `cargo tree -p offcut-api` holds no `native-tls`, `openssl` or `aws-lc`.
 - [ ] `Config` tests cover each new variable missing and `SMTP_PORT` malformed, naming the variable and never the value.
-- [ ] Render's reading in the entry. **Human:** one real mail read: inbox or spam; link host unchanged.
+- [ ] **Human:** one real mail read: inbox or spam; link host unchanged.
 
 ## Prompt 139 (V6 03/14) — A link becomes a user, a session and a token
 

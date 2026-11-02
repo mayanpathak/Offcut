@@ -124,7 +124,7 @@ Server tests need Docker Desktop running (Postgres on port 9000).
 
 ### Step 2.1 - Founder: the port probe
 
-§6.2, five minutes. Paste the three lines to the agent, delete the service. **`2525: blocked` stops here** (D-253).
+Done on 2026-11-02 (§6.2): 2525 is open from Render's free service.
 
 ### Step 2.2 - The code
 

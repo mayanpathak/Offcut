@@ -67,7 +67,7 @@
 - [x] 3. **A mail account exists.** Brevo; five `SMTP_*`/`MAIL_FROM` values in `.env.deploy`; login on port 2525 succeeds from D1; one test mail accepted (V6 CL Entry 0.1).
 - [x] 4. **The provider is Dodo Payments.** Founder, 2026-11-02.
 - [x] 5. **Mail test 1 arrived.** Founder, 2026-11-02. Whether it reached the inbox or spam is not recorded yet (V6 CL open item 12). It decides nothing; TE-8 does.
-- [ ] 6. **The port probe was read on Render** (D-253, G 2.1). Founder step. Blocks P138's adapter, not the docs and not P137.
+- [x] 6. **The port probe was read on Render** (D-253, §6.2): 2525 open, 587 and 465 blocked.
 - [x] 7. **The founder said yes to DC-12, "carefully"** (D-246). The row is in TS §41.2.
 - [ ] 8. **A draft pull request `v6-build` → `main` is open** after Setup. CI runs on pull requests only.
 
@@ -272,15 +272,21 @@ pub enum MailError { Rejected, Unavailable }   // both become 503 email_unavaila
 
 `AppState` gains `mailer: Arc<dyn Mailer>` and `billing: Arc<dyn BillingProvider>`. `tests/common/mod.rs` gets `FakeMailer`, which stores the last link for a test to read and can be told to fail, and `FakeBilling`.
 
-### 6.2 The port probe
+### 6.2 The port probe (done 2026-11-02)
 
-Founder's step on Render's dashboard, in five minutes: New → Web Service → Existing image `docker.io/library/python:3.12-alpine`, instance type Free, no environment variables, with this Docker command. It was run on D1 (all three open there, as expected, and it serves on `PORT`):
+Read on a throwaway free Render web service, from the public image `docker.io/library/python:3.12-alpine`, holding no secret, deleted afterwards:
 
 ```text
-python -c "import socket,http.server,os;C=lambda p:(lambda s:(s.settimeout(8),s.connect_ex(('smtp-relay.brevo.com',p)))[1])(socket.socket());B='\n'.join(f'{p}: '+('open' if C(p)==0 else 'blocked') for p in (2525,587,465)).encode();print(B.decode(),flush=True);H=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:(s.send_response(200),s.end_headers(),s.wfile.write(B))});http.server.HTTPServer(('',int(os.environ.get('PORT','10000'))),H).serve_forever()"
+2525: open
+587: blocked
+465: blocked
 ```
 
-Open the service's URL. Expected: `2525: open`, `587: blocked`, `465: blocked`. Record the three lines in the changelog and delete the service. It holds no secret and logs nothing but those lines. `2525: blocked` is D-253's stop. If Render will not accept the command as written, wrap it with `sh -c` or use a one-file repository: the point is the reading.
+So D-252 stands and `lettre` stays. This reads a TCP connection only: STARTTLS and a login from Render are first proven by the real mail of G 14.6, and a failure there is D-253's stop. To read it again, for instance on another host, set an environment variable `P` to the script below and the Docker command to `python -c exec(__import__(chr(111)+chr(115)).environ[chr(80)])`. The first form, with the script inline in the command, exited on Render with no output: Render does not document how that field parses quotes and spaces, so this one has neither.
+
+```text
+import socket,http.server,os;R=[];[(lambda p:(lambda s:(s.settimeout(8),R.append(f'{p}: '+('open' if s.connect_ex(('smtp-relay.brevo.com',p))==0 else 'blocked')),print(R[-1],flush=True)))(socket.socket()))(p) for p in (2525,587,465)];B='\n'.join(R).encode();H=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:(s.send_response(200),s.end_headers(),s.wfile.write(B))});http.server.HTTPServer(('',int(os.environ.get('PORT','10000'))),H).serve_forever()
+```
 
 ---
 
