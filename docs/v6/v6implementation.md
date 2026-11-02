@@ -565,7 +565,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 
 | ID | Who, when | How | Pass | If it fails |
 |---|---|---|---|---|
-| TE-8 | Agent sends from D1, founder reads, **P138** (D-304) | 50 real template mails with a link to `APP_ORIGIN`: Gmail, Outlook, Yahoo at least. Inbox, spam or missing, in 30 s. The link's host is unchanged; the visible From is recorded | At least 95% in the inbox within 30 s; quota at least 100 a day (Brevo: 300) | D-256 |
+| TE-8, **cut down by the founder on 2026-11-02, see `experiments.md`** | Agent sends from D1, founder reads, **P138** (D-304) | 50 real template mails with a link to `APP_ORIGIN`: Gmail, Outlook, Yahoo at least. Inbox, spam or missing, in 30 s. The link's host is unchanged; the visible From is recorded | At least 95% in the inbox within 30 s; quota at least 100 a day (Brevo: 300) | D-256 |
 | TE-9 | Founder and agent, P144, P149, G 8.7 | Test purchase, renewal, cancel, refund; delayed endpoint | All six kinds observed; a timed-out webhook retried; a test purchase updates the row and the next token says Creator | Second provider behind the trait |
 
 ---

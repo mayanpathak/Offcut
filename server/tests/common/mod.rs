@@ -124,6 +124,8 @@ impl TestApp {
     /// `DATABASE_URL` names, migrates it, and serves the router over it. The
     /// role in `DATABASE_URL` needs `CREATEDB`.
     pub async fn spawn() -> TestApp {
+        // As `main.rs` does. Only the first call in a process installs it.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let server = server_options();
         let database = format!("offcut_test_{}", Uuid::new_v4().simple());
         let mut admin = server.connect().await.expect("connect to DATABASE_URL");

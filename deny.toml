@@ -60,6 +60,7 @@ deny = [
   # - `serde-wasm-bindgen`, which the binding crates convert values with,
   #   uses `js-sys` and `wasm-bindgen`.
   # - `uuid`, `rand`, `rand_core` and `ring` use `getrandom`; `sqlx-postgres` uses `rand`.
+  # - `offcut-api` draws a link's and a refresh token's bytes (v6implementation D-257).
   # - `proptest`, a dev-dependency of the media crates, uses `rand`. A test may
   #   draw random cases; the `cargo tree` check keeps `rand` out of the crates.
   # - `tempfile`, which `insta` (snapshot tests, a dev-dependency) writes its
@@ -74,7 +75,7 @@ deny = [
   { crate = "wasm-bindgen", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "reqwest", "wasm-bindgen-futures", "web-sys", "js-sys", "serde-wasm-bindgen", "wgpu"] },
   { crate = "wgpu", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "vello"] },
   { crate = "rand", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "sqlx-postgres", "proptest"] },
-  { crate = "getrandom", wrappers = ["offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring", "tempfile"] },
+  { crate = "getrandom", wrappers = ["offcut-api", "offcut-wasm-core", "offcut-wasm-render", "offcut-render", "uuid", "rand", "rand_core", "ring", "tempfile"] },
 
   # Media crates: `offcut-api` may not depend on them. Each entry lists the crates
   # that may, from the TS §7 graph; `offcut-api` is in none of the lists.

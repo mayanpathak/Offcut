@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO users (id, email, email_normalized) VALUES ($1, $2, $2)\n         ON CONFLICT (email_normalized) DO UPDATE SET email_normalized = EXCLUDED.email_normalized\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da151cf3470bc99955bc64ffb1bde0d22f4f1f21e317775900bfc9a6cb4c9b58"
+}

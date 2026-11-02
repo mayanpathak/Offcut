@@ -6,6 +6,8 @@
 
 pub mod claims;
 pub mod profile;
+#[cfg(feature = "sign")]
+pub mod sign;
 pub mod token;
 pub mod verify;
 

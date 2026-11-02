@@ -1,11 +1,16 @@
-//! The database: the pool, the migrations, and one module per table that V1 writes.
+//! The database: the pool, the migrations, and one module per table.
 
 use sqlx::PgPool;
 use sqlx::migrate::MigrateError;
 use sqlx::postgres::PgPoolOptions;
 
 pub mod analytics_events;
+pub mod magic_links;
 pub mod platform_waitlist;
+pub mod sessions;
+pub mod subscriptions;
+pub mod usage_receipts;
+pub mod users;
 
 /// The free database tier allows few connections (TS §22.9).
 const MAX_CONNECTIONS: u32 = 5;

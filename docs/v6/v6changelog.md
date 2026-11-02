@@ -14,7 +14,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
-| 9 | P138's three human boxes: read the real mail (subject "Your Offcut sign-in link", link host `example.invalid`); one real send from Render (G 2.4); mailboxes for TE-8, and counting them (G 2.5). A failure of the second or a TE-8 below 95% stops the mail work (D-253, D-256) | Founder | Entry 6 |
+| 9 | Read the 3 template mails sent to the second Gmail address on 2026-11-02 17:22 UTC: inbox or spam, the visible From, and that the link's host is `example.invalid` (D-255). Delete the Render mail-probe service, which holds the SMTP key | Founder | Entry 7 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
@@ -212,3 +212,24 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **Counts.** Rust 666 / 0 / 4, up from 657; Vitest 336; `pnpm check` exit 0; frozen check no output. Not pushed: the first push is P142.
 
 **Open: the three human boxes of open item 9.** Not ticked. Until they are, nothing proves mail from Render with a login, or delivery beyond one Gmail address.
+
+## Entry 7 - 2026-11-02 - P139: a link becomes a user, a session and a token
+
+**P138's human boxes.** One real send from Render read `sent` in its logs (founder's screenshot, 17:07 UTC), so `lettre` on 2525 stands. **TE-8 is cut down by the founder's decision:** two Gmail addresses only, "if it works it works", no 50 mails. Three template mails went to the second address. `docs/v6/experiments.md` holds what this does not prove: no other mail provider has been tried. P138's last box stays with open item 9.
+
+**Changed.** `offcut-entitlement`: `sign.rs` behind the feature `sign`, `tests/token_roundtrip.rs`, `tests/profile.rs`. `auth/{mod,session,access_token}.rs`; `db/{users,magic_links,sessions,subscriptions,usage_receipts}.rs`; `entitlement/issue.rs` as TS §22.3; `AppError`'s seven variants, mapped as D-264. Routes `POST /auth/magic-link` and `POST /auth/verify`, 1 kB each. `deny.toml`: `offcut-api` may use `getrandom` (D-257). `server/.sqlx/` gains 8 queries.
+
+**Differs from the plan.**
+
+| Point | What and why |
+|---|---|
+| `limit()` in `rate_limit.rs` | Not added. The one route here that needs a key from its body calls `limiter.check` directly, as `by_ip` does. P140 adds `limit()` with its first three users, so one helper is not written for one caller |
+| `reqwest` in tests | Its `json` feature is on for the dev-dependency, for `auth_flow.rs` |
+| `token_roundtrip.rs` | `required-features = ["sign"]`. It runs in `cargo test --workspace`, as CI does; `cargo test -p offcut-entitlement` alone needs `--features sign` |
+| The access token's `verify` | Written and tested now, since verify's answer must be checked. The extractor that uses it is P140's |
+
+**Read on D1.** `auth_flow.rs` 11 cases, among them: only the hash stored, a second request spends the first link, mail failure 503 and no row, expired, used, unknown, **two racing verifies give one success**, one user across two sign-ins, the cookie's text exact, the access token's lifetime, a Free token that verifies with `ENTITLEMENT_SIGNING_KEY`'s public key. `cargo tree -p offcut-wasm-render -e features` holds no `sign`. `SQLX_OFFLINE=true cargo check -p offcut-api --tests` passes.
+
+**Counts.** Rust 691 / 0 / 4, up from 666; Vitest 336; `pnpm check` exit 0; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P142.
+
+**Found, not fixed.** A failed mail deletes the new link, but the address's older unused link was already spent in the same statement. So a mail failure can kill a link that was still in the inbox. Small: the person asks again. As §7.1 says.

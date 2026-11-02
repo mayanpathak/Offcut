@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::rate_limit::{RouteGroup, by_ip};
 use crate::state::AppState;
-use crate::{account, analytics, headers, log};
+use crate::{account, analytics, auth, headers, log};
 
 const KB: usize = 1024;
 /// Every route, unless its row in the table says otherwise (TS §22.1).
@@ -35,12 +35,20 @@ pub fn build(state: AppState) -> Router {
     // Layer 6, per route: a body limit other than the default.
     let body = DefaultBodyLimit::max;
 
-    // The table of TS §22.1, in its order. The twelve routes of V6 are
-    // comments: route, body limit, rate limit group.
+    // The table of TS §22.1, in its order. The routes still to come in
+    // V6 are comments: route, body limit, rate limit group.
     let api = Router::new()
         .route("/healthz", get(healthz).layer(ip(RouteGroup::Healthz)))
-        // POST /auth/magic-link    1 kB     MagicLinkEmail, MagicLinkIp
-        // POST /auth/verify        1 kB     Verify
+        // `MagicLinkEmail`, the other limit of this route, is checked in its
+        // handler: the key is the address it reads.
+        .route(
+            "/auth/magic-link",
+            post(auth::request_magic_link).layer((body(KB), ip(RouteGroup::MagicLinkIp))),
+        )
+        .route(
+            "/auth/verify",
+            post(auth::verify).layer((body(KB), ip(RouteGroup::Verify))),
+        )
         // POST /auth/refresh       0        Refresh
         // POST /auth/logout        0        Logout
         // GET  /me                 none     Me
