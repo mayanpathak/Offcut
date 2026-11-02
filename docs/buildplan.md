@@ -2,7 +2,7 @@
 
 **Status:** v1.3. Built from `product.md` (PS, Product Spec v1.3) and `technicalspec.md` (TS, Technical Spec v1.3).
 
-**What this document is.** The order in which Offcut gets built, as ten versions plus eleven point releases. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the MVP product and, from v1.2, **the seams the AI edit plan needs** (TS §40.9), so that nothing written in V4-V6 has to be rewritten later. V6.1 to V6.11 add the long path and the AI-planned editor (TS §40.10, §41-§53, §8A below), and V6.10 is feature-complete. V7 to V10 add no features: they are testing, hardening and the launch gate.
+**What this document is.** The order in which Offcut gets built, as ten versions plus eleven point releases. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the MVP product and, from v1.2, **the seams the AI edit plan needs** (TS §40.9), so that nothing written in V4-V6 has to be rewritten later. V6.1 to V6.11 add the long path and the AI-planned editor (TS §40.10, §41-§53, §8A below), and V6.11 ends with the feature freeze. V7 to V10 add no features: they are testing, hardening and the launch gate.
 
 **v1.3 in one paragraph (founder decisions of 2026-11-02).** V6 comes first, then V6.1-V6.11, then V7-V10. A long video up to 20 minutes becomes 5-10 finished shorts, built on a "virtual clip" design that leaves everything downstream unchanged. **A clip of at most 90 seconds with new features off stays V5, byte for byte: TS §41, the compatibility contract, binds every release.** The old V6.x are renumbered (table below; TS §42), so older documents and code comments are read through that map. Chapter markers and the lower third moved post-launch.
 
@@ -559,7 +559,7 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 
 ---
 
-## 8. V6 - Accounts, limits, payments: feature-complete (M1.7, M1.8; week 5, second half: 12-15 Nov)
+## 8. V6 - Accounts, limits, payments: the MVP's features (M1.7, M1.8; week 5, second half: 12-15 Nov)
 
 **Goal.** The last missing MVP features: magic-link sign-in, the signed entitlement token, the free plan's three exports a month with watermark, usage receipts, account deletion and export, and checkout for the Creator plan through the merchant of record. After V6 the only new features are V6.1-V6.11 (§8A). Seam S-10: account deletion and export iterate one list of per-user tables, so V6.2's `ai_usage` and `ai_shorts_grants` are two more entries. **v1.3: V6 comes first, because nothing can be sold without it, and V6.2 and V6.4 need accounts for quotas.**
 
@@ -597,7 +597,7 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 | `server/src/db/subscriptions.rs`, `webhook_events.rs` | The transition table of TS §22.5; events older than `last_event_at` ignored |
 | Routes `POST /billing/checkout`, `GET /billing/portal`, `POST /billing/webhook` | Hosted checkout by full-page navigation; no third-party script |
 
-Replace the placeholder mail and billing variables in Render with real values. Keep `FOUNDING_OFFER_ENABLED=false` until V9. Prices (15 USD/month, 144 USD/year, 99 USD/year founding) are configured at the merchant and shown from `web/src/config/pricing.ts`; the server holds no amounts.
+Replace the placeholder mail and billing variables in Render with real values. Keep `FOUNDING_OFFER_ENABLED=false` until the founding release after V6.6 (§8A.6). Prices (15 USD/month, 144 USD/year, 99 USD/year founding) are configured at the merchant and shown from `web/src/config/pricing.ts`; the server holds no amounts.
 
 **D. Client**
 
@@ -618,7 +618,7 @@ Replace the placeholder mail and billing variables in Render with real values. K
 | ID | What you do | Pass | If it fails |
 |---|---|---|---|
 | TE-8 | Send 50 magic links to the major mailbox providers; read the quota terms | At least 95% in the inbox within 30 s; at least 100 emails/day; works from a single verified sender address with no purchased domain | Other candidate. There is no paid remedy: if neither delivers, sign-in is unreliable and that is a launch risk to state plainly |
-| TE-9 | Test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | Account approved; all six `BillingEventKind`s observed; a timed-out webhook is retried | Second provider behind `BillingProvider` |
+| TE-9 | Test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed in test mode; a timed-out webhook is retried. Approval for live mode is the founding release's box (§8A.6), not V6's | Second provider behind `BillingProvider` |
 
 ### 8.3 The M1 gate (Sun 15 Nov 2026): all P0 features work on dev machines
 
@@ -682,10 +682,10 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 | When | Founder's work | Decides |
 |---|---|---|
-| Beside V6, any time before V6.4 | **E-12, optional by the founder's decision of 2026-11-02, and recommended:** test OpusClip, Submagic, Vizard and Descript by hand on one video; free shorts for 20 YouTubers from a throwaway script; offer the founding plan | Whether stitched shorts lead the pitch; the order of V6.8-V6.11 |
+| Beside V6, any time before V6.4 | **E-12, optional by the founder's decision of 2026-11-02, and recommended:** test OpusClip, Submagic, Vizard and Descript by hand on one video; free shorts for 20 YouTubers from a throwaway script; ask who would pay (the founding plan is sold from V6.6's founding release) | Whether stitched shorts lead the pitch; the order of V6.8-V6.11 |
 | V6.4 | Mark postable moments on at least 10 real long videos: the labelled set for TE-19 and E-13 | Whether the Director is good enough to keep going |
 | After V6.4 | **Private alpha** with 10-15 YouTubers on their own videos (the long-path half of E-2) | What to fix first; which of V6.6's parts and V6.7-V6.11 matter |
-| After V6.6 | **First public demos,** made with the product; founding-plan offer (E-5), waitlist, affiliate talks | Whether the look is good enough to sell |
+| After V6.6 | **First public demos,** made with the product; **the founding release (§8A.6): live payments, then the founding-plan offer (E-5)**; waitlist, affiliate talks | Whether the look is good enough to sell |
 | V6.11 | The person-mask panel on 20 shorts (TE-25) | Which effects ship |
 | After V6.11 | **Feature freeze.** Marketing runs alongside V7-V10 | The launch date |
 
@@ -874,7 +874,17 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Depends on.** V6.2 for the catalog; V6.3 for `EndCard`'s map. Parts A, B, C and E may ship before D.
 
-**Exit.** The part rows above; `catalog_complete.rs`; existing goldens unchanged. **After this, first public demos and founding-plan offer.** Tagged `v6.6`.
+**Exit.** The part rows above; `catalog_complete.rs`; existing goldens unchanged. **After this, first public demos.** Tagged `v6.6`.
+
+**The founding release, right after `v6.6` (founder's decision of 2026-11-02; moved from V9, TS §22.5, E-5).** No new version number: a deploy, with its own commits, on the branch of V6.7. It adds no product feature. Early paying strangers test the price directly.
+
+- [ ] `/legal/:doc`: Terms of Service, Privacy Policy, Refund and Cancellation Policy (14 days), moved here from V8 and V10, written as §10.3 says. Public pricing and a contact route. Dodo's FAQ says its review reads these on the live site.
+- [ ] Dodo approves live payments, and tax settings are confirmed.
+- [ ] Vercel's plan terms are recorded, and the founder accepts the non-commercial-terms risk in writing (TS §29), since real money now passes through the site. V9 listed this; it comes first now.
+- [ ] Copy says only what BP §10.3 allows. `privacy-network.spec.ts` is V8's, so before it exists the founder reads one network capture of a clip on the live site, as V5 did, and records it. PS §17 ties the claim to that test.
+- [ ] Live products, key and webhook secret in Render with `BILLING_API_BASE_URL=https://live.dodopayments.com`. The live webhook URL is registered. Test-mode `subscriptions` rows are wiped. This makes every offer purchasable, not only the founding one.
+- [ ] One real purchase and one refund, read in `subscriptions`.
+- [ ] Then `FOUNDING_OFFER_ENABLED=true`, and the offer goes to the waitlist and alpha people. Target: at least 5 paying strangers (PS §19 E-5).
 
 ---
 
@@ -1126,15 +1136,9 @@ Also measure a 90-second clip. It has no budget; it is expected at about 1.5x, a
 
 Add `web/tests-e2e/api-cold-start.spec.ts`: an API delayed 45 s shows the waking copy after 3 s and then succeeds; with the API down, an export with a cached token completes and its receipt waits in the outbox (INV-3). Re-check TE-11 (Render memory, cold start, monthly hours) and TE-14 (peak memory).
 
-### 11.3 Non-code work: E-5 presale starts (weeks 8-10)
+### 11.3 Non-code work: E-5 presale continues (moved to after V6.6, §8A.6)
 
-Before any real money is taken:
-
-- [ ] Vercel's plan terms are recorded in writing (TE-5), and you have accepted the non-commercial-terms risk in writing (TS §29). No paid plan is used.
-- [ ] The merchant account is approved for live mode and tax settings are confirmed.
-- [ ] Refund policy page is live (14 days).
-
-Then set `FOUNDING_OFFER_ENABLED=true` and offer the founding-member plan at 99 USD/year to waitlist and alpha people. Target: at least 5 paying strangers, not friends or family, before launch (PS §19 E-5). E-2 finishes at the end of week 9.
+The founding offer has been live since §8A.6's release (founder's decision of 2026-11-02), with its boxes ticked there. Keep offering it at 99 USD/year to waitlist and alpha people. Target: at least 5 paying strangers, not friends or family, before launch (PS §19 E-5). E-2 finishes at the end of week 9.
 
 ### 11.4 Exit checklist
 
@@ -1193,8 +1197,8 @@ Then set `FOUNDING_OFFER_ENABLED=true` and offer the founding-member plan at 99 
 
 ### 12.3 Launch items (PS §20.6)
 
-- [ ] Terms of Service, Privacy Policy and refund policy live (section 10.3 explains the review they did and did not get).
-- [ ] Merchant-of-record account live, tax settings confirmed.
+- [ ] Terms of Service, Privacy Policy and refund policy live since §8A.6, and re-read against the allowlist (section 10.3 explains the review they did and did not get).
+- [ ] Merchant-of-record account live since §8A.6, tax settings re-confirmed.
 - [ ] Support inbox, FAQ page, and the uptime monitor's public status page.
 - [ ] Demo videos made with the product itself replace the hand-made E-1 demos; uploaded to the asset host.
 - [ ] `scripts/metrics.sql` returns all PS §20.5 metrics.

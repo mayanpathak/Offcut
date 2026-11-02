@@ -957,7 +957,7 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 |---|---|---|---|---|
 | Do technical creators want auto-visualized numbers/lists enough to engage? | **E-1** Landing page + 3 hand-made demo clips + waitlist, 3 weeks | M0 | ≥ 1,000 visitors and ≥ 5% join the waitlist (≥ 50) (TARGET). Fewer than 1,000 visitors = inconclusive | Yes: continue. No: rewrite the pitch and re-run once; if still < 3%, stop and reconsider the ICP |
 | Can local ASR + render fit the time budget on R1? | **E-3** (ASR perf) and **E-4** (render/encode perf), spike in weeks 1-2 | M0 | Median ASR ≤ 20 s and render+encode ≤ 90 s for a 60 s clip on R1 (TARGET); p90 total ≤ 180 s | Yes: continue. No: apply fallbacks (§20.4); if still failing, cloud fallback becomes P0 and H4 weakens |
-| Will strangers pay before the product is polished? | **E-5** Founding-member presale at $99/year (31% off $144: (144 − 99) ÷ 144 = 31.25%) | M2 | ≥ 5 paying strangers (not friends/family) before launch (TARGET) | Yes: confident launch. No: investigate price vs value before spending on marketing |
+| Will strangers pay before the product is polished? | **E-5** Founding-member presale at $99/year (31% off $144: (144 − 99) ÷ 144 = 31.25%). v1.3: starts right after V6.6 (founder, 2026-11-02; `buildplan.md` §8A.6) | M2 | ≥ 5 paying strangers (not friends/family) before launch (TARGET) | Yes: confident launch. No: investigate price vs value before spending on marketing |
 | Is the output good enough that people would post it? | **E-2** Concierge/alpha with 15 technical creators on their own clips | M1-M2 | ≥ 8 of 15 would post the result with ≤ 2 minutes of changes (TARGET) | Yes: H1 supported. No: identify the gap (captions? events? audio?) before launch |
 
 ### Important

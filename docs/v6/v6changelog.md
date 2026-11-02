@@ -16,7 +16,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 9 | One real send from the Render free service: TCP on 2525 is proven, STARTTLS and login from there are not | Founder, at the deployed checks | Entry 1, G 14.6 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
-| 13 | Open the draft pull request `v6-build` → `main` | Founder | G 0.6 |
+| 14 | Dodo's FAQ says the live site must publicly show pricing, Terms, Privacy, Refund and Cancellation Policy, and a contact route during its review, and those pages are planned for the founding release. Verification may be held until then. Test mode and V6's gate are unaffected. Ask Dodo, or bring the pages forward | Founder | V6 §18, BP §8A.6 |
 
 ## Known issues for later prompts
 
@@ -123,3 +123,38 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **After the commit, same day.** Mail test 1 reached the inbox (founder). It went from a Gmail address to itself, so it says little about other mailboxes; TE-8 reads those. The first port probe failed on Render with "Application exited early" and no output: the command held quotes and spaces, and Render does not document how that field parses them. A second form, with no quote and no space, puts the script in an environment variable, and it ran.
 
 **Render's reading (founder's logs, 2026-11-02, free web service):** `2525: open`, `587: blocked`, `465: blocked`. `lettre` stays (D-252, V6 section 6.2). This is a TCP connection only, so open item 9 stays until a real mail goes out from Render.
+
+## Entry 2 - 2026-11-02 - The audit of the V6 documents: fixes before P137
+
+**Source.** An outside audit the founder supplied: 9 blocking problems, 7 gaps, smaller items and stale text. Each was checked against the code at `v6-build` before being applied. All held. One was narrower than reported: Dodo's documents do give a way to force a test renewal, by patching `next_billing_date`, with a failure card, so item 8 needs no short-interval product.
+
+**Founder's decision.** The founding offer goes live after V6.6 (D-303). BP §8A.6 now holds a founding release, with live payments, every offer purchasable, the legal pages moved forward, and Vercel's terms accepted. BP §8.2's TE-9 row, §11.3, §12.3 and PS §19 follow. V6 itself ships it off.
+
+**The plan was wrong on sessions, and now is not.** D-258 as first written moved the previous hash on each use and retried refresh for 70 s against a 30 s grace. It would have signed people out in three ways: a third request with one cookie, a late retry read as reuse, and crossed responses read as reuse 15 minutes later. D-258 is rewritten; the lock and the 25 s budget are D-297; the fourth row of §7.3 sends no `Set-Cookie`; the tests now hold three concurrent refreshes and a rotated-away token used after 30 s.
+
+**Fixed.**
+
+| Audit item | Decision |
+|---|---|
+| Two more protected assertions (lines 142, 321) | D-293: the title keeps the sentence, so neither changes and no new row |
+| Seeded tokens | D-294 |
+| Main sign-in path illegal | D-295 |
+| Callback tab races itself | D-296 |
+| Prompts out of order | D-298 |
+| DC-11 fails the frozen check | D-245, G 0.4: `verify/README.md` excluded by name |
+| P144 cannot answer its questions | G Phase 8 rewritten, with a logging endpoint (V6 §6.3) and forced renewals |
+| M1 walk cannot finish | G 13: local rows with the key set-up; checkout at G 14.6 |
+| Old subscription's events; double charge | D-299, D-300 |
+| Protected interface limits | D-302, named in P147's and P148's gates |
+| Receipts across accounts | D-267: `sub` on the row |
+| Mail proven too late | D-304: a real send from Render and TE-8 in P138; visible From recorded; rollback in §18 |
+| S-10 half built | D-270: an export test against the list |
+| Unlisted test edit | D-246 names `start-export.test.ts`'s case |
+| Smaller items | Close line before 134 (D-246); `Resumed`, `PlanChanged` (D-301); `is_partial` (D-277); `forCheckout` needs a session (§12); open the link on this computer (D-302) |
+| Stale text and core-doc conflicts | §1A, D-242, D-260, D-305, §4's count, the channel's name, §21's additions, G 14.2, G 14.6, the "feature-complete" wording |
+
+**Corrected for the record.** Entry 1's open-item numbers: item 11 closed with DC-12's yes, item 12 with the inbox reading, item 13 with pull request 10. Entry 1's "Docker" assumption in the older documents: server tests need Postgres on port 9000 only (D-305).
+
+**Tested.** The two new probes ran on D1 as plain argument lists: the webhook log answered 500, 200 and 500 for a first delivery, a retry and another event, and served its log; the mail probe sent "Offcut mail test 2" to the sender's own address. Not run: anything on Render, any call to Dodo with a key.
+
+**Counted once.** Thirteen new decisions make D-241 to D-305. Fourteen prompts stay; P138 and P144 grow.
