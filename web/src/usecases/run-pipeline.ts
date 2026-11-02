@@ -371,8 +371,8 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
   });
 
-  // 13. (F) The cleaned voice, kept for what rebuilds the program later (V6.2,
-  //     V6.3), before it is handed on; then the program's audio from it, on
+  // 13. (F) The cleaned voice, kept for what rebuilds the program later (V6.3,
+  //     V6.7), before it is handed on; then the program's audio from it, on
   //     the identity map (D-127), which the export will read (TS §40.9 S-8);
   //     then the clip's records.
   run.stage = "storage";

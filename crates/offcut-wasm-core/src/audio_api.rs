@@ -51,7 +51,7 @@ pub fn run_chain(pcm48: &[f32], on_block: &Function) -> Result<JsValue, JsValue>
 
 /// `{ prog48: Float32Array, loudness: number }`: `out48` played on
 /// `time_map` (a `TimeMap`), with `speech` (`OutSpan[]`) where music would
-/// duck (V6.3). V4 takes the identity map only: any other is `E_DSP`
+/// duck (V6.7). V4 takes the identity map only: any other is `E_DSP`
 /// `Unsupported` (D-164).
 #[wasm_bindgen]
 pub fn assemble(out48: &[f32], time_map: JsValue, speech: JsValue) -> Result<JsValue, JsValue> {

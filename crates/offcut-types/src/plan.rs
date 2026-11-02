@@ -1,6 +1,6 @@
 //! The edit plan's wire format (TS §40.2, v4implementation D-119, D-120).
 //! One shape, fixed at `PLAN_FORMAT = 1`, for every producer: the rules of
-//! V4 and the model of V6.1 on. These are data only: what a plan means, and
+//! V4 and the model of V6.2 on. These are data only: what a plan means, and
 //! whether it is valid, is decided by `offcut-plan`.
 //!
 //! Serde: every struct refuses unknown fields; an enum whose variants carry
@@ -27,14 +27,14 @@ pub struct EditPlan {
     /// The `CATALOG_VERSION` the plan was produced against.
     pub catalog: u32,
     pub source: PlanSource,
-    /// Empty until V6.2.
+    /// Empty until V6.3.
     pub cuts: Vec<Cut>,
     pub items: Vec<PlanItem>,
-    /// Empty until V6.1.
+    /// Empty until V6.2.
     pub chapters: Vec<Chapter>,
-    /// Empty until V6.1.
+    /// Empty until V6.2.
     pub extras: TextExtras,
-    /// `None` until V6.3.
+    /// `None` until V6.7.
     pub music: Option<MusicCue>,
 }
 
@@ -43,7 +43,7 @@ pub struct EditPlan {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PlanSource {
     Rules,
-    /// `provider` is a provider id (V6.1 decides the list).
+    /// `provider` is a provider id (V6.2 decides the list).
     Model {
         provider: String,
         model: String,
@@ -153,7 +153,7 @@ pub struct Chapter {
     pub title: Label,
 }
 
-/// Text around the video. Every field may be left out (empty until V6.1).
+/// Text around the video. Every field may be left out (empty until V6.2).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(default, deny_unknown_fields)]
 pub struct TextExtras {
@@ -179,7 +179,7 @@ pub struct MusicCue {
 
 /// What `offcut-plan`'s `validate` left out of a plan, and why (TS §40.4).
 /// `kind` is `None` for a cut, a chapter, a text extra or a music cue. No
-/// content: it may become an analytics event (V6.1).
+/// content: it may become an analytics event (V6.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
 pub struct Dropped {
     pub kind: Option<EventKind>,
@@ -444,7 +444,7 @@ mod tests {
     }
 
     /// The JSON of a one-item plan of the rules, exactly. A contract with
-    /// V6.1's server and with stored plans: a change here is a new
+    /// V6.2's server and with stored plans: a change here is a new
     /// `PLAN_FORMAT`, never an edit of this string.
     #[test]
     fn the_json_of_a_one_item_rules_plan_is_pinned() {

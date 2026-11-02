@@ -13,7 +13,7 @@ python verify/verify_mp4.py <file> --profile free|creator --expected-duration-ms
 pnpm verify <file> --profile creator --expected-duration-ms N
 ```
 
-`N` is how long the export should be, in milliseconds, worked out by the test. `--source` is what checks 8 and 11 compare with; the two are separate, because from V6.2 they differ. Without `--source` those parts are reported as not measured.
+`N` is how long the export should be, in milliseconds, worked out by the test. `--source` is what checks 8 and 11 compare with; the two are separate, because from V6.3 they differ. Without `--source` those parts are reported as not measured.
 
 It prints one line per check, `PASS <n>` or `FAIL <n>: <reason>`. A line `INFO <n>: <reading>` reports a number and judges nothing. A reason names a tag's key, never its value. The exit status is 0 only when every check passes, 1 when one fails, and 2 when a tool or NumPy is missing or the arguments are wrong.
 

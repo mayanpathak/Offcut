@@ -41,7 +41,7 @@ function wordsOf(words: readonly Word[], edits: Readonly<Record<number, string>>
 function figureOf(item: PlanItem, words: readonly Word[], edits: Readonly<Record<number, string>>): string {
   const own = (): string => wordsOf(words, edits, item.anchors.start, item.anchors.end);
   if (item.params.kind !== "detected") {
-    // A plan of a model (V6.1) points at words.
+    // A plan of a model (V6.2) points at words.
     return own();
   }
   const params = item.params.params;

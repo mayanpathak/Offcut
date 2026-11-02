@@ -1,6 +1,6 @@
 //! [ONLY colour values] The colours and fonts a style is drawn in, by role
 //! (TS §40.5, D-136). A style names roles; a theme gives each role its value,
-//! so that a brand kit (V6.7) is one `Theme`. The values are the table of
+//! so that a brand kit (V6.10) is one `Theme`. The values are the table of
 //! v4implementation §8.4 (D-139, D-170), all (assumption), reviewed in E-2.
 
 use offcut_types::StyleId;

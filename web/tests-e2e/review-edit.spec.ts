@@ -424,6 +424,8 @@ test.describe("the editor (review-edit), on one processed clip", () => {
     for (const tab of ["Captions", "Style", "Visuals", "Framing"]) {
       await openTab(page, tab);
       await blur(page);
+      const scanned = await axe(page);
+      expect(scanned.map((v) => `${v.id}: ${v.nodes.length} node(s)`), `axe on the ${tab} tab`).toEqual([]);
       // Every element that takes the focus by Tab: the page's own controls, not a roving group's other members.
       const expected = await page.evaluate(() => {
         const all = [...document.querySelectorAll<HTMLElement>("button, input, select, textarea, a[href], [tabindex]")];

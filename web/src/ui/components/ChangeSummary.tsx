@@ -14,7 +14,7 @@ import { PanelSection } from "../primitives/PanelSection";
 import styles from "../styles/components.module.css";
 import { PostExportQuestion } from "./PostExportQuestion";
 
-/** The rows of J11, only those that happened (PS §10). One row per field: V6.2, V6.3 and V6.6 each add one. */
+/** The rows of J11, only those that happened (PS §10). One row per field: V6.3 and V6.7 each add one. */
 export function summaryRows(s: ChangeSummary): string[] {
   const rows: string[] = [];
   if (s.voice_cleaned) {

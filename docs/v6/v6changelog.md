@@ -16,14 +16,13 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 9 | One real send from the Render free service: TCP on 2525 is proven, STARTTLS and login from there are not | Founder, at the deployed checks | Entry 1, G 14.6 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
-| 14 | Read the three legal pages, then open and merge the pull request from `site-pages` (founder). Then tell Dodo the pages are live, and check its product form's description against them | Founder | Entry 3 |
+| 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 
 ## Known issues for later prompts
 
 | # | Issue | Prompt |
 |---|---|---|
-| 1 | About 57 code comments use the old V6.x numbers (TS §42) | V6's first prompt (DC-11) |
-| 2 | Carried from V5: known issue 10 (`aria-details`), known issue 3 (`openEditor`) | V6 first |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner and passes on the retry. Cause not proven. Its failure now says what the page showed | The first CI run that shows it |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -168,3 +167,17 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **What this moves.** BP §8A.6's first box is done early, apart from a re-read when accounts open. Those pages say what happens "when accounts open", so P148 re-reads them against what V6 built.
 
 **Read on D1.** `pnpm check` exit 0; Vitest 336; `pnpm e2e` 16 passed, up from 12; the new pages looked at. CI not read: it needs the founder's pull request. **Not lawyer-reviewed:** BP §10.3's known gap. The founder reads them before merging.
+
+## Entry 4 - 2026-11-02 - P137: comments through the version map; known issues 10 and 3
+
+**Before it.** The founder read the legal pages and merged pull request 11 as `343a7c9`. This branch merged `origin/main` as `1f8d054`, ahead of the plan's "before P146", so V6 is built on what is live.
+
+**DC-11.** One regex, one pass (D-245): 49 hits read, 48 lines changed in 24 files, the regenerated `web/src/gen/domain.ts` among them. Two sentences the map alone made wrong were corrected by hand: chapters now read post-launch, and `ChangeSummary`'s comment no longer names a chapters row in V6.6. `verify/README.md` line 16 by name. **Proof:** a script stripped comments from each of the 23 code files at `HEAD` and in the tree, strings left alone, and they compared equal. No `.snap` or `.png` in the diff. The renumbered comments were read once as sentences. TS §42 said about 57 comments; 49 lines is what exists.
+
+**Known issue 10, closed.** `aria-details` is set only on the Captions tab, where the transcript exists. `review-edit`'s case 16 now scans all four tabs: on the old `PreviewPlayer.tsx` it failed with `aria-valid-attr-value: 1 node(s)` on the Style tab, on the new it passes, keyed build, `d1`.
+
+**Known issue 3, read and not cured (30 minutes, as the prompt limits).** V5's last run (41289198237) shows `getByTestId('drop-zone')` not found for 90 s, then a pass on the retry, with nothing saying what the page held. Whether the fake clock holds the capability check back cannot be told from that, and a change made on a guess would hide it. `openEditor` in `model-download.spec.ts` now throws with the page's text, so the next occurrence names the cause. The wait is unchanged.
+
+**A wrong turn, for the record.** A first keyed build took the wrong value for the test key, from a greedy `sed` over `ci.yml`, so the app stopped at start with no drop zone. It looked like known issue 3 and was not. Nothing committed came of it.
+
+**Counts.** Rust 657 / 0 / 4; Vitest 336; `pnpm check` passes from the commit (`check-gen-clean` compares with what is committed). Frozen check: no output. `pnpm e2e` not re-run: nothing it reads changed since Entry 3's 16.

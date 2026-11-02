@@ -8,7 +8,7 @@ use crate::catalog::CATALOG_VERSION;
 
 /// One item per event, in the detector's order. `enabled` is not copied:
 /// every item of V4 starts enabled, and the user's toggles stay in
-/// `EditState.event_overrides` (D-145). `t` is unused in V4; V6.4 maps the
+/// `EditState.event_overrides` (D-145). `t` is unused in V4; V6.6 maps the
 /// rules' kinds onto new ones with it (D-163).
 pub fn from_rules(events: &[DetectedEvent], t: &Transcript) -> EditPlan {
     let _ = t;

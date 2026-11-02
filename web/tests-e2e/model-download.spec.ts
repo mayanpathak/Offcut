@@ -110,7 +110,12 @@ async function openEditor(page: Page, assets: AssetOptions = {}): Promise<{ api:
   await watchPanel(page);
   await page.clock.install();
   await page.goto("/app");
-  await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: patient(30_000) });
+  // A failure says what the page showed instead (V5 CL known issue 3: this wait fails on the hosted runner, and passes on the retry).
+  await expect(page.getByTestId("drop-zone"))
+    .toBeVisible({ timeout: patient(30_000) })
+    .catch(async (error: unknown) => {
+      throw new Error(`no drop zone; the page showed: ${await page.locator("body").innerText()}`, { cause: error });
+    });
   return { api, assets: log };
 }
 

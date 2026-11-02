@@ -1,5 +1,5 @@
 //! How captions move, as data (TS §19.4, D-137). A style's motion is one
-//! `CaptionMotion`; V6.5's kinetic presets append members to the enums here.
+//! `CaptionMotion`; V6.6's kinetic presets append members to the enums here.
 
 use offcut_types::OutMs;
 

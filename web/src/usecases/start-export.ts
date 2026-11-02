@@ -38,7 +38,7 @@ const REVOKE_AFTER_MS = 60_000;
 const UUID_BYTES = 16;
 const TWO_POW_32 = 2 ** 32;
 
-/** The key's `theme` until a brand kit (V6.7): a function of the style and the renderer, both in the key (D-224). */
+/** The key's `theme` until a brand kit (V6.10): a function of the style and the renderer, both in the key (D-224). */
 const DEFAULT_THEME = "default";
 /** Bits per second times milliseconds, to bytes. */
 const BITS_MS_PER_BYTE_S = 8000;

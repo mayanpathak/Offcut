@@ -1,5 +1,5 @@
 //! How loud the cleaned voice is, every 10 ms (TS §40.6): the input of the
-//! time map V6.2 makes. It measures; it decides nothing. Nothing calls it in
+//! time map V6.3 makes. It measures; it decides nothing. Nothing calls it in
 //! V4 (v4implementation D-163).
 
 use offcut_types::SilenceProfile;

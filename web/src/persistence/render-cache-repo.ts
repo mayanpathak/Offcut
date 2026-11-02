@@ -23,9 +23,9 @@ export type CacheInputs = {
   edit: EditState;
   plan: EditPlan;
   timeMap: TimeMap;
-  /** "default" until a brand kit (V6.7): a function of the style and the renderer, both in the key (D-224). */
+  /** "default" until a brand kit (V6.10): a function of the style and the renderer, both in the key (D-224). */
   theme: string;
-  /** `null` until music (V6.3). */
+  /** `null` until music (V6.7). */
   musicId: string | null;
   /** From the token the worker verified, and from nowhere else (D-220, INV-9). */
   profileKind: ProfileKind;

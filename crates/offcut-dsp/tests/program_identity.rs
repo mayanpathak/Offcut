@@ -93,7 +93,7 @@ fn on_the_identity_map_the_program_is_the_cleaned_voice() {
 fn a_map_that_is_not_the_identity_and_music_are_refused() {
     let voice = chain(&pcm("speech_20s_long_pause.mp4")).samples;
     let cfg = ProgramConfig::default();
-    // A second out of the middle taken away: what V6.2 will make. V4 builds
+    // A second out of the middle taken away: what V6.3 will make. V4 builds
     // no such map outside a test (D-164).
     let cut: TimeMap = serde_json::from_str(
         r#"{ "segments": [
