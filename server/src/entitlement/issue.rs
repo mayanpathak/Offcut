@@ -13,12 +13,18 @@ use time::{Date, Duration, OffsetDateTime, Time};
 use crate::db::{subscriptions, usage_receipts};
 use crate::error::AppError;
 
+/// A signed token, and the plan it says.
+pub struct Issued {
+    pub token: String,
+    pub plan: Plan,
+}
+
 pub async fn issue(
     pool: &PgPool,
     key: &SigningKey,
     user: UserId,
     now: OffsetDateTime,
-) -> Result<String, AppError> {
+) -> Result<Issued, AppError> {
     let period = subscriptions::period_end(pool, user).await?;
     let paid_until = period.filter(|end| now <= *end);
     let (plan, remaining, period_end) = match paid_until {
@@ -40,7 +46,10 @@ pub async fn issue(
         iat: UnixSecs::new(now.unix_timestamp()),
         exp: UnixSecs::new(now.unix_timestamp() + ENTITLEMENT_OFFLINE_TTL_SECS),
     };
-    Ok(sign_token(&claims, key))
+    Ok(Issued {
+        token: sign_token(&claims, key),
+        plan,
+    })
 }
 
 /// The first instant of the UTC month of `now`, and the last second of it.

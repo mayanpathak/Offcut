@@ -1,7 +1,7 @@
 //! The `users` table.
 
 use offcut_types::UserId;
-use sqlx::PgConnection;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 /// The user of this address, made with `new_id` if there is none. Two sign-ins
@@ -21,4 +21,12 @@ pub async fn find_or_create(
     .fetch_one(conn)
     .await?;
     Ok(UserId::new(row.id))
+}
+
+/// The address of a user, or `None` when the account is gone.
+pub async fn email(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::Error> {
+    let row = sqlx::query!("SELECT email FROM users WHERE id = $1", user.get())
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|row| row.email))
 }

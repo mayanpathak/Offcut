@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions\n         SET prev_token_hash = refresh_token_hash, prev_valid_until = $3,\n             refresh_token_hash = $2, last_used_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7cffc01665e3948cf60a64cff94b36fc199f11b4e520ddf82159cb59ebe4b446"
+}

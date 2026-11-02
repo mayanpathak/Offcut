@@ -49,9 +49,16 @@ pub fn build(state: AppState) -> Router {
             "/auth/verify",
             post(auth::verify).layer((body(KB), ip(RouteGroup::Verify))),
         )
-        // POST /auth/refresh       0        Refresh
-        // POST /auth/logout        0        Logout
-        // GET  /me                 none     Me
+        .route(
+            "/auth/refresh",
+            post(auth::refresh).layer((body(0), ip(RouteGroup::Refresh))),
+        )
+        .route(
+            "/auth/logout",
+            post(auth::logout).layer((body(0), ip(RouteGroup::Logout))),
+        )
+        // `Me` is limited per user in its handler.
+        .route("/me", get(auth::me))
         // GET  /entitlement        none     Entitlement
         // POST /usage/receipts     1 kB     UsageReceipts
         // POST /billing/checkout   1 kB     Checkout

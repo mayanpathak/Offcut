@@ -1,9 +1,21 @@
 //! The `sessions` table. It holds hashes of refresh tokens, never a token.
 
 use offcut_types::UserId;
-use sqlx::PgConnection;
+use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
+
+/// What deciding a refresh needs of a session.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SessionRow {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub refresh_token_hash: Vec<u8>,
+    pub prev_token_hash: Option<Vec<u8>>,
+    pub prev_valid_until: Option<OffsetDateTime>,
+    pub expires_at: OffsetDateTime,
+    pub revoked_at: Option<OffsetDateTime>,
+}
 
 pub async fn create(
     conn: &mut PgConnection,
@@ -20,6 +32,83 @@ pub async fn create(
         expires_at,
     )
     .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// The session whose current or previous hash this is, locked until the
+/// transaction ends. A request that waits for the lock sees the row as the
+/// holder left it, so requests with one cookie take their turns.
+pub async fn for_update(
+    conn: &mut PgConnection,
+    token_hash: &[u8],
+) -> Result<Option<SessionRow>, sqlx::Error> {
+    sqlx::query_as!(
+        SessionRow,
+        "SELECT id, user_id, refresh_token_hash, prev_token_hash, prev_valid_until, expires_at,
+                revoked_at
+         FROM sessions
+         WHERE refresh_token_hash = $1 OR prev_token_hash = $1
+         FOR UPDATE",
+        token_hash,
+    )
+    .fetch_optional(conn)
+    .await
+}
+
+/// The current token was used: it becomes the previous one, good until `until`.
+pub async fn rotate_current(
+    conn: &mut PgConnection,
+    id: Uuid,
+    new_hash: &[u8],
+    until: OffsetDateTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE sessions
+         SET prev_token_hash = refresh_token_hash, prev_valid_until = $3,
+             refresh_token_hash = $2, last_used_at = now()
+         WHERE id = $1",
+        id,
+        new_hash,
+        until,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// The previous token was used in its grace. The previous hash and its time do
+/// not move (v6implementation D-258).
+pub async fn rotate_in_grace(
+    conn: &mut PgConnection,
+    id: Uuid,
+    new_hash: &[u8],
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE sessions SET refresh_token_hash = $2, last_used_at = now() WHERE id = $1",
+        id,
+        new_hash,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+pub async fn revoke(conn: &mut PgConnection, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query!("UPDATE sessions SET revoked_at = now() WHERE id = $1", id)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
+/// Ends the session of this hash, if there is one still running.
+pub async fn revoke_by_token(pool: &PgPool, token_hash: &[u8]) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE sessions SET revoked_at = now()
+         WHERE (refresh_token_hash = $1 OR prev_token_hash = $1) AND revoked_at IS NULL",
+        token_hash,
+    )
+    .execute(pool)
     .await?;
     Ok(())
 }

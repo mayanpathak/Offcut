@@ -14,7 +14,6 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
-| 9 | Read the 3 template mails sent to the second Gmail address on 2026-11-02 17:22 UTC: inbox or spam, the visible From, and that the link's host is `example.invalid` (D-255). Delete the Render mail-probe service, which holds the SMTP key | Founder | Entry 7 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
@@ -233,3 +232,25 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **Counts.** Rust 691 / 0 / 4, up from 666; Vitest 336; `pnpm check` exit 0; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P142.
 
 **Found, not fixed.** A failed mail deletes the new link, but the address's older unused link was already spent in the same statement. So a mail failure can kill a link that was still in the inbox. Small: the person asks again. As §7.1 says.
+
+## Entry 8 - 2026-11-02 - P140: rotation, logout, the extractor, /me
+
+**P138's last box, closed.** The founder read the three mails: all in the inbox of the second Gmail address, each link's host `example.invalid`, so Brevo does not rewrite the link (D-255). The Render mail-probe service is deleted, and pull request 12 is closed. The visible From was not reported, so `experiments.md` keeps it as unread.
+
+**Changed.** `auth/extract.rs`'s `AuthUser`, verifying with no database read, and putting the user's tag on the request's log line (TS §24.4). `auth/session.rs`: `decide`, a pure function of §7.3's table, `refresh`, `check_csrf`, `refresh_token_of`, `cleared_cookie`. `POST /auth/refresh`, `POST /auth/logout`, `GET /me`. `limit()` in `rate_limit.rs`, which the magic-link route now uses too (Entry 7's difference, closed). `db/sessions.rs`, `db/users.rs`'s `email`, `db/subscriptions.rs`'s `summary`. `issue()` returns the plan beside the token, so `/me` has no second reckoning of a plan (D-266).
+
+**Tests first.** 17 of the 18 new `auth_flow.rs` cases failed before the code; the 18th, wrong method, holds by the router's fallback.
+
+**The tests were tried against the bugs they guard, then restored.**
+
+| Bug put back | Caught by |
+|---|---|
+| A retry moves the previous hash, the plan's first design | `row_2`, `three_concurrent`, `a_token_rotated_away` |
+| A reuse does not revoke | `row_3` |
+| A refused refresh clears the cookie | `row_4` (both), `a_token_rotated_away` |
+
+The four race and grace cases then ran 12 times: no failure.
+
+**What holds after this, and what does not.** The lock of D-297 arrives with P145; until then only these tests stand behind the concurrent case. A session ends 60 days after its sign-in however active it is, as section 7.3 assumes, so a daily user signs in again every 60 days. It is one line to make it slide, and a founder's call if that proves annoying. The cookie through Vercel's rewrite and a real `Origin` are first read at G 14.6.
+
+**Counts.** Rust 713 / 0 / 4, up from 691; Vitest 336; `pnpm check` exit 0; frozen check no output; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P142.

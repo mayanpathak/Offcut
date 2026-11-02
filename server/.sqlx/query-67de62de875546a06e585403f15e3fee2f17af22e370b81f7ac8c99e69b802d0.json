@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions SET revoked_at = now()\n         WHERE (refresh_token_hash = $1 OR prev_token_hash = $1) AND revoked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "67de62de875546a06e585403f15e3fee2f17af22e370b81f7ac8c99e69b802d0"
+}
