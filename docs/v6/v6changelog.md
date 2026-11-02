@@ -17,6 +17,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 9 | One real send from the Render free service: TCP on 2525 is proven, STARTTLS and login from there are not | Founder, at the deployed checks | Entry 1, G 14.6 |
 | 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
+| 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
 
 ## Known issues for later prompts
 
@@ -181,3 +182,13 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 **A wrong turn, for the record.** A first keyed build took the wrong value for the test key, from a greedy `sed` over `ci.yml`, so the app stopped at start with no drop zone. It looked like known issue 3 and was not. Nothing committed came of it.
 
 **Counts.** Rust 657 / 0 / 4; Vitest 336; `pnpm check` passes from the commit (`check-gen-clean` compares with what is committed). Frozen check: no output. `pnpm e2e` not re-run: nothing it reads changed since Entry 3's 16.
+
+## Entry 5 - 2026-11-02 - The pages went live; Vercel blocks a private repository's deploy (outside a prompt)
+
+**What happened.** The founder made the repository private on 2026-11-01. Pull request 11's merge `343a7c9` passed `ci`, `e2e-media` and `deploy-api`, then `deploy-web` hung at `vercel deploy --prebuilt --prod`, which took 5 s the day before. Vercel's dashboard said: "The deployment was blocked because the commit email 133807457+mayanpathak@users.noreply.github.com could not be matched to a GitHub account." Vercel's Redeploy button was not used: it would skip the test-key check.
+
+**Fixed for now, by the founder's decision.** Before anything was published, every commit on every pushed branch was searched for the real values of `.env.deploy`: none found, and no `.env`, key or video was ever committed. The agent made the repository public and re-ran only `deploy-web`. Attempt 2 passed every step, including the rewrite, the headers and `@smoke`. The live bundle holds the new pages; `healthz` shows `343a7c9`.
+
+**What this proves and does not.** The same commit and email deploy while public and are blocked while private, so visibility decides it today. It does not say why: every merge on `main` since 2026-10-07 has this same noreply address, and the founder recalls deploys working while private around V3. Vercel may have tightened the check, which its forum suggests; nobody here can read that from its side.
+
+**Going private again.** The next merge to `main` will meet the same block, and private Actions minutes ran out once already (2026-10-29), at about 50-75 minutes a push. `vercel-email-check` holds one docs commit, ready to test merging with the Gmail address while private. That is untested.
