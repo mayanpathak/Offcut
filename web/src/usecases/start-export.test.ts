@@ -9,13 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChangeSummary, ClipInfo, DetectedEvent, EditPlan, EditState, ExportProfile, TimeMap, Transcript } from "../gen/domain";
 import type { CacheInputs } from "../persistence/render-cache-repo";
 import { cacheKey, canonicalJson, RENDERER_VERSION } from "../persistence/render-cache-repo";
+import { useAuthStore } from "../state/auth-store";
 import { useCapabilityStore } from "../state/capability-store";
 import { useClipStore } from "../state/clip-store";
+import { useEntitlementStore } from "../state/entitlement-store";
 import * as exportStore from "../state/export-store";
 import { answerPostExport } from "./answer-post-export";
 import { cancelJob } from "./cancel-job";
 import { importClip } from "./import-clip";
-import { dismissExport, downloadAgain, startExport } from "./start-export";
+import { closeGate, confirmLastExport, dismissExport, dismissUpgrade, downloadAgain, startExport } from "./start-export";
 
 type Deferred = { promise: Promise<unknown>; resolve(value: unknown): void };
 
@@ -58,7 +60,15 @@ const m = vi.hoisted(() => {
     },
     restartWorker: () => undefined,
   };
-  return { calls, events, held, answers, files, rows, device, pool };
+  const receipts = {
+    rows: [] as { exportId: string; plan: string; sub: string }[],
+    order: [] as string[],
+    fails: false,
+    statusNow: () => "?",
+    renewals: 0,
+    renew: (): Promise<unknown> => Promise.resolve({ ok: false, failure: { code: "E_NET_OFFLINE" } }),
+  };
+  return { calls, events, held, answers, files, rows, device, pool, receipts };
 });
 
 vi.mock("../workers/pool", async () => {
@@ -120,6 +130,30 @@ vi.mock("../persistence/db", () => {
 });
 vi.mock("../persistence/entitlement-repo", () => ({
   get: () => Promise.resolve(m.device.token === undefined ? undefined : { token: m.device.token, storedAt: 0 }),
+  put: (token: string) => {
+    m.device.token = token;
+    return Promise.resolve();
+  },
+}));
+vi.mock("../persistence/receipt-outbox", () => ({
+  enqueue: (exportId: string, plan: string, sub: string) => {
+    m.receipts.order.push(`enqueue while ${m.receipts.statusNow()}`);
+    if (m.receipts.fails) {
+      return Promise.reject(new Error("no database"));
+    }
+    m.receipts.rows.push({ exportId, plan, sub });
+    return Promise.resolve();
+  },
+  flushOutbox: () => {
+    m.receipts.order.push(`flush while ${m.receipts.statusNow()}`);
+    return Promise.resolve();
+  },
+}));
+vi.mock("../net/api-client", () => ({
+  getEntitlement: () => {
+    m.receipts.renewals += 1;
+    return m.receipts.renew();
+  },
 }));
 vi.mock("../persistence/clips-repo", () => ({
   get: () =>
@@ -183,9 +217,11 @@ const PLAN = { format: 1, items: [], cuts: [] } as unknown as EditPlan;
 const TIME_MAP = { segments: [{ kind: "source" }] } as unknown as TimeMap;
 const EDIT: EditState = { word_edits: {}, event_overrides: {}, style: "clean", crop_offset: 0, caption_position: 1, highlight_numbers: true };
 
-/** A token as `planOf` reads it, naming `plan`: what the worker answers is what counts. */
-function tokenNaming(plan: string): string {
-  return `${btoa(JSON.stringify({ plan }))}.signature`;
+/** A token whose claims name `plan`, good for a day: what the worker answers is what counts. */
+function tokenNaming(plan: string, over: Record<string, unknown> = {}): string {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = { v: 1, sub: "me", plan, free_exports_remaining: 3, period_end: now + 86_400, iat: now, exp: now + 86_400, ...over };
+  return `${btoa(JSON.stringify(claims))}.signature`;
 }
 
 const anchors: { download: string; href: string }[] = [];
@@ -227,6 +263,14 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 beforeEach(() => {
+  useAuthStore.setState(useAuthStore.getInitialState(), true);
+  useEntitlementStore.setState(useEntitlementStore.getInitialState(), true);
+  m.receipts.rows.length = 0;
+  m.receipts.order.length = 0;
+  m.receipts.fails = false;
+  m.receipts.renewals = 0;
+  m.receipts.statusNow = () => store().status;
+  m.receipts.renew = () => Promise.resolve({ ok: false, failure: { code: "E_NET_OFFLINE" } });
   vi.useFakeTimers({ toFake: ["setTimeout"] });
   m.calls.length = 0;
   m.events.length = 0;
@@ -631,7 +675,7 @@ describe("a token refused (D-230)", () => {
   it("no token at all: nothing begins", async () => {
     m.device.token = undefined;
     await exportNow();
-    expect(store().unavailable).toBe(true);
+    expect(store().gate).toBe("sign_in");
     expect(store().status).toBe("idle");
     expect(m.calls).toEqual([]);
   });
@@ -869,5 +913,238 @@ describe("a new import of the same file (D-228)", () => {
     useClipStore.setState({ status: "ready", clipId: CLIP, clipInfo: INFO, transcript: TRANSCRIPT, events: EVENTS, plan: PLAN, timeMap: TIME_MAP, edit: EDIT });
     await exportNow();
     expect(has("render.exportClip")).toBe(true);
+  });
+});
+
+describe("the gate (v6implementation §12, C-7)", () => {
+  const HOUR_AGO = () => Math.floor(Date.now() / 1000) - 3_600;
+
+  it("D-294: the token is read from the device at each start, as a test or another tab may have put it there", async () => {
+    await exportNow();
+    expect(useEntitlementStore.getState().token).toBe(m.device.token);
+    expect(store().status).toBe("done");
+  });
+
+  it("signed out with only an expired token: the dialog, nothing begun, and nothing asked of the server", async () => {
+    m.device.token = tokenNaming("creator", { exp: HOUR_AGO() });
+    await exportNow();
+    expect(store().gate).toBe("sign_in");
+    expect(store().status).toBe("idle");
+    expect(m.calls).toEqual([]);
+    expect(m.receipts.renewals).toBe(0);
+  });
+
+  it("an expired token, signed in: a new one is fetched and stored, and the export goes on", async () => {
+    useAuthStore.setState({ status: "signed_in" });
+    m.device.token = tokenNaming("creator", { exp: HOUR_AGO() });
+    const fresh = tokenNaming("creator");
+    m.receipts.renew = () => Promise.resolve({ ok: true, data: { entitlement_token: fresh } });
+    await exportNow();
+    expect(m.receipts.renewals).toBe(1);
+    expect(m.device.token).toBe(fresh);
+    expect(store().status).toBe("done");
+  });
+
+  it("an expired token that cannot be renewed: E_ENTITLEMENT_EXPIRED on the card, nothing begun, nothing announced", async () => {
+    useAuthStore.setState({ status: "signed_in" });
+    m.device.token = tokenNaming("creator", { exp: HOUR_AGO() });
+    await exportNow();
+    expect(store().status).toBe("idle");
+    expect(store().gateFailure).toMatchObject({ code: "E_ENTITLEMENT_EXPIRED", retryable: true });
+    expect(m.calls).toEqual([]);
+    expect(m.events).toEqual([]);
+  });
+
+  it("the card closes, and a next start clears it", async () => {
+    useAuthStore.setState({ status: "signed_in" });
+    m.device.token = tokenNaming("creator", { exp: HOUR_AGO() });
+    await exportNow();
+    dismissExport();
+    expect(store().gateFailure).toBeUndefined();
+
+    await exportNow();
+    expect(store().gateFailure).toBeDefined();
+    m.device.token = tokenNaming("creator");
+    await exportNow();
+    expect(store().gateFailure).toBeUndefined();
+    expect(store().status).toBe("done");
+  });
+
+  it("the session lost while renewing: the dialog, not the card", async () => {
+    useAuthStore.setState({ status: "signed_in" });
+    m.device.token = tokenNaming("creator", { exp: HOUR_AGO() });
+    m.receipts.renew = () => {
+      useAuthStore.setState({ status: "anonymous" });
+      return Promise.resolve({ ok: false, failure: { code: "E_AUTH_SESSION_EXPIRED" } });
+    };
+    await exportNow();
+    expect(store().gate).toBe("sign_in");
+    expect(store().gateFailure).toBeUndefined();
+  });
+
+  it("Free with none left: the prompt at the limit, nothing begun", async () => {
+    m.device.token = tokenNaming("free", { free_exports_remaining: 0 });
+    workerGives(FREE);
+    await exportNow();
+    expect(store().gate).toBe("upgrade");
+    expect(store().status).toBe("idle");
+    expect(m.calls).toEqual([]);
+    expect(named("export_started")).toEqual([]);
+    dismissUpgrade();
+    expect(store().gate).toBeNull();
+  });
+
+  it("a cache hit is behind the limit too: C-7 runs before C-9", async () => {
+    m.device.token = tokenNaming("free");
+    workerGives(FREE);
+    await exportNow();
+    expect(store().status).toBe("done");
+    m.device.token = tokenNaming("free", { free_exports_remaining: 0 });
+    await exportNow();
+    expect(store().gate).toBe("upgrade");
+    expect(has("deliver")).toBe(false);
+    expect(store().status).toBe("done");
+  });
+
+  it("Free with one left: asked first; Not now begins nothing, and Export it goes on without asking again", async () => {
+    m.device.token = tokenNaming("free", { free_exports_remaining: 1 });
+    workerGives(FREE);
+    await exportNow();
+    expect(store().gate).toBe("confirm_last");
+    expect(store().status).toBe("idle");
+    expect(m.calls).toEqual([]);
+    closeGate();
+    expect(store().gate).toBeNull();
+    expect(store().status).toBe("idle");
+
+    await exportNow();
+    expect(store().gate).toBe("confirm_last");
+    await confirmLastExport(CLIP);
+    expect(store().gate).toBeNull();
+    expect(store().status).toBe("done");
+    expect(m.receipts.rows).toHaveLength(1);
+  });
+
+  it("D-267: an unsent Free row of this account counts for the last-export question; another's does not", async () => {
+    m.device.token = tokenNaming("free", { free_exports_remaining: 2 });
+    workerGives(FREE);
+    useEntitlementStore.setState({ outboxFree: { someone_else: 1 } });
+    await exportNow();
+    expect(store().gate).toBeNull();
+    expect(store().status).toBe("done");
+
+    useEntitlementStore.setState({ outboxFree: { me: 1 } });
+    await exportNow();
+    expect(store().gate).toBe("confirm_last");
+  });
+
+  it("the gate's stop clears what the last start left in the status line", async () => {
+    m.device.free = CREATOR_ROOM - 1;
+    await exportNow();
+    expect(store().blocker).toBe("B_STORAGE_LOW");
+    m.device.token = undefined;
+    await exportNow();
+    expect(store().gate).toBe("sign_in");
+    expect(store().blocker).toBeUndefined();
+  });
+});
+
+describe("the receipt (v6implementation §12, D-267, C-12)", () => {
+  it("a new render writes one, under what the worker verified and the token's account, then flushes", async () => {
+    await exportNow();
+    expect(m.receipts.rows).toEqual([{ exportId: store().exportId, plan: "creator", sub: "me" }]);
+    // Before `saved`, as a person with the file must not lose its count; the flush after.
+    expect(m.receipts.order).toEqual(["enqueue while saving", "flush while done"]);
+  });
+
+  it("the plan is the worker's: a token naming Creator verified as Free writes a Free row", async () => {
+    m.device.token = tokenNaming("creator");
+    workerGives(FREE);
+    await exportNow();
+    expect(m.receipts.rows[0]?.plan).toBe("free");
+  });
+
+  it("a hit writes none", async () => {
+    await exportNow();
+    m.receipts.rows.length = 0;
+    m.receipts.order.length = 0;
+    await exportNow();
+    expect(store().status).toBe("done");
+    expect(named("export_done")[0]?.props).toMatchObject({ from_cache: true });
+    expect(m.receipts.rows).toEqual([]);
+    expect(m.receipts.order).toEqual([]);
+  });
+
+  it("a cancel writes none", async () => {
+    const stopping = new AbortController();
+    m.device.forcedSignal = stopping.signal;
+    m.answers.set("render.exportClip", () => {
+      stopping.abort();
+      return Promise.resolve({ cancelled: true });
+    });
+    await exportNow();
+    expect(store().status).toBe("idle");
+    expect(m.receipts.rows).toEqual([]);
+    expect(m.receipts.order).toEqual([]);
+  });
+
+  it("a failed export and a refused token write none", async () => {
+    refuse("render.exportClip", "E_ENCODE_VIDEO");
+    await exportNow();
+    expect(store().status).toBe("failed");
+    expect(m.receipts.rows).toEqual([]);
+
+    exportStore.reset();
+    refuse("render.exportProfile", "E_ENTITLEMENT_INVALID");
+    await exportNow();
+    expect(store().status).toBe("failed");
+    expect(m.receipts.rows).toEqual([]);
+  });
+
+  it("a write that fails is reported and does not fail the export: the person has the file", async () => {
+    m.receipts.fails = true;
+    await exportNow();
+    expect(store().status).toBe("done");
+    expect(has("deliver")).toBe(true);
+    expect(named("client_error")).toEqual([{ name: "client_error", props: { error_code: "E_STORAGE_IO", stage: "storage" } }]);
+    expect(named("export_done")).toHaveLength(1);
+  });
+});
+
+describe("the upgrade offer (PS §11)", () => {
+  it("a Free export offers it; a Creator export does not", async () => {
+    await exportNow();
+    expect(store().upgradeOffer).toBe(false);
+    exportStore.reset();
+    editIs({ style: "bold" });
+    workerGives(FREE);
+    await exportNow();
+    expect(store().upgradeOffer).toBe(true);
+  });
+
+  it("dismissed, the same export's hit does not offer it again; a new export does", async () => {
+    workerGives(FREE);
+    await exportNow();
+    dismissUpgrade();
+    expect(store().upgradeOffer).toBe(false);
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ from_cache: true });
+    expect(store().upgradeOffer).toBe(false);
+
+    editIs({ style: "bold" });
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ from_cache: false });
+    expect(store().upgradeOffer).toBe(true);
+  });
+
+  it("a new start takes the offer away until that export is done", async () => {
+    workerGives(FREE);
+    await exportNow();
+    editIs({ style: "bold" });
+    const hold = { promise: new Promise<unknown>(() => undefined), resolve: () => undefined };
+    m.held.set("render.exportProfile", hold);
+    void exportNow();
+    await until(() => store().status === "gating");
+    expect(store().upgradeOffer).toBe(false);
   });
 });

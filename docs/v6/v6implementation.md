@@ -178,6 +178,9 @@ All are **(V6 decision)** unless they say otherwise.
 | D-306 | **`net` and `persistence` import no store, so what they need is handed in once.** `connectAccount()` in `restore-session.ts`, first thing in `start-app.ts`, gives `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links. One lint edge is added: `start-app.ts` to `restore-session.ts` (P145) | TS §7's layers stand. It runs before anything else, as the callback page verifies when it mounts, which can be before `start-app.ts` reaches its marker |
 | D-307 | **A receipt answered 429 keeps its row.** §11.5's "a 4xx other than 401 removes it" holds for every other 4xx with a readable body; a 4xx with no readable body also stays (P145) | The stated reason is that the row "can never succeed", and a 429 can. Dropping it would hand back a Free export, and TS §23.3's "removed only on a 2xx" is the safer reading where the two differ |
 | D-308 | **`main.tsx` tells `startApp` whether to restore,** with `ROUTES.authCallback` (D-296). `start-app.ts` does not read the path itself (P145) | `ROUTES` is in `routes.tsx`, which imports every page: a use-case importing it would close a cycle through `ui` |
+| D-309 | **`forExport(room)` asks only the room.** The account was asked at the gate, and an export already in `gating` is not sent back to it. One lint edge is added: `blockers.ts` to `entitlement.ts`, as TS §12.5 has it ask `effective()` (P147) | A session lost during `lockForExport` must not turn into a sign-in dialog halfway through an export it has begun |
+| D-310 | **A token that cannot be renewed is `export-store`'s `gateFailure`,** shown by the same card as a failed export, `export-failed`. No machine state changes (P147) | TS C-7 asks for `<ErrorPanel E_ENTITLEMENT_EXPIRED>`, but nothing began: the table's only way to `failed` goes through `rendering`, which would announce an `export_started` |
+| D-311 | **While the sign-in or last-export dialog is open, the editor's shortcuts stand aside,** as they do for the shortcuts sheet (P147) | Space on the dialog's button would play the video and not press the button; and Escape must reach the dialog |
 
 ---
 
@@ -626,6 +629,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 | TS §12.5 | Button split (D-290) |
 | TS §13.2, PS §9.3 | The storage check's second try, past 3 s on a slow disk only (V6 CL Entry 12) |
 | TS §7, C-1, §23.3 | `start-app.ts` to `restore-session.ts`, `connectAccount` first (D-306); `startApp` told whether to restore (D-308); a 429 keeps a receipt (D-307) |
+| TS §7, C-7, §12.5 | `blockers.ts` to `entitlement.ts`, and the room alone in `gating` (D-309); `gateFailure` (D-310) |
 | TS §22.2; PS §16 | `users.email` normalized (D-260); rotation in the grace, the lock (D-258, D-297) |
 | TS §22.5 | Trait, `EventOwner`, table rows, new kinds, subscription id, refusal (D-274 to D-276, D-299 to D-301) |
 | TS §22.8 | Variables (D-251, D-273) |

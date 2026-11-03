@@ -14,6 +14,7 @@ import { ExportFailure } from "../components/ExportProgress";
 import { FramingPanel } from "../components/FramingPanel";
 import { PlanItemList } from "../components/PlanItemList";
 import { StylePanel } from "../components/StylePanel";
+import { UpgradePrompt } from "../components/UpgradePrompt";
 import { Crop, Palette, Sparkles, Type } from "../icons";
 import { Skeleton } from "../primitives/Skeleton";
 import { Tabs } from "../primitives/Tabs";
@@ -55,6 +56,7 @@ export function SidePanel({ ready }: { ready: boolean }) {
       <div className={styles.export}>
         <ExportFailure />
         <ExportOutcome />
+        <UpgradePrompt />
       </div>
       <div className={styles.tabs}>
         <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label={messages.panel.label} disabled={!ready}>

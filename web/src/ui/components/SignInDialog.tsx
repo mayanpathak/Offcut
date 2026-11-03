@@ -5,7 +5,7 @@
 //
 // It submits through script only: the CSP has `form-action 'none'`.
 
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { PRICES_USD } from "../../config/pricing";
 import { messages } from "../../copy/messages";
@@ -148,8 +148,8 @@ export function SignInForm() {
   return <div className={styles.signIn}>{status === "link_sent" && email !== null ? <LinkSent email={email} /> : <EmailEntry />}</div>;
 }
 
-/** Open for as long as it is drawn. Escape, the close button and the backdrop all call `onClose`. */
-export function SignInDialog({ onClose }: { onClose: () => void }) {
+/** A modal the gate opens, for as long as it is drawn. Escape, the close button and the backdrop all call `onClose`. */
+export function GateDialog({ title, testId, onClose, children }: { title: string; testId: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -162,35 +162,45 @@ export function SignInDialog({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
-  function close(): void {
-    stopWaitingForLink();
-    onClose();
-  }
-
   return (
     <dialog
       ref={dialog}
       className={editor.sheet}
       tabIndex={-1}
       aria-labelledby={titleId}
-      data-testid="sign-in-dialog"
-      onClose={close}
+      data-testid={testId}
+      onClose={onClose}
       onClick={(event) => {
         // A click on the backdrop lands on the dialog itself; its content fills it, so a click there does not.
         if (event.target === event.currentTarget) {
-          close();
+          onClose();
         }
       }}
     >
       <div className={editor.sheetBody}>
         <div className={editor.sheetHead}>
           <h2 id={titleId} className={editor.sheetTitle}>
-            {messages.signIn.title}
+            {title}
           </h2>
-          <IconButton icon={<X />} label={messages.signIn.close} size="sm" onClick={close} />
+          <IconButton icon={<X />} label={messages.signIn.close} size="sm" onClick={onClose} />
         </div>
-        <SignInForm />
+        {children}
       </div>
     </dialog>
+  );
+}
+
+export function SignInDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <GateDialog
+      title={messages.signIn.title}
+      testId="sign-in-dialog"
+      onClose={() => {
+        stopWaitingForLink();
+        onClose();
+      }}
+    >
+      <SignInForm />
+    </GateDialog>
   );
 }

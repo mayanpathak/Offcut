@@ -419,3 +419,52 @@ The four race and grace cases then ran 12 times: no failure.
 **The tests were tried against the bugs they guard, in the browser, then restored: 3 of 3 caught.** The callback restoring too; the token leaving the address late; a broadcast not heard.
 
 **Counts.** Vitest 468, up from 455; `pnpm e2e` 33, up from 19 (landing 18, signin 15); Rust 812 / 0 / 4; copy pending 7, down from 11. Not pushed: the next push is P148.
+
+## Entry 16 - 2026-11-03 - P147: the gate, the counter, the receipt
+
+**Changed.** `blockers.ts`: the last three codes, `forCheckout`, `disablesExport`, `effectiveNow`. `export-store.ts`: `gate`, `gateFailure`, `upgradeOffer`; `unavailable` and `setUnavailable` gone. `start-export.ts`: the gate before the export, with D-294's reload, and the receipt in V5's one place; `planOf` gone. `ExportButton.tsx`: the counter, D-290's split, the last-export dialog. `UpgradePrompt.tsx`, a stub with both placements and no way to buy until P148. `use-shortcuts.ts`. Copy: both `E_ENTITLEMENT_*` and the three blockers, off `COPY_PENDING`, which now holds the two billing codes; `messages.export.unavailable` gone. `export-free.spec.ts`, in `MEDIA_SUITES`.
+
+**DC-12, carefully. The whole of `git diff -- web/tests-e2e/export-creator.spec.ts`:**
+
+```diff
+-  test("no token: the button says exporting needs an account, and nothing is exported", async () => {
++  test("no token: the sign-in dialog opens with the limits, and nothing is exported", async () => {
+-    await expect(page.getByTestId("export-status")).toHaveText(messages.export.unavailable, { timeout: 30_000 });
++    await expect(page.getByTestId("sign-in-dialog").getByTestId("sign-in-limits")).toHaveText(/720p.*1080p/, { timeout: 30_000 });
++    await page.keyboard.press("Escape");
+```
+
+The title, line 127's assertion, and one line closing the dialog before line 134. No import changed. The other lines of the case are untouched and pass, and the next case, "a token signed with another key", passes after it. Lines 142 and 321 pass as they are (D-293): `E_ENTITLEMENT_INVALID`'s title and `messages.editor.failedStub` are one constant. The case at lines 274-282 passes with the prompt showing.
+
+**D-246's one Vitest case, `start-export.test.ts`:** `store().unavailable` became `store().gate === "sign_in"`; its `idle` and no-calls assertions stay.
+
+**One helper in that file changed, not named by D-246, and no assertion with it.** `tokenNaming` made a token holding only `{ plan }`. D-292 counts a token it cannot read as none, so every case would have read "no token". It now writes all seven claims. The cases read the same.
+
+**Differs from the plan.**
+
+| What | Why |
+|---|---|
+| D-309: `forExport(room)` asks only the room; one lint edge, `blockers.ts` to `entitlement.ts` | An export in `gating` is not sent back to the sign-in dialog. TS §12.5 asks `effective()` from a layer that could not import it |
+| D-310: `gateFailure` | TS C-7 asks for the error card, but nothing began, and the table's only way to `failed` would announce an `export_started` |
+| D-311: the shortcuts stand aside for a dialog | Space on a dialog's button would play the video. **The plan did not foresee this** |
+| A session with no token reads as `B_ENTITLEMENT_EXPIRED` | It can fetch one. TS's table names only `exp < now` |
+| The last-export dialog's button says "Export it", not "Export" | Playwright sees a button behind a modal, and protected cases press "Export" by its exact name |
+| The prompt's offer is once per export, by its id | A hit shares its export's id, so a dismissed one stays dismissed. PS §11's "after the first watermarked export" narrows this; P148 decides, with the final prompt |
+
+**Found by the protected tests while building.** Waiting on the gate left a gap before `start`: two quick clicks both passed, and the second threw. `start-export.test.ts`'s "a second click" caught it. The re-check V5 had at that spot is back. `dialog` text in the DC-12 line reads the limits by a pattern and not exact words, so that a price change does not need a new row of TS §41.2; `export-free.spec.ts` reads the exact words.
+
+**Acceptance, on keyed builds.**
+
+| Suite | Result |
+|---|---|
+| `export-free.spec.ts` | 10 of 10. Three exports, each all 11 checks and each refused as a Creator's; signed out, enabled, the click opens the dialog; axe on both dialogs and the prompt; the link in a second tab closes the dialog; the button's name still exactly "Export" with the counter showing; a receipt on each miss, none on a hit; the fourth renders nothing, and Download again still works |
+| `export-creator`, `timeline-preserved`, `cancel` | 34 of 34, in full and not by named case: all three seed tokens |
+| `pnpm e2e` on CI's build, hosts check | 33 of 33; exit 0 |
+
+**The tests were tried against the bugs they guard, then restored: 20 of 20 caught.** Unit, 19: the account never asked; an expired token usable; signed-out expired asking for a renewal; the outbox not subtracted at the limit; Creator blocked at zero; every blocker disabling the button; the room re-asking the account; checkout taking a cached token; no reload (D-294); the second-click check gone; no receipt on a miss; the receipt's plan from the page's claims (INV-9); no flush; a failed write failing the export; no last-export question; asked again after yes; a renewal failure not shown; the offer on Creator; a dismissed offer returning. Browser, 1: the shortcuts' guard removed. An earlier version of the keys case typed into a field, where shortcuts already stand aside, and so proved nothing of it: the case now presses Space with no field focused.
+
+**Not run here.** `pipeline-preview`, `preview-sync`, `review-edit`, `rejections`, `model-download`: they export nothing, and the one full media run is P150's (G 0.5). `ExportButton` and `use-shortcuts.ts` are on their pages, so that run reads them.
+
+**Found, not fixed.** `messages.ts` is at 653 of 700 lines, with P148's copy still to come. The Git Bash `python` is MSYS's and has no NumPy, so `verify_mp4.py` needs Python 3.13 first on `PATH` on D1.
+
+**Counts.** Vitest 500, up from 468; `pnpm e2e` 33; Rust 812 / 0 / 4; media `export-free` 10 new; copy pending 2, down from 7. Frozen check empty. Not pushed: the next push is P148.

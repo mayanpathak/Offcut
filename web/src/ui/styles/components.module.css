@@ -411,6 +411,12 @@
   gap: var(--sp-3);
 }
 
+.exportCounter {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
 .exportStatus {
   max-width: calc(var(--sp-7) * 5);
   margin: 0;

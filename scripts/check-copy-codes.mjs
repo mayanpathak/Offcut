@@ -25,17 +25,12 @@ const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
  * removed in the change that writes its copy.
  */
 const COPY_PENDING = [
-  // The billing and entitlement errors: due with their flows in V6.
+  // The billing errors: due with their flow in V6.
   // The fourteen a person can meet on this device have copy since V4
   // (v4implementation D-159).
   "E_BILLING_UNAVAILABLE",
   "E_BILLING_PENDING",
-  "E_ENTITLEMENT_INVALID",
-  "E_ENTITLEMENT_EXPIRED",
   // The three blockers no person can meet yet: the account and the plan, in V6.
-  "B_NOT_SIGNED_IN",
-  "B_ENTITLEMENT_EXPIRED",
-  "B_NO_FREE_EXPORTS",
 ];
 
 /** The code lists, and the file each is in. Each is written one code per line. */

@@ -122,15 +122,16 @@ test.describe("one clip, exported", () => {
     rmSync(scratch, { recursive: true, force: true });
   });
 
-  test("no token: the button says exporting needs an account, and nothing is exported", async () => {
+  test("no token: the sign-in dialog opens with the limits, and nothing is exported", async () => {
     await exportButton(page).click();
-    await expect(page.getByTestId("export-status")).toHaveText(messages.export.unavailable, { timeout: 30_000 });
+    await expect(page.getByTestId("sign-in-dialog").getByTestId("sign-in-limits")).toHaveText(/720p.*1080p/, { timeout: 30_000 });
     await expect(page.getByTestId("export-progress")).toHaveCount(0);
     // Longer than analytics waits to send: an `export_started` would have arrived.
     await page.waitForTimeout(11_000);
     expect(downloads).toEqual([]);
     expect(api.eventsOf("export_started")).toEqual([]);
     expect(await opfsList(page, "exports")).toEqual([]);
+    await page.keyboard.press("Escape");
     // The button can be pressed again: nothing was begun.
     await expect(exportButton(page)).toBeEnabled();
   });

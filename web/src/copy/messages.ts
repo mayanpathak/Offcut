@@ -18,8 +18,8 @@ type ErrorCopy = { title: string; body: string; action: string };
 /**
  * The error codes that can reach a person: the six of V1, the three of the
  * model download (V2), and the twelve more a person can meet on this device
- * since v4implementation D-159, and the account's four (V6). The billing and
- * entitlement codes get copy with their flows.
+ * since v4implementation D-159, and the account's and the token's six (V6). The
+ * billing codes get copy with their flow.
  */
 type ErrorCodeWithCopy = Extract<
   ErrorCode,
@@ -48,6 +48,8 @@ type ErrorCodeWithCopy = Extract<
   | "E_AUTH_LINK_EXPIRED"
   | "E_AUTH_SESSION_EXPIRED"
   | "E_AUTH_EMAIL_UNAVAILABLE"
+  | "E_ENTITLEMENT_INVALID"
+  | "E_ENTITLEMENT_EXPIRED"
 >;
 
 const MS_PER_SECOND = 1000;
@@ -75,6 +77,9 @@ function clockTime(ms: number): string {
   const seconds = total % SECONDS_PER_MINUTE;
   return `${String(Math.floor(total / SECONDS_PER_MINUTE))}:${seconds < 10 ? "0" : ""}${String(seconds)}`;
 }
+
+/** D-293: `E_ENTITLEMENT_INVALID`'s title is this sentence, which the export's protected cases read. */
+const FAILED_ON_DEVICE = "Something went wrong on this device.";
 
 export const messages = {
   landing: {
@@ -142,7 +147,8 @@ export const messages = {
   // `button` is the top bar's Export (v4implementation §17.5's `editor.export`).
   export: {
     button: "Export",
-    unavailable: "Exporting needs an account, and accounts are not open yet.",
+    counter: (left: number, total: number) => `${String(left)} of ${String(total)} left`,
+    lastFree: { title: "This is your last free export this month", body: "After this one, exporting needs Creator or the start of next month.", go: "Export it", notNow: "Not now" },
     stage: { rendering: "Rendering video", muxing: "Finishing file", saving: "Saving" },
     renderingLocally: "Everything is rendering on your computer.",
     done: "Your video is downloaded.",
@@ -167,7 +173,7 @@ export const messages = {
 
   // The editor's top bar and side panel (v4implementation D-178, D-184, §17.5).
   editor: {
-    failedStub: "Something went wrong on this device.",
+    failedStub: FAILED_ON_DEVICE,
     startOver: "Start over",
     mark: "Offcut",
     lengthLabel: (ms: number) => `Video length ${clockTime(ms)}`,
@@ -265,6 +271,13 @@ export const messages = {
 
   api: { waking: "Connecting to the account service…" },
 
+  // The one upgrade prompt (PS §10 J12). The way to buy arrives with the checkout.
+  upgrade: {
+    afterExport: (usd: number) => `Remove the watermark and export in 1080p: Creator, $${String(usd)}/month.`,
+    limitReached: (total: number, usd: number) => `You have used your ${String(total)} free exports this month. Creator, $${String(usd)}/month, has no limit and no watermark, in 1080p.`,
+    dismiss: "Not now",
+  },
+
   // Signing in (PS §10 J9, TS C-8). A link opened on a phone would leave this tab waiting, so the sent state says where to open it.
   signIn: {
     title: "Sign in to export", close: "Close", emailLabel: "Email address", submit: "Send me a sign-in link", sending: "Sending…",
@@ -280,14 +293,16 @@ export const messages = {
   },
   account: { title: "Account", signedIn: "You are signed in.", signOut: "Sign out" },
 
-  // Why an action cannot start now (TS §12.5): the four a person can meet in
-  // V2. The others come with the room check and with accounts.
+  // Why an action cannot start now (TS §12.5).
   blockers: {
     B_UNSUPPORTED: "This browser cannot run Offcut, so it cannot take a clip.",
     B_PIPELINE_BUSY: "Offcut is still working on a clip. Add another when it has finished.",
     B_EXPORT_IN_PROGRESS: "An export is running. Wait until it has finished.",
     B_PIPELINE_NOT_READY: "The clip is not ready to export yet.",
     B_STORAGE_LOW: "There is not enough room on this device for this video. Free some disk space, then try again.",
+    B_NOT_SIGNED_IN: "Sign in to export.",
+    B_ENTITLEMENT_EXPIRED: "Your plan needs checking before the next export.",
+    B_NO_FREE_EXPORTS: "You have used your free exports this month.",
   },
 
   // The landing page's prices (PS §11). Nothing is on sale until accounts open,
@@ -556,6 +571,8 @@ export const messages = {
     E_AUTH_LINK_INVALID: { title: "This sign-in link does not work", body: "It has been used already, or a newer link replaced it.", action: "Ask for a new link below." },
     E_AUTH_LINK_EXPIRED: { title: "This sign-in link has expired", body: "A link works for a short while after it is sent.", action: "Ask for a new link below." },
     E_AUTH_SESSION_EXPIRED: { title: "You have been signed out", body: "Your session has ended.", action: "Sign in again." },
+    E_ENTITLEMENT_INVALID: { title: FAILED_ON_DEVICE, body: "Your plan on this device could not be verified, so nothing was exported.", action: "Sign out and in again from your account page." },
+    E_ENTITLEMENT_EXPIRED: { title: "We could not check your plan", body: "Offcut checks it every few days, and the account service did not answer.", action: "Check your connection and try again." },
     E_AUTH_EMAIL_UNAVAILABLE: { title: "We could not send the email", body: "The email service is not taking messages just now.", action: "Try again in a little while." },
   } satisfies Record<ErrorCodeWithCopy, ErrorCopy>,
 

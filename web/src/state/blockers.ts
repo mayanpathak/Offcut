@@ -1,8 +1,11 @@
 // Why an action cannot start now (TS §12.5). This file is the only place
 // these conditions are evaluated. It reads the stores and changes nothing.
 
+import { type Effective, effective } from "../entitlement/entitlement";
+import { useAuthStore } from "./auth-store";
 import { useCapabilityStore } from "./capability-store";
 import { useClipStore } from "./clip-store";
+import { useEntitlementStore } from "./entitlement-store";
 import { useExportStore } from "./export-store";
 import type { ClipStatus } from "./machines/clip-machine";
 import type { ExportStatus } from "./machines/export-machine";
@@ -45,10 +48,37 @@ const STORAGE_MARGIN = 1.2;
 /** The room on the device, in bytes, and what an export needs: read by the use-case, since it takes a wait (v5implementation D-229). */
 export type ExportRoom = { freeBytes: number; neededBytes: number };
 
+const MS_PER_SECOND = 1000;
+
+/** What the token on this page allows, less what the server has not been told of yet (v6implementation D-267). */
+export function effectiveNow(): Effective | null {
+  const { claims, outboxFree } = useEntitlementStore.getState();
+  return effective(claims, outboxFree);
+}
+
+/**
+ * The account and the plan. A signed-out person with only an expired token is
+ * asked to sign in: the expired token is reached only while signed in, where a
+ * new one can be fetched (v6implementation §12). So is a session with no token.
+ */
+function accountBlocker(): BlockerCode | null {
+  const signedIn = useAuthStore.getState().status === "signed_in";
+  const now = effectiveNow();
+  const usable = now !== null && now.exp >= Date.now() / MS_PER_SECOND;
+  if (!signedIn && !usable) {
+    return "B_NOT_SIGNED_IN";
+  }
+  if (!usable) {
+    return "B_ENTITLEMENT_EXPIRED";
+  }
+  return now.plan === "free" && now.freeExportsRemaining === 0 ? "B_NO_FREE_EXPORTS" : null;
+}
+
 /**
  * The first thing that stands in the way of an export, or `null`. It is
  * asked while the export is still `idle` or, with `room`, in `gating` after a
- * cache miss. V6 adds the account and the plan.
+ * cache miss, when the account has been asked already and only the room is left
+ * (v6implementation D-309).
  */
 export function forExport(room?: ExportRoom): BlockerCode | null {
   const { status } = useExportStore.getState();
@@ -59,8 +89,18 @@ export function forExport(room?: ExportRoom): BlockerCode | null {
   if (useClipStore.getState().status !== "ready") {
     return "B_PIPELINE_NOT_READY";
   }
-  if (room !== undefined && room.freeBytes < room.neededBytes * STORAGE_MARGIN) {
-    return "B_STORAGE_LOW";
+  if (room !== undefined) {
+    return room.freeBytes < room.neededBytes * STORAGE_MARGIN ? "B_STORAGE_LOW" : null;
   }
-  return null;
+  return accountBlocker();
+}
+
+/** Whether a blocker disables the button. A click can mend any other, so it must get through to open what does (D-290). */
+export function disablesExport(code: BlockerCode): boolean {
+  return code === "B_EXPORT_IN_PROGRESS" || code === "B_PIPELINE_NOT_READY";
+}
+
+/** The first thing that stands in the way of buying: a cached token is no session (v6implementation §12). */
+export function forCheckout(): BlockerCode | null {
+  return useAuthStore.getState().status === "signed_in" ? null : "B_NOT_SIGNED_IN";
 }
