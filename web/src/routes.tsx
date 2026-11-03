@@ -1,9 +1,10 @@
-// The routes of the app (TS §13.1). Four are mounted; any other path, including
-// the two that arrive in V6, goes to the landing page.
+// The routes of the app (TS §13.1). Any other path goes to the landing page.
 
 import { createBrowserRouter, generatePath, Navigate } from "react-router";
 
 import { CapabilityGate } from "./ui/components/CapabilityGate";
+import { AccountPage } from "./ui/pages/AccountPage";
+import { AuthCallbackPage } from "./ui/pages/AuthCallbackPage";
 import { EditorPage } from "./ui/pages/EditorPage";
 import { LandingPage } from "./ui/pages/LandingPage";
 import { LegalPage } from "./ui/pages/LegalPage";
@@ -28,6 +29,8 @@ export const router = createBrowserRouter([
       </CapabilityGate>
     ),
   },
+  { path: ROUTES.authCallback, element: <AuthCallbackPage appPath={ROUTES.app} /> },
+  { path: ROUTES.account, element: <AccountPage homePath={ROUTES.landing} /> },
   { path: ROUTES.settings, element: <SettingsPage homePath={ROUTES.landing} /> },
   { path: ROUTES.legal, element: <LegalPage homePath={ROUTES.landing} /> },
   { path: "*", element: <Navigate to={ROUTES.landing} replace /> },

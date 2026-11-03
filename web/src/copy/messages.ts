@@ -18,8 +18,8 @@ type ErrorCopy = { title: string; body: string; action: string };
 /**
  * The error codes that can reach a person: the six of V1, the three of the
  * model download (V2), and the twelve more a person can meet on this device
- * since v4implementation D-159. The account, billing and entitlement codes
- * get copy with their flows (V6).
+ * since v4implementation D-159, and the account's four (V6). The billing and
+ * entitlement codes get copy with their flows.
  */
 type ErrorCodeWithCopy = Extract<
   ErrorCode,
@@ -44,6 +44,10 @@ type ErrorCodeWithCopy = Extract<
   | "E_ENCODE_VIDEO"
   | "E_ENCODE_AUDIO"
   | "E_MUX"
+  | "E_AUTH_LINK_INVALID"
+  | "E_AUTH_LINK_EXPIRED"
+  | "E_AUTH_SESSION_EXPIRED"
+  | "E_AUTH_EMAIL_UNAVAILABLE"
 >;
 
 const MS_PER_SECOND = 1000;
@@ -260,6 +264,21 @@ export const messages = {
   },
 
   api: { waking: "Connecting to the account service…" },
+
+  // Signing in (PS §10 J9, TS C-8). A link opened on a phone would leave this tab waiting, so the sent state says where to open it.
+  signIn: {
+    title: "Sign in to export", close: "Close", emailLabel: "Email address", submit: "Send me a sign-in link", sending: "Sending…",
+    limits: (freePerMonth: number, creatorMonthlyUsd: number) =>
+      `Create a free account to export. Free: ${String(freePerMonth)} exports a month, 720p, small watermark. Creator ($${String(creatorMonthlyUsd)}/month): no watermark, 1080p.`,
+    sentTitle: "Check your email",
+    sentBody: (email: string) => `We sent a sign-in link to ${email}. Open it on this computer, in this browser.`,
+    spamHint: "Not there after a minute? Look in your spam folder.", resend: "Send it again",
+  },
+  callback: {
+    verifying: "Signing you in…", signedIn: "You are signed in",
+    returnToTab: "If you have a video open in another tab, go back to it: that tab is signed in too.", openApp: "Go to Offcut",
+  },
+  account: { title: "Account", signedIn: "You are signed in.", signOut: "Sign out" },
 
   // Why an action cannot start now (TS §12.5): the four a person can meet in
   // V2. The others come with the room check and with accounts.
@@ -534,6 +553,10 @@ export const messages = {
       body: "Your browser has no space left on this device for the model's files.",
       action: "Free some disk space and try again.",
     },
+    E_AUTH_LINK_INVALID: { title: "This sign-in link does not work", body: "It has been used already, or a newer link replaced it.", action: "Ask for a new link below." },
+    E_AUTH_LINK_EXPIRED: { title: "This sign-in link has expired", body: "A link works for a short while after it is sent.", action: "Ask for a new link below." },
+    E_AUTH_SESSION_EXPIRED: { title: "You have been signed out", body: "Your session has ended.", action: "Sign in again." },
+    E_AUTH_EMAIL_UNAVAILABLE: { title: "We could not send the email", body: "The email service is not taking messages just now.", action: "Try again in a little while." },
   } satisfies Record<ErrorCodeWithCopy, ErrorCopy>,
 
   // A file Offcut cannot use (TS §15.3, PS §9.4): what the limit is and what

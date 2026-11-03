@@ -398,3 +398,24 @@ The four race and grace cases then ran 12 times: no failure.
 **Not proven yet.** The outbox's database is an in-memory map in `receipt-outbox.test.ts`: real IndexedDB is read by `export-free.spec.ts` in P147. Two real tabs and the broadcast are read by `signin.spec.ts` in P146.
 
 **Counts.** Vitest 455, up from 344; `pnpm e2e` 19, up from 16; Rust 812 / 0 / 4, as nothing under `server/` changed; `pnpm check` exit 0. Frozen check empty. Not pushed: the next push is P148.
+
+## Entry 15 - 2026-11-03 - P146: sign-in on screen
+
+**Changed.** `ui/components/SignInDialog.tsx`, holding `SignInForm` and `SignInDialog`; `ui/pages/AuthCallbackPage.tsx`; `ui/pages/AccountPage.tsx`, minimal: the form, and sign-out once signed in; `routes.tsx` mounts both; `usecases/{request-magic-link,complete-sign-in,sign-out}.ts`; copy for the four `E_AUTH_*`, off `COPY_PENDING`; `signin.spec.ts`, in `non-media`. `API_WAKING` is `messages.api.waking`, as it has been since V1. `signin_step` is sent at its two places. Nothing opens the dialog until P147.
+
+**Differs from the plan.**
+
+| What | Why |
+|---|---|
+| `SignInForm` uses the waitlist form's classes, and `[data-theme="dark"] .signIn` maps their colours to the editor's | One form on both themes. The pages' light colours in the dark dialog would fail contrast |
+| A sign-out whose `/auth/logout` fails changes nothing and says so | The cookie cannot be removed from the page, so the next start would sign the person back in. D-291 does not say. Telling them is the honest way round on a shared computer |
+| A callback whose connection failed keeps the token in memory and offers Try again | Only a dead link needs a new one. The token stays out of the address |
+| A link with no token at all reads as `E_AUTH_LINK_INVALID`, with no request | Nothing to verify |
+| "The callback tab does not ask for a session" moved from `landing.spec.ts` to `signin.spec.ts` | The callback now has its own page, and the landing file's helper reads the landing page. Stricter there: it also reads that the token is in no analytics batch |
+| `sign-in.test.ts`: a new row of TS §5 | The three use-cases' rules, as §4 names none for them |
+
+**Not read here.** Axe on the dialog itself: it opens only on a clip, so `export-free.spec.ts` reads it, in P147. `signin.spec.ts` reads axe on the same form on `/account`, on the sent state, on the error, on the callback's three states and signed in.
+
+**The tests were tried against the bugs they guard, in the browser, then restored: 3 of 3 caught.** The callback restoring too; the token leaving the address late; a broadcast not heard.
+
+**Counts.** Vitest 468, up from 455; `pnpm e2e` 33, up from 19 (landing 18, signin 15); Rust 812 / 0 / 4; copy pending 7, down from 11. Not pushed: the next push is P148.

@@ -12,6 +12,7 @@ export type RecordedRequest = { method: string; path: string; body: unknown };
 export type FakeApi = {
   /** Every request to /api/v1, in the order it arrived. `path` is relative to /api/v1. */
   requests: RecordedRequest[];
+  account: FakeAccount;
   /** Changes the account, as a webhook or another device would. */
   setSession(session: FakeSession | null): void;
   /** Every analytics event of that name, from all recorded `POST /events` bodies. */
@@ -28,6 +29,9 @@ export type FakeSession = {
   subscription?: unknown;
 };
 
+/** What the routes of the account read and change. Two pages given one `account` are two tabs of one browser. */
+export type FakeAccount = { session: FakeSession | null; receipts: Set<string> };
+
 /** What a route answers instead of its success. */
 export type FakeFailure = { status: number; code: string; retryAfterSecs?: number };
 
@@ -37,6 +41,8 @@ export type FakeApiOptions = {
   healthz?: { delayMs?: number };
   /** Signed in from the start. The default is nobody: `/auth/refresh` answers 401 (v6implementation §15.4). */
   session?: FakeSession;
+  /** Another page's `api.account`, in place of a new one. */
+  account?: FakeAccount;
   /** A route's failure, by its path: `{ "/auth/magic-link": { status: 503, code: "email_unavailable" } }`. */
   failures?: Record<string, FakeFailure>;
 };
@@ -92,7 +98,7 @@ function accountAnswer(
   path: string,
   headers: Record<string, string>,
   body: unknown,
-  account: { session: FakeSession | null; receipts: Set<string> },
+  account: FakeAccount,
 ): Answer | undefined {
   const token = () =>
     mintEntitlementToken({
@@ -188,7 +194,7 @@ function accountAnswer(
 export async function installFakeApi(page: Page, options: FakeApiOptions = {}): Promise<FakeApi> {
   const requests: RecordedRequest[] = [];
   const notifyMe = options.notifyMe ?? { status: 204 };
-  const account = { session: options.session === undefined ? null : { ...options.session }, receipts: new Set<string>() };
+  const account: FakeAccount = options.account ?? { session: options.session === undefined ? null : { ...options.session }, receipts: new Set<string>() };
 
   await page.route(`**${API_PREFIX}/**`, async (route) => {
     const request = route.request();
@@ -226,6 +232,7 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
 
   return {
     requests,
+    account,
     setSession: (session) => {
       account.session = session;
     },

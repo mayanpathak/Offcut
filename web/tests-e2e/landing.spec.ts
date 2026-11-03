@@ -262,15 +262,6 @@ test("the page does not wait for a session: with no answer it still works", asyn
   await expect(formStatus(page)).toHaveText(messages.notifyMe.success);
 });
 
-test("the callback tab does not ask for a session (D-296)", async ({ page }) => {
-  const api = await installFakeApi(page);
-  await page.goto("/auth/callback?token=not-used-yet");
-  await capabilityChecked(page);
-  await expect.poll(() => api.requests.some((entry) => entry.path === "/healthz")).toBe(true);
-  await page.waitForTimeout(500);
-  expect(api.requests.filter((entry) => entry.path === "/auth/refresh")).toEqual([]);
-});
-
 test("/app shows the drop zone or the unsupported page, never a blank screen", async ({ page }) => {
   await installFakeApi(page);
   await page.goto("/app");
