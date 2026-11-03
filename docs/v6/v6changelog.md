@@ -369,3 +369,32 @@ The four race and grace cases then ran 12 times: no failure.
 **Open.** A refund names only the customer, so a refund of an old payment also ends the current plan. The founder issues refunds, so this is known and left. No live-mode call has been made.
 
 **Counts.** Rust 812 / 0 / 4, up from 782; Vitest 344, as nothing under `web/` changed; `pnpm check` exit 0; no `native-tls`, `openssl` or `aws-lc`. Not pushed: the next push is P148.
+
+## Entry 14 - 2026-11-03 - P145: the client's foundations
+
+**Changed.** `http.ts`; `api-client.ts` (the 12 functions, `authed`, the single-flight refresh under the lock); `state/{auth-store,entitlement-store}.ts`, `state/machines/auth-machine.ts`; `entitlement/entitlement.ts`; `persistence/receipt-outbox.ts`, `entitlement-repo.clear`, `schema.ts`'s outbox value; `platform/broadcast.ts`; `usecases/restore-session.ts`, `start-app.ts`'s marker, `main.tsx`; `tests-e2e/helpers/fake-api.ts`, every route, `/auth/refresh` 401 by default. `config/pricing.ts` is unchanged: it came with the pricing pages (Entry 3). No interface yet, and `start-export.ts` is not touched: nothing writes a receipt or reads a blocker until P147.
+
+**REOPENED CONTRACT `http.ts` (D-286, D-287).** `HttpRequest` gains `bearer`, `csrf`, `budgetMs`. A 5xx whose body is `email_unavailable` or `billing_unavailable` is one attempt and its own failure. Every other 502, 503 and 504 still reads as a waking API.
+
+**Differs from the plan.**
+
+| What | Why |
+|---|---|
+| D-306: `connectAccount`, and one lint edge | `net` and `persistence` import no store. It runs first, as the callback page can verify before `start-app.ts` reaches its marker |
+| D-307: a 429 keeps a receipt | §11.5's rule would have dropped a row that can still succeed, handing back a Free export. Any 4xx with no readable body stays too |
+| D-308: `main.tsx` tells `startApp` whether to restore | `ROUTES` lives in `routes.tsx`, which imports every page |
+| `authed` with a token already replaced uses it, without refreshing | A caller whose 401 lands after another's refresh ended would otherwise start a second one, which the acceptance forbids |
+| A flush stops at the first row that cannot go | The others would meet the same answer |
+| `api-client.test.ts`, `restore-session.test.ts`, `entitlement-store.test.ts` | New rows of TS §5: §4 did not name them, and these are where D-288, D-289, D-291 and D-292 are proven |
+
+**One test changed: `landing.spec.ts`, not a protected file (TS §41.1).** "A dropped file" waited for `/healthz` as the last request the start makes. The refresh now follows it, so the case raced. It now waits for `/auth/refresh`, and a refresh after that wait still fails the case, so it is no weaker. Three cases added: one refresh, after the wake, with no error; a page that still works when the refresh never answers; no refresh on the callback tab.
+
+**A protected proof that could have raced, measured.** `pipeline-preview`'s "quiet processing" fails on any request after the drop but files and analytics, and the refresh leaves at the same point the drop zone appears. Six runs, three at once: the refresh leaves 23 to 65 ms after the zone shows, and the drop ends 586 to 656 ms after. Both slow together on a slower machine, so D-289's marker stays and the spec is unchanged, confirmed by its hash. If a run ever names `/auth/refresh` in that case, this is why.
+
+**Acceptance.** `auth-machine.test.ts` walks `unknown`, verify, `signed_in`. A 502 `billing_unavailable` makes one attempt and gives `E_BILLING_UNAVAILABLE`. Two callers meeting 401 cause one refresh. The refresh takes the lock, waits for a lock held by another tab, and stops at 25 s counted from its send, with attempts at 0, 11 and 23 s. Keyed build, `pipeline-preview`: "quiet processing" and "preview before sign-in" pass; "preview before sign-in" passes again with a temporary change making `/auth/refresh` never answer, in the same 1.5 minutes, so nothing waits on it. That change is gone, by hash.
+
+**The tests were tried against the bugs they guard, then restored: 18 of 18 caught.** The budget ignored; a provider's failure retried; no CSRF header; no bearer; refresh not single-flight; no lock; the 70 s budget; refresh before the wake; a late 401 refreshing again; a 429 dropping a row; a lost session clearing the token (D-291); another account's rows sent (D-267); Creator rows counted as Free; a timer with no session (D-268); every account subtracted; no floor; the callback path throwing; an undecodable token kept (D-292).
+
+**Not proven yet.** The outbox's database is an in-memory map in `receipt-outbox.test.ts`: real IndexedDB is read by `export-free.spec.ts` in P147. Two real tabs and the broadcast are read by `signin.spec.ts` in P146.
+
+**Counts.** Vitest 455, up from 344; `pnpm e2e` 19, up from 16; Rust 812 / 0 / 4, as nothing under `server/` changed; `pnpm check` exit 0. Frozen check empty. Not pushed: the next push is P148.

@@ -177,9 +177,9 @@ test("a dropped file starts an import and opens /app, or is refused where Offcut
   const response = await page.goto("/");
   await capabilityChecked(page);
   await expect(dropZone(page)).not.toHaveAttribute("aria-disabled");
-  // Let the start of the app finish its own requests first: the wake-up
-  // call is the last one it always makes.
-  await expect.poll(() => api.requests.some((entry) => entry.path === "/healthz")).toBe(true);
+  // Let the start of the app finish its own requests first: the refresh, which
+  // goes once the API is up, is the last one it always makes (v6implementation D-297).
+  await expect.poll(() => api.requests.some((entry) => entry.path === "/auth/refresh")).toBe(true);
 
   const requests: { method: string; url: string }[] = [];
   page.on("request", (request) => requests.push({ method: request.method(), url: request.url() }));
@@ -232,6 +232,43 @@ test("a dropped file starts an import and opens /app, or is refused where Offcut
     return method !== "GET" || (target.origin !== origin && !assetHosts.includes(target.origin));
   });
   expect(unexpected).toEqual([]);
+});
+
+test("the start of the app asks once for a session, after the wake, and a refusal is not an error", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await page.goto("/");
+  await capabilityChecked(page);
+  await expect.poll(() => api.requests.some((entry) => entry.path === "/auth/refresh")).toBe(true);
+  await page.waitForTimeout(500);
+
+  const paths = api.requests.map((entry) => entry.path);
+  expect(paths.filter((path) => path === "/auth/refresh")).toHaveLength(1);
+  expect(paths.indexOf("/healthz")).toBeLessThan(paths.indexOf("/auth/refresh"));
+  expect(api.requests.find((entry) => entry.path === "/auth/refresh")?.method).toBe("POST");
+  expect(api.eventsOf("client_error")).toEqual([]);
+});
+
+test("the page does not wait for a session: with no answer it still works", async ({ page }) => {
+  await installFakeApi(page);
+  // Added after the fake, so it goes first. It never answers.
+  await page.route("**/api/v1/auth/refresh", () => undefined);
+  const asked = page.waitForRequest("**/api/v1/auth/refresh");
+  await page.goto("/");
+  await capabilityChecked(page);
+  await asked;
+  await expect(page.getByRole("link", { name: messages.landing.whatLeavesLink })).toBeVisible();
+  await emailField(page).fill(EMAIL);
+  await submitButton(page).click();
+  await expect(formStatus(page)).toHaveText(messages.notifyMe.success);
+});
+
+test("the callback tab does not ask for a session (D-296)", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await page.goto("/auth/callback?token=not-used-yet");
+  await capabilityChecked(page);
+  await expect.poll(() => api.requests.some((entry) => entry.path === "/healthz")).toBe(true);
+  await page.waitForTimeout(500);
+  expect(api.requests.filter((entry) => entry.path === "/auth/refresh")).toEqual([]);
 });
 
 test("/app shows the drop zone or the unsupported page, never a blank screen", async ({ page }) => {

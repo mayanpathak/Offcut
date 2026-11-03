@@ -175,6 +175,9 @@ All are **(V6 decision)** unless they say otherwise.
 | D-303 | **The founding offer goes live after V6.6 (founder, 2026-11-02).** V6 ships it off (`FOUNDING_OFFER_ENABLED=false`). BP's founding release, after `v6.6`, holds Dodo live mode, all offers purchasable, and the legal pages | Early paying strangers test the price directly, about three months sooner than V9 |
 | D-304 | **Mail is proven from Render before the merge, and TE-8 moves to P138.** G 2.4 sends one real authenticated mail from a throwaway Render service. TE-8 runs with the template in P138, so a domain decision comes before the code depends on it | V6 has no flag: a mail failure found after the merge means no one can sign in |
 | D-305 | **Server tests need Postgres on port 9000, not Docker.** It is a Windows service on D1: on 2026-11-02 the Rust suite passed 657 with Docker Desktop stopped | V5's documents said otherwise |
+| D-306 | **`net` and `persistence` import no store, so what they need is handed in once.** `connectAccount()` in `restore-session.ts`, first thing in `start-app.ts`, gives `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links. One lint edge is added: `start-app.ts` to `restore-session.ts` (P145) | TS §7's layers stand. It runs before anything else, as the callback page verifies when it mounts, which can be before `start-app.ts` reaches its marker |
+| D-307 | **A receipt answered 429 keeps its row.** §11.5's "a 4xx other than 401 removes it" holds for every other 4xx with a readable body; a 4xx with no readable body also stays (P145) | The stated reason is that the row "can never succeed", and a 429 can. Dropping it would hand back a Free export, and TS §23.3's "removed only on a 2xx" is the safer reading where the two differ |
+| D-308 | **`main.tsx` tells `startApp` whether to restore,** with `ROUTES.authCallback` (D-296). `start-app.ts` does not read the path itself (P145) | `ROUTES` is in `routes.tsx`, which imports every page: a use-case importing it would close a cycle through `ui` |
 
 ---
 
@@ -456,7 +459,7 @@ TS §12.2's table with D-295's rows, through `transition()`. `auth-store.ts` hol
 
 ### 11.5 Outbox
 
-`enqueue`, `remove`, `flushOutbox`, which sends only the signed-in user's rows. Flushes after an export, at app start, on `online`. Timers 5 s, 30 s, 5 min. A 2xx removes the row and sets the token. A 4xx other than 401 also removes it: it can never succeed, and it logs `client_error`. Nothing else removes one (`receipt-outbox.test.ts`, TS §23.3).
+`enqueue`, `remove`, `flushOutbox`, which sends only the signed-in user's rows. Flushes after an export, at app start, on `online`. Timers 5 s, 30 s, 5 min. A 2xx removes the row and sets the token. A 4xx other than 401 and 429 (D-307) also removes it: it can never succeed, and it logs `client_error`. Nothing else removes one (`receipt-outbox.test.ts`, TS §23.3).
 
 ### 11.6 Broadcast
 
@@ -622,6 +625,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 | TS §22.1 | Magic link's 503 beside "always 202" (D-254); checkout's 403 (D-300) |
 | TS §12.5 | Button split (D-290) |
 | TS §13.2, PS §9.3 | The storage check's second try, past 3 s on a slow disk only (V6 CL Entry 12) |
+| TS §7, C-1, §23.3 | `start-app.ts` to `restore-session.ts`, `connectAccount` first (D-306); `startApp` told whether to restore (D-308); a 429 keeps a receipt (D-307) |
 | TS §22.2; PS §16 | `users.email` normalized (D-260); rotation in the grace, the lock (D-258, D-297) |
 | TS §22.5 | Trait, `EventOwner`, table rows, new kinds, subscription id, refusal (D-274 to D-276, D-299 to D-301) |
 | TS §22.8 | Variables (D-251, D-273) |

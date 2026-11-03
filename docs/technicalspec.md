@@ -645,7 +645,8 @@ offcut/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
 │   │   │   ├── http.test.ts
 │   │   │   ├── asset-fetch.ts         [ONLY] fetch to the asset CDN
-│   │   │   └── api-client.ts          typed route functions
+│   │   │   ├── api-client.ts          typed route functions
+│   │   │   └── api-client.test.ts
 │   │   ├── platform/
 │   │   │   ├── capability.ts
 │   │   │   ├── capability.test.ts
@@ -663,6 +664,7 @@ offcut/
 │   │   │   ├── export-store.ts
 │   │   │   ├── auth-store.ts
 │   │   │   ├── entitlement-store.ts
+│   │   │   ├── entitlement-store.test.ts
 │   │   │   ├── ui-store.ts            selected tab, follow switch, editing word, toasts, save state (v4implementation §17)
 │   │   │   ├── history.ts             undo and redo of EditState, 50 steps (D-184)
 │   │   │   ├── history.test.ts
@@ -716,6 +718,8 @@ offcut/
 │   │   │   ├── cancel-job.ts
 │   │   │   ├── dev-faults.ts          (V4) development builds only: crash, hang, fail a call on purpose (v4implementation D-155, G 14.5)
 │   │   │   ├── restore-clip.ts
+│   │   │   ├── restore-session.ts     (V6) C-1's session step; hands `net` and the outbox what they may not import
+│   │   │   ├── restore-session.test.ts
 │   │   │   ├── request-magic-link.ts
 │   │   │   ├── complete-sign-in.ts
 │   │   │   ├── sign-out.ts

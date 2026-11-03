@@ -27,3 +27,9 @@ export async function put(token: string): Promise<void> {
   const stored: Versioned<EntitlementRecord> = { schemaVersion: DB_VERSION, value: { token, storedAt: Date.now() } };
   await db.put(STORES.entitlement, stored, KEY);
 }
+
+/** Forgets the token: sign-out, never a lost session (v6implementation D-291). */
+export async function clear(): Promise<void> {
+  const db = await openDb();
+  await db.delete(STORES.entitlement, KEY);
+}
