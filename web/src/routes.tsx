@@ -25,7 +25,7 @@ export const router = createBrowserRouter([
     path: ROUTES.app,
     element: (
       <CapabilityGate>
-        <EditorPage />
+        <EditorPage accountPath={ROUTES.account} />
       </CapabilityGate>
     ),
   },

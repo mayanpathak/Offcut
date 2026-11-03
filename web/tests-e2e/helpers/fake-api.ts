@@ -87,6 +87,11 @@ function eventsIn(body: unknown): unknown[] {
 
 type Answer = { status: number; json?: unknown };
 
+/** Whether a subscription of the fake's session is `active` or `past_due`, as the server's `live_id` asks. */
+function isLive(subscription: unknown): boolean {
+  return typeof subscription === "object" && subscription !== null && "status" in subscription && subscription.status !== "canceled";
+}
+
 const errorAnswer = (status: number, code: string, retryAfterSecs: number | null = null): Answer => ({
   status,
   json: { code, retry_after_secs: retryAfterSecs },
@@ -164,9 +169,11 @@ function accountAnswer(
       return { status: 200, json: { entitlement_token: token() } };
     }
     case "POST /billing/checkout":
-      return { status: 200, json: { url: FAKE_CHECKOUT_URL } };
+      // A subscription the merchant still bills is refused a second (v6implementation D-300).
+      return isLive(subscription) ? errorAnswer(403, "forbidden") : { status: 200, json: { url: FAKE_CHECKOUT_URL } };
     case "GET /billing/portal":
-      return { status: 200, json: { url: FAKE_PORTAL_URL } };
+      // A person who has never subscribed has no customer at the merchant.
+      return subscription === null ? errorAnswer(404, "not_found") : { status: 200, json: { url: FAKE_PORTAL_URL } };
     case "POST /account/delete":
       account.session = null;
       return { status: 204 };

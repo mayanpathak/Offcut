@@ -1,5 +1,6 @@
 // The design reviews' captures (v4implementation D-191, G 10.8): the eight
-// states of §17.2 and V5's done state (D-235) at the two reference widths, written to
+// states of §17.2, V5's done state (D-235) and V6's sign-in, limits, prompts and
+// account page (v6implementation §13) at the two reference widths, written to
 // test-results/screens/<state>-<width>x<height>.png. D1 only: `pnpm screens`
 // builds the page in development mode first, so that it has its development
 // hooks (`__offcutDev`, D-155), and CI never runs this project. Each picture
@@ -9,13 +10,20 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { messages } from "../src/copy/messages";
+import { PRICES_USD } from "../src/config/pricing";
 import { installFakeApi } from "./helpers/fake-api";
 import { type AssetOptions, dropClip, ensureModelCached, modelManifest, patient, referenceClip, routeAssets } from "./helpers/fixtures";
 
 declare global {
   interface Window {
     /** The page's development hooks (`web/src/ui/dev-hooks.ts`), in a development build only. */
-    __offcutDev?: { openWordField(i: number): void; failClip(code: string): void; fakeExport(fraction: number): void; fakeExportDone(): void };
+    __offcutDev?: {
+      openWordField(i: number): void;
+      failClip(code: string): void;
+      fakeExport(fraction: number): void;
+      fakeExportDone(): void;
+      fakeUpgrade(placement: "after_export" | "limit_reached"): void;
+    };
   }
 }
 
@@ -40,6 +48,12 @@ const EXPORT_FRACTION = 0.42;
 /** How long the clip plays before the ready picture: past its first caption. */
 const PLAYED_MS = 3000;
 const FOUND = messages.feed.eventFound.number_reveal("");
+const EMAIL = "someone@example.com";
+const DAY_SECS = 24 * 3600;
+/** A subscription that renews in 20 days, as the account page shows one. */
+const ACTIVE = { status: "active", interval: "monthly", current_period_end: Math.floor(Date.now() / 1000) + 20 * DAY_SECS, cancel_at_period_end: false };
+/** Past the minute the account page waits for a payment (TS C-11). */
+const PAST_THE_WAIT_MS = 62_000;
 
 /** Waits for the fonts and, unless the state passes quickly, for the movement to end; then takes the picture. */
 async function picture(page: Page, state: string, settle = true): Promise<void> {
@@ -131,6 +145,82 @@ for (const size of WIDTHS) {
       await page.evaluate((code) => window.__offcutDev?.failClip(code), ERROR_CODE);
       await expect(page.getByTestId("clip-failed")).toBeVisible();
       await picture(page, "error");
+    });
+
+    test("V6, the editor: the sign-in dialog, the link sent, the callback, the counter, the last export, both prompts", async ({ page, context }) => {
+      await ensureModelCached(context);
+      const api = await installFakeApi(page);
+      await routeAssets(page);
+      await page.goto("/app");
+      await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
+      await dropClip(page, referenceClip());
+      await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled({ timeout: patient(240_000) });
+      const exportButton = page.getByRole("button", { name: messages.export.button, exact: true });
+
+      await exportButton.dispatchEvent("click");
+      const dialog = page.getByTestId("sign-in-dialog");
+      await expect(dialog).toBeVisible();
+      await picture(page, "sign-in-dialog");
+      await dialog.getByTestId("sign-in-email").fill(EMAIL);
+      await dialog.getByRole("button", { name: messages.signIn.submit, exact: true }).click();
+      await expect(dialog.getByTestId("sign-in-sent")).toBeVisible();
+      await picture(page, "sign-in-sent");
+
+      // The link opened in a tab of its own, for an account with one export left.
+      api.setSession({ email: EMAIL, freeExportsRemaining: 1 });
+      const tab = await context.newPage();
+      await installFakeApi(tab, { account: api.account });
+      await tab.goto("/auth/callback?token=fake-good-link");
+      await expect(tab.getByTestId("callback-done")).toBeVisible();
+      await picture(tab, "callback-signed-in");
+      await tab.close();
+
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByTestId("export-counter")).toBeVisible();
+      await picture(page, "counter");
+      await exportButton.dispatchEvent("click");
+      await expect(page.getByTestId("last-export-dialog")).toBeVisible();
+      await picture(page, "last-export");
+      await page.getByTestId("last-export-dialog").getByRole("button", { name: messages.export.lastFree.notNow }).click();
+
+      await page.evaluate(() => window.__offcutDev?.fakeExportDone());
+      await page.evaluate(() => window.__offcutDev?.fakeUpgrade("after_export"));
+      await expect(page.getByTestId("upgrade-prompt")).toContainText(messages.upgrade.afterExport(PRICES_USD.creatorMonthly));
+      await picture(page, "upgrade-after-export");
+      await page.evaluate(() => window.__offcutDev?.fakeUpgrade("limit_reached"));
+      await expect(page.getByTestId("upgrade-prompt")).toHaveAttribute("data-placement", "limit_reached");
+      await picture(page, "upgrade-limit");
+    });
+
+    test("V6, the account page: signed out, Free, Creator, a payment not confirmed yet, the delete question", async ({ page }) => {
+      await page.clock.install();
+      const api = await installFakeApi(page);
+      await page.goto("/account");
+      await expect(page.getByTestId("sign-in-email")).toBeVisible();
+      await picture(page, "account-signed-out");
+
+      api.setSession({ email: EMAIL, freeExportsRemaining: 2 });
+      await page.reload();
+      await expect(page.getByTestId("account-plan-line")).toBeVisible();
+      await picture(page, "account-free");
+
+      api.setSession({ email: EMAIL, plan: "creator", subscription: ACTIVE });
+      await page.reload();
+      await expect(page.getByTestId("account-subscription")).toBeVisible();
+      await picture(page, "account-creator");
+
+      api.setSession({ email: EMAIL });
+      await page.goto("/account?checkout=success");
+      await expect(page.getByTestId("checkout-notice")).toHaveText(messages.account.confirming);
+      // Past the session's restore first: the jump would time out a refresh still on its way.
+      await expect(page.getByTestId("account-plan-line")).toBeVisible();
+      await page.clock.fastForward(PAST_THE_WAIT_MS);
+      await expect(page.getByTestId("checkout-notice")).toHaveAttribute("data-code", "E_BILLING_PENDING");
+      await picture(page, "account-payment-pending");
+
+      await page.getByRole("button", { name: messages.account.delete, exact: true }).click();
+      await expect(page.getByTestId("delete-dialog")).toBeVisible();
+      await picture(page, "account-delete-question");
     });
   });
 }

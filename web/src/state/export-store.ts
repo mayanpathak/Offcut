@@ -154,12 +154,14 @@ export function gateFailed(failure: AppFailure): void {
   useExportStore.setState(next, true);
 }
 
-/** A finished export on Free offers the upgrade, unless this export's offer was dismissed. */
-export function offerUpgrade(): void {
+/** A finished export on Free offers the upgrade, unless this export's offer was dismissed. Whether it was offered. */
+export function offerUpgrade(): boolean {
   const { status, exportId } = useExportStore.getState();
-  if (status === "done" && exportId !== undefined && !dismissedOffers.has(exportId)) {
-    useExportStore.setState({ upgradeOffer: true });
+  if (status !== "done" || exportId === undefined || dismissedOffers.has(exportId)) {
+    return false;
   }
+  useExportStore.setState({ upgradeOffer: true });
+  return true;
 }
 
 /** The prompt was dismissed, at the limit or after an export. */

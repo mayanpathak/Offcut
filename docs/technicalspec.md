@@ -721,6 +721,7 @@ offcut/
 │   │   │   ├── restore-session.ts     (V6) C-1's session step; hands `net` and the outbox what they may not import
 │   │   │   ├── restore-session.test.ts
 │   │   │   ├── sign-in.test.ts        (V6) request-magic-link, complete-sign-in and sign-out
+│   │   │   ├── account.test.ts        (V6) start-checkout, confirm-checkout, open-billing-portal, delete-account and export-account-data
 │   │   │   ├── request-magic-link.ts
 │   │   │   ├── complete-sign-in.ts
 │   │   │   ├── sign-out.ts

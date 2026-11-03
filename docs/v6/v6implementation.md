@@ -181,6 +181,10 @@ All are **(V6 decision)** unless they say otherwise.
 | D-309 | **`forExport(room)` asks only the room.** The account was asked at the gate, and an export already in `gating` is not sent back to it. One lint edge is added: `blockers.ts` to `entitlement.ts`, as TS §12.5 has it ask `effective()` (P147) | A session lost during `lockForExport` must not turn into a sign-in dialog halfway through an export it has begun |
 | D-310 | **A token that cannot be renewed is `export-store`'s `gateFailure`,** shown by the same card as a failed export, `export-failed`. No machine state changes (P147) | TS C-7 asks for `<ErrorPanel E_ENTITLEMENT_EXPIRED>`, but nothing began: the table's only way to `failed` goes through `rendering`, which would announce an `export_started` |
 | D-311 | **While the sign-in or last-export dialog is open, the editor's shortcuts stand aside,** as they do for the shortcuts sheet (P147) | Space on the dialog's button would play the video and not press the button; and Escape must reach the dialog |
+| D-312 | **The top bar's "Account" opens `/account` in a tab of its own** (P148) | Leaving `/app` lets go of the clip, and `restoreClip` is V7's. A sign-in in that tab reaches the editor by the broadcast, and its token by the repository (D-294) |
+| D-313 | **`startCheckout` sends the analytics queue before the page leaves for the merchant,** one request, not awaited (P148) | `checkout_step` `started` is H2's step, and the send as the page unloads did not arrive in the browser test |
+| D-314 | **The prompt comes once per watermarked export, until it is dismissed** (P148). PS §11's "after the first watermarked export" is read with PS J12's "On a free export" and TS C-11's "once per export". "Make another clip" is in the `after_export` placement only | P147 left the reading open. At the limit there is nothing to export another clip with this month |
+| D-315 | **The account page offers the two plans only on Free with no live subscription, and "Manage subscription" whenever the account has a subscription row. A checkout refused by D-300 goes to the portal inside `startCheckout`,** for the prompt and the page alike (P148) | One way out of the refusal, wherever the offer was chosen |
 
 ---
 
@@ -630,6 +634,7 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 | TS §13.2, PS §9.3 | The storage check's second try, past 3 s on a slow disk only (V6 CL Entry 12) |
 | TS §7, C-1, §23.3 | `start-app.ts` to `restore-session.ts`, `connectAccount` first (D-306); `startApp` told whether to restore (D-308); a 429 keeps a receipt (D-307) |
 | TS §7, C-7, §12.5 | `blockers.ts` to `entitlement.ts`, and the room alone in `gating` (D-309); `gateFailure` (D-310) |
+| TS C-11, §13.3, §13.4; PS §11 | The account link in a tab of its own (D-312); the queue sent before checkout (D-313); once per watermarked export, "Make another clip" (D-314); offers, portal and the refusal's way out (D-315) |
 | TS §22.2; PS §16 | `users.email` normalized (D-260); rotation in the grace, the lock (D-258, D-297) |
 | TS §22.5 | Trait, `EventOwner`, table rows, new kinds, subscription id, refusal (D-274 to D-276, D-299 to D-301) |
 | TS §22.8 | Variables (D-251, D-273) |

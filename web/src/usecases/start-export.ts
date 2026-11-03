@@ -137,6 +137,10 @@ async function passGate(lastConfirmed: boolean): Promise<boolean> {
       exportStore.setGate("sign_in");
       return false;
     case "B_NO_FREE_EXPORTS":
+      // A click while the prompt is up shows nothing new.
+      if (exportStore.useExportStore.getState().gate !== "upgrade") {
+        track({ name: "upgrade_prompt", props: { placement: "limit_reached", action: "shown" } });
+      }
       exportStore.setGate("upgrade");
       return false;
     case "B_ENTITLEMENT_EXPIRED":
@@ -168,9 +172,18 @@ export function confirmLastExport(clipId: ClipId): Promise<void> {
   return startExport(clipId, { lastConfirmed: true });
 }
 
-/** "Not now", on the upgrade prompt. */
+/** "Not now", on the upgrade prompt: the placement it was shown in. */
 export function dismissUpgrade(): void {
+  const placement = exportStore.useExportStore.getState().gate === "upgrade" ? "limit_reached" : "after_export";
+  track({ name: "upgrade_prompt", props: { placement, action: "dismissed" } });
   exportStore.dismissOffer();
+}
+
+/** After a watermarked export (PS §11), once per export until it is dismissed: a hit shares its export's id. */
+function offerUpgrade(): void {
+  if (exportStore.offerUpgrade()) {
+    track({ name: "upgrade_prompt", props: { placement: "after_export", action: "shown" } });
+  }
 }
 
 /** What a receipt says of a file the person has. A write that fails does not take the file back (§12). */
@@ -467,7 +480,7 @@ export async function startExport(clipId: ClipId, options: { lastConfirmed?: boo
       unlockAfterExport();
       exportDone(values, exportedAs, startedAt, true);
       if (exportedAs === "free") {
-        exportStore.offerUpgrade();
+        offerUpgrade();
       }
       return;
     }
@@ -536,7 +549,7 @@ export async function startExport(clipId: ClipId, options: { lastConfirmed?: boo
   unlockAfterExport();
   exportDone(values, exportedAs, startedAt, false);
   if (exportedAs === "free") {
-    exportStore.offerUpgrade();
+    offerUpgrade();
   }
   void flushOutbox();
 }

@@ -25,12 +25,8 @@ const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
  * removed in the change that writes its copy.
  */
 const COPY_PENDING = [
-  // The billing errors: due with their flow in V6.
-  // The fourteen a person can meet on this device have copy since V4
-  // (v4implementation D-159).
-  "E_BILLING_UNAVAILABLE",
-  "E_BILLING_PENDING",
-  // The three blockers no person can meet yet: the account and the plan, in V6.
+  // Empty since V6: the billing errors were the last, with their flow
+  // (v6implementation §13). A new code gets its copy in the change that adds it.
 ];
 
 /** The code lists, and the file each is in. Each is written one code per line. */

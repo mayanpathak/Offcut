@@ -39,12 +39,12 @@ function Announcement({ view }: { view: StageView }) {
   return <span className={styles.srOnly}>{text}</span>;
 }
 
-export function EditorLayout({ view }: { view: StageView }) {
+export function EditorLayout({ view, accountPath }: { view: StageView; accountPath: string }) {
   useShortcuts();
   const panel = view === "download" || view === "processing" || view === "cancelled" || view === "ready";
   return (
     <div data-theme="dark" className={panel ? styles.editorWithPanel : styles.editor} data-testid="editor">
-      <TopBar view={view} />
+      <TopBar view={view} accountPath={accountPath} />
       <Stage view={view} />
       {panel ? (
         <aside className={styles.panel}>

@@ -16,7 +16,7 @@ import { type BrowserContext, type Download, expect, type Page, test } from "@pl
 import { PRICES_USD } from "../src/config/pricing";
 import { messages } from "../src/copy/messages";
 import { LIMITS } from "../src/gen/domain";
-import { type FakeApi, installFakeApi } from "./helpers/fake-api";
+import { FAKE_CHECKOUT_URL, type FakeApi, installFakeApi } from "./helpers/fake-api";
 import {
   axe,
   dropClip,
@@ -148,6 +148,18 @@ test.describe("three free exports", () => {
     await expect(page.getByTestId("export-status")).toHaveText("");
   });
 
+  test("the top bar's Account link opens the account page in a tab of its own, and the clip stays here", async () => {
+    const link = page.getByRole("link", { name: `${messages.editor.account} ${messages.editor.newTab}`, exact: true });
+    await expect(link).toHaveAttribute("target", "_blank");
+    const opening = context.waitForEvent("page");
+    await link.click();
+    const tab = await opening;
+    await tab.waitForURL(/\/account$/);
+    await tab.close();
+    await expect(canvas(page)).toBeVisible();
+    await expect(counter(page)).toHaveText(messages.export.counter(3, TOTAL));
+  });
+
   test("first export: 720 by 1280 with the watermark, all 11 checks; the counter falls; one receipt", async () => {
     await expect(prompt(page)).toHaveCount(0);
     const file = await saved("first.mp4", () => exportButton(page).click());
@@ -167,9 +179,21 @@ test.describe("three free exports", () => {
     await expect(prompt(page)).toContainText(messages.upgrade.afterExport(PRICES_USD.creatorMonthly));
     await expect(page.getByTestId("export-outcome").getByTestId("upgrade-prompt")).toHaveCount(0);
     await expect(prompt(page).locator(":focus")).toHaveCount(0);
+    // Both offers, and the way to another clip; no founding offer while it is off (D-303).
+    await expect(prompt(page).getByRole("button")).toHaveText([
+      messages.upgrade.monthly(PRICES_USD.creatorMonthly),
+      messages.upgrade.annual(PRICES_USD.creatorAnnual),
+      messages.upgrade.anotherClip,
+      messages.upgrade.dismiss,
+    ]);
     expect(await violations(page), "axe with the prompt").toEqual([]);
     await prompt(page).getByRole("button", { name: messages.upgrade.dismiss }).click();
     await expect(prompt(page)).toHaveCount(0);
+    await sendQueuedAnalytics(page);
+    expect(api.eventsOf("upgrade_prompt").map((event) => (event as { props: unknown }).props)).toEqual([
+      { placement: "after_export", action: "shown" },
+      { placement: "after_export", action: "dismissed" },
+    ]);
   });
 
   test("the same edit again: the stored file, no receipt, the counter as it was, and the prompt stays dismissed", async () => {
@@ -247,5 +271,22 @@ test.describe("three free exports", () => {
     const again = await saved("third-again.mp4", () => page.getByTestId("download-again").click());
     expect(await sha256Of(again)).toBe(await sha256Of(lastFile));
     expect(receipts()).toHaveLength(3);
+  });
+
+  // Last: the page leaves for the merchant's.
+  test("at the limit, an offer in the prompt goes to the merchant's checkout, and the click is told with its placement", async () => {
+    await page.route(FAKE_CHECKOUT_URL, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Fake checkout</title>" }));
+    await expect(prompt(page)).toHaveAttribute("data-placement", "limit_reached");
+    await sendQueuedAnalytics(page);
+    api.forget();
+    await prompt(page).getByRole("button", { name: messages.upgrade.annual(PRICES_USD.creatorAnnual), exact: true }).click();
+    await expect(page).toHaveURL(FAKE_CHECKOUT_URL);
+    expect(api.requests.filter((request) => request.path === "/billing/checkout").map((request) => request.body)).toEqual([{ offer: "creator_annual" }]);
+    await expect
+      .poll(() => [...api.eventsOf("upgrade_prompt"), ...api.eventsOf("checkout_step")])
+      .toEqual([
+        { name: "upgrade_prompt", props: { placement: "limit_reached", action: "clicked" } },
+        { name: "checkout_step", props: { step: "started" } },
+      ]);
   });
 });

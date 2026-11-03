@@ -1137,6 +1137,41 @@ describe("the upgrade offer (PS §11)", () => {
     expect(store().upgradeOffer).toBe(true);
   });
 
+  it("told: shown after a Free export with its placement, and dismissed with it; nothing on Creator (v6implementation §14)", async () => {
+    await exportNow();
+    expect(named("upgrade_prompt")).toEqual([]);
+    exportStore.reset();
+    editIs({ style: "bold" });
+    workerGives(FREE);
+    await exportNow();
+    dismissUpgrade();
+    expect(named("upgrade_prompt")).toEqual([
+      { name: "upgrade_prompt", props: { placement: "after_export", action: "shown" } },
+      { name: "upgrade_prompt", props: { placement: "after_export", action: "dismissed" } },
+    ]);
+  });
+
+  it("told at the limit: shown once however often Export is pressed, and dismissed as limit_reached", async () => {
+    m.device.token = tokenNaming("free", { free_exports_remaining: 0 });
+    workerGives(FREE);
+    const told: unknown[] = [];
+    const press = async () => {
+      await exportNow();
+      told.push(...named("upgrade_prompt").map((event) => event.props));
+    };
+    await press();
+    await press();
+    expect(told).toEqual([{ placement: "limit_reached", action: "shown" }]);
+    dismissUpgrade();
+    told.push(...named("upgrade_prompt").map((event) => event.props));
+    await press();
+    expect(told).toEqual([
+      { placement: "limit_reached", action: "shown" },
+      { placement: "limit_reached", action: "dismissed" },
+      { placement: "limit_reached", action: "shown" },
+    ]);
+  });
+
   it("a new start takes the offer away until that export is done", async () => {
     workerGives(FREE);
     await exportNow();

@@ -18,6 +18,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
 | 16 | Delete the webhook logger on Render, and its endpoint in Dodo's test mode. The endpoint for the deployed site is registered at G 14.6 | Founder | Entry 13 |
+| 17 | Read the legal and pricing words P148 changed (Entry 17), before the merge puts them live. With them: from the merge until the founding release, the account page's two offers lead to Dodo's test mode (D-285), where the pages say Creator is not on sale. Keep the offers, or hide them on the live site until then | Founder, before P150 | Entry 17 |
 
 ## Known issues for later prompts
 
@@ -468,3 +469,54 @@ The title, line 127's assertion, and one line closing the dialog before line 134
 **Found, not fixed.** `messages.ts` is at 653 of 700 lines, with P148's copy still to come. The Git Bash `python` is MSYS's and has no NumPy, so `verify_mp4.py` needs Python 3.13 first on `PATH` on D1.
 
 **Counts.** Vitest 500, up from 468; `pnpm e2e` 33; Rust 812 / 0 / 4; media `export-free` 10 new; copy pending 2, down from 7. Frozen check empty. Not pushed: the next push is P148.
+
+## Entry 17 - 2026-11-03 - P148: upgrade, checkout, the account page
+
+**Changed.** `usecases/{start-checkout,confirm-checkout,open-billing-portal,delete-account,export-account-data}.ts`. `UpgradePrompt.tsx`, finished: the two offers, "Make another clip" after an export, "Not now", and its line for a failure. `AccountPage.tsx`, whole: the plan and its counter, the offers or "Manage subscription", the return from checkout with its wait, the account's data, deletion behind a question, sign-out. `TopBar.tsx`'s "Account" link, its path handed down from `routes.tsx` through `EditorPage` and `EditorLayout`. `upgrade_prompt` `shown` and `dismissed` in `start-export.ts`, `clicked` in `start-checkout.ts`; `checkout_step`'s three steps. The last copy: both billing errors, the account page and the top bar's link. `COPY_PENDING` is empty. `fake-api.ts` refuses a checkout for a live subscription and answers the portal 404 with none, as the server does. `checkout.spec.ts`, in `non-media`. A development hook, `fakeUpgrade`, for the captures.
+
+**The legal and pricing words, for the founder to read (open item 17).** Each "when accounts open" that V6's merge makes true now says so; what is about payment stays as it was, as Creator goes on sale only with the founding release (D-303):
+
+| Where | Was | Now |
+|---|---|---|
+| Pricing section | "Not on sale yet. These plans start when accounts open: leave your email below to hear when they do." | "The Free plan comes with a free account. Creator is not on sale yet: leave your email below to hear when it is." |
+| Terms, Plans and payment | "They start when accounts open, and until then nothing can be bought." | "The Free plan starts when you create an account. Creator is not on sale yet, and until it is, nothing can be bought." |
+| Privacy, heading | "What we will collect when accounts open" | "What we collect when you have an account" |
+| Privacy, that section | "You will be able to export this data or delete your account" | "You can …", and two facts the server keeps that it did not name: when each sign-in began and was last used, and a sign-in link for a day at most |
+| Privacy, Who handles it | "When accounts open, Brevo will send sign-in emails" | "Brevo sends the sign-in emails, so it receives your email address" |
+| Refunds, first heading | "Before accounts open" | "Before Creator goes on sale" |
+| All three | "Last updated 2 November 2026." | "3 November 2026." |
+
+**Differs from the plan.**
+
+| What | Why |
+|---|---|
+| D-312: "Account" opens in a tab of its own | Leaving `/app` would let go of the clip; `restoreClip` is V7's |
+| D-313: the analytics queue is sent before leaving for checkout | The `started` step did not arrive when left to the send as the page unloads |
+| D-314: once per watermarked export, until dismissed; "Make another clip" after an export only | Settles P147's open reading of PS §11 |
+| D-315: offers on Free with no live subscription; "Manage subscription" with any subscription row; D-300's refusal goes to the portal in `startCheckout` | One way out of the refusal, from the prompt or the page |
+| The wait for Creator reads again after a failed read, and stops when the session has ended | TS C-11 does not say. A 429 is likely for a page asking every 2 s; a lost session will not mend itself |
+| The offers' buttons say "$15/month" and "$144/year" | At 1280 the panel was 5 px too narrow for "Creator, $15/month" beside "Creator, $144/year". The sentence above each pair names the plan |
+| `account.test.ts`: a new row of TS §5 | §4 names no test of the five use-cases |
+
+**Acceptance.**
+
+| Box | Result |
+|---|---|
+| `COPY_PENDING` empty; its check and the analytics tests | `check-copy-codes`: pending 0, every list in full. `analytics_allowlist.rs` and the client's tests pass; no event or field was added |
+| `checkout.spec.ts` as §15.4 | 12 of 12, three times over: to the provider's page; the return asks every 2 s until Creator, the address cleaned and the device's token Creator; past the minute `E_BILLING_PENDING` with Check again (the page's clock moved forward); the cancel; the portal; the refusal to the portal; the provider down; the data file; deletion |
+| `UpgradePrompt` | Its placement type has two members; non-modal; outside `export-outcome`; no focus. `export-free.spec.ts` reads all three, its four buttons in order, and its events |
+| `export-creator`, "summary and the question", unchanged in Tier 2 | The whole file, as its cases are serial: 18 of 18 with the prompt showing. The file has no change since P147 |
+| Axe at 0; keyboard | Axe on every account state, the question, the prompt. Tab alone reaches the yearly offer and Enter buys; Tab and Enter open the question, the focus is on keeping, Escape keeps, Tab and Enter delete |
+| The legal pages and the pricing section | The table above |
+| Tier 3 | `pnpm build`, then `pnpm check && pnpm fixtures && pnpm test`, `pnpm e2e`: all exit 0. `pnpm e2e` 45 of 45 (landing 18, signin 15, checkout 12) |
+
+**The tests were tried against the bugs they guard, then restored by hash: 16 of 16 caught.** No session check; no portal on D-300's refusal; no send before leaving; the click not told; no wait between reads; a failed read ending the wait; an ended session waiting on; the token not kept; a shorter minute; a retry told as a return; a failed deletion clearing the device; a deletion keeping the token; the data file's address kept; shown on every press at the limit; dismissed under the wrong placement; a dismissed offer shown again. Two were missed at first: the failed read was a 500, which `http.ts` retries as a waking API, so the test now reads a 429; and a guard in `offerUpgrade` that no flow could reach is gone.
+
+**Captures, for the founder's one look.** `~/v6-review/`, 32 pictures at 1280 x 800 and 1920 x 1080: the sign-in dialog and the sent state, the callback, the counter, the last-export question, the prompt after an export and at the limit, the account page signed out, on Free, on Creator, with a payment not confirmed, and the delete question; and the empty, ready, exporting and done states with the new link. One capture failed once on its own race: the clock moved forward while the session's first refresh was still out. It now waits for the signed-in page.
+
+**Found, not fixed.**
+- An offer chosen in the editor's prompt leaves the page for the merchant's, as TS C-11 says, and with it the clip, until V7's `restoreClip`. After an export the file is already downloaded; at the limit the edit is lost.
+- From the merge until the founding release, the offers lead to Dodo's test mode (D-285) while the pages say Creator is not on sale (open item 17).
+- `messages.ts` is at 679 of 700 lines.
+
+**Counts.** Vitest 522, up from 500; `pnpm e2e` 45, up from 33; Rust 816 / 0 / 4, every `test result` line of `pnpm test` summed: no Rust file has changed since P144's 812, so the 4 are a difference of counting, not new tests; media `export-free` 13, up from 10; copy pending 0, down from 2. Frozen check empty. **Push 2**, not waited on.
