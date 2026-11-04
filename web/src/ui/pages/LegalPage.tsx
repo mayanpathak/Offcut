@@ -18,7 +18,7 @@ export function LegalPage({ homePath }: { homePath: string }) {
   }
   const page = messages.legal.docs[doc];
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       <article className={styles.section}>
         <Link to={homePath}>{messages.settings.backLink}</Link>
         <h1 className={styles.title}>{page.title}</h1>

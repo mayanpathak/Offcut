@@ -9,7 +9,7 @@ import styles from "../styles/pages.module.css";
 
 export function SettingsPage({ homePath }: { homePath: string }) {
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       <section className={styles.section}>
         <Link to={homePath}>{messages.settings.backLink}</Link>
         <h1 className={styles.title}>{messages.settings.title}</h1>

@@ -20,7 +20,7 @@ export function CapabilityGate({ children }: { children: ReactNode }) {
     return <UnsupportedPage reason={reason} />;
   }
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       <p className={styles.text} role="status">
         {messages.capability.checking}
       </p>

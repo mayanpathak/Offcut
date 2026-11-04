@@ -71,7 +71,7 @@ export function AuthCallbackPage({ appPath }: { appPath: string }) {
   }, []);
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       {view.kind === "verifying" || view.kind === "waking" ? (
         <section className={styles.section}>
           <h1 className={styles.title}>{messages.callback.verifying}</h1>

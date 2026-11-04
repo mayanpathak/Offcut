@@ -12,7 +12,7 @@ import { LEGAL_DOCS, messages } from "../src/copy/messages";
 import { ANALYTICS_EVENT_DOCS, type CheckResult, type GpuVendor, type MemoryBucket, type Platform } from "../src/gen/api";
 import { LIMITS, UNSUPPORTED_REASONS } from "../src/gen/domain";
 import { installFakeApi } from "./helpers/fake-api";
-import { flushAnalytics } from "./helpers/fixtures";
+import { axe, flushAnalytics } from "./helpers/fixtures";
 
 declare global {
   interface Window {
@@ -603,4 +603,17 @@ test("L-6: every clip loads from the asset host under the isolation headers, and
     expect(state).toEqual({ error: null, paused: false, origin: assetHosts[0] });
   }
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+});
+
+/** An accessibility violation, as the reviews quote one: its rule and how many elements break it. */
+const violations = async (page: Page) => (await axe(page)).map((v) => `${v.id}: ${String(v.nodes.length)} node(s)`);
+
+test("L-12: the settings and a legal page, on the dark system, have no serious or critical accessibility violation", async ({ page }) => {
+  await installFakeApi(page);
+  for (const path of ["/settings", "/legal/terms"]) {
+    await page.goto(path);
+    await expect(page.locator("main[data-theme='dark']")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(await violations(page), `axe on ${path}`).toEqual([]);
+  }
 });

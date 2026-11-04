@@ -171,3 +171,30 @@
 .dialog::backdrop {
   background: color-mix(in srgb, var(--color-text) 40%, transparent);
 }
+
+/* --- The pages on the dark system (designimplementation §15, Part C) ------
+   Settings, the legal pages, account, the sign-in callback, the unsupported
+   page and the capability check set data-theme="dark" on their root. The
+   rules above read V1's colour names; here those names take the dark tokens
+   of tokens.css, so the markup, copy and logic stay as they are. The shared
+   form and button classes of components.module.css read the same names. */
+
+.page[data-theme="dark"] {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface-1);
+  --color-text: var(--text);
+  --color-muted: var(--text-2);
+  --color-border: #3a3a44;
+  --color-accent: #b79dfb;
+  --color-on-accent: #0e0e11;
+  --color-ok: var(--ok);
+  --color-problem: var(--danger);
+
+  /* The dark tokens set the editor's 14 px; these pages keep their 16 px. */
+  font-size: var(--text-base);
+}
+
+/* A modal's backdrop on a dark page darkens, as the editor's does. */
+.page[data-theme="dark"] .dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}

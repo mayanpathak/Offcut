@@ -504,3 +504,39 @@ Every frame count is unchanged. A middle frame of each was read on D1 beside the
 **Open.** Item 2 is closed (the upload).
 
 **Found, not fixed.** None.
+
+## Entry 10 - 2026-11-05: P157, the other pages on the dark system (Part C)
+
+**What changed.**
+
+- **One attribute per page.** `data-theme="dark"` on the root `<main>` of six pages: `SettingsPage`, `LegalPage`, `AccountPage`, `AuthCallbackPage`, `UnsupportedPage`, and `CapabilityGate`'s checking state. Each `.tsx` diff is that attribute and nothing else.
+- **`pages.module.css`, one block at its end.**
+  - `.page[data-theme="dark"]` maps V1's colour names (`--color-bg`, `--color-surface`, `--color-text`, `--color-muted`, `--color-border`, `--color-accent`, `--color-on-accent`, `--color-ok`, `--color-problem`) to the dark tokens. Every rule above it, and the shared form and button classes of `components.module.css`, read these names, so no markup changes.
+  - The pages keep their 16 px body (the dark tokens set the editor's 14 px).
+  - The account page's deletion dialog gets a dark backdrop. Its `::backdrop` mixes `--color-text`, which would turn light on a dark page.
+- **The font** is Inter UI, from the dark tokens.
+- **New case L-12.** `axe(page)` on `/settings` and `/legal/terms`, each with its `main[data-theme='dark']` and its H1: no serious or critical violation. `landing.spec.ts`'s import line gains `axe` from `helpers/fixtures.ts`; no case changed.
+
+**Frozen-check exceptions** (named by P157): the six `.tsx` and `pages.module.css`. Only `ui/components/CapabilityGate.tsx` is under a frozen path, and the check prints only it.
+
+**Tier 3.**
+
+- `signin.spec.ts` and `checkout.spec.ts` are non-media, so Tier 2 runs them in full.
+- Of the media suites, only `export-free.spec.ts` reaches the account page. Its case "the top bar's Account link opens the account page in a tab of its own" is part of a serial group that first processes a clip end to end, so it cannot run alone.
+- It runs in CI's `e2e-media` on the pull request, and in Part B's full media run.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **444.2 kB** |
+| `pnpm e2e --workers=4` | 55 of 56 passed, including L-12 and all of signin and checkout. "Two tabs" (signin, on the account and callback pages this prompt touches) failed in the full run, then passed **3 of 3** alone with `--repeat-each=3`: Entry 3's flake |
+| `git diff 8d94a06 -- web/tests-e2e/signin.spec.ts web/tests-e2e/checkout.spec.ts` | empty |
+| Captures | `/settings`, `/legal/terms` and `/account` on the dark system, read on D1 at 1280 × 800 |
+| Frozen check | `web/src/ui/components/CapabilityGate.tsx` only, the named exception |
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

@@ -17,7 +17,7 @@ const MOBILE_FIRST: { preselect: Wanted } = { preselect: "mobile" };
 export function UnsupportedPage({ reason }: { reason: UnsupportedReason }) {
   const copy = messages.unsupported;
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       <section className={styles.section}>
         <h1 className={styles.title}>{copy.title}</h1>
         <p className={styles.lead} data-testid="unsupported-reason">
