@@ -2,6 +2,7 @@
 // does, the way in, whether this browser can run it (J3), where it works and
 // that the video is not uploaded; beside them, the hero clip in a phone.
 
+import { m, useReducedMotion } from "motion/react";
 import { Link } from "react-router";
 
 import { messages } from "../../copy/messages";
@@ -9,7 +10,7 @@ import { LANDING_CLIPS } from "../../net/asset-fetch";
 import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
 import styles from "../styles/landing.module.css";
 import { LoopVideo } from "./LoopVideo";
-import { Chip, CtaLink, Eyebrow, PhoneFrame } from "./parts";
+import { Chip, CtaLink, EASE, Eyebrow, PhoneFrame } from "./parts";
 
 /** The one line that says whether this browser can run Offcut. */
 function capabilityLine(state: CapabilityState): { text: string; supported: boolean } {
@@ -20,6 +21,43 @@ function capabilityLine(state: CapabilityState): { text: string; supported: bool
     return { text: messages.unsupported.reasons[state.reason], supported: false };
   }
   return { text: messages.capability.checking, supported: false };
+}
+
+/** M5: the chips enter one after another, then drift a few pixels for ever (§8.2). */
+const CHIP_ENTER_S = 0.5;
+const CHIP_FIRST_S = 0.5;
+const CHIP_STAGGER_S = 0.12;
+const CHIP_RISE_PX = 12;
+const DRIFT_PX = 6;
+const DRIFT_S = 6;
+
+/** One of the three chips around the hero's phone: decoration, so it may fade in. */
+function FloatingChip({ text, index }: { text: string; index: number }) {
+  const reduced = useReducedMotion() === true;
+  const chip = (
+    <Chip className={styles.heroChipFace} dot>
+      {text}
+    </Chip>
+  );
+  if (reduced) {
+    return <span className={styles.heroChip}>{chip}</span>;
+  }
+  return (
+    <m.span
+      className={styles.heroChip}
+      initial={{ opacity: 0, y: CHIP_RISE_PX }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: CHIP_ENTER_S, delay: CHIP_FIRST_S + index * CHIP_STAGGER_S, ease: EASE }}
+    >
+      <m.span
+        className={styles.heroChipDrift}
+        animate={{ y: [0, -DRIFT_PX, 0, DRIFT_PX, 0] }}
+        transition={{ duration: DRIFT_S + index, delay: CHIP_FIRST_S + CHIP_ENTER_S, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {chip}
+      </m.span>
+    </m.span>
+  );
 }
 
 export function Hero({ appPath, settingsPath }: { appPath: string; settingsPath: string }) {
@@ -62,10 +100,8 @@ export function Hero({ appPath, settingsPath }: { appPath: string; settingsPath:
           <PhoneFrame>
             <LoopVideo clip={LANDING_CLIPS.hero} label={copy.clipLabels.hero} eager />
           </PhoneFrame>
-          {copy.heroChips.map((chip) => (
-            <Chip key={chip} className={styles.heroChip} dot>
-              {chip}
-            </Chip>
+          {copy.heroChips.map((chip, index) => (
+            <FloatingChip key={chip} text={chip} index={index} />
           ))}
         </div>
       </div>

@@ -2,14 +2,25 @@
 // the page's sections, "Start free", and the 2 px progress bar of a short
 // under it (D-317).
 
+import { useMotionValueEvent, useScroll } from "motion/react";
+import { useRef } from "react";
+
 import { messages } from "../../copy/messages";
 import styles from "../styles/landing.module.css";
 import { CtaLink } from "./parts";
 
+/** The bar shows its hairline once the page has scrolled this far (§6, section 0). */
+const SCROLLED_PX = 8;
+
 export function TopBar({ appPath }: { appPath: string }) {
   const copy = messages.landing;
+  const bar = useRef<HTMLElement>(null);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (y) => {
+    bar.current?.toggleAttribute("data-scrolled", y > SCROLLED_PX);
+  });
   return (
-    <header className={styles.topBar}>
+    <header className={styles.topBar} ref={bar}>
       <div className={[styles.container, styles.topBarInner].join(" ")}>
         <a className={styles.wordmark} href="#top" aria-label={copy.homeLink}>
           <span className={styles.wordmarkO}>{copy.wordmark.slice(0, 1)}</span>

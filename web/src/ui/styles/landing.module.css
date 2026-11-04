@@ -556,9 +556,17 @@
   background: #000;
 }
 
+/* A chip's place (M5 moves it in), its drift, and its glass face. */
 .heroChip {
   position: absolute;
   z-index: 2;
+}
+
+.heroChipDrift {
+  display: block;
+}
+
+.heroChipFace {
   background: rgb(29 29 35 / 0.82);
   backdrop-filter: blur(10px);
   box-shadow:

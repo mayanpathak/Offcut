@@ -2,6 +2,7 @@
 // to the full list. The hero's privacy line and its "What leaves your device"
 // link are not repeated here: each must be on the page once (D-334).
 
+import { m, useReducedMotion } from "motion/react";
 import { Link } from "react-router";
 
 import { messages } from "../../copy/messages";
@@ -10,12 +11,14 @@ import { Check } from "../icons";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
 import { LoopVideo } from "./LoopVideo";
-import { SectionHead } from "./parts";
+import { SectionHead, useRise } from "./parts";
 
 const CHECK_SIZE = 18;
 
 export function Privacy({ settingsPath }: { settingsPath: string }) {
   const copy = messages.landing;
+  const rise = useRise();
+  const reduced = useReducedMotion() === true;
   return (
     <section className={landing.section} id="privacy" aria-labelledby="privacy-heading">
       <div className={landing.container}>
@@ -23,13 +26,16 @@ export function Privacy({ settingsPath }: { settingsPath: string }) {
           <div className={styles.privacyText}>
             <SectionHead eyebrow={copy.eyebrows.privacy} heading={copy.privacy.heading} headingId="privacy-heading" />
             <ul className={styles.privacyFacts}>
-              {copy.privacy.facts.map((fact) => (
-                <li key={fact}>
-                  <span className={styles.privacyCheck}>
+              {copy.privacy.facts.map((fact, index) => (
+                <m.li key={fact} {...rise(index + 1)}>
+                  <m.span
+                    className={styles.privacyCheck}
+                    {...(reduced ? {} : { initial: { opacity: 0 }, whileInView: { opacity: 1 }, viewport: { once: true } })}
+                  >
                     <Check size={CHECK_SIZE} />
-                  </span>
+                  </m.span>
                   {fact}
-                </li>
+                </m.li>
               ))}
             </ul>
             <Link className={styles.privacyLink} to={settingsPath}>

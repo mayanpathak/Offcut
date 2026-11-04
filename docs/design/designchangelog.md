@@ -332,3 +332,55 @@ All 12 rows of §5 are cards with "Coming soon" (case L-2).
 **Open.** Nothing new.
 
 **Found, not fixed.** None.
+
+## Entry 7 - 2026-11-05: P154, Motion
+
+**What changed.**
+
+- **M7, the section entrances.** `useRise()` in `parts.tsx` gives `initial { y: 16 }`, `whileInView { y: 0 }`, `once`, `amount: 0.3`, 0.6 s, the brand ease, and 0.06 s between siblings. It is used by:
+  - every `SectionHead`;
+  - the before-after steps;
+  - the 8 bento cards;
+  - the privacy facts;
+  - the two plans;
+  - the 12 soon cards (staggered by row).
+
+  Content only moves, it never fades (rule 2.5). Under reduced motion the hook gives no animation props at all, so nothing is registered: this does not rely on `MotionConfig` alone.
+- **M5, the hero chips.** They enter one after another (0.12 s apart) from opacity 0 (decoration) and 12 px down. Then they drift ±6 px for ever (6-8 s, `easeInOut`). Under reduced motion they are plain spans.
+- **M8, the bento spotlight.** A pointer handler writes `--x` and `--y` with `style.setProperty` on the card, and a radial gradient follows them. The hover lift uses `translate`, so it does not fight Motion's `transform`.
+- **The top bar's hairline.** It appears after 8 px of scroll, through Motion's `useScroll` and `useMotionValueEvent`, which toggle a `data-scrolled` attribute (no style is written).
+- **M11, in CSS,** every keyframe under `(prefers-reduced-motion: no-preference)`:
+  - the waveform, noisy then clean;
+  - the crop window sliding;
+  - the editor card's word swap;
+  - the transcript's words appearing;
+  - the "Coming soon" chips' dot pulse;
+  - Creator's violet sweep along its border (`@property --sweep` and a masked conic gradient).
+
+  Still, each picture shows its final state: the clean waveform and the fixed word.
+- **New cases.**
+  - **L-5:** under `emulateMedia({ reducedMotion: "reduce" })`, after a scroll through and 1 s, `document.getAnimations()` is empty, the headings are there, and there is no pin spacer. The clip and pill checks join when they exist (P155, P156).
+  - **L-7:** a scroll from top to bottom in 20 steps records no security-policy violation, and `crossOriginIsolated` stays true.
+
+`git grep -n "opacity: 0" web/src/ui/landing` has two hits, both decoration:
+
+- `Hero.tsx`, the floating chips' entrance (M5);
+- `Privacy.tsx`, the facts' check icons (§6 says only the icons fade).
+
+**No** `layout`, `layoutId`, `AnimatePresence` or `style` prop is used.
+
+**What differs from the plan.** None.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. Longest file `landing.module.css`, 663 lines |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **397.6 kB** (main chunk 203.7 kB, CSS 13.2 kB) |
+| `pnpm e2e --workers=4` | **52 of 52** passed, including L-5, L-7 and the two `page.clock` cases (`landing_view`, `capability_check`) |
+| Frozen check | empty |
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

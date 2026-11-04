@@ -3,7 +3,7 @@
 // untouched (§2.1). Motion lives here and in the sections, never outside
 // ui/landing/ (D-319).
 
-import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
+import { domAnimation, LazyMotion, m, MotionConfig, useReducedMotion } from "motion/react";
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 
@@ -20,6 +20,41 @@ export function MotionScope({ children }: { children: ReactNode }) {
 }
 
 const join = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
+
+/** The brand ease of tokens.css (`--ease`). */
+export const EASE = [0.2, 0.8, 0.2, 1] as const;
+/** M7: how far content rises into place, how long it takes, and the stagger between siblings (§8.2). */
+const RISE_PX = 16;
+const RISE_S = 0.6;
+const STAGGER_S = 0.06;
+/** The share of an element on screen that starts its entrance. */
+const IN_VIEW = 0.3;
+
+/** The props of M7's entrance for the `index`-th of a group of siblings. */
+export type Rise = (index?: number) => {
+  initial?: { y: number };
+  whileInView?: { y: number };
+  viewport?: { once: boolean; amount: number };
+  transition?: { duration: number; ease: typeof EASE; delay: number };
+};
+
+/**
+ * M7, the section entrances: content rises 16 px into place when it comes
+ * into view, once. It only moves, it never fades (rule 2.5), and with
+ * reduced motion it gets no animation at all.
+ */
+export function useRise(): Rise {
+  const reduced = useReducedMotion() === true;
+  return (index = 0) =>
+    reduced
+      ? {}
+      : {
+          initial: { y: RISE_PX },
+          whileInView: { y: 0 },
+          viewport: { once: true, amount: IN_VIEW },
+          transition: { duration: RISE_S, ease: EASE, delay: index * STAGGER_S },
+        };
+}
 
 /** A section's timecode eyebrow (D-317): "00:07  WHAT IT DOES". */
 export function Eyebrow({ time, label }: { time: string; label: string }) {
@@ -45,14 +80,15 @@ export function SectionHead({
   lead?: string;
   center?: boolean;
 }) {
+  const rise = useRise();
   return (
-    <div className={join(styles.sectionHead, center && styles.sectionHeadCenter)}>
+    <m.div className={join(styles.sectionHead, center && styles.sectionHeadCenter)} {...rise()}>
       <Eyebrow {...eyebrow} />
       <h2 className={styles.h2} id={headingId}>
         {heading}
       </h2>
       {lead === undefined ? null : <p className={styles.sectionLead}>{lead}</p>}
-    </div>
+    </m.div>
   );
 }
 
@@ -107,17 +143,31 @@ export function BentoCard({
   title,
   body,
   chips = [],
+  index,
   className,
   children,
 }: {
   title: string;
   body: string;
   chips?: readonly string[];
+  /** The card's place in the grid, for M7's stagger. */
+  index: number;
   className?: string | undefined;
   children: ReactNode;
 }) {
+  const rise = useRise();
   return (
-    <article className={join(cards.card, className)}>
+    <m.article
+      className={join(cards.card, className)}
+      {...rise(index)}
+      // M8: the spotlight follows the pointer, through two CSS variables
+      // written with the CSS object model (the security policy allows it).
+      onPointerMove={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        event.currentTarget.style.setProperty("--x", `${String(Math.round(event.clientX - box.left))}px`);
+        event.currentTarget.style.setProperty("--y", `${String(Math.round(event.clientY - box.top))}px`);
+      }}
+    >
       {children}
       <div className={cards.cardText}>
         <h3 className={cards.cardTitle}>{title}</h3>
@@ -132,6 +182,6 @@ export function BentoCard({
           </ul>
         )}
       </div>
-    </article>
+    </m.article>
   );
 }

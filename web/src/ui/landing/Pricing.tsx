@@ -3,18 +3,21 @@
 // as before. Free has a way in, "Start free"; Creator is not on sale yet
 // (v6implementation D-303), so the section offers no way to buy.
 
+import { m } from "motion/react";
+
 import { PRICES_USD } from "../../config/pricing";
 import { messages } from "../../copy/messages";
 import { LIMITS } from "../../gen/domain";
 import { Check } from "../icons";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
-import { Chip, CtaLink, Eyebrow } from "./parts";
+import { Chip, CtaLink, Eyebrow, useRise } from "./parts";
 
 const CHECK_SIZE = 16;
 
 export function Pricing({ appPath }: { appPath: string }) {
   const pricing = messages.pricing;
+  const rise = useRise();
   return (
     <section className={landing.section} id="pricing" aria-labelledby="pricing-heading" data-testid="pricing">
       <div className={landing.container}>
@@ -26,7 +29,7 @@ export function Pricing({ appPath }: { appPath: string }) {
           <p className={landing.sectionLead}>{pricing.notOnSale}</p>
         </div>
         <div className={styles.plans}>
-          <div className={styles.plan}>
+          <m.div className={styles.plan} {...rise(0)}>
             <h3 className={styles.planName}>{pricing.free.name}</h3>
             <p className={styles.planPrice}>{pricing.free.price(PRICES_USD.free)}</p>
             <ul className={styles.planFeatures}>
@@ -44,8 +47,8 @@ export function Pricing({ appPath }: { appPath: string }) {
             <CtaLink className={styles.planCta} variant="primary" size="small" to={appPath}>
               {messages.landing.cta.startFree}
             </CtaLink>
-          </div>
-          <div className={[styles.plan, styles.planCreator].join(" ")}>
+          </m.div>
+          <m.div className={[styles.plan, styles.planCreator].join(" ")} {...rise(1)}>
             <div className={styles.planTop}>
               <h3 className={styles.planName}>{pricing.creator.name}</h3>
               <Chip>{pricing.creator.tag}</Chip>
@@ -62,7 +65,7 @@ export function Pricing({ appPath }: { appPath: string }) {
             <Chip className={styles.planCta} dot>
               {pricing.creator.soon}
             </Chip>
-          </div>
+          </m.div>
         </div>
         <p className={styles.merchant}>{pricing.merchant}</p>
       </div>

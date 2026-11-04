@@ -52,7 +52,7 @@ export function Features() {
           lead={copy.features.lead}
         />
         <div className={styles.bento}>
-          <BentoCard className={styles.cardTall} title={cards.captions.title} body={cards.captions.body} chips={cards.captions.chips}>
+          <BentoCard index={0} className={styles.cardTall} title={cards.captions.title} body={cards.captions.body} chips={cards.captions.chips}>
             <PhoneFrame className={styles.miniPhone}>
               <LoopVideo clip={LANDING_CLIPS.captionStyles} label={copy.clipLabels.captionStyles}>
                 <div className={styles.captionStill} aria-hidden="true">
@@ -66,7 +66,7 @@ export function Features() {
             </PhoneFrame>
           </BentoCard>
 
-          <BentoCard className={styles.cardWide} title={cards.visuals.title} body={cards.visuals.body} chips={cards.visuals.chips}>
+          <BentoCard index={1} className={styles.cardWide} title={cards.visuals.title} body={cards.visuals.body} chips={cards.visuals.chips}>
             <div className={styles.squareFrame}>
               <LoopVideo clip={LANDING_CLIPS.visuals} label={copy.clipLabels.visuals}>
                 <div className={styles.visualsStill} aria-hidden="true">
@@ -77,13 +77,13 @@ export function Features() {
             </div>
           </BentoCard>
 
-          <BentoCard title={cards.voice.title} body={cards.voice.body}>
+          <BentoCard index={2} title={cards.voice.title} body={cards.voice.body}>
             <div className={styles.art}>
               <Waveform />
             </div>
           </BentoCard>
 
-          <BentoCard title={cards.framing.title} body={cards.framing.body}>
+          <BentoCard index={3} title={cards.framing.title} body={cards.framing.body}>
             <div className={styles.art} aria-hidden="true">
               <div className={styles.cropFrame}>
                 <span className={styles.cropWindow} />
@@ -91,7 +91,7 @@ export function Features() {
             </div>
           </BentoCard>
 
-          <BentoCard className={styles.cardWide} title={cards.editor.title} body={cards.editor.body}>
+          <BentoCard index={4} className={styles.cardWide} title={cards.editor.title} body={cards.editor.body}>
             <div className={styles.art} aria-hidden="true">
               <p className={styles.editorLine}>
                 <span>{mock.editorMock.line}</span>
@@ -103,7 +103,7 @@ export function Features() {
             </div>
           </BentoCard>
 
-          <BentoCard title={cards.transcription.title} body={cards.transcription.body}>
+          <BentoCard index={5} title={cards.transcription.title} body={cards.transcription.body}>
             <div className={styles.art} aria-hidden="true">
               <ol className={styles.transcript}>
                 {mock.transcriptMock.map((word, index) => (
@@ -116,7 +116,7 @@ export function Features() {
             </div>
           </BentoCard>
 
-          <BentoCard title={cards.account.title} body={cards.account.body}>
+          <BentoCard index={6} title={cards.account.title} body={cards.account.body}>
             <div className={styles.art} aria-hidden="true">
               <span className={styles.mailChip}>
                 {mock.mailChip}
@@ -125,7 +125,7 @@ export function Features() {
             </div>
           </BentoCard>
 
-          <BentoCard className={styles.cardWide} title={cards.export.title} body={cards.export.body}>
+          <BentoCard index={7} className={styles.cardWide} title={cards.export.title} body={cards.export.body}>
             <div className={styles.art} aria-hidden="true">
               <div className={styles.exportArt}>
                 {cards.export.chips.slice(0, 2).map((badge) => (

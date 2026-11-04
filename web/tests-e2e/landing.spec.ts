@@ -485,3 +485,43 @@ test("L-4: no sentence on the page says that Offcut is not open", async ({ page 
     expect(text).not.toContain(words);
   }
 });
+
+/** Scrolls from the top of the page to its end in `steps` steps, as a reader would. */
+async function scrollThrough(page: Page, steps = 20): Promise<void> {
+  const height = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  for (let step = 1; step <= steps; step += 1) {
+    await page.evaluate((top) => window.scrollTo(0, top), Math.round((height * step) / steps));
+    await page.waitForTimeout(150);
+  }
+}
+
+test("L-5: with reduced motion the page is complete and still", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installFakeApi(page);
+  await page.goto("/");
+  await scrollThrough(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1000);
+
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
+  await expect(page.getByRole("heading", { name: messages.landing.final.line })).toBeAttached();
+  await expect(page.locator(".pin-spacer")).toHaveCount(0);
+});
+
+test("L-7: scrolling the whole page breaks no rule of the security policy, and the page stays isolated", async ({ page }) => {
+  await installFakeApi(page);
+  await page.addInitScript(() => {
+    window.cspViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+      window.cspViolations?.push(`${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+  await page.goto("/");
+  await capabilityChecked(page);
+  await scrollThrough(page);
+  await page.waitForTimeout(500);
+
+  expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+});

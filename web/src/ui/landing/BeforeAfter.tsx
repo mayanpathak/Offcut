@@ -1,18 +1,21 @@
 // Section 3: before and after (designimplementation §6). The raw take beside
 // the finished short, and the three things that happened in between.
 
+import { m } from "motion/react";
+
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
 import { LoopVideo } from "./LoopVideo";
-import { SectionHead } from "./parts";
+import { SectionHead, useRise } from "./parts";
 
 /** "01", "02": a step's number, as a timeline would write it. */
 const stepNumber = (index: number) => String(index + 1).padStart(2, "0");
 
 export function BeforeAfter() {
   const copy = messages.landing;
+  const rise = useRise();
   return (
     <section className={landing.section} id="before-after" aria-labelledby="before-after-heading">
       <div className={landing.container}>
@@ -33,10 +36,10 @@ export function BeforeAfter() {
         </div>
         <ol className={styles.steps}>
           {copy.beforeAfter.steps.map((step, index) => (
-            <li key={step} className={styles.step}>
+            <m.li key={step} className={styles.step} {...rise(index)}>
               <span className={styles.stepIndex}>{stepNumber(index)}</span>
               {step}
-            </li>
+            </m.li>
           ))}
         </ol>
       </div>
