@@ -16,15 +16,14 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 10 | Dodo Payments' verification. **Read 2026-11-04:** identity and bank approved; the product review is on hold because the live landing page reads as a waitlist ("Offcut is not open yet", no way into the app), with a resubmission allowed once the site is public. Not V6's: live mode is the founding release's (D-285, D-303). The founder decides after V6 | Founder, after P150 | Entry 0.1, Entry 18 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
-| 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
-| 16 | Delete the webhook logger on Render, and its endpoint in Dodo's test mode. P149 used it once more (Entry 18), and it is no longer needed. The endpoint for the deployed site is registered at G 14.6 | Founder | Entry 13, Entry 18 |
-| 17 | Read the legal and pricing words P148 changed (Entry 17), before the merge puts them live. With them: from the merge until the founding release, the account page's two offers lead to Dodo's test mode (D-285), where the pages say Creator is not on sale. Keep the offers, or hide them on the live site until then | Founder, before P150 | Entry 17 |
+| 16 | Delete the webhook logger service on Render and its endpoint in Dodo's test mode (keep the `offcut-api` endpoint, registered 2026-11-04); remove `MAIL_API_KEY` from Render, as the V6 deploy is healthy | Founder | Entry 13, Entry 20 |
+| 17 | V6 went live with P148's legal and pricing words and with the account page's two offers, which lead to Dodo's test mode while the pages say Creator is not on sale (D-285). Keep the offers or hide them until the founding release; decide with open item 10's resubmission | Founder, after V6 | Entry 17, Entry 20 |
 
 ## Known issues for later prompts
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386, the first since: `e2e-media` 26 passed, 1 skipped, nothing flaky | Next CI runs |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -611,3 +610,43 @@ Rust reads 812, as P144 recorded: P148's 816 summed lines from outside `cargo te
 - From Entry 18: the INR price shown to a buyer in India, and the portal's plan change, unread.
 
 **Open, for the founder, in order (G 14).** Open item 17 before the merge. G 14.4, Render's variables, with `BILLING_WEBHOOK_SECRET` a real `whsec_` value. G 14.5, ready and merge. G 14.6, the webhook for the deployed site, the live journey, the saved exports for `verify_mp4.py`, the production read. G 14.8, the tag. The closing entry follows the merge.
+
+## Entry 20 - 2026-11-04 - V6 closed: merged, deployed, tagged
+
+**Merge.** The founder merged pull request 10 as `f948429`, with the same tree as `638eaf5`. Tagged `v6` on `f948429` and pushed by the agent, at the founder's request.
+
+**The `main` run, 41827888094, in three attempts.**
+
+| Attempt | What happened | Done |
+|---|---|---|
+| 1 | `ci` green. `e2e-media` failed one case on both tries, the flake of known issue 3 (above); the deploy jobs were skipped, so nothing went out | The founder agreed to a re-run of the failed job |
+| 2 | `e2e-media` 26 of 26. `deploy-api` pushed the image and called the hook, but Render kept the old instance: the new one stopped at boot with `config error: MAIL_FROM`. Render's value was not a bare address, which `lettre::Address` requires. `deploy-web` waited 300 s for the new version and stopped, so Vercel was not touched | The founder set `MAIL_FROM` to `.env.deploy`'s bare address. `healthz` read `f948429` at 13:14 UTC |
+| 3 | `deploy-web` re-run: green | V6 live |
+
+So the order held: the old API and the old site stayed together while the new API could not start. G 14.4 now says why: the check is the address alone, with no display name, quotes or spaces.
+
+**Step 14.7.** `healthz` through the site reads `f948429`. `/account`, `/auth/callback`, `/legal/privacy` answer 200; `/api/v1/me` without a session 401. The live bundle holds V6's words. Headers on `/`: CSP as TS §24.3, COOP `same-origin`, COEP `require-corp`, `nosniff`, `no-referrer`, Permissions-Policy, HSTS.
+
+**G 14.6, the live journey (founder and agent, test mode).**
+
+| Step | Who | Read |
+|---|---|---|
+| Webhook endpoint for `offcut-api` | Founder | Registered and enabled in test mode (read through Dodo's API); its secret in Render |
+| Sign-in with a real mail | Founder | Signed in on the deployed site |
+| Free export | Founder | `offcut-20261104-1859.mp4`: 720 x 1280, watermark correlation 0.78, -14.1 LUFS; `verify_mp4.py` all 11 pass |
+| Test purchase, $15/month | Founder | A new subscription at Dodo with `metadata.user_id`; the live account page read Creator, so the deployed webhook verified Dodo's signature and the row changed |
+| Creator export | Founder | `offcut-20261104-1916.mp4`: 1080 x 1920, correlation -0.02, -14.2 LUFS; all 11 pass, with the expected length 45,200 ms of the video stream (the audio's 45,205 ms gives one frame more, so it is not the length to pass) |
+| Cancel | Founder, in Dodo | The page read "It ends on 4 December 2026, and then you are on the Free plan": Creator kept to the period end (TS §22.5) |
+| Full refund | Agent, through Dodo's API | `succeeded`, not partial |
+| Account data | Founder | `offcut-account-data.json` downloaded |
+
+**Not reported before the tag, so named here:** the account page after the refund (expected Free), the founder's read of the production `subscriptions` row (expected `canceled`, period end at the refund), and the deletion of the test account. The refund path is proven in test mode on D1 (Entry 18) and in `webhook_idempotency.rs` and `billing_events.rs`.
+
+**Found, not fixed.**
+- `web/vercel.json`'s rule for every path but `assets/` and `ort/` sets `Cache-Control: no-cache`, and so overrides the API's `no-store` on `/api/v1/*` through the site. It is from V1. A browser still revalidates, but responses that carry tokens should be `no-store`. For V6.1.
+- Known issue 3, above, for V6.1.
+- From Entries 18 and 19: the INR price shown to a buyer in India; the portal's plan change; two stale comments in frozen crates.
+
+**Open after V6.** Open item 10: Dodo's product review, on hold as the live site read as a waitlist; with V6 live, the site now has free accounts and exports. Items 16 and 17 above. Then V6.1 opens its own branch from `main` (BP §8A.0).
+
+**Final counts.** Rust 812 / 0 / 4; Vitest 522; `pnpm e2e` 45; verifier self-test 16; media 106 passed, 1 skipped, on D1. Every box of v6implementation §20 is ticked, each with its evidence.
