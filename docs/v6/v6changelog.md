@@ -14,17 +14,17 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
-| 10 | Dodo Payments' verification: under review as an individual, stated as up to 72 hours. Read TE-9's cases in test mode | Founder | Entry 0.1, TE-9 |
+| 10 | Dodo Payments' verification. **Read 2026-11-04:** identity and bank approved; the product review is on hold because the live landing page reads as a waitlist ("Offcut is not open yet", no way into the app), with a resubmission allowed once the site is public. Not V6's: live mode is the founding release's (D-285, D-303). The founder decides after V6 | Founder, after P150 | Entry 0.1, Entry 18 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 15 | Before V6's merge: Vercel blocks a production deploy from this repository while it is private (Entry 5). Stay public through merges, or test merging with the Gmail address (branch `vercel-email-check`) | Founder | Entry 5 |
-| 16 | Delete the webhook logger on Render, and its endpoint in Dodo's test mode. The endpoint for the deployed site is registered at G 14.6 | Founder | Entry 13 |
+| 16 | Delete the webhook logger on Render, and its endpoint in Dodo's test mode. P149 used it once more (Entry 18), and it is no longer needed. The endpoint for the deployed site is registered at G 14.6 | Founder | Entry 13, Entry 18 |
 | 17 | Read the legal and pricing words P148 changed (Entry 17), before the merge puts them live. With them: from the merge until the founding release, the account page's two offers lead to Dodo's test mode (D-285), where the pages say Creator is not on sale. Keep the offers, or hide them on the live site until then | Founder, before P150 | Entry 17 |
 
 ## Known issues for later prompts
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain | Next CI runs |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386, the first since: `e2e-media` 26 passed, 1 skipped, nothing flaky | Next CI runs |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -520,3 +520,51 @@ The title, line 127's assertion, and one line closing the dialog before line 134
 - `messages.ts` is at 679 of 700 lines.
 
 **Counts.** Vitest 522, up from 500; `pnpm e2e` 45, up from 33; Rust 816 / 0 / 4, every `test result` line of `pnpm test` summed: no Rust file has changed since P144's 812, so the 4 are a difference of counting, not new tests; media `export-free` 13, up from 10; copy pending 0, down from 2. Frozen check empty. **Push 2**, not waited on.
+
+## Entry 18 - 2026-11-04 - P149: TE-9, the M1 list's local rows
+
+**Push 2's CI.** Run 41602738386 is green: `ci` (Vitest 522, `pnpm e2e` 45, every Rust test) and `e2e-media` (26 passed, 1 skipped, nothing flaky). The deploy jobs were skipped, as on any branch. Nothing to fix.
+
+**Changed.** `docs/v6/experiments.md`'s TE-9 and this entry. No product code, test or fixture: no reading asked for one.
+
+**TE-9, as far as test mode allows.** In `experiments.md`. In short: a test purchase made on D1 turned the next token Creator. To get there, Dodo's real deliveries were forwarded to the local API byte for byte, with Dodo's own signatures. Also read: a real `subscription.plan_changed` applied as D-301 says, a real partial refund that ends nothing (D-277), and a cancel that keeps Creator to the period end. Not producible: `subscription.past_due`, as Dodo sends `on_hold`. Left for G 14.6: the deployed site's own endpoint, a delivery to a sleeping host, and whether the portal offers a plan change.
+
+**The M1 walk (BP §8.3), on D1.** Set up as G 13 says: the API on 8080 with `APP_ORIGIN=http://localhost:5173`, the test seed's key, and `.env.deploy`'s five mail values; the web app through `pnpm --filter web dev` with `ci.yml`'s public key, checked against the seed before start. The founder walked it. The local database records what the walk did:
+
+| Row | Ticked by | Evidence |
+|---|---|---|
+| Capability detection and the unsupported page | Walk | One browser refused with `UNSUPPORTED_AAC_DECODE`; Chrome or Edge passed |
+| Input probe and actionable rejections | Founder, on V1-V5's proof | Not exercised: no `clip_rejected` |
+| One-time model download | Founder, on V1-V5's proof | Not exercised: this origin had the model, so no `model_download` |
+| Local transcription with word timestamps | Walk | WebGPU, 77 s for a 79 s clip |
+| Pattern detector | Walk, in part | One number and one keyword. Lists and from-to on V1-V5's proof |
+| Voice cleanup and loudness, duration unchanged | Walk | -14.1 LUFS; both exports 78.933 s |
+| Captions in Clean, Bold, Tech | Founder, on V4's proof | Clean in the walk; no style was picked |
+| NumberReveal, ListReveal, FromTo, KeywordPop | Walk, in part | NumberReveal and KeywordPop. The others on V1-V5's proof |
+| 9:16 framing | Walk, in part | A landscape clip cropped; the offset not moved, no portrait clip |
+| Preview with synced audio | Walk | `preview_played` |
+| Review UI | Founder, on V4's proof | No `review_action`: no word edited, no event turned off |
+| Export: Creator 1080 x 1920, Free 720 x 1280 with watermark | Walk | Both files pass `verify_mp4.py`, all 11 checks |
+| "What we changed" summary | Walk | Shown after each export (founder) |
+| Account: magic link, entitlement cache, usage receipt | Walk | A real mail signed in; a `free` receipt, then a `creator` receipt |
+| Checkout, Creator plan | Walk, locally | Guide G 13 leaves this to G 14.6; it could be walked here because of the forwarding. G 14.6 still walks it on the deployed site |
+| Settings page "What leaves your device" | Founder, on V4's proof | Not exercised: it sends no event |
+| Allowlisted analytics, 19 events | Walk, in part | 11 of 19 arrived. The 8 not seen need a rejection, a download, an edit, a failure, a cancel, an answer, or clearing local data. The allowlist tests pass; the formal proof is V8's |
+
+**Differs from the plan.**
+
+| What | Why |
+|---|---|
+| The local API also took `.env.deploy`'s six test-mode billing values, not only the five mail values G 13 names | The boot stops on a secret that is not `whsec_` (P144), and `.env` holds placeholders |
+| The checkout row walked locally, through the forwarded deliveries | The logger of G 8.2 records the signature, so a real delivery could be replayed unchanged. G 14.6 still walks it on the deployed site |
+| Rows the walk did not reach, ticked by the founder on earlier versions' proof | The founder's decision, 2026-11-04. Each is named in the table above |
+
+**Afterwards.** The test subscription was cancelled through the API; no test subscription is running. The two servers and the forwarding script are stopped. Its scripts lived in the session's scratchpad, printing no key, address, name, id or link.
+
+**Open.** Open item 10 now reads Dodo's answer of 2026-11-04: identity and bank approved; the product on hold, as the live site reads as a waitlist. Open item 16: the logger can go. Open item 17 is unchanged and is needed before P150's merge.
+
+**Found, not fixed.**
+- The test purchase was charged in INR (1,476.89), not 15 USD: Dodo shows a local currency to a buyer in India, while the pricing section names dollars. Read again in live mode before the founding release.
+- With `do_not_bill`, a plan change from monthly to annual keeps the monthly cycle's date, so the row reads annual with a period end a month away. That is correct for what was paid. A portal change, if the portal offers one, may bill differently: G 14.6.
+
+**Counts.** Unchanged from Entry 17, as no code changed: Vitest 522, `pnpm e2e` 45, Rust 816 / 0 / 4, media `export-free` 13. Frozen check empty. Not pushed: the next push is P150's.

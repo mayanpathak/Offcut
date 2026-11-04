@@ -26,13 +26,39 @@ Decision: `lettre` over SMTP on 2525 stands (D-252). D-253's stop is not met.
 
 Quota: Brevo's free plan, 300 a day against the 100 the pass asks.
 
-## TE-9: the merchant. Dodo Payments, test mode, 2026-11-03
+## TE-9: the merchant. Dodo Payments, test mode, 2026-11-03 and 2026-11-04
 
 | Reading | Result |
 |---|---|
 | Hosted checkout with `metadata`; a customer portal | Both work, through `adapter.rs` |
-| `Activated`, `Renewed`, `PastDue`, `CancelScheduled`, `Canceled`, `Refunded` | All six observed, from real deliveries |
-| A timed-out webhook retried | A 500 is retried after about 6 s, with the same `webhook-id` |
-| A test purchase updates the row and the next token says Creator | Through the fake provider only so far. Read on the deployed site at G 14.6 |
+| `Activated`, `Renewed`, `PastDue`, `CancelScheduled`, `Canceled`, `Refunded` | All six observed, from real deliveries (P144) |
+| A timed-out webhook retried | A 500 is retried after about 6 s, with the same `webhook-id`. A true timeout, from a sleeping host, is read on the deployed site at G 14.6 |
+| A test purchase updates the row and the next token says Creator | **Yes, on D1, 2026-11-04 (P149).** Below |
+| A partial refund | `refund.succeeded` with `is_partial: true`; ends nothing (D-277). Below |
+| `subscription.plan_changed` | Real, and applied (D-301). Below |
+| `subscription.past_due` | Not produced: a declined renewal sends `subscription.on_hold` (P144). Both are `PastDue` |
+| Can the customer portal change the plan? | Not read. If it can, the event is handled; read at G 14.6 or whenever the founder opens the portal |
 
-Approval for live mode is not part of this: it belongs to the founding release (`buildplan.md` §8A.6).
+### P149: the whole purchase on D1, with Dodo's own deliveries
+
+A local server gets no webhook, so the throwaway logger of G 8.2 (still registered in test mode) received each delivery, and a script in the session's scratchpad forwarded each one to the local API on port 8080 within seconds: the same bytes, the same `webhook-id`, `webhook-timestamp` and `webhook-signature`. So the local server verified Dodo's real signatures, inside the 5-minute window. Nothing was signed by us. Before that, a real delivery with one byte changed was refused with 401, and the exact one was accepted.
+
+| Step | Who | Read |
+|---|---|---|
+| Sign in with a real mail; Free export | Founder | `signin_step` `link_requested`, `completed`; a `free` receipt; the file passes `verify_mp4.py --profile free` (720 x 1280, watermark correlation 0.78) |
+| The prompt's offer, $15/month, Dodo's test card | Founder | `upgrade_prompt` `shown`, `clicked`; `checkout_step` `started` |
+| Dodo's deliveries | Script | `subscription.updated`, `active`, `renewed`, `payment.succeeded` within 2 s, each retried 6-8 s later with the same id. Every subscription event carries `metadata.user_id` |
+| The local row | Agent, local database | `creator`, `monthly`, `active`, period end 2026-12-04, the owner from `metadata`. Three `webhook_events` rows: a retry is a duplicate, and `payment.*` is not stored |
+| The return | Founder | `checkout_step` `returned_success`, after the row was written |
+| The next export | Founder | A `creator` receipt, so the token said Creator; the file passes `verify_mp4.py --profile creator` (1080 x 1920, watermark correlation 0.06) |
+| Plan change, monthly to annual, `do_not_bill`, through the API | Agent | `subscription.plan_changed`, with `updated`, `renewed` and a payment of 0. The row reads `annual`, period end still 2026-12-04: Dodo keeps the cycle and charges the year then |
+| Cancel, through the API | Agent | `subscription.cancelled` and `updated`. The row reads `canceled`, period end 2026-12-04: Creator until then (TS §22.5) |
+| A partial refund, 5 USD of a P144 payment, through the API | Agent | The API and the delivery both say `is_partial: true`; the same 16 fields as the full refund. The local server answered 200 and changed nothing |
+
+**What this shows.** TE-9's pass is met in test mode: all six kinds, a retried delivery with the same id, and a purchase that turns the next token Creator. What is left for G 14.6: the same purchase on the deployed site with its own endpoint, a delivery to a sleeping host, and the portal's options.
+
+**Found.** The founder's test purchase was charged **1,476.89 INR**, not 15 USD: Dodo shows a local currency to a buyer it places in India. The pricing section names dollars. Worth reading in live mode before the founding release.
+
+**Afterwards.** No test subscription is running: the three in test mode read `cancelled`, `cancelled`, `failed`.
+
+Approval for live mode is not part of this: it belongs to the founding release (`buildplan.md` §8A.6). On 2026-11-04 Dodo approved the founder's identity and bank, and put the product review on hold because the live site reads as a waitlist (open item 10).
