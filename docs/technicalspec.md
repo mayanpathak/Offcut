@@ -105,9 +105,9 @@ RENDER (one free web service, Docker image `offcut-api`)
     └── /api/v1/account/*            delete, export
 
 MANAGED POSTGRES (free tier, external to Render; TE-6)   users, sessions, subscriptions, receipts, events
-EMAIL PROVIDER (HTTPS API, free tier; TE-8)              magic-link delivery
+EMAIL PROVIDER (SMTP relay, Brevo free tier; TE-8)      magic-link delivery, STARTTLS on port 2525 (V6, D-248, D-252)
 AI PROVIDER (HTTPS API, free tier; TE-15; v1.2)          edit-plan completions, called by the server only
-MERCHANT OF RECORD (TE-9)                                hosted checkout, customer portal, webhooks
+MERCHANT OF RECORD (Dodo Payments; TE-9)                 hosted checkout, customer portal, webhooks; test mode until the founding release (D-285)
 UPTIME MONITOR (free tier)                               GET /api/v1/healthz every 5 min
 ```
 
@@ -121,7 +121,7 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 - **Postgres provider:** the only durable server-side state.
 - **Asset CDN:** immutable, content-hashed public files. Receives no user data.
 - **Merchant of record:** card data, tax, invoices, refunds, subscription lifecycle. Source of truth for subscription state (PS §16).
-- **Email provider:** delivers one template (magic link).
+- **Email provider:** delivers one template (magic link). Brevo's SMTP relay, through `lettre` (V6, D-248).
 - **The backend explicitly does not:** transcode, transcribe, render, store or proxy media; store or log transcripts, captions, edits, file names or paths (it forwards the transcript of a plan request to the AI provider and forgets it); validate plans against user edits (the client does, §40.4); hold prices; run scheduled jobs outside its own process; keep in-memory state that must survive a restart (Render restarts free services at any time).
 
 ---
@@ -144,7 +144,7 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 | `crates/offcut-wasm-{core,render}` | `wasm-bindgen` exports, JS-value conversion | the pure crates, `serde-wasm-bindgen`, `web-sys` | product rules (no branching on domain values beyond argument decoding) |
 | `crates/offcut-entitlement` | Token format, verification; signing behind feature `sign` | `ed25519-dalek`, `offcut-types` | network, storage |
 | `crates/offcut-api-types` | Every client-server DTO and the analytics allowlist | `serde`, `ts-rs`, `offcut-types` | server or client code |
-| `server` (`offcut-api`) | Routes, DB access, signing, provider adapters | Postgres, email API, merchant API, AI provider API (v1.2) | any media handling; storing or logging a transcript; client crates other than `offcut-types`, `offcut-api-types`, `offcut-entitlement` and `offcut-plan` (v1.2: catalog, prompt, schema; §40.7) |
+| `server` (`offcut-api`) | Routes, DB access, signing, provider adapters | Postgres, SMTP relay, merchant API, AI provider API (v1.2) | any media handling; storing or logging a transcript; client crates other than `offcut-types`, `offcut-api-types`, `offcut-entitlement` and `offcut-plan` (v1.2: catalog, prompt, schema; §40.7) |
 | `crates/offcut-plan` (v1.2, V4) | Plan types' logic: catalog, prompt and schema generation, validation, rules producer, time-map construction | `offcut-types`, `offcut-text` (tokenize, `parse_quantity`, `format_quantity`), `serde`, `thiserror`; `serde_json` behind the default feature `prompt` (v4implementation D-122) | `web-sys`, `wasm-bindgen`, `wgpu`, network, clocks, randomness, `offcut-scene`, `offcut-render` |
 | Vercel config | Headers, rewrite | Render origin | functions, middleware, edge config |
 
@@ -198,7 +198,8 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 |---|---|---|
 | `axum`, `tokio`, `tower`, `tower-http` | HTTP service | Pinned |
 | `sqlx` (Postgres, rustls, offline query cache) | DB access with compile-time-checked SQL | Pinned; `.sqlx/` committed |
-| `reqwest` (rustls) | Email and merchant API calls | Pinned |
+| `reqwest` (rustls, `rustls-no-provider`, `ring` installed once in `main.rs`) | Merchant API calls (V6, D-281) | Pinned |
+| `lettre` (`smtp-transport`, `tokio1-rustls`, `ring`; no default features) | Magic-link mail over SMTP with STARTTLS (V6, D-248, D-249) | Pinned |
 | `ed25519-dalek` | Entitlement and access-token signing | Pinned |
 | `tracing`, `tracing-subscriber` (JSON) | Logs to stdout | Pinned |
 | `uuid` (v7), `time` | Ids, timestamps | Pinned |
@@ -211,8 +212,8 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 | Render free web service (prebuilt Docker image from GHCR) | API | TE-11 |
 | Managed Postgres, free tier. Candidates: Neon, Supabase | Server state | TE-6 decides |
 | Object storage with free egress. Candidates: Cloudflare R2, Hugging Face Hub | Model files, demo video, sample clip | TE-7 decides |
-| Transactional email API, free tier. Candidates: Resend, Brevo | Magic links | TE-8 decides |
-| Merchant of record. Candidates: Paddle, Lemon Squeezy, Dodo Payments (PS A-4) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 decides |
+| Transactional email, free tier: **Brevo's SMTP relay**, port 2525, as Render's free services block 25, 465 and 587 (V6, D-252) | Magic links; 300 a day | TE-8 (cut down by the founder, `docs/v6/experiments.md`) |
+| Merchant of record: **Dodo Payments** (PS A-4; founder, 2026-11-02) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 (test mode read in V6; live approval belongs to the founding release, BP §8A.6) |
 | Free uptime monitor (candidate: UptimeRobot) | PS §20.1 uptime monitor; keeps the API warm | TE-11 |
 | GitHub Actions + GHCR | CI, image registry | TE-10 |
 
@@ -1070,6 +1071,7 @@ everything ─► gen (types only)
 - `workers/protocol.ts` imports only `gen`; workers and `pool.ts` both import it, never each other.
 - `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call, and the two pairs of §2 "Edges added in V2" (`import-clip.ts` to `run-pipeline.ts`, `start-export.ts` to `control-preview.ts`); checked by a `boundaries` rule.
 - Stores never import use-cases; use-cases write stores through exported action functions only.
+- **Edges added in V6.** `start-app.ts` to `restore-session.ts`: `connectAccount()` runs first in `start-app.ts` and hands `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links, so `net` and `persistence` import no store (v6implementation D-306). `blockers.ts` to `entitlement.ts`, as §12.5 asks `effective()` (D-309). `offcut-api` uses `getrandom` directly, as a wrapper in `deny.toml`, for the 32 random bytes of a link and a refresh token (D-257).
 
 ---
 
@@ -1140,6 +1142,8 @@ main.tsx → startApp()
   → modelManager.inspect()                  ⇒ model: unknown → absent | partial | ready
   → restoreClip()                           (C-13)
 ```
+
+As built in V6 (v6implementation D-289, D-296, D-306, D-308): `connectAccount()` from `restore-session.ts` runs first, before anything else, as the callback page may verify when it mounts; `restoreSession()` starts at `start-app.ts`'s marker and nothing waits for it (INV-3). `main.tsx` tells `startApp` whether to restore: on `/auth/callback` it does not. Refresh runs after `ready()`, under `navigator.locks`, with a 25 s budget (D-297).
 
 **C-2. Drop a clip and validate (J2, J5)**
 ```text
@@ -1243,6 +1247,8 @@ no edit changes the audio, the clip duration or any timestamp
   → C-9
 ```
 
+As built in V6 (v6implementation D-290, D-294, D-309, D-310, D-314): the three account arms open a dialog from a button that stays enabled; `B_ENTITLEMENT_EXPIRED` that cannot be renewed is `gateFailure`, shown by the export-failed card with no `export_started`; the last Free export's question is a dialog of its own; the token is reloaded from `entitlement-repo` first. While the sign-in or last-export dialog is open, the editor's shortcuts stand aside (D-311).
+
 As built in V5 (v5implementation §13, D-229, D-231): the sign-in and limit arms are V6's. `B_STORAGE_LOW` is evaluated inside C-9, after a cache miss, by `forExport({ freeBytes, neededBytes })`, since `navigator.storage.estimate()` is asynchronous and the button reads `forExport()` while drawing. A blocked export returns to `idle` and says why in the `export-status` line beside the button, with nothing swept: it is not an `ErrorPanel`, as nothing failed.
 
 **C-8. Magic-link sign-in (J9)**
@@ -1262,6 +1268,8 @@ user opens the emailed link (new tab): /auth/callback?token=…
 original tab: broadcast.on("signed_in") → restoreSession() ⇒ link_sent → signed_in → dialog closes; user clicks Export again
 original tab closed: /app in the new tab → restoreClip() (C-13)
 ```
+
+As built in V6 (v6implementation D-254, D-259, D-295): the magic-link request and the verify are one attempt each, after `ready()`, since a link is single-use and a retried verify would read a good link as used. A relay failure is 503 `email_unavailable` → `E_AUTH_EMAIL_UNAVAILABLE` in the dialog, not a waking API (D-287). The dialog says to open the link on this computer (D-302).
 
 **C-9. Render and export (J10)**
 ```text
@@ -1318,6 +1326,8 @@ merchant → browser: /account?checkout=success | cancel
       ✗ timeout → messages.E_BILLING_PENDING (retry button; webhook may still arrive)
 <AccountPage "Manage subscription"> → openBillingPortal() → GET /api/v1/billing/portal → navigate
 ```
+
+As built in V6 (v6implementation D-312 to D-315): the prompt comes once per watermarked export, until dismissed; "Make another clip" is in `after_export` only. `startCheckout` needs a session (`forCheckout`), sends the analytics queue before leaving (one request, not awaited), and on D-300's 403 opens the portal instead. The account page offers the two plans only on Free with no live subscription, and "Manage subscription" whenever a subscription row exists. The top bar's "Account" opens `/account` in a tab of its own, as leaving `/app` would let go of the clip until V7's `restoreClip`. The wait for Creator reads again after a failed read and stops when the session has ended.
 
 **C-12. Cancel**
 ```text
@@ -1389,10 +1399,11 @@ effects: import, processing, preview, review never call the API (INV-3)
 **C-19. Merchant webhook (server)**
 ```text
 POST /api/v1/billing/webhook → billing::webhook::handle
-  → adapter.verify_signature(headers, raw_body)     ✗ 401
-  → adapter.parse_event(raw_body) → BillingEvent     unknown type → 200 (ignored)
+  → adapter.verify_signature(headers, raw_body, now) ✗ 401
+  → adapter.parse_event(headers, raw_body) → BillingEvent   unknown type → 200 (ignored)
   → tx: webhook_events.insert(provider_event_id)     ✗ unique violation → 200 (already processed; no state change)
-        subscriptions.apply(event)  (§22.5)
+        resolve the owner (D-275); none, or a deleted user → 200, nothing changed (D-272, D-284)
+        subscriptions.apply(event)  (§22.5); a whole refund of a live subscription also cancels it at the provider
   → 200
 ```
 
@@ -1743,7 +1754,7 @@ Input rejections (`REJECT_*`) are listed with triggers and tests in §15.3. Unsu
 | `auth-store.ts` | Auth state, email, in-memory access token | `start-app.ts`, sign-in/out use-cases, `delete-account.ts` |
 | `entitlement-store.ts` | Latest entitlement token and decoded claims | `start-app.ts`, `complete-sign-in.ts`, `start-export.ts`, `confirm-checkout.ts`, `receipt-outbox.ts` callback |
 
-Stores hold no derived data that another store owns. `entitlement/entitlement.ts::effective()` is the only place that combines the token with the outbox length.
+Stores hold no derived data that another store owns. `entitlement/entitlement.ts::effective()` is the only place that combines the token with the outbox. As built in V6 (v6implementation D-267), it subtracts only the outbox rows recorded as Free exports of the token's own account (`sub`), so a Creator export never spends a Free count and another account's rows never count against this one. `entitlement-store` reads claims without verifying, for display and blockers only, and an undecodable token counts as none (D-292); the worker still verifies (INV-9).
 
 ### 12.2 State machines
 
@@ -1829,6 +1840,12 @@ As built in V5 (v5implementation D-230, D-231): the table is unchanged. A token 
 | link_sent → anonymous | dialog closed |
 | anonymous_offline → signed_in / anonymous | `online` event then refresh |
 | signed_in → anonymous | sign-out, `E_AUTH_SESSION_EXPIRED`, account deleted |
+| unknown, anonymous → signed_in (V6, D-295) | verify ok in this tab |
+| anonymous → signed_in (V6, D-295) | `signed_in` broadcast, then refresh ok |
+| unknown, anonymous_offline → link_sent (V6, D-295) | magic-link request accepted: the dialog can be sent from either |
+| link_sent → link_sent (V6, D-295) | a resend |
+
+As built in V6: the callback tab does not restore a session (D-296): `main.tsx` tells `startApp` whether to restore, by the path (D-308), so a refresh's answer cannot overwrite the session that verify has just made. A sign-out clears the entitlement token; a lost session does not, so offline exports work until the token's `exp` (D-291).
 
 Server-side subscription status transitions are in §22.5.
 
@@ -1844,7 +1861,7 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 - `export: rendering → rendering`, `done → rendering` (a new export starts from `idle` with a new `ExportId`).
 - `export: gating → rendering` while clip state is not `ready`.
 - `preview: detached → playing`.
-- `auth: anonymous → signed_in` without `link_sent` or a refresh.
+- `auth: anonymous → signed_in` without a verify in this tab or a refresh: the trigger names which (V6, D-295).
 
 ### 12.4 Cross-machine rules
 
@@ -1873,6 +1890,8 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 | `B_NO_FREE_EXPORTS` | export | `plan == Free` and `effective().freeExportsRemaining == 0` |
 
 `B_MODEL_NOT_READY` is not a blocker: the pipeline waits in `processing(waitingModel = true)`.
+
+As built in V6 (v6implementation D-290, D-309, D-310): `forExport()` without `room` asks, after V5's three, the account: `B_NOT_SIGNED_IN` when not signed in and no unexpired token; `B_ENTITLEMENT_EXPIRED` when signed in with none; `B_NO_FREE_EXPORTS` on Free with `effective()` at 0. `disablesExport` disables the button only for `B_EXPORT_IN_PROGRESS` and `B_PIPELINE_NOT_READY`; the three account blockers let the click through, to open the sign-in dialog, renew the token, or open the last-export dialog. `forExport(room)`, in `gating` after a cache miss, asks only the room: the account was asked at the gate, and an export that has begun is not sent back to it. A token that cannot be renewed at the gate is `export-store`'s `gateFailure`, shown by the export-failed card; no machine state changes, and no `export_started` is sent. `forCheckout()` needs a session: a cached token is not one. `startExport` reloads the token from `entitlement-repo` before asking (D-294), as the repository is the truth across tabs. The counter sits outside the button's accessible name, which tests match as "Export" exactly (D-302).
 
 As built in V5 (v5implementation D-229): `forExport(room?)`. Without `room` it leaves `B_STORAGE_LOW` out, so the button is not disabled by a reading that may be stale; with `{ freeBytes, neededBytes }` it evaluates `freeBytes < neededBytes x 1.2`. `startExport` calls it after a cache miss, the cached file's bytes counted as free. A browser that gives no estimate is not blocked. V6 appends the last three codes.
 
@@ -1917,6 +1936,8 @@ runCapabilityCheck(): Promise<CapabilityReport>          // platform/capability.
 
 `gpuVendor ∈ {intel, amd, nvidia, apple, qualcomm, other, unknown}` from `adapter.info.vendor`; `memoryBucket ∈ {lt4, gb4, gb8plus, unknown}`; `platform ∈ {windows, macos, linux, chromeos, android, other, unknown}` from `navigator.userAgentData?.platform`. No other device attribute is read (PS §18: no fingerprinting beyond enums).
 
+As built in V6 (V6 CL Entry 12, founder's decision of 2026-11-03): `storageAnswer` asks check 5 once more when its first try has not answered in its time, and either try's answer counts; a no or a rejection is final at once. The other checks keep one wait. With a slow disk the run can take up to 4 s, past PS §9.3's 3 s; a normal run is unchanged. Reason: a capable browser on a busy laptop was told it cannot keep files.
+
 ### 13.3 Key components
 
 As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two rows. Components that later versions add (`SignInDialog`, `UpgradePrompt`, `RecentClips`) keep their rows of the version that builds them.
@@ -1936,7 +1957,9 @@ As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two 
 | `StylePanel` → `StylePicker` | clip store, preview store | `setStyle`, `setHighlightNumbers`; `styleThumbnails` |
 | `PlanItemList` → `CutsSection` | clip store (plan, overrides) | `toggleEvent`, `controlPreview.seek`; the empty state `NO_EVENTS_FOUND` (D-154); `CutsSection` renders nothing in V4 |
 | `FramingPanel` → `CropOffsetControl` | clip store | `setCaptionPosition`, `setCropOffset` |
-| `ExportButton` | export store, `entitlement.effective()`, blockers | `startExport` |
+| `ExportButton` → `LastExportDialog` (V6) | export store, `entitlement.effective()`, blockers | `startExport`, `confirmLastExport`, `closeGate`; the counter outside the button's accessible name; disabled only by D-290's two blockers |
+| `SignInDialog` → `SignInForm`, in `GateDialog` (V6) | auth store | `requestMagicLink`; the Free/Creator limits before the email field; "open the link on this computer" (D-302) |
+| `UpgradePrompt` (V6) | export store, entitlement store | `startCheckout`, "Make another clip" (`after_export` only), dismiss; non-modal, beside `ExportOutcome`, takes no focus (D-302, D-314) |
 | `ExportProgress` (the pill, D-189) | export store | `cancelJob("export")` |
 | `ChangeSummary`'s `ExportOutcome`, in `SidePanel`'s slot above the tabs (v5implementation D-232) | export store | none; closing is local, keyed by `exportId` |
 | `PostExportQuestion` (D-234) | export store | `answerPostExport` |
@@ -1945,6 +1968,8 @@ As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two 
 | `WhatLeavesTable` | `gen/api.ts::ANALYTICS_EVENT_DOCS` | none |
 | `RejectionPanel`, `ErrorPanel` (by context, D-190) | clip/export store failure | retry, `reloadPreview`, undo; `failureShown` sends `client_error` once |
 | `NotifyMeForm` | none | `submitNotifyMe` |
+| `AuthCallbackPage` (V6) | auth store | `completeSignIn` once, after `ready()`; never refreshes (D-296) |
+| `AccountPage` (V6) | auth store, entitlement store | `startCheckout`, `confirmCheckout`, `openBillingPortal`, `exportAccountData`, `deleteAccount` behind a question, sign-out (D-315) |
 
 The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`, `SegmentedControl`, `Skeleton`, `Slider`, `Spinner`, `Switch`, `Tabs`, `Toast`, `Tooltip`) take their values from `ui/styles/tokens.css` only (D-179, D-181); no component library is used.
 
@@ -1953,7 +1978,7 @@ The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`,
 - **Copy.** Every PS §10 microcopy string, every rejection, error, blocker and unsupported message is a key in `copy/messages.ts`. Numbers inside copy (90 seconds, 3 exports, prices, model size) are interpolated from `gen/domain.ts` limits, `config/pricing.ts` and `config/model-manifest.json`; none is typed into a sentence. Enforced by `messages.test.ts` (asserts no digit literals in message templates except through placeholders).
 - **Limits before the click (PS §10 J9).** `ExportButton` renders the counter and plan limits in its idle state; `SignInDialog` renders the Free/Creator comparison before the email field. `export-free.spec.ts` asserts the counter is visible before the first click.
 - **No upgrade prompts during processing or editing (PS §11).** `UpgradePrompt` renders only for placements `after_export` and `limit_reached`; the placement type has no other member.
-- **One prompt per export.** Dismissal is stored in `export-store` for that `ExportId`.
+- **One prompt per export.** Dismissal is stored in `export-store` for that `ExportId`. As built in V6 (D-314): once per watermarked export, until dismissed; at the limit, when Export is pressed, and a press while it is showing adds nothing.
 - **Edits are optimistic and local.** No edit ever awaits the network.
 
 ### 13.5 Acceptance targets
@@ -2857,14 +2882,14 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | Route | Auth | Purpose | Body limit | Rate limit | Idempotency |
 |---|---|---|---|---|---|
 | `GET /healthz` | none | Liveness; touches no DB | none | 60/min per IP | n/a |
-| `POST /auth/magic-link` | none | Create link, send email; always 202 (no account enumeration) | 1 kB | 3 per 15 min per email; 10/h per IP | New request invalidates earlier unused links for that email |
+| `POST /auth/magic-link` | none | Create link, send email; 202 for any address (no account enumeration); 503 `email_unavailable` when the mail relay fails, sent inside the request with an 8 s timeout (V6, D-254) | 1 kB | 3 per 15 min per email; 10/h per IP | New request invalidates earlier unused links for that email |
 | `POST /auth/verify` | none | Consume link; create user if new; set refresh cookie; return `SessionResponse` | 1 kB | 10/min per IP | Token is single-use |
 | `POST /auth/refresh` | refresh cookie + CSRF header | Rotate refresh token; return `SessionResponse` | 0 | 30/min per IP | Previous token accepted for 30 s (multi-tab), then reuse revokes the session |
 | `POST /auth/logout` | refresh cookie + CSRF header | Revoke session; clear cookie | 0 | 30/min per IP | Idempotent |
 | `GET /me` | bearer | `MeResponse` | none | 60/min per user | n/a |
 | `GET /entitlement` | bearer | Fresh `EntitlementResponse` | none | 60/min per user | n/a |
 | `POST /usage/receipts` | bearer | Record one export; return fresh token | 1 kB | 30/min per user | `export_id` primary key; repeats return the same shape and change nothing |
-| `POST /billing/checkout` | bearer | Hosted-checkout URL for an `Offer` | 1 kB | 10/min per user | none |
+| `POST /billing/checkout` | bearer | Hosted-checkout URL for an `Offer`; 403 `forbidden` for an `active` or `past_due` subscription (V6, D-300) | 1 kB | 10/min per user | none |
 | `GET /billing/portal` | bearer | Customer-portal URL | none | 10/min per user | n/a |
 | `POST /billing/webhook` | provider signature over raw body | Apply subscription events | 64 kB | 120/min per IP | `provider_event_id` primary key; replays return 200 and change nothing |
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
@@ -2884,7 +2909,8 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 - **Refresh token.** 32 random bytes; stored only as a hash (PS §17); cookie `offcut_rt; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=5184000` (60 days; assumption, M1.7); rotated on every use.
 - **CSRF.** The two cookie-authenticated routes require header `X-Offcut-Csrf: 1` and an `Origin` header equal to `APP_ORIGIN`. All other authenticated routes use the bearer token and ignore cookies.
 - **CORS.** The API emits no CORS headers. Browsers reach it only same-origin through the Vercel rewrite.
-- **Email normalization.** Trim + lower-case in `auth/magic_link.rs`; `users.email` keeps the address as given (PS §16).
+- **Email normalization.** Trim + lower-case in `auth/magic_link.rs`. `users.email` holds the normalized address, as `magic_links` keeps only the normalized one (V6, D-260; PS §16).
+- **Rotation (V6, D-258, D-297).** A session's previous refresh hash stays valid for 30 s from the first rotation, however often it is used, and every accepted refresh rotates and sends a new cookie; a use in the grace does not move or extend the previous hash. After the grace, a reuse revokes the session. The client refreshes under `navigator.locks` across tabs, after `ready()`, with a 25 s retry budget, so a retry never lands outside the grace. A session ends 60 days after sign-in, however active (no sliding).
 
 ### 22.3 Entitlement rules (`entitlement/issue.rs`, the only place)
 
@@ -2913,7 +2939,7 @@ issue(user_id, now) -> signed token
 3. Server computes the user's current plan and runs `INSERT … ON CONFLICT (export_id) DO NOTHING` with `plan_at_export`.
 4. Server calls `issue()` and returns the fresh token.
 5. Client stores the token and removes the outbox entry.
-6. Until step 5, `entitlement.effective()` = token remaining minus outbox length, floored at 0.
+6. Until step 5, `entitlement.effective()` = token remaining minus the outbox's Free rows of this account, floored at 0 (V6, D-267). A receipt without a session waits in the outbox (D-268); one answered 429 keeps its row, as does a 4xx with no readable body (D-307).
 7. The server never rejects a receipt for exceeding a limit: the export has already happened. A Creator account above `CREATOR_FAIR_USE_PER_MONTH` produces one `fair_use_exceeded` warning log line per day (hashed user id); no behaviour changes (PS §11 "soft").
 
 Limits are conversion mechanisms, not security controls (PS §11). No server logic trusts the client beyond counting what it reports.
@@ -2921,33 +2947,39 @@ Limits are conversion mechanisms, not security controls (PS §11). No server log
 ### 22.5 Billing
 
 ```rust
-// billing/provider.rs
+// billing/provider.rs (as built in V6: v6implementation D-274, D-275, D-301)
 #[async_trait]
 pub trait BillingProvider: Send + Sync {
-    async fn create_checkout_url(&self, user: UserId, email: &str, offer: Offer, return_url: &str) -> Result<String, BillingError>;
-    async fn create_portal_url(&self, customer_id: &str) -> Result<String, BillingError>;
-    async fn cancel_subscription(&self, subscription_id: &str) -> Result<(), BillingError>;
-    fn verify_signature(&self, headers: &HeaderMap, raw_body: &[u8]) -> Result<(), BillingError>;
-    fn parse_event(&self, raw_body: &[u8]) -> Result<Option<BillingEvent>, BillingError>;   // None = irrelevant type
+    async fn create_checkout_url(&self, user: UserId, email: &str, offer: Offer, return_url: &str, cancel_url: &str) -> Result<String, BillingError>;
+    async fn create_portal_url(&self, customer_id: &str, return_url: &str) -> Result<String, BillingError>;
+    async fn cancel_subscription(&self, subscription_id: &str) -> Result<(), BillingError>;   // "already cancelled" is Ok
+    fn verify_signature(&self, headers: &HeaderMap, raw_body: &[u8], now: UnixSecs) -> Result<(), BillingError>;
+    fn parse_event(&self, headers: &HeaderMap, raw_body: &[u8]) -> Result<Option<BillingEvent>, BillingError>;   // None = irrelevant type
 }
-pub enum BillingEventKind { Activated, Renewed, PastDue, CancelScheduled, Canceled, Refunded }
-pub struct BillingEvent { pub provider_event_id: String, pub user_id: UserId, pub customer_id: String,
-                          pub subscription_id: String, pub kind: BillingEventKind, pub interval: BillingInterval,
-                          pub current_period_end: UnixSecs, pub occurred_at: UnixSecs }
+pub enum BillingError { Unavailable, BadSignature, BadEvent }
+pub enum BillingEventKind { Activated, Renewed, PastDue, CancelScheduled, Canceled, Refunded, Resumed, PlanChanged }
+pub enum EventOwner { User(UserId), Customer(String) }
+pub struct BillingEvent { pub provider_event_id: String, pub owner: EventOwner, pub customer_id: String,
+                          pub subscription_id: Option<String>, pub kind: BillingEventKind, pub interval: Option<BillingInterval>,
+                          pub current_period_end: Option<UnixSecs>, pub occurred_at: UnixSecs }
 ```
 
-- **Checkout.** Hosted checkout by full-page navigation. `user_id` travels as the provider's custom/passthrough data and returns in every event (TE-9). Return URLs: `<APP_ORIGIN>/account?checkout=success|cancel`.
+- **Provider (TE-9, V6).** Dodo Payments, through `billing/adapter.rs`, against `BILLING_API_BASE_URL` (`https://test.dodopayments.com` or `https://live.dodopayments.com`, D-273). Its webhooks follow Standard Webhooks: `provider_event_id` is the `webhook-id` header, which is why `parse_event` reads the headers (D-274). The signature is checked in `adapter.rs` itself: `whsec_` secret, HMAC-SHA256 over `id.timestamp.body`, any `v1,` entry compared in constant time, a timestamp more than 5 minutes off refused (D-278). A secret that is not a `whsec_` value stops the server at boot. The mapping was read from real test-mode deliveries (V6 CL Entries 13 and 18): `subscription.active` → `Activated`; `renewed` → `Renewed`; `on_hold` and `past_due` → `PastDue`; `cancelled` and `expired` → `Canceled`; `plan_changed` → `PlanChanged`; `updated` → `CancelScheduled` or `Resumed` by its `cancel_at_next_billing_date`; a whole `refund.succeeded` → `Refunded`, a partial one (`is_partial`) → `None` (D-277); every `payment.*` → `None`. The interval comes from `offers.rs` by the event's product id; an unknown product is `billing_event_ignored`.
+- **Owner (D-275).** A subscription event names its user through `metadata.user_id`. A refund carries no metadata and no subscription id, only the customer: its owner is `Customer`, resolved through `subscriptions.provider_customer_id`. No resolvable owner, or a user since deleted, is 200 with nothing changed (D-272, D-284).
+- **Checkout.** Hosted checkout by full-page navigation. `user_id` travels as the provider's `metadata` and returns in every subscription event (TE-9, read). Return URLs: `<APP_ORIGIN>/account?checkout=success|cancel`. A user whose row is `active` or `past_due` is refused with 403 `forbidden`, and the client opens the portal instead (D-300). Any provider failure is 502 `billing_unavailable`. `GET /billing/portal` without a subscription row is 404.
 - **Offers (`billing/offers.rs`, the only place).** `Offer → env price id → (Plan::Creator, BillingInterval)`. `CreatorAnnualFounding` (E-5 presale, PS §19) is accepted only while `FOUNDING_OFFER_ENABLED=true`. Amounts (15 USD/month, 144 USD/year, 99 USD/year founding; PS §11, §19) are configured at the provider and displayed from `web/src/config/pricing.ts`; the server holds no amounts.
-- **Event application (one transaction with the dedupe insert, C-19).** Events older than `subscriptions.last_event_at` are ignored.
+- **Event application (one transaction with the dedupe insert, C-19).** Events older than `subscriptions.last_event_at` are ignored. An event whose `subscription_id` differs from the row's is ignored, except `Activated` (D-299).
 
 | From | Event | To | Fields set |
 |---|---|---|---|
-| none, canceled | `Activated` | active | all provider ids, interval, `current_period_end`, `cancel_at_period_end = false` |
+| none, canceled, past_due (V6, D-276: recovery) | `Activated` | active | all provider ids, interval, `current_period_end`, `cancel_at_period_end = false` |
 | active, past_due | `Renewed` | active | `current_period_end` |
-| active | `PastDue` | past_due | none |
+| active | `PastDue` | past_due | none: the paid period is not moved, as the provider moves `next_billing_date` before the charge |
 | active, past_due | `CancelScheduled` | unchanged | `cancel_at_period_end = true` |
+| active, past_due, with `cancel_at_period_end` (V6, D-301) | `Resumed` | unchanged | `cancel_at_period_end = false` |
+| active, past_due (V6, D-301) | `PlanChanged` | unchanged | interval, `current_period_end` |
 | active, past_due | `Canceled` | canceled | `current_period_end` as reported |
-| any | `Refunded` | canceled | `current_period_end = occurred_at` |
+| any | `Refunded` | canceled | `current_period_end = occurred_at`; a live subscription is also cancelled at the provider inside the transaction, as a refund does not stop it there (V6 CL Entry 13) |
 
 Any other (from, event) pair is logged as `billing_event_ignored` and changes nothing; `billing_events.rs` covers every cell.
 
@@ -2998,14 +3030,14 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 
 ### 22.8 Configuration (`config.rs`, the only place that reads the environment)
 
-`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `MAIL_API_KEY`, `MAIL_FROM`, `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRUSTED_PROXY_HOPS`. A missing or malformed variable aborts startup with the variable's name (never its value).
+`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
 
 ### 22.9 Free-tier behaviour (external facts: verified 2026-10, re-verified by TE-11)
 
 - The service sleeps after 15 minutes without inbound traffic and takes about one minute to wake.
 - **Keep-warm.** The uptime monitor that PS §20.1 requires calls `GET /api/v1/healthz` every 5 minutes. One always-on instance uses at most 24 x 31 = 744 h of the 750 free instance hours per month (derived).
 - **Client tolerance.** `apiClient.wake()` at app start; per-attempt timeout `API_TIMEOUT = 10 s`; retries while total wait is within `API_COLD_START_BUDGET = 70 s` (C-15). Import, processing, preview and review never call the API.
-- **Webhooks.** Delivered to the Render host directly. A request that hits a sleeping service may time out; the merchant's retry delivers it (TE-9 confirms the retry schedule).
+- **Webhooks.** Delivered to the Render host directly. A request that hits a sleeping service may time out; the merchant's retry delivers it. TE-9 read (V6): a failed delivery is retried after about 6 s with the same `webhook-id`; Dodo documents up to 8 attempts over about 27 hours.
 - **Boot.** `sqlx::migrate!` runs at startup; the retention purge runs at startup and every 6 h in-process.
 - **Memory.** DB pool `max_connections = 5`; no caches. Budget 512 MB (TE-11).
 
@@ -3042,7 +3074,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 | `edits` | `clipId` | `{ editState }` |
 | `renderCache` | cache key (hex) | `{ clipId, exportId, opfsPath, bytes, createdAt, summary }` (a hit skips the worker, so the summary comes from the row, v5implementation D-226). Only `persistence/render-cache-repo.ts` writes it |
 | `entitlement` | `"current"` | `{ token, storedAt }` |
-| `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts }` |
+| `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts, plan, sub }` (V6, D-267: the plan it was exported under and the account it belongs to; `flushOutbox` sends only the signed-in account's rows) |
 | `meta` | string | `anonId`, `persistRequested` |
 
 Every value is wrapped as `{ schemaVersion: number, value }`.
@@ -3140,7 +3172,7 @@ CREATE TABLE platform_waitlist (
 - **Server retention.** `analytics/retention.rs` deletes `analytics_events` older than 90 days (PS §16), `magic_links` older than 1 day, `webhook_events` older than 90 days (assumption, TE-9: longer than the provider's retry horizon), revoked or expired `sessions`.
 - **Backups.** None on a free database tier (assumption, TE-6). Accepted cost: subscription state is rebuilt from the merchant by replaying events; usage receipts and waitlist would be lost. Reversal: none inside the 0 USD constraint (PS A-10); a paid tier with backups needs a founder decision and a spec revision.
 
-**Acceptance.** `restore.spec.ts`: reload mid-review returns to `ready` with edits intact and no re-transcription. `clear-local-data.spec.ts`: OPFS empty and stores empty afterwards. `receipt-outbox.test.ts`: entries survive reload and are removed only on a 2xx. Estimated server data at base-case traffic: 12,000 visitors x 30 events x 200 B = 72 MB before retention (derived from PS §13.2; per-visitor event count is an assumption, TE-6).
+**Acceptance.** `restore.spec.ts`: reload mid-review returns to `ready` with edits intact and no re-transcription. `clear-local-data.spec.ts`: OPFS empty and stores empty afterwards. `receipt-outbox.test.ts`: entries survive reload and are removed only on a 2xx; as built in V6 (v6implementation §11.5, D-307), also on a 4xx with a readable body other than 401 and 429, as that receipt can never succeed. A 429, a 401, or a 4xx with no readable body keeps its row. Estimated server data at base-case traffic: 12,000 visitors x 30 events x 200 B = 72 MB before retention (derived from PS §13.2; per-visitor event count is an assumption, TE-6).
 
 **v1.3.** Long-path stores and paths: §43.4. Assets: §48.5. Memory: §50.2. Server tables: §52. **Seams (not built now).** `BrandPreset`, `VersionSet`, `CloudJobConsent` (P1) and `Workspace` (P2) from PS §16 are new stores/tables; none exists.
 
@@ -3160,7 +3192,7 @@ CREATE TABLE platform_waitlist (
 
 Nothing else: no font CDN, no analytics vendor, no error tracker, no tag manager, no third-party script (PS §17). `config/allowlist-hosts.ts` lists hosts 1 and 2 and is the only such list; `scripts/check-hosts.mjs` fails the build when the bundle contains any other `http(s)://` host literal.
 
-**From the server:** Postgres host; email API host; merchant API host; AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
+**From the server:** Postgres host; the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
 
 ### 24.2 Secrets
 
@@ -3595,7 +3627,7 @@ First, on every event, the job `changes`: the secret scan, and whether code chan
 | Render (`render.yaml`) | One web service, runtime `image` from GHCR, plan `free`, `healthCheckPath: /api/v1/healthz`, environment variables of §22.8 set in the dashboard (`sync: false`) |
 | Postgres | External free-tier instance; TLS required; connection string in `DATABASE_URL` |
 | Asset CDN | `scripts/upload-assets.sh` uploads content-hashed files; CORS for `APP_ORIGIN`; `Cache-Control: public, max-age=31536000, immutable` |
-| Email | API key in Render; sender identity per TE-8 |
+| Email | The five SMTP variables of §22.8 in Render; one verified Gmail sender, no domain (TE-8; D-256's risk accepted by the founder) |
 | Uptime monitor | `GET https://<render-host>/api/v1/healthz` every 5 min |
 
 **Deployment consequences of the architecture**
@@ -3603,6 +3635,8 @@ First, on every event, the job `changes`: the secret scan, and whether code chan
 - **Deploy order.** Server first, then web. The server rejects unknown request fields, so a new client must never reach an old server. Additive response fields are safe (the client ignores unknown fields).
 - **Version skew in open tabs.** A tab loaded before a deploy may request a hashed worker or WASM file that the new deployment no longer serves. `pool.ts` therefore preloads all four worker scripts and both WASM bundles into the HTTP cache at app start (immutable caching makes later instantiation offline-safe).
 - **Stateless API.** Render may restart or sleep the instance at any time; nothing but rate-limit buckets is lost.
+- **Test-mode production (V6, D-285, D-303).** From V6's merge until the founding release after V6.6, production runs Dodo's test-mode keys, with `BILLING_API_BASE_URL=https://test.dodopayments.com` and a test-mode webhook endpoint: a test card buys Creator and no money moves. The founding release switches four variables and registers a live endpoint, then wipes any test-mode `subscriptions` row.
+- **Mail from Render (V6, D-252).** Render's free web services block outbound 25, 465 and 587; the relay is reached on 2525 with STARTTLS.
 - **Model updates.** A new `modelId` is a new CDN path; old files stay until no deployed manifest references them.
 - **Domain.** The system works on the hosts' default domains. A custom domain is not required by the architecture but is likely required by the email provider for sender verification (TE-8); its registration fee is outside the 0 USD infrastructure target.
 - **CI minutes.** `e2e-media.yml` runs on a Windows runner; if free minutes are insufficient for a private repository (TE-10), it runs on `main` only and before release, and `pnpm e2e:device` covers pull requests locally.
@@ -3809,8 +3843,8 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | TE-5 | Is the static host usable as specified: plan terms for a paid product, COOP/COEP headers, `/api/v1` rewrite, proxy timeout against a cold API, forwarded-IP header shape? | Read the current plan terms; deploy the shell; call a deliberately slow endpoint through the rewrite; inspect `X-Forwarded-For` | Terms permit the use (or the founder accepts the terms risk in writing; no paid plan, PS A-10); `crossOriginIsolated` true; a 60 s upstream delay survives the proxy; hop count known | M0.1; decision before week 8 | Reversal path of TDR-12; if only the timeout fails, the client calls `/healthz` until warm before any real request |
 | TE-6 | Which free Postgres provider persists beyond 30 days, accepts 5 connections, and fits the data estimate? | Read current terms; run migrations; idle for a week; measure reconnect time | No expiry; reconnect under 2 s; storage quota at least 5x the §23.3 estimate | M0.1 | Other candidate; then any other free Postgres provider (no paid tier, PS A-10) |
 | TE-7 | Which asset host gives free egress, HTTP Range, CORS that works under COEP, and files of 150 MB? | Upload a 150 MB file; ranged fetch from the deployed shell | 206 responses; CORS readable; no egress charge in terms | M0.1-M0.2 | Other candidate; then split the model into parts under the host's limit |
-| TE-8 | Which email provider delivers magic links within its free quota, and does it require a verified sender domain? | Send 50 links to major mailbox providers; read quota terms | At least 95% inbox delivery within 30 s; quota at least 100 emails/day | M1.7 | Other candidate; prefer one that verifies a single sender address without a custom domain, because a domain registration is a cost outside PS A-10 |
-| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | Account approved within 2 weeks; all six `BillingEventKind`s observed; a timed-out webhook is retried | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18) |
+| TE-8 | Which email provider delivers magic links within its free quota, and does it require a verified sender domain? | Send 50 links to major mailbox providers; read quota terms | At least 95% inbox delivery within 30 s; quota at least 100 emails/day | M1.7 | Other candidate; prefer one that verifies a single sender address without a custom domain, because a domain registration is a cost outside PS A-10. **Read in V6 (`docs/v6/experiments.md`):** Brevo over SMTP on 2525, one verified Gmail sender, 300 a day. Cut down by the founder on 2026-11-02 to two Gmail mailboxes, every mail in the inbox; Outlook and Yahoo unproven, and Brevo calls a free-mail sender "not recommended". A real send from Render worked |
+| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed; a timed-out webhook is retried; a test purchase turns the next token Creator. **v1.3 (V6): live approval moves to the founding release (BP §8A.6)** | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18). **Read in V6, test mode (`docs/v6/experiments.md`): Dodo Payments; all six kinds and `PlanChanged` observed from real deliveries; a failed delivery retried after about 6 s with the same `webhook-id`; a test purchase on D1 turned the next token Creator. On 2026-11-04 Dodo approved the identity and bank and held the product review until the live site is public** |
 | TE-10 | Can CI run the media suites (WebGPU + H.264 + AAC encode) on a hosted Windows runner within free minutes? | Run `e2e-media.yml` | Suites pass headless; monthly minutes within the free allowance | M0.4 | Run on `main` and pre-release only; `pnpm e2e:device` locally |
 | TE-11 | Does the API fit the Render free instance: memory, cold-start time, instance hours with keep-warm, image deploy, log retention? | Deploy; measure RSS, cold start over 10 sleeps, monthly hour use | RSS under 400 MB; cold start under 70 s; one always-on service fits the monthly hours | M0.1, M2.4 | Another free container host for the same image (§22.9) |
 | TE-12 | Does `offcut-mp4` demux the real-clip corpus (edit lists, rotation, VFR, phone encoders)? | `corpus/run_corpus.ts` | At least 90% of clips demux and export; "inconclusive" with fewer than 10 corpus clips (V3: 2 clips, inconclusive, v3implementation D-88) | M1.1, re-checked at V9 and M2.3 | JS demuxer behind the same interface (§15) |
@@ -4021,7 +4055,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 
 1. Hosting plan for a paid product on the static host (TE-5, TDR-12): the founder stays on Vercel's free plan and pays nothing; the plan's non-commercial terms remain an accepted risk, with another free static host as the only remedy.
 2. All free-tier facts for Render, Postgres, asset storage, email, CI minutes, uptime monitor (TE-5 to TE-11); re-listed by `scripts/check-external-facts.mjs` before launch.
-3. Email sender verification without a registered domain (TE-8): a domain costs money and is outside PS A-10, so the provider must accept a single verified sender address; deliverability of magic links under that setup is unproven.
+3. Email sender verification without a registered domain (TE-8): a domain costs money and is outside PS A-10, so the provider must accept a single verified sender address; deliverability of magic links under that setup is unproven. V6: Brevo accepts one Gmail sender; two Gmail mailboxes received every mail; other providers are unread (`docs/v6/experiments.md`). Read with real sign-ups: `signin_step` `link_requested` without `completed`.
 4. Mobile detection via `navigator.userAgentData.mobile` (§3) — E-8 data at M2.2.
 5. `MAX_FILE_SIZE` read as 500,000,000 bytes; `INPUT_FPS_TOLERANCE`; `MIN_WORDS`; `MAX_RECENT_CLIPS` (§10.2) — M1.1, E-2, M2.1.
 6. First video track used when several exist; fragmented MP4 rejected (§15.4) — TE-12.
@@ -4036,11 +4070,11 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 15. Preview size, queue length, late-frame and first-frame targets, seek target (§20) — M1.5. Measured in V4 on D1 (not R1, D-114): first frame 76-94 ms after `ready` (500 ms), seek 78-94 ms (300 ms), drift at most 26.9 ms over 60 s with 0% late frames (80 ms, 5%), never downscaled; the queue of 6 and the 360 x 640 downscale size are kept.
 16. Video and audio bitrates, keyframe interval, 2-channel audio, encoder ladder order (§21.2) — TE-4.
 17. `CANCEL_TIMEOUT`; `API_TIMEOUT`; `API_COLD_START_BUDGET` (§14.3, §22.9) — M1.5, TE-11. Measured in V4 on D1: a hung render worker's run is back at `accepted` 2.4-2.5 s after Cancel; `CANCEL_TIMEOUT_MS = 2000` kept.
-18. Magic-link, access-token and refresh-token lifetimes; all rate-limit values in §22.1 — M1.7.
+18. Magic-link, access-token and refresh-token lifetimes; all rate-limit values in §22.1 — M1.7. Built in V6 as written: a link 15 minutes, single-use; an access token 15 minutes; a session 60 days from sign-in, however active (founder's confirmation), with a 30 s grace for a rotated refresh token (D-258).
 19. Free quota month = UTC calendar month (§22.3) — product confirmation at M1.7.
-20. Creator until `current_period_end` for canceled and past-due; refund ends access immediately (§22.3, §22.5) — TE-9.
+20. Creator until `current_period_end` for canceled and past-due; refund ends access immediately (§22.3, §22.5) — TE-9. Read in V6 test mode: a cancel keeps the paid date; a declined renewal is `on_hold` and does not move it; a refund does not stop the subscription at Dodo, so the webhook cancels it there.
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
-22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
+22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6. Dodo's documented retries span about 27 hours, inside 90 days.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
 24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.

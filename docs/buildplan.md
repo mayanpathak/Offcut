@@ -576,7 +576,7 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 | Create | Purpose |
 |---|---|
 | `server/src/auth/mod.rs`, `magic_link.rs`, `session.rs`, `access_token.rs`, `extract.rs` | Magic link (32 random bytes, hash stored, 15 min, single use); refresh cookie `HttpOnly; Secure; SameSite=Strict`, rotated on every use; Ed25519 access token, 15 min, memory only; CSRF header on the two cookie routes (TS §22.2) |
-| `server/src/mail/mod.rs`, `http_mailer.rs`, `templates.rs` | `Mailer` trait; the TE-8 provider's adapter; one template |
+| `server/src/mail/mod.rs`, `smtp_mailer.rs`, `templates.rs` | `Mailer` trait; SMTP through Brevo on port 2525 with `lettre` (as built, v6implementation D-248, D-252); one template |
 | `server/src/db/users.rs`, `magic_links.rs`, `sessions.rs` | Queries for the three tables |
 | Routes `POST /auth/magic-link`, `/auth/verify`, `/auth/refresh`, `/auth/logout`, `GET /me` | Body limits, rate limits and idempotency of TS §22.1 |
 
@@ -604,7 +604,7 @@ Replace the placeholder mail and billing variables in Render with real values. K
 | Create or complete | Purpose |
 |---|---|
 | `web/src/state/auth-store.ts`, `entitlement-store.ts`, `machines/auth-machine.ts` | Auth state machine (TS §12.2) |
-| `web/src/entitlement/entitlement.ts` | `effective()` = token remaining minus outbox length, floored at 0; the only place the two are combined |
+| `web/src/entitlement/entitlement.ts` | `effective()` = token remaining minus the outbox's Free rows of the token's own account, floored at 0 (as built, v6implementation D-267); the only place the two are combined |
 | `web/src/persistence/entitlement-repo.ts` (since V2, v2implementation D-23), `receipt-outbox.ts` | Token cache; receipts survive reload and retry at 5 s, 30 s, 5 min, then each app start |
 | `web/src/platform/broadcast.ts` | The sign-in tab tells the original tab over `BroadcastChannel` |
 | `web/src/config/entitlement-public-key.ts` (since V2, v2implementation D-24), `pricing.ts` | Public key as an array (rotation); display prices |
@@ -612,6 +612,8 @@ Replace the placeholder mail and billing variables in Render with real values. K
 | `web/src/usecases/` `request-magic-link.ts`, `complete-sign-in.ts`, `sign-out.ts`, `start-checkout.ts`, `confirm-checkout.ts`, `open-billing-portal.ts`, `delete-account.ts`, `export-account-data.ts`; `start-app.ts` complete (session restore) | C-8, C-11, C-18 |
 | `web/src/ui/components/SignInDialog.tsx`, `UpgradePrompt.tsx`; `ui/pages/AuthCallbackPage.tsx`, `AccountPage.tsx` | Limits shown before the email field; the callback strips the token from the URL; the prompt has two placements only, `after_export` and `limit_reached` |
 | `ExportButton.tsx` complete | Counter visible before the click; "last free export this month" confirm before the third (PS §11) |
+
+**As built** (`docs/v6/v6implementation.md`, D-241 to D-315; `docs/v6/v6changelog.md`). All of the above, in 14 prompts (P137-P150) on `v6-build`. Mail goes through Brevo's SMTP relay on port 2525, as Render's free services block 25, 465 and 587 (D-248, D-252); TE-8 was cut down by the founder. The merchant is Dodo Payments, run in test mode in production until the founding release (D-273, D-285); its adapter was written from 64 real test-mode deliveries (`server/tests/fixtures/dodo/`), which showed that a refund does not stop a subscription there, so the webhook cancels it. Beyond the tables: two more billing kinds, `Resumed` and `PlanChanged` (D-301); a checkout refused for a live subscription, which goes to the portal (D-300, D-315); `users.email` normalized (D-260); a 30 s grace for a rotated refresh token and a cross-tab lock (D-258, D-297); outbox rows that record their plan and account (D-267); a sign-out that clears the token while a lost session keeps offline exports (D-291); the storage check's second try (V6 CL Entry 12); `LegalPage` and pricing on the landing page, shipped ahead of V6 for the merchant's review. One protected assertion changed, by row DC-12 of TS §41.2: `export-creator.spec.ts`'s "no token" case now expects the sign-in dialog.
 
 ### 8.2 Experiments
 
@@ -693,7 +695,7 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 | Release | Prompts (rough) |
 |---|---|
-| V6 | 10 |
+| V6 | 14, as built (P137-P150) |
 | V6.1 | 14 |
 | V6.2 | 10 |
 | V6.3 | 14 |
@@ -705,7 +707,7 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 | V6.9 | 10 |
 | V6.10 | 10 |
 | V6.11 | 10 |
-| **Total** | **about 143, about 5-8 weeks** |
+| **Total** | **about 147, about 5-8 weeks** |
 
 V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIMATE). The founder sets the date when V6.11 closes.
 

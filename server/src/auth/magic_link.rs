@@ -1,4 +1,5 @@
-//! Email normalization (TS §22.2). The magic-link flow itself arrives in V6.
+//! Email normalization (TS §22.2) and the link's lifetime. The flow that uses
+//! them is in `auth/mod.rs`.
 
 /// How long a sign-in link works (TS §22.2, an assumption of M1.7).
 pub const MAGIC_LINK_TTL_MINUTES: i64 = 15;

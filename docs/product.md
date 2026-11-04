@@ -300,7 +300,7 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 ### 9.3 Supported platform
 
 - **Supported:** desktop Chrome and Edge (current stable) on Windows and macOS. ASSUMPTION: these cover most of the primary ICP's laptops; E-8 measures.
-- **Detection:** feature detection, not user-agent string parsing. On page load the capability check requires: `VideoEncoder`/`VideoDecoder` with `isConfigSupported` true for H.264 decode and for H.264 encode at 1080×1920, and AAC audio decode and encode; WebGPU adapter available; WebAssembly SIMD and threads (cross-origin isolation); both OPFS and IndexedDB storage (large files and metadata); at least 4 GB device memory where reported; a desktop form factor (the structured `navigator.userAgentData.mobile` hint, since phones and tablets are out of scope, §9.2). Tests run in under 3 seconds and the result is logged as an allowlisted event (§17).
+- **Detection:** feature detection, not user-agent string parsing. On page load the capability check requires: `VideoEncoder`/`VideoDecoder` with `isConfigSupported` true for H.264 decode and for H.264 encode at 1080×1920, and AAC audio decode and encode; WebGPU adapter available; WebAssembly SIMD and threads (cross-origin isolation); both OPFS and IndexedDB storage (large files and metadata); at least 4 GB device memory where reported; a desktop form factor (the structured `navigator.userAgentData.mobile` hint, since phones and tablets are out of scope, §9.2). Tests run in under 3 seconds and the result is logged as an allowlisted event (§17). (V6, founder's decision of 2026-11-03: a storage check that has not answered is asked once more, so on a slow disk the check can take up to 4 seconds rather than wrongly telling a capable browser it cannot keep files.)
 - **Unsupported users see:** a plain page stating the exact missing capability ("Your browser cannot encode H.264 video here"), the supported list ("Chrome or Edge on Windows or macOS"), a link to the demo video so they still see the product, and an email field "Tell me when Safari/Firefox/mobile is supported." Counted as `unsupported_reason`.
 - **Deferred and why:** Safari, Firefox, Linux, mobile (see §9.2). WebCodecs reportedly reached full cross-browser support only in 2026 (Safari 26.x) and Firefox for Android lacks it, with patchy audio-encode support (*general-market knowledge, re-verify before launch*); that makes a Chromium-first launch the lowest-risk way to test H1-H3.
 
@@ -533,7 +533,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 
 **Honest statement about enforcement.** Because processing is local, limits are **conversion mechanisms, not security controls**. A determined user can bypass the watermark or export counter by tampering with the client. That is acceptable: the target user pays for convenience and updates, and the cost of enforcing harder (obfuscation, server-side rendering) breaks the model. Metering at a high level: the client holds a signed entitlement token (plan, period, free exports remaining) cached for up to 7 days offline; each export sends an idempotent usage receipt (`export_id`, no content) to the server; the server computes counts; the watermark is rendered into the video by the pipeline unless the token says Creator.
 
-**Upgrade trigger design.** (1) Visible export counter before every export. (2) After the first watermarked export, one dismissible prompt framed as removing the watermark and getting 1080p. (3) At export #3 on Free, "this is your last free export this month" before the click. (4) No upgrade popups during processing or editing.
+**Upgrade trigger design.** (1) Visible export counter before every export. (2) After the first watermarked export, one dismissible prompt framed as removing the watermark and getting 1080p. (As built in V6, read with J12's "On a free export": after each watermarked export, once, until it is dismissed.) (3) At export #3 on Free, "this is your last free export this month" before the click. (4) No upgrade popups during processing or editing.
 
 **Target plan mix.** At MVP, 100% of paid users are on Creator. Billing mix (ASSUMPTION): 75% monthly / 25% annual in the base case, giving a blended revenue per paid user of 0.75 × $15 + 0.25 × $12 = **$14.25/month** (§13.2). Pro is excluded from all numbers in this document.
 
@@ -865,7 +865,7 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 
 | Entity | Key fields | Notes |
 |---|---|---|
-| User | id, email, created_at | Email stored as given; deletion flow in §17 |
+| User | id, email, created_at | Email stored normalized (trimmed, lower-case; V6: the sign-in link keeps only that form); deletion flow in §17 |
 | Session | id, user_id, refresh_token_hash, expires_at | Refresh tokens stored only as hashes; rotated on use |
 | Subscription | user_id, provider_customer_id, plan, status, current_period_end | Source of truth is the merchant of record; webhooks update this |
 | WebhookEvent | provider_event_id (unique), type, processed_at | Idempotency: unique key prevents double-processing |
@@ -905,7 +905,7 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 
 | Area | Commitment |
 |---|---|
-| **Auth** | Email magic link (no passwords at MVP) with short-lived link tokens; optional Google sign-in is P1 |
+| **Auth** | Email magic link (no passwords at MVP) with short-lived link tokens; optional Google sign-in is P1. The email address passes through the mail provider, Brevo, to deliver the link (V6) |
 | **Session handling** | Short-lived access token, rotating refresh token in an HttpOnly, Secure, SameSite cookie; refresh tokens stored only as hashes server-side |
 | **Rate limiting** | Per-IP and per-account limits on sign-in, magic-link sends, usage receipts and webhooks (token bucket) |
 | **Web security** | Strict Content Security Policy, no third-party scripts in the app shell, COOP/COEP for WASM threads, model files verified by SHA-256 before load |

@@ -568,3 +568,46 @@ The title, line 127's assertion, and one line closing the dialog before line 134
 - With `do_not_bill`, a plan change from monthly to annual keeps the monthly cycle's date, so the row reads annual with a period end a month away. That is correct for what was paid. A portal change, if the portal offers one, may bill differently: G 14.6.
 
 **Counts.** Unchanged from Entry 17, as no code changed: Vitest 522, `pnpm e2e` 45, Rust 816 / 0 / 4, media `export-free` 13. Frozen check empty. Not pushed: the next push is P150's.
+
+## Entry 19 - 2026-11-04 - P150: copy-back, the final gate (before the merge)
+
+**Changed.** The copy-back of v6implementation §21, every row:
+
+| Where | What |
+|---|---|
+| TS §1, §2, §3, §33 | Mail through Brevo's SMTP relay on 2525 (D-248, D-252); Dodo Payments named; `reqwest` and `lettre` rows; test-mode production until the founding release (D-285); the five SMTP variables in Render |
+| TS §7 | V6's edges: `start-app.ts` to `restore-session.ts` (D-306), `blockers.ts` to `entitlement.ts` (D-309); `getrandom` direct in `offcut-api` (D-257) |
+| TS §9 | C-1 (D-289, D-296, D-306, D-308), C-7 (D-290, D-294, D-309 to D-311, D-314), C-8 (D-254, D-259, D-287, D-302), C-11 (D-312 to D-315), C-19 (headers, the owner, the refund's cancel) |
+| TS §12.1-§12.3, §12.5 | `effective()` counts this account's Free rows (D-267); claims read without verifying (D-292); the auth machine's new rows (D-295); the button split and the room-only gate (D-290, D-309, D-310) |
+| TS §13.2; PS §9.3 | The storage check's second try, up to 4 s on a slow disk (Entry 12) |
+| TS §13.3, §13.4; PS §11 | `LastExportDialog`, `SignInDialog`, `UpgradePrompt`, `AuthCallbackPage`, `AccountPage`; once per watermarked export (D-314) |
+| TS §22.1, §22.2; PS §16 | The magic link's 503 (D-254); checkout's 403 (D-300); `users.email` normalized (D-260); rotation's grace and the lock (D-258, D-297); sessions end 60 days after sign-in |
+| TS §22.4, §23.1, §23.3 | The outbox row's `plan` and `sub` (D-267); a receipt without a session waits (D-268); a 429 keeps its row (D-307) |
+| TS §22.5 | The trait as built, `EventOwner`, `Resumed`, `PlanChanged`, the subscription id, the refusal, the mapping read from real deliveries, the refund's cancel at the merchant (D-274 to D-278, D-299 to D-301) |
+| TS §22.8, §22.9 | Variables (D-251, D-273); `whsec_`; the retry read in TE-9 |
+| TS §24.1 | The SMTP relay and the merchant's hosts |
+| TS §37, §39.3 | TE-8 and TE-9 as read; items 3, 18, 20 and 22 |
+| PS §17 | The address passes through Brevo |
+| BP §8.1, §8A.0 | `smtp_mailer.rs`; `effective()`; "As built"; V6 at 14 prompts, the total about 147 |
+
+TS §5 was kept right as files appeared. `server/src/auth/magic_link.rs`'s first comment said "the magic-link flow itself arrives in V6": it now says where the flow is.
+
+**Step 14.1.** `git grep -nP "\bV6\b(?!\.\d)" -- web/src crates server`: no marker of work to do is left in `web/src` or `server`. Two comments in frozen crates still speak of V6 in the future (below).
+
+**Tier 4 (D1, once).** `pnpm build`, `pnpm check`, `pnpm fixtures`, `pnpm test`, `pnpm e2e`, the verifier's self-test, a keyed `pnpm build:e2e`, then the full `pnpm e2e:media`, detached:
+
+| Suite | Count | D-244's floor |
+|---|---|---|
+| Rust | 812 / 0 / 4 | 657 / 0 / 4 |
+| Vitest | 522 | 336 |
+| `pnpm e2e` | 45 | 12 |
+| Verifier self-test | 16 | 16 |
+| Media | 106 passed, 1 skipped (`rej_h264_444`, as before), in 35.1 min; nothing flaky | 94 + 1 skip |
+
+Rust reads 812, as P144 recorded: P148's 816 summed lines from outside `cargo test --workspace`. No bench: no render path changed. The full media run is V6's one (D-242).
+
+**Found, not fixed.**
+- `crates/offcut-api-types/src/errors.rs` says the seven codes are "defined now so V6 adds handlers", and `crates/offcut-entitlement/src/token.rs` says `encode` is used "by tests now, and by the signer of V6". Both are true of the past now. The crates change only as comments in P137, so they wait for V6.1, which opens its own branch.
+- From Entry 18: the INR price shown to a buyer in India, and the portal's plan change, unread.
+
+**Open, for the founder, in order (G 14).** Open item 17 before the merge. G 14.4, Render's variables, with `BILLING_WEBHOOK_SECRET` a real `whsec_` value. G 14.5, ready and merge. G 14.6, the webhook for the deployed site, the live journey, the saved exports for `verify_mp4.py`, the production read. G 14.8, the tag. The closing entry follows the merge.
