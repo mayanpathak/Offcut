@@ -589,3 +589,50 @@ They were made from the development build (`vite build --mode development`, as `
 **Open.** Item 3 (design review 3) is done as a self-review; the founder's own read is in the morning report.
 
 **Found, not fixed.** None.
+
+## Entry 12 - 2026-11-05: P160a, the copy-back (Parts A and C) and the gates before the merge
+
+**The copy-back of §20, for Parts A and C.** DC-13 waits for Part B's own pull request.
+
+| Spec | What changed |
+|---|---|
+| TS §5 | Done with the prompts (P151, P153, P155): every new file has its row, `gsap-runtime.ts` and `landing-cards.module.css` included |
+| TS §13.1, the `/` row | Hero with the captioned headline and the hero clip; sections of features and "Coming soon"; `DropZone`; pricing with a way in; the update form; Motion and GSAP (TDR-26) |
+| TS §13.5 | The app-shell budget is 500 kB (D-320) |
+| TS §39.3 item 24 | 500 kB, with this release's reading: 444.3 kB, main 205.8 kB, GSAP chunk 44.1 kB; no task over 50 ms while scrolling |
+| TS §38 | TDR-26: GSAP and Motion, on the landing page only |
+| INV-15 | Done in P151: "`copy/messages.ts` and the files it imports" |
+| PS §10 J1 | The new hero line, the clips in place of the hand-made demo, the sections |
+| PS §11 | Unchanged prices. A note: "Start free" on Free, "On sale soon" on Creator until the founding release |
+| BP | A paragraph for the design release, between V6 and the cloud-transcription release |
+
+`git grep -n "TODO\|FIXME" web/src/ui/landing` is empty.
+
+**The gates of `overnight-run.md` §7.2, before the first merge.**
+
+- [x] **Local, on the head of this commit's code (`e3f2548`; this commit adds documents only):**
+  - `pnpm check` passes;
+  - `cargo test --workspace`: 812 / 0 / 4, as at Setup (Part A touches no Rust);
+  - Vitest 522, as at Setup;
+  - `pnpm build`: `check-hosts` ok, app shell 444.3 kB (≤ 500);
+  - `pnpm e2e --workers=4`: **57 of 57**. Setup's floor was 45; the 12 new cases are L-1 to L-12.
+- [x] **L-1 to L-12 pass** (Part C was built, so L-12 counts).
+- [x] **The unchanged cases.** The 17 unchanged landing cases, `signin.spec.ts` and `checkout.spec.ts` pass with no change to their code:
+  - `git diff 8d94a06 -- web/tests-e2e/signin.spec.ts web/tests-e2e/checkout.spec.ts` is empty;
+  - in `landing.spec.ts`, the only lines removed are the pricing case's title and its `link` count of 0 (§12.4's declared change), and the import line that now also takes `axe`. Everything else is added.
+- [x] **The targeted media cases on a keyed build.**
+  - P152's `rejections.spec.ts --grep REJECT_FILE_SIZE` passed on `pnpm build:e2e`.
+  - P157 has no case that can run alone (Entry 10). CI's `e2e-media` ran the media suites on the pull request instead (below).
+- [x] **The frozen check** prints only `web/src/ui/components/CapabilityGate.tsx`, Part C's named file.
+- [x] **The changed files.** `git diff --stat 8d94a06` (outside `docs/`) lists only these 50 files:
+  - §10.1's files;
+  - Part C's seven;
+  - `gsap-runtime.ts` and `landing-cards.module.css`, recorded in Entries 6 and 8;
+  - `screens.spec.ts`'s landing loop (§12.5);
+  - the lock file.
+- [ ] **CI on the pull request's head, every job, `e2e-media` included.** The push after P156 (run 41908517780) was green in every job: `changes`, `ci` in 12 min 46 s, `e2e-media` in 15 min 57 s. The push of this commit starts the run that is read before the merge, and its result is recorded in the closing entry.
+- [x] **The self-review rubric** passed (Entry 11).
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

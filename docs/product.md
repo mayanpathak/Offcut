@@ -485,7 +485,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 
 | Step | What the user sees and does | Notes (limits and microcopy) |
 |---|---|---|
-| **J1** Land | Hero: "Turn what you say into a finished short." Before/after demo on a real technical clip. Below: "Your video stays on your computer." and a link to "What leaves your device." | Supported-browser line: "Works in Chrome or Edge on Windows and Mac." Shown before any upload |
+| **J1** Land | Hero (design release, 2026-11-05): "Say it once. Post it finished.", with the hero clip, "Start free" into the app and "See how it works". Below: "Your video stays on your computer." and a link to "What leaves your device." Then short product clips (made with Remotion, in place of the hand-made demo), every feature that works today, everything after V6 marked "Coming soon", the drop zone, pricing and the update form | Supported-browser line: "Works in Chrome or Edge on Windows and Mac." Shown before any upload |
 | **J2** Drop | Large drop zone: "Drop a clip or a full video (up to 20 minutes, English)." Optional "Try with a sample clip". (With `long_video` off: "Drop a clip (up to 90 seconds, English).") | No account needed for a clip; a long video goes to L1 |
 | **J3** Capability check | 1-3 second check, green tick or a clear unsupported page (§9.3) | Tone: plain, specific. "Your browser can do this." |
 | **J4** First-run model download | "One-time setup: downloading the speech model (about 250 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
@@ -524,6 +524,8 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | **Free** | $0 | Full-length processing and preview; 3 exports/month (the quota resets on the UTC calendar month); 720×1280; small watermark; every caption preset, plan item, cut and music feature; AI edit plans up to the free plan quota (§12.8); **1 long video a month, with all its shorts in preview (v1.3)**; 20 chat messages a month | Nothing planned; free stays this usable |
 | **Creator** | $15/month or $144/year ($12/month equivalent, 20% off) | Unlimited exports (soft fair-use ceiling 100/month: exports above it are logged, never blocked); 1080×1920; no watermark; everything in Free; the larger AI edit plan quota; **unlimited long videos** (soft ceiling 200 a month, logged, blocked at 3×) **and the back-catalogue queue; chat** (soft 1,000 a month); **brand kit** (V6.10) | |
 | **Pro** (not at MVP) | $29/month (planned) | Not sold at MVP | Three versions per recording; brand presets; priority support (P1, §21) |
+
+**On the landing page (design release, 2026-11-05).** The prices above are unchanged. Free has a "Start free" link into the app. Until the founding release turns on live payments (`technicalspec.md`, v6implementation D-303), Creator shows its price and "On sale soon", with no way to buy on the page.
 
 **Pricing metric and why.** Flat monthly per-creator subscription with effectively unlimited exports, not credits or minutes. Reason: competitors reportedly meter by credits or minutes, which creates friction; our marginal cost is near zero, so metering would be artificial. The Free tier limit (3 exports) exists as a conversion mechanism, not as cost control.
 

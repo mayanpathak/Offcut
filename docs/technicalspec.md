@@ -1931,7 +1931,7 @@ As built in V5 (v5implementation D-229): `forExport(room?)`. Without `room` it l
 
 | Path | Page | Notes |
 |---|---|---|
-| `/` | `LandingPage` | J1: hero, before/after demo video (asset CDN), supported-browser line, "What leaves your device" link, `DropZone`, sample-clip button. Runs the capability check for the E-8 beacon |
+| `/` | `LandingPage` | J1 (design release, designimplementation §6): hero with the captioned headline and the hero clip (asset host), the capability line, the supported-browser line and the "What leaves your device" link; sections of features and "Coming soon"; `DropZone` with the sample-clip button; pricing with a way in ("Start free" to `/app`); the update form. Sections in `ui/landing/`, animated with Motion and GSAP (TDR-26). Runs the capability check for the E-8 beacon |
 | `/app` | `EditorPage` inside `CapabilityGate` | J2-J12. Unsupported → `UnsupportedPage` in place |
 | `/auth/callback` | `AuthCallbackPage` | Reads `token` from the query, then removes it with `history.replaceState` |
 | `/account` | `AccountPage` | Plan, export counter, checkout return, manage subscription, delete, export data |
@@ -2010,7 +2010,7 @@ The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`,
 ### 13.5 Acceptance targets
 
 - Capability check completes within 3 s (PS §9.3); `capability.spec.ts`.
-- App shell (HTML + JS + CSS, excluding WASM) at most 400 kB gzip (assumption, M2.4); `scripts/check-hosts.mjs` also reports bundle sizes.
+- App shell (HTML + JS + CSS, excluding WASM) at most 500 kB gzip (400 until the design release; the founder's yes of 2026-11-04, designimplementation D-320; assumption, M2.4); `scripts/check-hosts.mjs` also reports bundle sizes.
 - No main-thread task longer than 100 ms while a clip is processing (assumption, M2.4); `pipeline-preview.spec.ts` with `PerformanceObserver("longtask")`.
 
 **Contingency.** Bundle over budget: lazy-load `/account`, `/settings`, `/legal`. Long tasks: move the offending work behind a worker method.
@@ -3919,6 +3919,8 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 
 **TDR-24 (v1.3). Chat returns typed operations.** Chosen over a whole new plan and over scripts. Why: small requests stay small, undo is the existing history, the validator stays the only gate. Cost: a request with no op fitting it gets "I can't do that yet". Reversal: more ops.
 
+**TDR-26 (design release). GSAP and Motion, on the landing page only.** Chosen over hand-written CSS and requestAnimationFrame code for the landing page's animation (designimplementation D-318, D-319). Why: a page whose job is to sell needs timelines, scroll-scrubbed and pinned sections (GSAP with ScrollTrigger) and React-side entrances (Motion), and both libraries do this well with less code of our own. Cost: 44 kB gzip for GSAP in a chunk loaded with `import()` after the first paint, about 30 kB for Motion's `domAnimation` in the main chunk; GSAP's licence is GreenSock's own "no charge" licence, not an OSI one (read 2026-11-05, designchangelog Entry 4). Kept out of the product: ESLint refuses both outside `src/ui/landing/`, and case L-8 proves the editor's route downloads no GSAP. Reversal: Motion and CSS alone, about a day's work (§17 of the plan).
+
 **TDR-25 (v1.3). Matte as a stored low-resolution video.** Chosen over running the model during render. Why: INV-12, memory, and no new playback code. Cost: a pass per short and H.264 on alpha. Reversal: a lossless frame file (§51.1).
 
 **TDR-8. Preview uses the export renderer and the audio clock.** Chosen over a `<video>` element with overlays. Why: what the user approves is what exports, frame for frame. Cost: a decode loop and clock sync to maintain. Reversal: pre-rendered preview file (§20).
@@ -4102,7 +4104,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6. Dodo's documented retries span about 27 hours, inside 90 days.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
-24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. R1 and M2.4 re-read them.
+24. App-shell size 500 kB (400 kB until the design release, designimplementation D-320); long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. Measured in the design release on D1: app shell 444.3 kB gzip (500), of which the main chunk 205.8 kB and the landing page's GSAP chunk 44.1 kB, which the editor's route never downloads; no main-thread task over 50 ms while scrolling the landing page (designchangelog Entry 8). R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
