@@ -5,6 +5,7 @@ import { m } from "motion/react";
 
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
+import beforeAfterPoster from "../assets/landing/beforeAfter.webp";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
 import { LoopVideo } from "./LoopVideo";
@@ -26,7 +27,7 @@ export function BeforeAfter() {
           lead={copy.beforeAfter.lead}
         />
         <div className={styles.wideFrame}>
-          <LoopVideo clip={LANDING_CLIPS.beforeAfter} label={copy.clipLabels.beforeAfter}>
+          <LoopVideo clip={LANDING_CLIPS.beforeAfter} poster={beforeAfterPoster} label={copy.clipLabels.beforeAfter}>
             <div className={styles.beforeAfterStill} aria-hidden="true">
               <span className={styles.stillLandscape} />
               <span className={styles.stillArrow} />

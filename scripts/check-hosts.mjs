@@ -82,6 +82,8 @@ const NON_NETWORK_LITERALS = [
 
   // GSAP, the landing page's animations (designimplementation §10.5).
   { prefix: "https://gsap.com", exact: true, chunk: GSAP_CHUNK, reason: "the address in the text of GSAP's console warning for a target that is not found; the library makes no request" },
+  // The open-graph tags of index.html (designimplementation D-335).
+  { prefix: "https://offcut-one.vercel.app/", chunk: /^index\.html$/, reason: "the site's own address in the open-graph tags, which a link preview reads; the page makes no request to it" },
 ];
 
 const URL_LITERAL = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/g;

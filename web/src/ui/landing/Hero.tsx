@@ -9,6 +9,7 @@ import { Link } from "react-router";
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
+import heroPoster from "../assets/landing/hero.webp";
 import styles from "../styles/landing.module.css";
 import { CaptionedHeadline } from "./CaptionedHeadline";
 import { type GsapSetup, useGsap } from "./gsap";
@@ -134,14 +135,24 @@ export function Hero({ appPath, settingsPath }: { appPath: string; settingsPath:
         </div>
 
         <div className={styles.heroVisual} ref={visual}>
-          <div data-phone>
-            <PhoneFrame>
-              <LoopVideo clip={LANDING_CLIPS.hero} label={copy.clipLabels.hero} eager />
-            </PhoneFrame>
-          </div>
-          {copy.heroChips.map((chip, index) => (
-            <FloatingChip key={chip} text={chip} index={index} />
-          ))}
+          {LANDING_CLIPS.hero === undefined ? (
+            // Without the clip: a phone drawn in CSS, and the three chips around it (D-325, M5).
+            <>
+              <div data-phone>
+                <PhoneFrame>
+                  <LoopVideo clip={undefined} poster={heroPoster} label={copy.clipLabels.hero} />
+                </PhoneFrame>
+              </div>
+              {copy.heroChips.map((chip, index) => (
+                <FloatingChip key={chip} text={chip} index={index} />
+              ))}
+            </>
+          ) : (
+            // The clip draws its own phone and chips (remotion-prompts.md, hero), so the page only places it.
+            <div className={styles.heroClip} data-phone>
+              <LoopVideo clip={LANDING_CLIPS.hero} poster={heroPoster} label={copy.clipLabels.hero} eager />
+            </div>
+          )}
         </div>
       </div>
     </section>

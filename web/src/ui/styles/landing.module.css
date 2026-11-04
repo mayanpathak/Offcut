@@ -661,3 +661,15 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* The hero clip, which draws its own phone and chips: placed, not framed. */
+.heroClip {
+  position: relative;
+  width: min(340px, 78vw);
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 1px var(--lp-hairline),
+    0 40px 90px -40px rgb(0 0 0 / 0.9);
+}

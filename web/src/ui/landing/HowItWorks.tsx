@@ -7,6 +7,7 @@ import { useRef } from "react";
 
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
+import howItWorksPoster from "../assets/landing/howItWorks.webp";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
 import { type GsapSetup, useGsap } from "./gsap";
@@ -69,7 +70,7 @@ export function HowItWorks() {
             </ol>
           </div>
           <div className={styles.wideFrame}>
-            <LoopVideo clip={LANDING_CLIPS.howItWorks} label={copy.clipLabels.howItWorks}>
+            <LoopVideo clip={LANDING_CLIPS.howItWorks} poster={howItWorksPoster} label={copy.clipLabels.howItWorks}>
               <div className={styles.appStill} aria-hidden="true">
                 <span className={styles.appStillBar} />
                 <span className={styles.appStillStage} />

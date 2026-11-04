@@ -8,6 +8,7 @@ import { Link } from "react-router";
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import { Check } from "../icons";
+import privacyPoster from "../assets/landing/privacy.webp";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
 import { LoopVideo } from "./LoopVideo";
@@ -43,7 +44,7 @@ export function Privacy({ settingsPath }: { settingsPath: string }) {
             </Link>
           </div>
           <div className={styles.wideFrame}>
-            <LoopVideo clip={LANDING_CLIPS.privacy} label={copy.clipLabels.privacy}>
+            <LoopVideo clip={LANDING_CLIPS.privacy} poster={privacyPoster} label={copy.clipLabels.privacy}>
               <div className={styles.privacyStill} aria-hidden="true">
                 <span className={styles.privacyShield} />
               </div>

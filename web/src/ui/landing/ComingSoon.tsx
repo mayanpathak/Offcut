@@ -6,6 +6,7 @@ import { m } from "motion/react";
 
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
+import comingSoonPoster from "../assets/landing/comingSoon.webp";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-cards.module.css";
 import sections from "../styles/landing-sections.module.css";
@@ -25,7 +26,7 @@ export function ComingSoon() {
         <SectionHead eyebrow={copy.eyebrows.soon} heading={soon.heading} headingId="soon-heading" lead={soon.lead} />
         {LANDING_CLIPS.comingSoon === undefined ? null : (
           <div className={sections.wideFrame}>
-            <LoopVideo clip={LANDING_CLIPS.comingSoon} label={copy.clipLabels.comingSoon} />
+            <LoopVideo clip={LANDING_CLIPS.comingSoon} poster={comingSoonPoster} label={copy.clipLabels.comingSoon} />
           </div>
         )}
         {[soon.next, soon.later].map((group, groupIndex) => (

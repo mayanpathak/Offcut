@@ -6,10 +6,12 @@
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import { ArrowRight, Download } from "../icons";
+import captionStylesPoster from "../assets/landing/captionStyles.webp";
+import visualsPoster from "../assets/landing/visuals.webp";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-cards.module.css";
 import { LoopVideo } from "./LoopVideo";
-import { BentoCard, Chip, PhoneFrame, SectionHead } from "./parts";
+import { BentoCard, Chip, SectionHead } from "./parts";
 
 /** The bars of the voice card's waveform: heights in a 0-1 range, noisy then clean. */
 const WAVE_BARS = 28;
@@ -53,8 +55,8 @@ export function Features() {
         />
         <div className={styles.bento}>
           <BentoCard index={0} className={styles.cardTall} title={cards.captions.title} body={cards.captions.body} chips={cards.captions.chips}>
-            <PhoneFrame className={styles.miniPhone}>
-              <LoopVideo clip={LANDING_CLIPS.captionStyles} label={copy.clipLabels.captionStyles}>
+            <div className={styles.tallClip}>
+              <LoopVideo clip={LANDING_CLIPS.captionStyles} poster={captionStylesPoster} label={copy.clipLabels.captionStyles}>
                 <div className={styles.captionStill} aria-hidden="true">
                   {cards.captions.chips.map((name, index) => (
                     <span key={name} className={styles.captionStillLine} data-style={index}>
@@ -63,12 +65,12 @@ export function Features() {
                   ))}
                 </div>
               </LoopVideo>
-            </PhoneFrame>
+            </div>
           </BentoCard>
 
           <BentoCard index={1} className={styles.cardWide} title={cards.visuals.title} body={cards.visuals.body} chips={cards.visuals.chips}>
             <div className={styles.squareFrame}>
-              <LoopVideo clip={LANDING_CLIPS.visuals} label={copy.clipLabels.visuals}>
+              <LoopVideo clip={LANDING_CLIPS.visuals} poster={visualsPoster} label={copy.clipLabels.visuals}>
                 <div className={styles.visualsStill} aria-hidden="true">
                   <span className={styles.visualsNumber} />
                   <span className={styles.visualsBars} />

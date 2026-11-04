@@ -442,6 +442,9 @@ const WAITLIST_WORDS = [
   "Leave your email and we will tell you when it is",
 ];
 
+/** The clips of the page, one per slot of designimplementation §9.1, all uploaded (Entry 9). */
+const CLIP_SLOTS = 7;
+
 /** The page's widths in the design reviews, and a phone's. */
 const REVIEW_SIZES = [
   { width: 1280, height: 800 },
@@ -512,6 +515,15 @@ test("L-5: with reduced motion the page is complete and still", async ({ page })
     await expect(pill).toHaveCSS("opacity", "0");
   }
   await expect(page.locator("[data-lit]")).toHaveCount(0);
+  // Every clip stands still on its poster, with a button to play it (D-326).
+  const clips = page.locator("[data-clip]");
+  await expect(clips).toHaveCount(CLIP_SLOTS);
+  for (const clip of await clips.all()) {
+    const video = clip.locator("video");
+    expect(await video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+    await expect(video).toHaveAttribute("poster", /\/assets\/.+\.webp$/);
+    await expect(clip.getByRole("button", { name: messages.landing.playClip })).toBeVisible();
+  }
 });
 
 test("L-7: scrolling the whole page breaks no rule of the security policy, and the page stays isolated", async ({ page }) => {
@@ -567,4 +579,28 @@ test("L-9: leaving for /app inside the app leaves nothing of the landing page be
   await expect(page.locator(".pin-spacer")).toHaveCount(0);
   await expect(page.locator("[data-landing]")).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("L-6: every clip loads from the asset host under the isolation headers, and plays", async ({ page }) => {
+  await installFakeApi(page);
+  const response = await page.goto("/");
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  // The policy names the asset host in more than one directive: one host.
+  const assetHosts = [...new Set((csp.match(/https?:\/\/[^\s;]+/g) ?? []).map((host) => new URL(host).origin))];
+  expect(assetHosts).toHaveLength(1);
+
+  const videos = page.locator("[data-clip] video");
+  await expect(videos).toHaveCount(CLIP_SLOTS);
+  for (const video of await videos.all()) {
+    await video.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => video.evaluate((element) => (element as HTMLVideoElement).readyState), { timeout: 20_000 })
+      .toBeGreaterThanOrEqual(2);
+    const state = await video.evaluate((element) => {
+      const clip = element as HTMLVideoElement;
+      return { error: clip.error === null ? null : clip.error.code, paused: clip.paused, origin: new URL(clip.currentSrc).origin };
+    });
+    expect(state).toEqual({ error: null, paused: false, origin: assetHosts[0] });
+  }
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 });

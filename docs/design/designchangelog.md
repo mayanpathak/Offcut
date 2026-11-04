@@ -7,7 +7,7 @@ This file covers the design release between V6 and the cloud-transcription relea
 | # | Item | Who | Where |
 |---|---|---|---|
 | 1 | F-3: hide the in-app offers until live mode, as a small change of its own after this release (V6 CL open item 17) | Founder | §18 |
-| 2 | The upload of the seven re-encoded clips needs the founder's go (P156) | Founder | guide Step 6.3 |
+| 2 | ~~The upload of the seven re-encoded clips~~: **closed** 2026-11-05, uploaded under `overnight-run.md` §3.2 | Agent | Entry 9 |
 | 3 | Design review 3 (P158) | Founder | guide Phase 8 |
 | 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
 | 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
@@ -432,5 +432,75 @@ All 12 rows of §5 are cards with "Coming soon" (case L-2).
 | Frozen check | empty |
 
 **Open.** Item 5 (new): GSAP's banner comments in the bundle.
+
+**Found, not fixed.** None.
+
+## Entry 9 - 2026-11-05: P156, the clips
+
+**Step 6.1, the re-encode.** The seven web files were encoded from their masters in `offcut-remotion/out/` into `~/design-upload/`, with guide Step 6.1's command. The `out/` folder was only read. The §9.2 probe of the results:
+
+| Clip | Size | Codec | Pixels | fps | Frames | Audio | Faststart | Bytes (cap) |
+|---|---|---|---|---|---|---|---|---|
+| hero | 720 × 1280 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 300 | none | yes | 599,441 (2,500,000) |
+| before-after | 1280 × 720 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 360 | none | yes | 393,358 (3,000,000) |
+| caption-styles | 720 × 1280 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 270 | none | yes | 298,252 (2,000,000) |
+| visuals | 960 × 960 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 360 | none | yes | 293,808 (2,500,000) |
+| how-it-works | 1280 × 720 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 360 | none | yes | 723,654 (2,500,000) |
+| privacy | 1280 × 720 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 180 | none | yes | 44,173 (1,500,000) |
+| coming-soon | 1280 × 720 | H.264 High | `yuv420p`, tv, BT.709 | 30 | 240 | none | yes | 214,432 (1,500,000) |
+
+Every frame count is unchanged. A middle frame of each was read on D1 beside the same frame of the original: the colours match.
+
+**Step 6.3, the upload.** The founder's go is given by `overnight-run.md` §3.2. `grep -c '^ASSET_S3_' .env.deploy` printed 4. The seven files were uploaded once, with `sh scripts/upload-assets.sh media …` in a subshell. No key was printed, and nothing else on the asset host was touched. The printed paths:
+
+- `media/offcut-hero-720x1280.638a910246cea94f.mp4`
+- `media/offcut-before-after-1280x720.8302b0f909c47763.mp4`
+- `media/offcut-caption-styles-720x1280.d2b8c6103512e7d2.mp4`
+- `media/offcut-visuals-960x960.7d7b21acf8b32466.mp4`
+- `media/offcut-how-it-works-1280x720.bf1c3a7343abb4b6.mp4`
+- `media/offcut-privacy-1280x720.642f1e2cda617aaa.mp4`
+- `media/offcut-coming-soon-1280x720.5fff4a66a864300e.mp4`
+
+`curl -sI` with `Origin: https://offcut-one.vercel.app` on each answered:
+
+- `200`;
+- `video/mp4`;
+- `Cache-Control: public, max-age=31536000, immutable`;
+- `Access-Control-Allow-Origin: https://offcut-one.vercel.app`.
+
+`http://localhost:4173` is allowed too, so L-6 runs locally. The hand-made demo stays on the asset host; nothing references it.
+
+**Code.**
+
+- **`net/asset-fetch.ts`.** `LANDING_CLIPS` holds the seven paths and sizes. `DEMO_VIDEO_PATH` is now the hero clip's path (D-324), through a `HERO_CLIP` constant. `git grep -n "demo.81cafa494d9c2b68" web/src` is empty.
+- **Posters.** The seven `.webp` posters are in `web/src/ui/assets/landing/<slot>.webp` (5.7-11.9 kB each, over Vite's 4 kB inline limit, so emitted hashed under `/assets/`). Each section passes its poster to `LoopVideo`.
+- **`web/public/og.png`** (1200 × 630, 143 kB): the headline in Inter 800 with the yellow pill, beside a frame of the hero clip, on `#0e0e11`.
+- **`web/index.html`.** A title, a description, `og:type`, `og:title`, `og:description`, `og:image` (`https://offcut-one.vercel.app/og.png`), its width and height, `og:url` and `twitter:card`. No script and no other host.
+- **`check-hosts.mjs`.** It tolerates `https://offcut-one.vercel.app/`, in `index.html` only, with its reason: the site's own address in the open-graph tags, which a link preview reads.
+- **New case L-6.** For each of the 7 clips, scrolled into view: `readyState >= 2`, no error, playing, and `currentSrc` on the asset host; `crossOriginIsolated` stays true. L-5 now also checks that, under reduced motion, every clip is paused on its poster with a "Play the clip" button.
+
+**What differs from the plan.**
+
+- **The hero clip and the caption-styles clip are not framed in a CSS phone.**
+  - Both clips draw their own phone. The hero also draws its own three chips ("Voice cleaned", "Captions, word by word", and the counted number): `remotion-prompts.md`, hero, 3.0-9.0 s, and "the page will place it to the right of the headline".
+  - In the page's phone, the read of the captures showed a phone inside a phone, and two sets of the same chips.
+  - So with a clip, the page places it in a rounded 9:16 box (`.heroClip`, `.tallClip`).
+  - The CSS phone and M5's floating chips stay as the still for a missing clip (D-325). With all seven clips uploaded, M5 is not shown. M4's tilt applies to the clip's box.
+- **`og.png` uses a frame from the middle of the hero clip**, not its poster. The poster is the clip's first frame, nearly black ("Raw take").
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. 521 files in the tree; longest `landing.module.css`, 675 lines |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **444.2 kB** (main 205.7 kB, GSAP 44.1 kB, CSS 13.2 kB, `index.html` 0.7 kB) |
+| `pnpm e2e --workers=4` | 54 of 55 passed, including L-6 (10.9 s), `@smoke` and "every request of a session…". "Two tabs" failed and passed alone (Entry 3). The `page.clock` cases took 7.9 s and 8.5 s |
+| The unsupported page | Opened at `/app` under Playwright's Pixel 7 emulation: `UNSUPPORTED_MOBILE`, and its video's `currentSrc` is the hero clip, `readyState` 4, 720 × 1280, no error |
+| Frozen check | empty |
+
+**Seen in the clips, for the founder.** The how-it-works clip shows the editor's real screenshots, with a person's face in the preview. Entry 2's read accepted this clip under the truth rules (§9.2: "the only person on screen is the founder"). This run takes that face to be the founder's own footage. If it is not, re-render the clip and upload it again (a new path; the slot shows its poster meanwhile).
+
+**Open.** Item 2 is closed (the upload).
 
 **Found, not fixed.** None.
