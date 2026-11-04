@@ -7,6 +7,7 @@ import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 
+import cards from "../styles/landing-cards.module.css";
 import styles from "../styles/landing.module.css";
 
 /** Motion for the whole page: the light `m` component, and reduced motion as the visitor asks (§8.1). */
@@ -99,4 +100,38 @@ export function PhoneFrame({ children, frameRef, className }: { children: ReactN
 /** A small label in the accent face, with an optional dot. */
 export function Chip({ children, dot = false, className }: { children: ReactNode; dot?: boolean; className?: string | undefined }) {
   return <span className={join(styles.chip, dot && styles.chipDot, className)}>{children}</span>;
+}
+
+/** A card of the features' bento grid: its picture, then its title, its words and its chips. */
+export function BentoCard({
+  title,
+  body,
+  chips = [],
+  className,
+  children,
+}: {
+  title: string;
+  body: string;
+  chips?: readonly string[];
+  className?: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <article className={join(cards.card, className)}>
+      {children}
+      <div className={cards.cardText}>
+        <h3 className={cards.cardTitle}>{title}</h3>
+        <p className={cards.cardBody}>{body}</p>
+        {chips.length === 0 ? null : (
+          <ul className={cards.cardChips}>
+            {chips.map((chip) => (
+              <li key={chip}>
+                <Chip>{chip}</Chip>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </article>
+  );
 }

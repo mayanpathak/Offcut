@@ -249,3 +249,86 @@ The first `build:e2e` failed in Cargo ("could not parse/generate dep info … os
 **Open.** Nothing new.
 
 **Found, not fixed.** None.
+
+## Entry 6 - 2026-11-05: P153, every feature, every "Coming soon", the way in
+
+**What changed.**
+
+- **New sections in `ui/landing/`**, each with its `id` and timecode eyebrow:
+  - `Marquee`;
+  - `BeforeAfter`;
+  - `Features`: the 8 cards of §6, each with its CSS illustration. The `captionStyles` and `visuals` slots go through `LoopVideo`, with the illustration as children;
+  - `HowItWorks`;
+  - `Privacy`: its three facts and a "See the full list" link. Neither the privacy line nor a second "What leaves your device" link (D-334);
+  - `ComingSoon`: "Next" and "On the way", every card with the chip, then the footnote;
+  - `FinalCall`.
+- **`parts.tsx`.** `BentoCard`.
+- **`Pricing.tsx`** (D-329, option (a)):
+  - the Free card has "Every feature above" and a "Start free" link to `appPath`;
+  - the Creator card has the tag "For regular posting" and the chip "On sale soon", with no button and no link;
+  - the section's lead is `notOnSale`.
+- **`LandingPage.tsx`.** It composes the 12 sections in §6's order.
+- **Styles.**
+  - `landing-sections.module.css` grows to 574 lines.
+  - **New: `landing-cards.module.css`** (436 lines): the bento cards and the "Coming soon" cards. It is split off to keep each file under 700 lines (§10.1 allows a split). It has its TS §5 row.
+
+**DECLARED CHANGE (§12.4).** In `landing.spec.ts`, the case "pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy":
+
+- the title gains ", only a way in";
+- `pricing.getByRole("link")` goes from a count of 0 to 1;
+- a new line checks that this link is named `cta.startFree` with `href` `/app`.
+
+`pricing.getByRole("button")` stays at 0, and every price and feature line is unchanged. No other existing case changed.
+
+**New cases.** L-1 (each card's title; no sideways scroll at 1280, 1920 and 390), L-2 (12 soon cards, each with the chip, its title and its line; the footnote) and L-4 (none of the waitlist's sentences on the page). L-3 now expects 4 "Start free" links.
+
+**§4, row by row: where each feature is named on `/`.**
+
+| # | Where |
+|---|---|
+| F1 | Try it: the limits line (`LIMITS`), and the drop zone's own prompt |
+| F2 | Try it: the drop zone's "Try a sample" button |
+| F3 | Card "Transcribed on your computer"; before-after step |
+| F4 | Card "A cleaner voice, same length"; marquee; before-after step |
+| F5 | Card "Captions that follow your voice" (Clean, Bold, Mono, accent numbers) |
+| F6 | Card "Visuals for what you say" (Big number, List, Before → after, Emphasis; "turn any of them off") |
+| F7 | Card "Vertical, framed your way" (pass through, crop, you pick it) |
+| F8 | The same card (top, middle, bottom, drag) |
+| F9 | Card "Fix any word in a click" (live preview with sound) |
+| F10 | The same card (correct a word, change every copy, hide it) |
+| F11 | The same card (undo, redo, keyboard shortcuts) |
+| F12 | Not marketed (§4) |
+| F13 | Card "Ready to post"; pricing |
+| F14 | Card "Ready to post" ("a short summary of what we changed") |
+| F15 | Card "Sign in with a link" |
+| F16 | Pricing |
+| F17 | Card "Sign in with a link" (your plan, your data, delete your account) |
+| F18 | Hero facts (privacy line and link); the privacy section |
+| F19 | Hero facts; the capability line |
+
+All 12 rows of §5 are cards with "Coming soon" (case L-2).
+
+**What differs from the plan.**
+
+- "Every feature above" is a list item of its own on the Free card. It is not part of `pricing.free.features()`, which the pricing case loops over.
+- Creator's "goes on sale soon" sentence is the section's lead (`notOnSale`), so the card carries a short chip, "On sale soon", rather than the sentence a second time.
+
+**The design read.** Captures at 1280 and 390, read on D1, led to three fixes:
+
+- the last "Coming soon" card takes a whole row in the three-column grid, where it stood alone;
+- "1080p" and "720p" keep their lower-case "p";
+- the captions card's phone is larger.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. 511 files in the tree |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **391.6 kB** (main chunk 198.1 kB, CSS 12.7 kB) |
+| `pnpm e2e --workers=4` | 49 of 50 passed: the 17 unchanged landing cases, the declared pricing case, L-1 to L-4 and L-10, signin and checkout. Checkout's "Free: the plan and its count…" failed (`toHaveURL` of the merchant's checkout within 5 s). Alone, `--repeat-each=3`: 3 passed. It is one of Entry 3's load-flaky cases, on the account page, which Part A does not touch |
+| Frozen check | empty |
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

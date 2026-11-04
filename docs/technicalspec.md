@@ -894,7 +894,8 @@ offcut/
 │   │           ├── controls.module.css    the primitives that hold a value: Tabs, Switch, SegmentedControl, Slider (v4changelog Entry 19)
 │   │           ├── preview.module.css     the player, its transport and the direct-manipulation chrome
 │   │           ├── landing.module.css     the landing page: root, tokens, top bar, hero, shared parts (designimplementation §7)
-│   │           └── landing-sections.module.css  the landing page's sections after the hero
+│   │           ├── landing-sections.module.css  the landing page's sections after the hero
+│   │           └── landing-cards.module.css  the features' bento cards and the "Coming soon" cards (split to stay under 700 lines)
 │   └── tests-e2e/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts

@@ -344,7 +344,7 @@ test("@smoke the page is isolated and the WASM bundle compiles under the CSP", a
   expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
 });
 
-test("pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy", async ({ page }) => {
+test("pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy, only a way in", async ({ page }) => {
   await installFakeApi(page);
   await page.goto("/");
 
@@ -357,7 +357,8 @@ test("pricing: the plans show their prices and limits, say they are not on sale,
     await expect(pricing.getByText(feature)).toBeVisible();
   }
   await expect(pricing.getByRole("button")).toHaveCount(0);
-  await expect(pricing.getByRole("link")).toHaveCount(0);
+  await expect(pricing.getByRole("link")).toHaveCount(1);
+  await expect(pricing.getByRole("link", { name: messages.landing.cta.startFree, exact: true })).toHaveAttribute("href", "/app");
 });
 
 test("the footer reaches each legal page, and each has its title, its date and a contact link", async ({ page }) => {
@@ -390,8 +391,8 @@ test("a legal document that does not exist goes back to the landing page", async
 // New cases only: every case above is as it was, except the pricing case's
 // declared change (§12.4).
 
-/** Where "Start free" leads into the app: the top bar and the hero. */
-const START_FREE_LINKS = 2;
+/** Where "Start free" leads into the app: the top bar, the hero, pricing and the final call. */
+const START_FREE_LINKS = 4;
 const startFree = (scope: Pick<Page, "getByRole">) => scope.getByRole("link", { name: messages.landing.cta.startFree, exact: true });
 
 test("L-3: every Start free leads to /app, which shows the drop zone or the unsupported page", async ({ page }) => {
@@ -432,4 +433,55 @@ test("L-10: each string the tests look for is on the page once, by its name and 
   await expect(page.getByText(messages.landing.privacyLine)).toHaveCount(1);
   // The waitlist cases read the status of the page's one form.
   await expect(page.locator("form")).toHaveCount(1);
+});
+
+/** The sentences of the old waitlist, which no longer appear anywhere on the page (§13). */
+const WAITLIST_WORDS = [
+  "Offcut is not open yet. Leave your email and we will tell you when it is.",
+  "not open yet",
+  "Leave your email and we will tell you when it is",
+];
+
+/** The page's widths in the design reviews, and a phone's. */
+const REVIEW_SIZES = [
+  { width: 1280, height: 800 },
+  { width: 1920, height: 1080 },
+  { width: 390, height: 844 },
+];
+
+test("L-1: every feature card of the page is named, and the page never scrolls sideways", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  for (const card of Object.values(messages.landing.features.cards)) {
+    await expect(page.getByRole("heading", { name: card.title, exact: true })).toBeVisible();
+  }
+  for (const size of REVIEW_SIZES) {
+    await page.setViewportSize(size);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  }
+});
+
+test("L-2: every feature after V6 is on the page, each marked Coming soon", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  const soon = messages.landing.soon;
+  const items = [...soon.next.items, ...soon.later.items];
+  const cards = page.getByTestId("soon-card");
+  await expect(cards).toHaveCount(items.length);
+  for (const [index, item] of items.entries()) {
+    await expect(cards.nth(index)).toContainText(soon.chip);
+    await expect(cards.nth(index).getByRole("heading", { name: item.title, exact: true })).toBeVisible();
+    await expect(cards.nth(index)).toContainText(item.line);
+  }
+  await expect(page.getByText(soon.footnote)).toBeVisible();
+});
+
+test("L-4: no sentence on the page says that Offcut is not open", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: messages.landing.updatesHeading })).toBeVisible();
+  const text = await page.locator("body").innerText();
+  for (const words of WAITLIST_WORDS) {
+    expect(text).not.toContain(words);
+  }
 });

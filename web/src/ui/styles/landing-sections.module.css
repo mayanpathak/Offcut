@@ -275,3 +275,300 @@
   color: var(--text);
   text-decoration: underline;
 }
+
+/* --- Clip frames ----------------------------------------------------------- */
+
+.wideFrame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  margin-top: 48px;
+  border-radius: var(--lp-radius-lg);
+  background: #0a0a0d;
+  box-shadow:
+    inset 0 0 0 1px var(--lp-hairline-2),
+    0 40px 80px -40px rgb(0 0 0 / 0.8),
+    0 0 100px -40px rgb(139 92 246 / 0.4);
+}
+
+/* --- Marquee (section 2) --------------------------------------------------- */
+
+.marquee {
+  overflow: hidden;
+  padding-block: 22px;
+  border-block: 1px solid var(--lp-hairline);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+}
+
+.marqueeLine {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marqueeLine li {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
+  color: var(--text-2);
+  font-size: clamp(15px, 1.6vw, 19px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.marqueeLine li::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--brand);
+  transform: rotate(45deg);
+}
+
+/* --- Before and after (section 3) ------------------------------------------ */
+
+.beforeAfterStill,
+.appStill,
+.privacyStill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6%;
+  background: radial-gradient(60% 80% at 50% 50%, rgb(139 92 246 / 0.12), transparent);
+}
+
+.stillLandscape {
+  width: 36%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2a2a33, #1a1a20);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+}
+
+.stillArrow {
+  width: 8%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand));
+}
+
+.stillPortrait {
+  height: 78%;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #3a3550, #1d1d23);
+  box-shadow:
+    inset 0 0 0 1px rgb(139 92 246 / 0.4),
+    0 0 40px -10px rgb(139 92 246 / 0.5);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-weight: 600;
+}
+
+.stepIndex {
+  flex: none;
+  color: var(--lp-violet-text);
+  font-family: var(--font-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* --- How it works (section 5) ---------------------------------------------- */
+
+.howGrid,
+.privacy {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+}
+
+.howGrid .wideFrame,
+.privacy .wideFrame {
+  margin-top: 0;
+}
+
+@media (max-width: 1023px) {
+  .howGrid,
+  .privacy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.howSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 0;
+  list-style: none;
+}
+
+.howStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    opacity var(--base) var(--ease),
+    box-shadow var(--base) var(--ease);
+}
+
+.howStep .stepIndex {
+  padding-top: 4px;
+}
+
+/* While GSAP pins the section, the step the scroll has reached stands out;
+   the others stay readable (M9). */
+.how[data-pinned] .howStep {
+  opacity: 0.5;
+}
+
+.how[data-pinned] .howStep[data-active] {
+  opacity: 1;
+  box-shadow:
+    inset 0 0 0 1px rgb(139 92 246 / 0.6),
+    0 0 40px -16px rgb(139 92 246 / 0.6);
+}
+
+.howStepTitle {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.howStepBody {
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.appStill {
+  flex-direction: column;
+  gap: 4%;
+  padding: 5%;
+}
+
+.appStillBar {
+  width: 100%;
+  height: 8%;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.appStillStage {
+  width: 100%;
+  flex: 1;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d1d23, #121217);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+}
+
+.appStillPanel {
+  display: none;
+}
+
+/* --- Privacy (section 7) --------------------------------------------------- */
+
+.privacyText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.privacyFacts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 32px;
+  padding: 0;
+  font-size: 17px;
+  list-style: none;
+}
+
+.privacyFacts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.privacyCheck {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgb(61 220 132 / 0.12);
+  color: var(--lp-mono-green);
+}
+
+.privacyLink {
+  margin-top: 24px;
+  font-weight: 600;
+}
+
+.privacyShield {
+  width: 18%;
+  aspect-ratio: 4 / 5;
+  border-radius: 40% 40% 50% 50% / 30% 30% 70% 70%;
+  background: linear-gradient(180deg, rgb(61 220 132 / 0.5), rgb(61 220 132 / 0.08));
+  box-shadow: 0 0 60px -10px rgb(61 220 132 / 0.5);
+}
+
+/* --- Final call (section 11) ----------------------------------------------- */
+
+.finalInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding-block: clamp(56px, 7vw, 96px);
+  border-radius: 32px;
+  background: radial-gradient(60% 80% at 50% 0%, rgb(139 92 246 / 0.22), transparent 70%);
+  text-align: center;
+}
+
+.finalLine {
+  position: relative;
+  max-width: 13em;
+  font-size: clamp(40px, 6.5vw, 88px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  text-wrap: balance;
+}

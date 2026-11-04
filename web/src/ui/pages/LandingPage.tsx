@@ -12,9 +12,16 @@ import { useNavigate } from "react-router";
 
 import type { LegalDoc } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
+import { BeforeAfter } from "../landing/BeforeAfter";
+import { ComingSoon } from "../landing/ComingSoon";
+import { Features } from "../landing/Features";
+import { FinalCall } from "../landing/FinalCall";
 import { Hero } from "../landing/Hero";
+import { HowItWorks } from "../landing/HowItWorks";
+import { Marquee } from "../landing/Marquee";
 import { MotionScope } from "../landing/parts";
 import { Pricing } from "../landing/Pricing";
+import { Privacy } from "../landing/Privacy";
 import { SiteFooter } from "../landing/SiteFooter";
 import { TopBar } from "../landing/TopBar";
 import { TryIt } from "../landing/TryIt";
@@ -51,9 +58,16 @@ export function LandingPage({
         <TopBar appPath={appPath} />
         <main>
           <Hero appPath={appPath} settingsPath={settingsPath} />
+          <Marquee />
+          <BeforeAfter />
+          <Features />
+          <HowItWorks />
           <TryIt />
-          <Pricing />
+          <Privacy settingsPath={settingsPath} />
+          <Pricing appPath={appPath} />
+          <ComingSoon />
           <Updates />
+          <FinalCall appPath={appPath} />
         </main>
         <SiteFooter legalPath={legalPath} settingsPath={settingsPath} />
       </div>
