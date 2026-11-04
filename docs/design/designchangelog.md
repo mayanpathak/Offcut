@@ -83,3 +83,48 @@ The branch `design-build` starts at `8d94a06` (V6's closing entry on `v6-build`,
 - **Footage.** `public/footage/` was never filled, so the other clips show a drawn silhouette in place of the founder. That is allowed; a later re-render is a new upload.
 
 **Not done yet.** No code. Setup comes next, and its baseline is Entry 3.
+
+## Entry 3 - 2026-11-05: Setup, the baseline (overnight run)
+
+**What.** This entry records the baseline that every later entry is compared with. It also opens the draft pull request. No code changed.
+
+The release is built tonight by one agent working alone, under `docs/design/overnight-run.md`. The founder's authorisations of 2026-11-05 are quoted there (§3). In short:
+
+- the agent takes the design decisions the plan leaves open;
+- it gives the upload's go (P156);
+- it does design review 3 with the rubric of `overnight-run.md` §5;
+- it merges, runs the deploy checks and tags, under the gates of §7.
+
+Wherever the plan says "stop and ask", the agent follows `overnight-run.md` §6 and records the case under Open items.
+
+**Checks.**
+
+- Branch `design-build` at `f334dbc`, on top of `8d94a06`. `origin/main..8d94a06` is one commit, V6's closing entry.
+- Frozen check (guide Step 0.2): empty.
+
+**Baseline on D1.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass (`check-file-tree`: longest file `messages.ts`, 679 lines) |
+| `cargo test --workspace` | 812 passed, 0 failed, 4 ignored |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **351.6 kB** (main chunk 163.6 kB, CSS 7.3 kB) |
+| `pnpm e2e` | 45 cases: `landing.spec.ts` 18, `signin.spec.ts` 15, `checkout.spec.ts` 12 |
+| Media floor | V6's close (V6 CL Entry 19): 106 passed and 1 skipped. Not re-run now |
+
+**`pnpm e2e` on D1 depends on load.**
+
+- With the default 6 workers (12 cores), the first run passed 41 of 45. The failures were three `checkout.spec.ts` cases and `signin.spec.ts`'s "two tabs: the link opened in a new tab signs the first in through the broadcast".
+- Run alone, the three checkout cases passed. The "two tabs" case passed 3 of 3 with `--repeat-each=3`.
+- With `--workers=4`, two full runs each passed 44 of 45. "Two tabs" failed both times: the first tab did not show `account-signed-in` within 5 s.
+- The code is untouched, so this is a timing flake of D1 under parallel load, in a case this release does not touch until Part C (P157). CI runs on Linux with one retry.
+
+**How every gate of this release reads `pnpm e2e`.**
+
+- `pnpm e2e --workers=4`.
+- Then any case that failed is run again alone. "Two tabs" is the one known to fail in the full run.
+- The gate passes only if each case that failed passes alone, and it was one of the cases above.
+- Each entry records both results.
+
+**Not done yet.** Prompt 151 comes next.
