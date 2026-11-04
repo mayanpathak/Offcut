@@ -19,6 +19,7 @@ const MEDIA_SUITES = [
   "model-download.spec.ts",
   "pipeline-preview.spec.ts",
   "export-creator.spec.ts",
+  "export-free.spec.ts",
   "timeline-preserved.spec.ts",
   "rejections.spec.ts",
   "preview-sync.spec.ts",
@@ -52,7 +53,7 @@ export default defineConfig({
   },
   projects: [
     // `pnpm e2e`, and the Linux job of CI. No dependency: it never fetches the model.
-    { name: "non-media", testMatch: "landing.spec.ts" },
+    { name: "non-media", testMatch: ["landing.spec.ts", "signin.spec.ts", "checkout.spec.ts"] },
     // With the arguments of the suites it stands for: it asks whether their Chrome can run the app.
     { name: "media-setup", testMatch: "media.setup.ts", fullyParallel: false, workers: 1, use: MEDIA_USE },
     {

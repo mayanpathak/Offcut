@@ -356,3 +356,60 @@ async fn a_stored_row_holds_neither_the_ip_address_nor_the_user_agent() {
         .unwrap();
     assert_eq!(fresh, 1);
 }
+
+#[tokio::test]
+async fn the_purge_also_takes_old_links_old_webhook_events_and_finished_sessions() {
+    let app = TestApp::spawn().await;
+    let run = |sql: &'static str| sqlx::query(sql).execute(&app.pool);
+    run(
+        "INSERT INTO magic_links (token_hash, email_normalized, created_at, expires_at) VALUES
+           ('\\x01', 'old@example.com', now() - interval '25 hours', now()),
+           ('\\x02', 'new@example.com', now() - interval '23 hours', now())",
+    )
+    .await
+    .unwrap();
+    run(
+        "INSERT INTO webhook_events (provider_event_id, event_type, processed_at) VALUES
+           ('old', 'x', now() - interval '91 days'),
+           ('new', 'x', now() - interval '89 days')",
+    )
+    .await
+    .unwrap();
+    run("INSERT INTO users (id, email, email_normalized)
+         VALUES ('00000000-0000-0000-0000-000000000001', 'a@example.com', 'a@example.com')")
+    .await
+    .unwrap();
+    run(
+        "INSERT INTO sessions (id, user_id, refresh_token_hash, expires_at, revoked_at)
+         SELECT ('00000000-0000-0000-0000-00000000000' || n)::uuid,
+                '00000000-0000-0000-0000-000000000001',
+                decode('0' || n, 'hex'),
+                now() + CASE n WHEN 2 THEN interval '-1 hour' ELSE interval '1 hour' END,
+                CASE n WHEN 1 THEN now() END
+         FROM generate_series(1, 3) AS n",
+    )
+    .await
+    .unwrap();
+
+    // A link, an event, a revoked session and an expired one.
+    assert_eq!(purge_once(&app.pool).await.unwrap(), 4);
+
+    let left = |sql: &'static str| sqlx::query_scalar::<_, String>(sql).fetch_all(&app.pool);
+    assert_eq!(
+        left("SELECT email_normalized FROM magic_links")
+            .await
+            .unwrap(),
+        ["new@example.com"]
+    );
+    assert_eq!(
+        left("SELECT provider_event_id FROM webhook_events")
+            .await
+            .unwrap(),
+        ["new"]
+    );
+    assert_eq!(
+        left("SELECT id::text FROM sessions").await.unwrap(),
+        ["00000000-0000-0000-0000-000000000003"]
+    );
+    assert_eq!(purge_once(&app.pool).await.unwrap(), 0);
+}

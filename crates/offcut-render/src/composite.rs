@@ -1,5 +1,5 @@
 //! One render pass to the canvas: the source frame, then the overlay over it.
-//! What a list may ask of the pass is V4's support rule (D-133); V6.5
+//! What a list may ask of the pass is V4's support rule (D-133); V6.6
 //! replaces the rule with layers, and the signature of `render` stays.
 
 use offcut_scene::{CropRect, DisplayList, DrawCmd, Rect, VideoSlot};

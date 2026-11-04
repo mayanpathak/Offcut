@@ -1,0 +1,29 @@
+{
+  "business_id": "bus_test",
+  "data": {
+    "amount": 1500,
+    "brand_id": "bus_test",
+    "business_id": "bus_test",
+    "created_at": "2026-11-02T22:36:15.415652Z",
+    "currency": "USD",
+    "customer": {
+      "customer_id": "cus_test",
+      "email": "test@example.com",
+      "metadata": {},
+      "name": "Test Person",
+      "phone_number": null
+    },
+    "is_partial": false,
+    "metadata": {},
+    "network_reference": null,
+    "network_reference_type": null,
+    "network_reference_updated_at": null,
+    "payload_type": "Refund",
+    "payment_id": "pay_test",
+    "reason": "asdfghjk",
+    "refund_id": "ref_test",
+    "status": "succeeded"
+  },
+  "timestamp": "2026-11-02T22:36:16.874755Z",
+  "type": "refund.succeeded"
+}

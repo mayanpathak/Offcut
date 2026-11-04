@@ -117,3 +117,57 @@
   border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
 }
+
+/* --- The account page ----------------------------------------------------- */
+
+/* A notice that needs an answer, such as a payment not confirmed yet. */
+.card {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cardTitle {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* What cannot be undone: the problem colour, so it is not read as the next step. */
+.dangerButton {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-problem);
+  background: transparent;
+  color: var(--color-problem);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* The question before a deletion, as a modal of the page's colours. */
+.dialog {
+  width: min(calc(100vw - 2 * var(--space-3)), 32rem);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dialog::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}

@@ -1,7 +1,7 @@
 //! Styles are data on theme roles (D-136, TS §40.5): `theme.rs` is the only
 //! home of a colour value, so no `Rgba {` literal appears in the scene's
 //! source anywhere else but `display_list.rs`, which defines the type. A
-//! brand kit (V6.7) then changes every colour by changing one `Theme`.
+//! brand kit (V6.10) then changes every colour by changing one `Theme`.
 
 use std::fs;
 use std::io;

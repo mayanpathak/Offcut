@@ -13,6 +13,7 @@ import { DEV_HOOKS } from "../../config/env";
 import { messages } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
 import { type PreviewState, usePreviewStore } from "../../state/preview-store";
+import { useUiStore } from "../../state/ui-store";
 import { attach, detach, pause, play, scrub, seekDone, seekStart } from "../../usecases/control-preview";
 import { cachedPlan } from "../../usecases/start-export";
 import { TRANSCRIPT_ID } from "./CaptionEditor";
@@ -114,6 +115,8 @@ export function PreviewPlayer() {
   const placement = useClipStore((state) => state.edit.caption_position);
   const slow = useSlowSeek();
   const mirror = useCaptionMirror();
+  // The transcript the canvas points at is on the Captions tab only.
+  const tab = useUiStore((state) => state.tab);
 
   // The canvas is handed over once, when the player appears: an element
   // gives its drawing away for good. The audio is the clip's, read then.
@@ -165,10 +168,10 @@ export function PreviewPlayer() {
         role="img"
         aria-label={messages.preview.canvas}
         aria-describedby={CANVAS_WORDS_ID}
-        aria-details={TRANSCRIPT_ID}
+        aria-details={tab === "captions" ? TRANSCRIPT_ID : undefined}
         data-testid="preview-canvas"
       />
-      {/* The canvas's text alternative is the transcript editor (D-192). */}
+      {/* The canvas's text alternative is the transcript editor (D-192), on the Captions tab. */}
       <span id={CANVAS_WORDS_ID} className={styles.srOnly}>
         {messages.preview.canvasWords}
       </span>

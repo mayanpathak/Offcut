@@ -1,7 +1,8 @@
 //! Tracing setup and redaction. This file is the only place that decides what
 //! a request's log line may contain (TS §24.4).
 //!
-//! Logged per request: request id, method, route template, status, latency.
+//! Logged per request: request id, method, route template, status, latency, and
+//! for an authenticated route the user's tag.
 //! Never logged: email addresses, tokens, cookies, bodies, IP addresses, query
 //! strings, or the raw path.
 
@@ -28,6 +29,7 @@ pub fn request_span<B>(req: &Request<B>) -> tracing::Span {
         request_id = request_id(req),
         method = %req.method(),
         route = route(req),
+        user = tracing::field::Empty,
     )
 }
 

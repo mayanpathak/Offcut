@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status, billing_interval, current_period_end, cancel_at_period_end\n         FROM subscriptions WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "billing_interval",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "billing_interval"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "current_period_end",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "current_period_end"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "cancel_at_period_end",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "cancel_at_period_end"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "17e06fecb6de36e2697daec777ad43ff9594cccc47ab59f9c1f26887508d36dc"
+}

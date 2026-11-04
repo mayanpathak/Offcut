@@ -173,6 +173,25 @@ function withTimeout<T>(started: Promise<T>, otherwise: T): Promise<T> {
   });
 }
 
+/**
+ * The storage check, in two waits. A disk that is merely slow is not a browser
+ * that refuses to keep files, and telling a person it is sends them to look for
+ * a setting that is not there. So a check that has not answered is asked once
+ * more, and either answer counts; a "no" or a rejection is a no at once. Only a
+ * slow disk meets the second wait, which can take the run past the 3 s of
+ * `LIMITS.CAPABILITY_CHECK_BUDGET` (founder's decision of 2026-11-03).
+ */
+async function storageAnswer(first: Promise<boolean>, askAgain: () => Promise<boolean>): Promise<boolean> {
+  const notYet = Symbol("not yet");
+  // A rejection is an answer: `withTimeout` alone would read it as no answer yet.
+  const answered = first.catch(() => false);
+  const answer = await withTimeout<boolean | typeof notYet>(answered, notYet);
+  if (answer !== notYet) {
+    return answer;
+  }
+  return withTimeout(Promise.race([answered, start(askAgain)]), false);
+}
+
 function gpuVendorOf(vendor: string | null): GpuVendor {
   const name = (vendor ?? "").toLowerCase();
   if (name === "") {
@@ -277,7 +296,7 @@ export async function runCapabilityCheck(probe: PlatformProbe = browserProbe): P
     withTimeout(started.webCodecs, false),
     withTimeout(started.isolated, false),
     withTimeout(started.simd, false),
-    withTimeout(started.storage, false),
+    storageAnswer(started.storage, () => probe.storageOk()),
     withTimeout(started.memoryGb, MEMORY_UNREADABLE),
     withTimeout(started.vendor, null),
     withTimeout(started.h264Decode, false),

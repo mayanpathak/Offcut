@@ -168,6 +168,11 @@
   position: absolute;
 }
 
+/* The bar's one link, "Account": a quiet button that is a link. */
+.barLink {
+  text-decoration: none;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

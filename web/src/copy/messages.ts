@@ -5,7 +5,7 @@
 // Wording rules (TS §25.1 P-12): the privacy claim is the factual one, that
 // the video is not uploaded. Legal and certification terms are not used.
 
-import type { AnalyticsEvent, Wanted } from "../gen/api";
+import type { AnalyticsEvent, BillingInterval, Wanted } from "../gen/api";
 import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
 
 type EventName = AnalyticsEvent["name"];
@@ -18,8 +18,7 @@ type ErrorCopy = { title: string; body: string; action: string };
 /**
  * The error codes that can reach a person: the six of V1, the three of the
  * model download (V2), and the twelve more a person can meet on this device
- * since v4implementation D-159. The account, billing and entitlement codes
- * get copy with their flows (V6).
+ * since v4implementation D-159, and the account's, the token's and billing's eight (V6).
  */
 type ErrorCodeWithCopy = Extract<
   ErrorCode,
@@ -44,6 +43,14 @@ type ErrorCodeWithCopy = Extract<
   | "E_ENCODE_VIDEO"
   | "E_ENCODE_AUDIO"
   | "E_MUX"
+  | "E_AUTH_LINK_INVALID"
+  | "E_AUTH_LINK_EXPIRED"
+  | "E_AUTH_SESSION_EXPIRED"
+  | "E_AUTH_EMAIL_UNAVAILABLE"
+  | "E_ENTITLEMENT_INVALID"
+  | "E_ENTITLEMENT_EXPIRED"
+  | "E_BILLING_UNAVAILABLE"
+  | "E_BILLING_PENDING"
 >;
 
 const MS_PER_SECOND = 1000;
@@ -71,6 +78,9 @@ function clockTime(ms: number): string {
   const seconds = total % SECONDS_PER_MINUTE;
   return `${String(Math.floor(total / SECONDS_PER_MINUTE))}:${seconds < 10 ? "0" : ""}${String(seconds)}`;
 }
+
+/** D-293: `E_ENTITLEMENT_INVALID`'s title is this sentence, which the export's protected cases read. */
+const FAILED_ON_DEVICE = "Something went wrong on this device.";
 
 export const messages = {
   landing: {
@@ -138,7 +148,8 @@ export const messages = {
   // `button` is the top bar's Export (v4implementation §17.5's `editor.export`).
   export: {
     button: "Export",
-    unavailable: "Exporting needs an account, and accounts are not open yet.",
+    counter: (left: number, total: number) => `${String(left)} of ${String(total)} left`,
+    lastFree: { title: "This is your last free export this month", body: "After this one, exporting needs Creator or the start of next month.", go: "Export it", notNow: "Not now" },
     stage: { rendering: "Rendering video", muxing: "Finishing file", saving: "Saving" },
     renderingLocally: "Everything is rendering on your computer.",
     done: "Your video is downloaded.",
@@ -163,7 +174,7 @@ export const messages = {
 
   // The editor's top bar and side panel (v4implementation D-178, D-184, §17.5).
   editor: {
-    failedStub: "Something went wrong on this device.",
+    failedStub: FAILED_ON_DEVICE,
     startOver: "Start over",
     mark: "Offcut",
     lengthLabel: (ms: number) => `Video length ${clockTime(ms)}`,
@@ -172,6 +183,8 @@ export const messages = {
     // The toast after an undo or a redo (D-184), with the other one as its action.
     undone: "Change undone.", redone: "Change redone.",
     availableAfterExport: "Available when the export finishes",
+    // A tab of its own, so that the clip in this one stays open (v6implementation §13).
+    account: "Account", newTab: "(opens in a new tab)",
   },
   panel: { label: "Edit your video", captions: "Captions", style: "Style", visuals: "Visuals", framing: "Framing" },
   captions: {
@@ -261,22 +274,67 @@ export const messages = {
 
   api: { waking: "Connecting to the account service…" },
 
-  // Why an action cannot start now (TS §12.5): the four a person can meet in
-  // V2. The others come with the room check and with accounts.
+  // The one upgrade prompt (PS §10 J12), and the two offers of the checkout (TS C-11; none founding, D-303).
+  upgrade: {
+    afterExport: (usd: number) => `Remove the watermark and export in 1080p: Creator, $${String(usd)}/month.`,
+    limitReached: (total: number, usd: number) => `You have used your ${String(total)} free exports this month. Creator, $${String(usd)}/month, has no limit and no watermark, in 1080p.`,
+    // The offers' buttons: the sentence above each pair names the plan.
+    monthly: (usd: number) => `$${String(usd)}/month`, annual: (usd: number) => `$${String(usd)}/year`,
+    opening: "Opening checkout…", anotherClip: "Make another clip", dismiss: "Not now",
+  },
+
+  // Signing in (PS §10 J9, TS C-8). A link opened on a phone would leave this tab waiting, so the sent state says where to open it.
+  signIn: {
+    title: "Sign in to export", close: "Close", emailLabel: "Email address", submit: "Send me a sign-in link", sending: "Sending…",
+    limits: (freePerMonth: number, creatorMonthlyUsd: number) =>
+      `Create a free account to export. Free: ${String(freePerMonth)} exports a month, 720p, small watermark. Creator ($${String(creatorMonthlyUsd)}/month): no watermark, 1080p.`,
+    sentTitle: "Check your email",
+    sentBody: (email: string) => `We sent a sign-in link to ${email}. Open it on this computer, in this browser.`,
+    spamHint: "Not there after a minute? Look in your spam folder.", resend: "Send it again",
+  },
+  callback: {
+    verifying: "Signing you in…", signedIn: "You are signed in",
+    returnToTab: "If you have a video open in another tab, go back to it: that tab is signed in too.", openApp: "Go to Offcut",
+  },
+  // `/account` (TS C-11, C-18; PS §17). A date is the day a period ends, as the legal pages write one.
+  account: {
+    title: "Account", signedIn: "You are signed in.", signOut: "Sign out", email: (email: string) => `Signed in as ${email}.`,
+    date: (secs: number) => new Date(secs * MS_PER_SECOND).toLocaleDateString("en-GB", { dateStyle: "long" }),
+    planHeading: "Your plan",
+    free: (left: number, total: number) => `Free: ${String(left)} of ${String(total)} exports left this month, in 720p with a small watermark.`,
+    creator: "Creator: no watermark, in 1080p.", interval: { monthly: "Paid monthly.", annual: "Paid yearly." } satisfies Record<BillingInterval, string>,
+    term: (paid: string, when: string) => `${paid} ${when}`,
+    renews: (date: string) => `It renews on ${date}.`, ends: (date: string) => `It ends on ${date}, and then you are on the Free plan.`,
+    pastDue: "Your last payment did not go through. Update your payment details to keep Creator.",
+    manage: "Manage subscription", opening: "Opening…",
+    confirming: "Confirming your payment…", active: "You are on Creator now. Thank you.", cancelled: "Checkout cancelled. Nothing was charged.", checkAgain: "Check again",
+    dataHeading: "Your data", exportData: "Export my account data", preparing: "Preparing your data…", exported: "Your account data is downloaded.",
+    delete: "Delete account", deleting: "Deleting your account…",
+    deleteDialog: {
+      title: "Delete your account?", confirm: "Delete my account", keep: "Keep my account",
+      body: "Any subscription is cancelled at once, you are signed out everywhere, and your email, plan and export counts are removed from our servers. The videos in this browser stay as they are. This cannot be undone.",
+    },
+    deleted: "Your account is deleted. The videos in this browser stay as they are.",
+  },
+
+  // Why an action cannot start now (TS §12.5).
   blockers: {
     B_UNSUPPORTED: "This browser cannot run Offcut, so it cannot take a clip.",
     B_PIPELINE_BUSY: "Offcut is still working on a clip. Add another when it has finished.",
     B_EXPORT_IN_PROGRESS: "An export is running. Wait until it has finished.",
     B_PIPELINE_NOT_READY: "The clip is not ready to export yet.",
     B_STORAGE_LOW: "There is not enough room on this device for this video. Free some disk space, then try again.",
+    B_NOT_SIGNED_IN: "Sign in to export.",
+    B_ENTITLEMENT_EXPIRED: "Your plan needs checking before the next export.",
+    B_NO_FREE_EXPORTS: "You have used your free exports this month.",
   },
 
-  // The landing page's prices (PS §11). Nothing is on sale until accounts open,
-  // so the section says so and has no way to buy. It lists only what the plans
-  // will hold when they do.
+  // The landing page's prices (PS §11). Accounts are open, so Free is; Creator
+  // goes on sale with the founding release (v6implementation D-303), and until
+  // then the section has no way to buy. It lists only what the plans hold.
   pricing: {
     heading: "Pricing",
-    notOnSale: "Not on sale yet. These plans start when accounts open: leave your email below to hear when they do.",
+    notOnSale: "The Free plan comes with a free account. Creator is not on sale yet: leave your email below to hear when it is.",
     free: {
       name: "Free",
       price: (usd: number) => `$${String(usd)}`,
@@ -297,7 +355,7 @@ export const messages = {
   // each change (buildplan.md §10.3). Not reviewed by a lawyer. The wording rules
   // at the top of this file apply.
   legal: {
-    updated: "Last updated 2 November 2026.",
+    updated: "Last updated 3 November 2026.",
     contactLead: "Questions? Write to",
     contactEmail: "ranupathak1986@gmail.com",
     footerContact: "Contact",
@@ -317,7 +375,7 @@ export const messages = {
           {
             heading: "Plans and payment",
             body: [
-              "The plans and prices are on the home page. They start when accounts open, and until then nothing can be bought.",
+              "The plans and prices are on the home page. The Free plan starts when you create an account. Creator is not on sale yet, and until it is, nothing can be bought.",
               "Dodo Payments will be the merchant of record: it sells the subscription to you, takes the payment and handles tax. A subscription renews at the end of each period until you cancel it. The Refund and Cancellation Policy says what happens then.",
               "The limits of a plan are part of how it is priced. We may change plans or prices for the future, and we will tell subscribers before a change reaches them.",
             ],
@@ -353,12 +411,12 @@ export const messages = {
             ],
           },
           {
-            heading: "What we will collect when accounts open",
-            body: ["Your email address, your plan and subscription status, and a count of your exports, with no content. You will be able to export this data or delete your account from your account page. Dodo Payments will handle payment, so we will not see your card details, and it may keep its own billing records for tax reasons."],
+            heading: "What we collect when you have an account",
+            body: ["Your email address, your plan and subscription status, a count of your exports with no content, and when each sign-in began and was last used. A sign-in link is kept for a day at most. You can export this data or delete your account from your account page. Dodo Payments will handle payment, so we will not see your card details, and it may keep its own billing records for tax reasons."],
           },
           {
             heading: "Who handles it",
-            body: ["We use Vercel to serve the site, Render to run the server, Neon for the database and Cloudflare to serve the files the app downloads. When accounts open, Brevo will send sign-in emails and Dodo Payments will handle payment. We do not sell your data, show ads or use third-party trackers."],
+            body: ["We use Vercel to serve the site, Render to run the server, Neon for the database and Cloudflare to serve the files the app downloads. Brevo sends the sign-in emails, so it receives your email address, and Dodo Payments will handle payment. We do not sell your data, show ads or use third-party trackers."],
           },
           {
             heading: "Changes",
@@ -371,7 +429,7 @@ export const messages = {
         linkLabel: "Refunds",
         sections: [
           {
-            heading: "Before accounts open",
+            heading: "Before Creator goes on sale",
             body: ["Nothing can be bought yet, so nothing can be charged. This policy applies once plans go on sale."],
           },
           {
@@ -534,6 +592,14 @@ export const messages = {
       body: "Your browser has no space left on this device for the model's files.",
       action: "Free some disk space and try again.",
     },
+    E_AUTH_LINK_INVALID: { title: "This sign-in link does not work", body: "It has been used already, or a newer link replaced it.", action: "Ask for a new link below." },
+    E_AUTH_LINK_EXPIRED: { title: "This sign-in link has expired", body: "A link works for a short while after it is sent.", action: "Ask for a new link below." },
+    E_AUTH_SESSION_EXPIRED: { title: "You have been signed out", body: "Your session has ended.", action: "Sign in again." },
+    E_ENTITLEMENT_INVALID: { title: FAILED_ON_DEVICE, body: "Your plan on this device could not be verified, so nothing was exported.", action: "Sign out and in again from your account page." },
+    E_ENTITLEMENT_EXPIRED: { title: "We could not check your plan", body: "Offcut checks it every few days, and the account service did not answer.", action: "Check your connection and try again." },
+    E_AUTH_EMAIL_UNAVAILABLE: { title: "We could not send the email", body: "The email service is not taking messages just now.", action: "Try again in a little while." },
+    E_BILLING_UNAVAILABLE: { title: "The payment service did not answer", body: "Nothing was charged and nothing changed.", action: "Try again in a few minutes." },
+    E_BILLING_PENDING: { title: "Your payment is not confirmed yet", body: "The payment service can take a few minutes to tell us. If you paid, your plan turns to Creator on its own.", action: "Check again in a minute." },
   } satisfies Record<ErrorCodeWithCopy, ErrorCopy>,
 
   // A file Offcut cannot use (TS §15.3, PS §9.4): what the limit is and what

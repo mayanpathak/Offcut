@@ -4,7 +4,7 @@
 //! on `OutMs`; this file is the only place one becomes the other.
 //!
 //! V4 builds one map only, the identity of a clip's duration. A map that is
-//! not the identity is made from a plan's cuts in V6.2 (`from_segments`);
+//! not the identity is made from a plan's cuts in V6.3 (`from_segments`);
 //! until then it can only arrive by deserialization, which checks it.
 
 use serde::de::Error as _;
@@ -41,7 +41,7 @@ pub struct TimeMap {
 }
 
 /// The loudness of a recording, one value per 10 ms, in dB: what the time map
-/// snaps its splices to from V6.2 (TS §40.6). Made by `offcut-dsp`; not
+/// snaps its splices to from V6.3 (TS §40.6). Made by `offcut-dsp`; not
 /// serialized.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SilenceProfile {

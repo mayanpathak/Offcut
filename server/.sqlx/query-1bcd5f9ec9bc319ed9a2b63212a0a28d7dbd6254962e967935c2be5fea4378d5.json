@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_customer_id, provider_subscription_id, billing_interval, status,\n                cancel_at_period_end, current_period_end, last_event_at\n         FROM subscriptions WHERE user_id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_customer_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "provider_customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_subscription_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "provider_subscription_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "billing_interval",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "billing_interval"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "cancel_at_period_end",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "cancel_at_period_end"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "current_period_end",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "current_period_end"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "last_event_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "last_event_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1bcd5f9ec9bc319ed9a2b63212a0a28d7dbd6254962e967935c2be5fea4378d5"
+}

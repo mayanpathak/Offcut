@@ -15,7 +15,7 @@ if (DEV_HOOKS) {
   installDevHooks();
 }
 
-export function EditorPage() {
+export function EditorPage({ accountPath }: { accountPath: string }) {
   const view = useStageView();
-  return <EditorLayout view={view} />;
+  return <EditorLayout view={view} accountPath={accountPath} />;
 }

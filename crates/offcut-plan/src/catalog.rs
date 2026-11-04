@@ -1,7 +1,7 @@
 //! [ONLY] What the renderer can draw, as a plan may ask for it (TS §40.3,
 //! v4implementation D-123). The prompt, the output schema and the validator's
 //! limits are all read from these rows; a change to them is a new
-//! `CATALOG_VERSION`. Every number here is an assumption until V6.1 (E-11).
+//! `CATALOG_VERSION`. Every number here is an assumption until V6.2 (E-11).
 
 use offcut_types::EventKind;
 

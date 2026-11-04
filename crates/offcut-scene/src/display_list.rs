@@ -115,7 +115,7 @@ pub enum DrawCmd {
     },
     PopLayer,
     /// The part `src` of a video, drawn into `dst`. `dst` is in output pixels
-    /// already: scaling a list leaves it alone. `mask` (V6.5) clips it to a
+    /// already: scaling a list leaves it alone. `mask` (V6.6) clips it to a
     /// shape.
     Video {
         slot: VideoSlot,

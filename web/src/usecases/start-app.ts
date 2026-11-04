@@ -12,6 +12,7 @@ import { runCapabilityCheck } from "../platform/capability";
 import { beginCheck, setSupported, setUnsupported } from "../state/capability-store";
 import { setIllegalTransitionReporter } from "../state/machines/transition";
 import { preload } from "../workers/pool";
+import { connectAccount, restoreSession } from "./restore-session";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -47,7 +48,10 @@ async function anonymousId(): Promise<AnonId> {
   }
 }
 
-async function run(): Promise<void> {
+async function run(options: StartOptions): Promise<void> {
+  // Before anything else can ask: the callback page verifies as soon as it mounts.
+  connectAccount();
+
   // 1. An illegal state transition throws in development and in tests. In a
   //    production build it is reported, and the state stays as it was.
   if (!env.dev) {
@@ -76,7 +80,10 @@ async function run(): Promise<void> {
   // 6. Start waking a sleeping API now. Nothing waits for the answer.
   wake();
 
-  // V6: restoreSession()
+  // The session this browser may hold. Nothing waits for it (INV-3, D-289).
+  if (options.restoreSession) {
+    void restoreSession();
+  }
 
   // 7. Fetch and compile the WASM bundle, where it will be used.
   if (reason === undefined || reason === null) {
@@ -93,10 +100,15 @@ async function run(): Promise<void> {
   // V7: restoreClip()
 }
 
+export type StartOptions = {
+  /** False on the callback page: a refresh answered after verify's cookie could overwrite the new session (D-296). */
+  restoreSession: boolean;
+};
+
 let started: Promise<void> | undefined;
 
 /** Starts the app. A second call returns the promise of the first. */
-export function startApp(): Promise<void> {
-  started ??= run();
+export function startApp(options: StartOptions): Promise<void> {
+  started ??= run(options);
   return started;
 }

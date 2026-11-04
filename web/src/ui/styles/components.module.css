@@ -93,6 +93,23 @@
   color: var(--color-problem);
 }
 
+/* --- The sign-in form. Its classes are the waitlist form's, whose colours are
+   the pages'. In the editor's dialog those colours are the editor's (D-179). --- */
+
+[data-theme="dark"] .signIn {
+  --color-surface: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--text-2);
+  --color-border: var(--text-2);
+  --color-accent: #b79dfb;
+  --color-on-accent: #0e0e11;
+  --color-problem: var(--danger);
+}
+
+.signIn p {
+  margin: 0;
+}
+
 /* --- Something that waits: the sample button while the clip is fetched ---- */
 
 .pending {
@@ -392,6 +409,12 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+}
+
+.exportCounter {
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  white-space: nowrap;
 }
 
 .exportStatus {

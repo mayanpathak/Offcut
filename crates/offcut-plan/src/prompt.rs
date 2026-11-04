@@ -1,7 +1,7 @@
 //! What a model is told and must answer with (TS §40.3, v4implementation
 //! §7.3, D-123): the system prompt and the output schema, both generated from
 //! the catalog, and the user message, generated from a transcript. Written
-//! and snapshot-tested in V4; nothing calls them until V6.1. Behind the
+//! and snapshot-tested in V4; nothing calls them until V6.2. Behind the
 //! feature `prompt`, so the render bundle carries none of it (D-122).
 
 use std::fmt::Write as _;
@@ -11,10 +11,10 @@ use serde_json::{Map, Value, json};
 
 use crate::catalog::{AnchorRule, CATALOG_VERSION, ItemSpec, ParamSpec, ParamTy, catalog};
 
-/// A pause at least this long is marked in the user message (assumption, V6.1).
+/// A pause at least this long is marked in the user message (assumption, V6.2).
 pub const PAUSE_MARK_MS: u32 = 300;
 
-/// A transcript as the user message needs it. V6.1 fills it from the request.
+/// A transcript as the user message needs it. V6.2 fills it from the request.
 pub struct PromptInput<'a> {
     pub duration: DurMs,
     pub words: &'a [Word],

@@ -183,19 +183,19 @@ format: number,
  */
 catalog: number, source: PlanSource,
 /**
- * Empty until V6.2.
+ * Empty until V6.3.
  */
 cuts: Array<Cut>, items: Array<PlanItem>,
 /**
- * Empty until V6.1.
+ * Empty until V6.2.
  */
 chapters: Array<Chapter>,
 /**
- * Empty until V6.1.
+ * Empty until V6.2.
  */
 extras: TextExtras,
 /**
- * `None` until V6.3.
+ * `None` until V6.7.
  */
 music: MusicCue | null, };
 
@@ -241,7 +241,7 @@ export type Label = string;
 export type Chapter = { starts_at: WordIdx, title: Label, };
 
 /**
- * Text around the video. Every field may be left out (empty until V6.1).
+ * Text around the video. Every field may be left out (empty until V6.2).
  */
 export type TextExtras = { hook: Label | null, post_caption: string | null, hashtags: Array<Label>, };
 
@@ -252,7 +252,7 @@ export type MusicCue = { fits: boolean, energy: MusicEnergy, };
 /**
  * What `offcut-plan`'s `validate` left out of a plan, and why (TS §40.4).
  * `kind` is `None` for a cut, a chapter, a text extra or a music cue. No
- * content: it may become an analytics event (V6.1).
+ * content: it may become an analytics event (V6.2).
  */
 export type Dropped = { kind: EventKind | null, reason: DropReason, };
 

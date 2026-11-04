@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH spent AS (\n           UPDATE magic_links SET consumed_at = now()\n           WHERE email_normalized = $2 AND consumed_at IS NULL\n         )\n         INSERT INTO magic_links (token_hash, email_normalized, expires_at) VALUES ($1, $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a92a43e405b681a41e39dc769098257ca06191c6c34e67f0087c3457451d0435"
+}

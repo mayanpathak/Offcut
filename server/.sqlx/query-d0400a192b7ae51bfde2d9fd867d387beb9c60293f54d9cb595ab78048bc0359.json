@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT export_id, created_at, plan_at_export FROM usage_receipts\n         WHERE user_id = $1 ORDER BY created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "export_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "usage_receipts",
+            "name": "export_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "usage_receipts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "plan_at_export",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "usage_receipts",
+            "name": "plan_at_export"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d0400a192b7ae51bfde2d9fd867d387beb9c60293f54d9cb595ab78048bc0359"
+}

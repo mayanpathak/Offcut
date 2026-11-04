@@ -1,6 +1,6 @@
 //! [ONLY] The limits `validate` applies (v4implementation D-165): per kind,
 //! read from the catalog, and the cut and chapter limits of TS §40.4, which
-//! nothing reads until V6.2 and V6.6.
+//! nothing reads until V6.3 and V6.6.
 
 use std::collections::BTreeMap;
 
@@ -23,11 +23,11 @@ pub struct KindLimits {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlanConfig {
     pub per_kind: BTreeMap<EventKind, KindLimits>,
-    /// A shortened pause keeps at least this much (V6.2).
+    /// A shortened pause keeps at least this much (V6.3).
     pub min_keep_gap: DurMs,
-    /// At most this share of the clip is removed, in thousandths (V6.2).
+    /// At most this share of the clip is removed, in thousandths (V6.3).
     pub max_cut_share_permille: u32,
-    /// At most this many chapters (V6.6).
+    /// At most this many chapters (post-launch, TS §42).
     pub max_chapters: u32,
 }
 

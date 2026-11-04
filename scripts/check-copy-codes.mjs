@@ -25,21 +25,8 @@ const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
  * removed in the change that writes its copy.
  */
 const COPY_PENDING = [
-  // The account, billing and entitlement errors: due with their flows in V6.
-  // The fourteen a person can meet on this device have copy since V4
-  // (v4implementation D-159).
-  "E_AUTH_LINK_INVALID",
-  "E_AUTH_LINK_EXPIRED",
-  "E_AUTH_SESSION_EXPIRED",
-  "E_AUTH_EMAIL_UNAVAILABLE",
-  "E_BILLING_UNAVAILABLE",
-  "E_BILLING_PENDING",
-  "E_ENTITLEMENT_INVALID",
-  "E_ENTITLEMENT_EXPIRED",
-  // The three blockers no person can meet yet: the account and the plan, in V6.
-  "B_NOT_SIGNED_IN",
-  "B_ENTITLEMENT_EXPIRED",
-  "B_NO_FREE_EXPORTS",
+  // Empty since V6: the billing errors were the last, with their flow
+  // (v6implementation §13). A new code gets its copy in the change that adds it.
 ];
 
 /** The code lists, and the file each is in. Each is written one code per line. */

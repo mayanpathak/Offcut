@@ -155,12 +155,13 @@ export function ExportDone() {
   );
 }
 
-/** A failed export's card, at the top of the side panel (D-190). */
+/** A failed export's card, at the top of the side panel (D-190), or the gate's that could not fetch a token (TS C-7). */
 export function ExportFailure() {
   const status = useExportStore((state) => state.status);
   const failure = useExportStore((state) => state.failure);
-  if (status !== "failed") {
+  const gateFailure = useExportStore((state) => state.gateFailure);
+  if (status !== "failed" && gateFailure === undefined) {
     return null;
   }
-  return <ErrorPanel failure={failure} context="export" testId="export-failed" compact />;
+  return <ErrorPanel failure={status === "failed" ? failure : gateFailure} context="export" testId="export-failed" compact />;
 }

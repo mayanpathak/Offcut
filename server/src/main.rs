@@ -4,7 +4,11 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use offcut_api::billing::adapter::DodoBilling;
+use offcut_api::billing::provider::BillingError;
 use offcut_api::config::Config;
+use offcut_api::mail::MailError;
+use offcut_api::mail::smtp_mailer::SmtpMailer;
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
 use offcut_api::{analytics, db, log, router};
@@ -15,6 +19,10 @@ const RATE_LIMIT_MAX_KEYS: usize = 50_000;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // One crypto provider for every TLS client here (v6implementation D-281).
+    // An error means one is installed already, which is what was asked for.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let config = match Config::from_env() {
         Ok(config) => config,
         Err(error) => {
@@ -43,6 +51,10 @@ enum ServeError {
     Connect(&'static str),
     #[error("cannot migrate the database: {0}")]
     Migrate(#[from] sqlx::migrate::MigrateError),
+    #[error("cannot set up mail: {0}")]
+    Mail(#[from] MailError),
+    #[error("cannot set up billing: {0}")]
+    Billing(#[from] BillingError),
     #[error("cannot listen or serve: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -54,11 +66,17 @@ async fn serve(config: Config) -> Result<(), ServeError> {
     db::migrate(&pool).await?;
     analytics::retention::spawn_purge_task(pool.clone());
 
+    let mailer = Arc::new(SmtpMailer::new(&config)?);
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
+    let config = Arc::new(config);
+    let billing = Arc::new(DodoBilling::new(config.clone())?);
     let state = AppState {
         db: pool,
-        config: Arc::new(config),
+        config,
         limiter: Arc::new(RateLimiter::new(RATE_LIMIT_MAX_KEYS)),
+        mailer,
+        billing,
+        fair_use: Arc::default(),
     };
     // The rate limiter needs the peer address of each connection.
     let app = router::build(state).into_make_service_with_connect_info::<SocketAddr>();

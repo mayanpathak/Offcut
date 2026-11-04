@@ -369,7 +369,7 @@ The restarted file being Main is the proof it came from the ladder's next entry.
 
 **Not tested.** A person's real sign-in to export: no account exists until V6, so the tokens were minted, not issued. A real waitlist row or analytics row from this run. Firefox, Safari, a Mac, R1, a screen reader.
 
-**Boxes.** Every box of section 24 and section 23.3 is ticked but one: "A docs-only pull request skips `ci` and `e2e-media`", which the pull request carrying this entry shows. BP §7.3's are ticked; "on R1" reads D1 (D-202). V4's two founder boxes stay open item 1.
+**Boxes.** Every box of section 24 and section 23.3 is ticked. "A docs-only pull request skips `ci` and `e2e-media`" was shown by pull request 9, which carried this entry: `changes` passed, `ci` and `e2e-media` were skipped, on `1febc64`. BP §7.3's are ticked; "on R1" reads D1 (D-202). V4's two founder boxes stay open item 1.
 
 **Carried.** To V6: known issue 3 (`openEditor`), known issue 10 (the `aria-details`), first. To V9: known issue 4 (`detect_scene`). To watch: 6, 9, 11. To the founder: known issue 5, a production read that this merge was to be followed by, and open item 1.
 

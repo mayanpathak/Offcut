@@ -10,12 +10,12 @@ use crate::DspError;
 use crate::config::ChainConfig;
 use crate::loudness::integrated;
 
-/// How a program is put together. Empty in V4: V6.2 adds the cross-fade at a
-/// join, V6.3 the ducking of music under speech.
+/// How a program is put together. Empty in V4: V6.3 adds the cross-fade at a
+/// join, V6.7 the ducking of music under speech.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ProgramConfig {}
 
-/// A music bed (V6.3): mono 48 kHz, with its measured loudness.
+/// A music bed (V6.7): mono 48 kHz, with its measured loudness.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MusicInput<'a> {
     pub pcm48: &'a [f32],
@@ -41,7 +41,7 @@ pub fn assemble(
     music: Option<MusicInput<'_>>,
     cfg: &ProgramConfig,
 ) -> Result<ProgramAudio, DspError> {
-    // Where music ducks (V6.3), and how a join is smoothed (V6.2).
+    // Where music ducks (V6.7), and how a join is smoothed (V6.3).
     let _ = (speech, cfg);
     if !map.is_identity() || music.is_some() {
         return Err(DspError::Unsupported);

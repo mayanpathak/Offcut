@@ -576,7 +576,7 @@ export async function dropOversize(page: Page): Promise<void> {
  * the `Versioned` wrapper and its value. `undefined` when there is none, or
  * when the app has not made its database yet (it is not made here).
  */
-export function readIndexedDb(page: Page, store: "clips" | "transcripts" | "edits", key: string): Promise<unknown> {
+export function readIndexedDb(page: Page, store: "clips" | "transcripts" | "edits" | "entitlement", key: string): Promise<unknown> {
   return page.evaluate(
     ({ name, store, key }) =>
       new Promise<unknown>((resolve, reject) => {

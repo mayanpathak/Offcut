@@ -9,6 +9,9 @@ import type { BlockerCode } from "./blockers";
 import { EXPORT_MACHINE, type ExportEvent, type ExportStatus } from "./machines/export-machine";
 import { transition } from "./machines/transition";
 
+/** What the gate opened instead of an export (v6implementation §12): a dialog, or the prompt at the limit. */
+export type ExportGate = "sign_in" | "upgrade" | "confirm_last";
+
 export type ExportState = {
   status: ExportStatus;
   exportId?: ExportId;
@@ -18,11 +21,12 @@ export type ExportState = {
   /** When the export began, in milliseconds since the Unix epoch. */
   startedAt?: number;
   failure?: AppFailure;
-  /**
-   * No export can be made: this device holds no entitlement token, and until
-   * accounts exist nothing can fetch one (v2implementation D-23).
-   */
-  unavailable: boolean;
+  /** Open until it is closed or the next start. No export began, so it is no state of the machine. */
+  gate: ExportGate | null;
+  /** The gate could not fetch a token (D-310). Nothing began, so `failure`'s state does not apply. */
+  gateFailure?: AppFailure;
+  /** A finished export on Free offers the upgrade, once per export (PS §11). */
+  upgradeOffer: boolean;
   /** Why the last start did not go on (v5implementation D-231): the next start clears it. */
   blocker?: BlockerCode;
   /** What this export changed, once it is done. */
@@ -36,7 +40,7 @@ type Fields = Omit<ExportState, "status">;
 
 /** No export. */
 function empty(): Fields {
-  return { done: 0, total: 0, unavailable: false, answered: false };
+  return { done: 0, total: 0, gate: null, upgradeOffer: false, answered: false };
 }
 
 /**
@@ -44,6 +48,8 @@ function empty(): Fields {
  * `reset`: a cache hit shares its export's id, and is not asked again.
  */
 const answeredIds = new Set<ExportId>();
+/** The exports whose upgrade offer was dismissed, in this tab: a cache hit shares its export's id. */
+const dismissedOffers = new Set<ExportId>();
 
 export const useExportStore = create<ExportState>(() => ({ status: "idle", ...empty() }));
 
@@ -133,7 +139,36 @@ export function reset(): void {
   apply("reset", empty);
 }
 
-/** Whether an export can be made at all. Not a change of state. */
-export function setUnavailable(flag: boolean): void {
-  useExportStore.setState({ unavailable: flag });
+/** The gate stopped a start, or what it opened closed. What the last start left is gone. Not a change of state. */
+export function setGate(gate: ExportGate | null): void {
+  const next = { ...useExportStore.getState(), gate };
+  delete next.blocker;
+  delete next.gateFailure;
+  useExportStore.setState(next, true);
+}
+
+/** The gate needed a new token and could not get one. Not a change of state. */
+export function gateFailed(failure: AppFailure): void {
+  const next = { ...useExportStore.getState(), gate: null, gateFailure: failure };
+  delete next.blocker;
+  useExportStore.setState(next, true);
+}
+
+/** A finished export on Free offers the upgrade, unless this export's offer was dismissed. Whether it was offered. */
+export function offerUpgrade(): boolean {
+  const { status, exportId } = useExportStore.getState();
+  if (status !== "done" || exportId === undefined || dismissedOffers.has(exportId)) {
+    return false;
+  }
+  useExportStore.setState({ upgradeOffer: true });
+  return true;
+}
+
+/** The prompt was dismissed, at the limit or after an export. */
+export function dismissOffer(): void {
+  const { exportId, gate } = useExportStore.getState();
+  if (exportId !== undefined) {
+    dismissedOffers.add(exportId);
+  }
+  useExportStore.setState({ upgradeOffer: false, gate: gate === "upgrade" ? null : gate });
 }

@@ -168,6 +168,18 @@ const layerPolicies = [
     from: fromFile("usecases", "review-update.ts"),
     allow: { to: to("usecases", "control-preview.ts") },
   },
+
+  // The blockers ask what the plan allows through the one place that says (TS §12.5, v6implementation D-309).
+  {
+    from: fromFile("state", "blockers.ts"),
+    allow: { to: to("entitlement", "entitlement.ts") },
+  },
+
+  // The start of the app restores the session (TS C-1, v6implementation D-289).
+  {
+    from: fromFile("usecases", "start-app.ts"),
+    allow: { to: to("usecases", "restore-session.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------

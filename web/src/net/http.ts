@@ -6,6 +6,7 @@
 
 import { env } from "../config/env";
 import type { ApiError, ApiErrorCode } from "../gen/api";
+import type { ErrorCode } from "../gen/domain";
 import type { AppFailure } from "../workers/protocol";
 
 export const API_TIMEOUT_MS = 10_000;
@@ -24,6 +25,12 @@ export type HttpRequest = {
   body?: unknown;
   /** `"cold-start"` keeps trying while the API may be waking; `"none"` makes one attempt. */
   retry: "cold-start" | "none";
+  /** How long `"cold-start"` keeps trying. The default is `API_COLD_START_BUDGET_MS`. */
+  budgetMs?: number;
+  /** The access token, sent as `Authorization: Bearer`. */
+  bearer?: string;
+  /** The header the two routes that read the refresh cookie require (v6implementation §7.5). */
+  csrf?: true;
   keepalive?: boolean;
   /** Called at most once, 3 s after the first attempt started, if the request is still going. */
   onWaking?: () => void;
@@ -110,6 +117,15 @@ function parseApiError(text: string): ApiError | undefined {
   return { code: body.code, retry_after_secs: typeof retryAfter === "number" ? retryAfter : null };
 }
 
+/**
+ * A 5xx with one of these bodies is the API saying a provider failed: the API
+ * is up, so it is an answer and not a waking API (v6implementation D-287).
+ */
+const PROVIDER_FAILURES: Partial<Record<ApiErrorCode, ErrorCode>> = {
+  email_unavailable: "E_AUTH_EMAIL_UNAVAILABLE",
+  billing_unavailable: "E_BILLING_UNAVAILABLE",
+};
+
 /** An attempt either settles the request or may be made again. */
 type Attempt<T> =
   | { again: false; result: HttpResult<T> }
@@ -137,6 +153,10 @@ function interpret<T>({ status, text, retryAfter }: Extract<Received, { status: 
 
   const result: Extract<HttpResult<T>, { ok: false }> = { ok: false, failure: toAppFailure("status", status) };
   const apiError = parseApiError(text);
+  const provider = status >= 500 && apiError !== undefined ? PROVIDER_FAILURES[apiError.code] : undefined;
+  if (provider !== undefined) {
+    return { again: false, result: { ok: false, failure: failure(provider, true, `HTTP ${String(status)}`), ...(apiError === undefined ? {} : { apiError }) } };
+  }
   if (apiError !== undefined) {
     result.apiError = apiError;
   } else if (status === 429) {
@@ -158,9 +178,19 @@ export function createHttp(deps: HttpDeps): { request<T>(req: HttpRequest): Prom
       cache: "no-store",
       signal: req.signal === undefined ? timeout.signal : AbortSignal.any([timeout.signal, req.signal]),
     };
+    const headers: Record<string, string> = {};
     if (req.body !== undefined) {
-      init.headers = { "Content-Type": "application/json" };
+      headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(req.body);
+    }
+    if (req.bearer !== undefined) {
+      headers.Authorization = `Bearer ${req.bearer}`;
+    }
+    if (req.csrf === true) {
+      headers["X-Offcut-Csrf"] = "1";
+    }
+    if (Object.keys(headers).length > 0) {
+      init.headers = headers;
     }
     if (req.keepalive === true) {
       init.keepalive = true;
@@ -197,7 +227,7 @@ export function createHttp(deps: HttpDeps): { request<T>(req: HttpRequest): Prom
     if (!deps.onLine()) {
       return { ok: false, failure: toAppFailure("offline") };
     }
-    const deadline = deps.now() + API_COLD_START_BUDGET_MS;
+    const deadline = deps.now() + (req.budgetMs ?? API_COLD_START_BUDGET_MS);
     let finished = false;
     const { onWaking } = req;
     if (onWaking !== undefined) {

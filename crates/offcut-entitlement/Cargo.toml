@@ -11,6 +11,10 @@ workspace = true
 # Signing is the server's (V6). The browser bundle is built without it.
 sign = []
 
+[[test]]
+name = "token_roundtrip"
+required-features = ["sign"]
+
 [dependencies]
 offcut-types = { workspace = true }
 base64 = { workspace = true }

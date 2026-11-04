@@ -17,8 +17,13 @@ pub struct Config {
     pub log_level: tracing::Level,
     pub entitlement_signing_key: SigningKey,
     pub access_token_signing_key: SigningKey,
-    pub mail_api_key: String,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
     pub mail_from: String,
+    /// The merchant's API: its test or its live host (v6implementation D-273).
+    pub billing_api_base_url: String,
     pub billing_api_key: String,
     pub billing_webhook_secret: String,
     pub billing_price_creator_monthly: String,
@@ -58,6 +63,14 @@ impl Config {
             return Err(ConfigError::Malformed("APP_ORIGIN"));
         }
         // `bool` parses exactly "true" and "false".
+        let mail_from = required("MAIL_FROM")?;
+        if mail_from.parse::<lettre::Address>().is_err() {
+            return Err(ConfigError::Malformed("MAIL_FROM"));
+        }
+        let billing_api_base_url = required("BILLING_API_BASE_URL")?;
+        if !billing_api_base_url.starts_with("https://") || !is_origin(&billing_api_base_url) {
+            return Err(ConfigError::Malformed("BILLING_API_BASE_URL"));
+        }
         let founding_offer_enabled = parsed(
             "FOUNDING_OFFER_ENABLED",
             required("FOUNDING_OFFER_ENABLED")?.parse().ok(),
@@ -76,8 +89,12 @@ impl Config {
                 "ACCESS_TOKEN_SIGNING_KEY",
                 signing_key(&required("ACCESS_TOKEN_SIGNING_KEY")?),
             )?,
-            mail_api_key: required("MAIL_API_KEY")?,
-            mail_from: required("MAIL_FROM")?,
+            smtp_host: required("SMTP_HOST")?,
+            smtp_port: parsed("SMTP_PORT", required("SMTP_PORT")?.parse().ok())?,
+            smtp_username: required("SMTP_USERNAME")?,
+            smtp_password: required("SMTP_PASSWORD")?,
+            mail_from,
+            billing_api_base_url,
             billing_api_key: required("BILLING_API_KEY")?,
             billing_webhook_secret: required("BILLING_WEBHOOK_SECRET")?,
             billing_price_creator_monthly: required("BILLING_PRICE_CREATOR_MONTHLY")?,
@@ -138,8 +155,12 @@ impl fmt::Debug for Config {
             .field("log_level", &self.log_level)
             .field("entitlement_signing_key", &REDACTED)
             .field("access_token_signing_key", &REDACTED)
-            .field("mail_api_key", &REDACTED)
+            .field("smtp_host", &self.smtp_host)
+            .field("smtp_port", &self.smtp_port)
+            .field("smtp_username", &REDACTED)
+            .field("smtp_password", &REDACTED)
             .field("mail_from", &self.mail_from)
+            .field("billing_api_base_url", &self.billing_api_base_url)
             .field("billing_api_key", &REDACTED)
             .field("billing_webhook_secret", &REDACTED)
             .field(
@@ -182,8 +203,12 @@ mod tests {
             ("LOG_LEVEL", "info"),
             ("ENTITLEMENT_SIGNING_KEY", KEY_A),
             ("ACCESS_TOKEN_SIGNING_KEY", KEY_B),
-            ("MAIL_API_KEY", "mail-secret"),
+            ("SMTP_HOST", "smtp.example.com"),
+            ("SMTP_PORT", "2525"),
+            ("SMTP_USERNAME", "smtp-user-secret"),
+            ("SMTP_PASSWORD", "smtp-password-secret"),
             ("MAIL_FROM", "hello@offcut.example.com"),
+            ("BILLING_API_BASE_URL", "https://test.billing.example.com"),
             ("BILLING_API_KEY", "billing-secret"),
             ("BILLING_WEBHOOK_SECRET", "webhook-secret"),
             ("BILLING_PRICE_CREATOR_MONTHLY", "price_monthly"),
@@ -219,8 +244,15 @@ mod tests {
             config.access_token_signing_key.to_bytes()[..4],
             [32, 33, 34, 35]
         );
-        assert_eq!(config.mail_api_key, "mail-secret");
+        assert_eq!(config.smtp_host, "smtp.example.com");
+        assert_eq!(config.smtp_port, 2525);
+        assert_eq!(config.smtp_username, "smtp-user-secret");
+        assert_eq!(config.smtp_password, "smtp-password-secret");
         assert_eq!(config.mail_from, "hello@offcut.example.com");
+        assert_eq!(
+            config.billing_api_base_url,
+            "https://test.billing.example.com"
+        );
         assert_eq!(config.billing_api_key, "billing-secret");
         assert_eq!(config.billing_webhook_secret, "webhook-secret");
         assert_eq!(config.billing_price_creator_monthly, "price_monthly");
@@ -237,7 +269,7 @@ mod tests {
     #[test]
     fn each_missing_or_empty_variable_names_itself() {
         let names: Vec<&'static str> = complete().into_keys().collect();
-        assert_eq!(names.len(), 15);
+        assert_eq!(names.len(), 19);
         for name in names {
             let mut env = complete();
             env.remove(name);
@@ -313,6 +345,15 @@ mod tests {
             ("FOUNDING_OFFER_ENABLED", "TRUE"),
             ("TRUSTED_PROXY_HOPS", "256"),
             ("TRUSTED_PROXY_HOPS", "one"),
+            ("SMTP_PORT", "smtp"),
+            ("SMTP_PORT", "70000"),
+            ("SMTP_PORT", "-1"),
+            ("MAIL_FROM", "no-at-sign"),
+            ("MAIL_FROM", "two words@example.com"),
+            ("BILLING_API_BASE_URL", "http://test.billing.example.com"),
+            ("BILLING_API_BASE_URL", "http://localhost:8080"),
+            ("BILLING_API_BASE_URL", "https://test.billing.example.com/"),
+            ("BILLING_API_BASE_URL", "test.billing.example.com"),
         ];
         for (name, value) in cases {
             assert_eq!(
@@ -351,7 +392,8 @@ mod tests {
             "postgres://",
             KEY_A,
             KEY_B,
-            "mail-secret",
+            "smtp-user-secret",
+            "smtp-password-secret",
             "billing-secret",
             "webhook-secret",
         ];
@@ -360,7 +402,7 @@ mod tests {
         }
         // The seed bytes must not appear either, in any common rendering.
         assert!(!debug.contains("[0, 1, 2, 3") && !debug.to_lowercase().contains("00010203"));
-        assert_eq!(debug.matches("<redacted>").count(), 6);
+        assert_eq!(debug.matches("<redacted>").count(), 7);
         assert!(debug.contains("https://offcut.example.com") && debug.contains("8080"));
     }
 }

@@ -1,5 +1,5 @@
 //! The video of a frame, as a draw command (D-130, D-131). The crop is per
-//! frame: V6.1's punch-in, V6.2's jump-cut zoom and V6.5's shapes are keys of
+//! frame: V6.2's punch-in, V6.3's jump-cut zoom and V6.6's shapes are keys of
 //! this track, all in this file.
 
 use offcut_types::OutMs;

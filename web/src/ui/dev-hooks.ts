@@ -33,6 +33,8 @@ export type DevHooks = {
   fakeExport(fraction: number): void;
   /** Shows the done state with a summary. Nothing was exported (v5implementation D-235). */
   fakeExportDone(): void;
+  /** Shows the upgrade prompt as after a watermarked export, or at the limit (v6implementation §13). Nothing was exported. */
+  fakeUpgrade(placement: "after_export" | "limit_reached"): void;
   /** Worker `kind` crashes, as a worker killed from DevTools would (D-153). */
   crash(kind: WorkerKind): void;
   /** The next scene the render worker builds fails: the next review change fails (D-190). */
@@ -78,6 +80,9 @@ export function installDevHooks(): void {
         summary: { voice_cleaned: true, captions_emphasized: FAKE_EMPHASIZED, visual_moments: FAKE_VISUALS },
         answered: false,
       });
+    },
+    fakeUpgrade: (placement) => {
+      useExportStore.setState(placement === "after_export" ? { upgradeOffer: true, gate: null } : { gate: "upgrade" });
     },
     crash: crashWorker,
     failNextSetScene,

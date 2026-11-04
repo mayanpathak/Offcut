@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM platform_waitlist WHERE email_normalized = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "126c7ed89534b5bddb26bb4900adf9186199f67dda9bf5542fe0ed737e03d7e7"
+}

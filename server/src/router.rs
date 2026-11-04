@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::rate_limit::{RouteGroup, by_ip};
 use crate::state::AppState;
-use crate::{account, analytics, headers, log};
+use crate::{account, analytics, auth, billing, entitlement, headers, log, usage};
 
 const KB: usize = 1024;
 /// Every route, unless its row in the table says otherwise (TS §22.1).
@@ -35,20 +35,39 @@ pub fn build(state: AppState) -> Router {
     // Layer 6, per route: a body limit other than the default.
     let body = DefaultBodyLimit::max;
 
-    // The table of TS §22.1, in its order. The twelve routes of V6 are
-    // comments: route, body limit, rate limit group.
+    // The table of TS §22.1, in its order.
     let api = Router::new()
         .route("/healthz", get(healthz).layer(ip(RouteGroup::Healthz)))
-        // POST /auth/magic-link    1 kB     MagicLinkEmail, MagicLinkIp
-        // POST /auth/verify        1 kB     Verify
-        // POST /auth/refresh       0        Refresh
-        // POST /auth/logout        0        Logout
-        // GET  /me                 none     Me
-        // GET  /entitlement        none     Entitlement
-        // POST /usage/receipts     1 kB     UsageReceipts
-        // POST /billing/checkout   1 kB     Checkout
-        // GET  /billing/portal     none     Portal
-        // POST /billing/webhook    64 kB    Webhook
+        // `MagicLinkEmail`, the other limit of this route, is checked in its
+        // handler: the key is the address it reads.
+        .route(
+            "/auth/magic-link",
+            post(auth::request_magic_link).layer((body(KB), ip(RouteGroup::MagicLinkIp))),
+        )
+        .route(
+            "/auth/verify",
+            post(auth::verify).layer((body(KB), ip(RouteGroup::Verify))),
+        )
+        .route(
+            "/auth/refresh",
+            post(auth::refresh).layer((body(0), ip(RouteGroup::Refresh))),
+        )
+        .route(
+            "/auth/logout",
+            post(auth::logout).layer((body(0), ip(RouteGroup::Logout))),
+        )
+        // `Me` is limited per user in its handler.
+        .route("/me", get(auth::me))
+        // These two are limited per user in their handlers.
+        .route("/entitlement", get(entitlement::get_entitlement))
+        .route("/usage/receipts", post(usage::post_receipt).layer(body(KB)))
+        // These two are limited per user in their handlers.
+        .route("/billing/checkout", post(billing::checkout).layer(body(KB)))
+        .route("/billing/portal", get(billing::portal))
+        .route(
+            "/billing/webhook",
+            post(billing::webhook::handle).layer((body(64 * KB), ip(RouteGroup::Webhook))),
+        )
         .route(
             "/events",
             post(analytics::ingest).layer(ip(RouteGroup::Events)),
@@ -56,9 +75,13 @@ pub fn build(state: AppState) -> Router {
         .route(
             "/notify-me",
             post(account::notify::notify_me).layer((body(KB), ip(RouteGroup::NotifyMe))),
-        );
-    // POST /account/delete     0        AccountDelete
-    // GET  /account/export     none     AccountExport
+        )
+        // These two are limited per user in their handlers.
+        .route(
+            "/account/delete",
+            post(account::delete::delete_account).layer(body(0)),
+        )
+        .route("/account/export", get(account::export::export_account));
 
     let app = Router::new()
         .nest("/api/v1", api)

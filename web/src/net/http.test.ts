@@ -282,7 +282,95 @@ describe("an error the server chose", () => {
   });
 });
 
+describe("a provider that is down (D-287)", () => {
+  it("502 billing_unavailable is an answer: one attempt, E_BILLING_UNAVAILABLE", async () => {
+    const body = { code: "billing_unavailable", retry_after_secs: null };
+    const { request, calls, elapsed } = setup([{ status: 502, body }, { status: 204 }]);
+    const { failure, apiError } = failed(await request({ retry: "cold-start" }));
+
+    expect(failure).toMatchObject({ code: "E_BILLING_UNAVAILABLE", stage: "api", retryable: true });
+    expect(apiError).toEqual(body);
+    expect(calls).toHaveLength(1);
+    expect(elapsed()).toBe(0);
+  });
+
+  it("503 email_unavailable is an answer: one attempt, E_AUTH_EMAIL_UNAVAILABLE", async () => {
+    const body = { code: "email_unavailable", retry_after_secs: null };
+    const { request, calls } = setup([{ status: 503, body }, { status: 204 }]);
+    const { failure, apiError } = failed(await request({ retry: "cold-start" }));
+
+    expect(failure).toMatchObject({ code: "E_AUTH_EMAIL_UNAVAILABLE", stage: "api", retryable: true });
+    expect(apiError).toEqual(body);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("a 502 or 503 with any other body is still a waking API, and is tried again", async () => {
+    for (const body of [undefined, { code: "internal", retry_after_secs: null }]) {
+      for (const status of [502, 503]) {
+        const { request, calls } = setup([{ status, ...(body === undefined ? {} : { body }) }, { status: 204 }]);
+        const result = await request({ retry: "cold-start" });
+        expect(result.ok, `${String(status)} ${JSON.stringify(body)}`).toBe(true);
+        expect(calls).toHaveLength(2);
+      }
+    }
+  });
+
+  it("the code keeps its meaning only on a 5xx", async () => {
+    const { request } = setup([{ status: 400, body: { code: "billing_unavailable", retry_after_secs: null } }]);
+    expect(failed(await request()).failure.code).toBe("E_INTERNAL");
+  });
+});
+
+describe("the retry budget (D-286)", () => {
+  it("budgetMs stops the retries of a request that never answers", async () => {
+    const { request, calls, elapsed } = setup([{ hang: true }]);
+    const { failure } = failed(await request({ retry: "cold-start", budgetMs: 25 * SECONDS }));
+
+    expect(failure.code).toBe("E_NET_TIMEOUT");
+    // 10 s of timeout and 1 s of wait, 10 s and 2 s; the third attempt has the 2 s left.
+    expect(at(calls)).toEqual([0, 11, 23]);
+    expect(elapsed()).toBe(25 * SECONDS);
+  });
+
+  it("budgetMs stops the retries of a server that answers 500", async () => {
+    const { request, calls, elapsed } = setup([{ status: 500 }]);
+    await request({ retry: "cold-start", budgetMs: 25 * SECONDS });
+    // The next wait, 8 s from 23 s, would start past the budget.
+    expect(at(calls)).toEqual([0, 1, 3, 7, 15, 23]);
+    expect(elapsed()).toBeLessThanOrEqual(25 * SECONDS);
+  });
+
+  it("without budgetMs the budget is the cold start's", async () => {
+    const { request, elapsed } = setup([{ status: 500 }]);
+    await request({ retry: "cold-start" });
+    expect(elapsed()).toBeGreaterThan(25 * SECONDS);
+  });
+});
+
 describe("the request", () => {
+  it("carries a bearer token only when given one, with or without a body (D-286)", async () => {
+    const { request, calls } = setup([{ status: 204 }]);
+    await request({ method: "GET", path: "/me", bearer: "the-token" });
+    await request({ method: "POST", path: "/usage/receipts", body: { export_id: "x" }, bearer: "the-token" });
+    await request({ method: "GET", path: "/healthz" });
+
+    const [get, post, plain] = calls.map((call) => call.init);
+    expect(get?.headers).toEqual({ Authorization: "Bearer the-token" });
+    expect(post?.headers).toEqual({ "Content-Type": "application/json", Authorization: "Bearer the-token" });
+    expect(plain?.headers).toBeUndefined();
+  });
+
+  it("carries the CSRF header only when asked to (D-286)", async () => {
+    const { request, calls } = setup([{ status: 204 }]);
+    await request({ method: "POST", path: "/auth/refresh", csrf: true });
+    await request({ method: "POST", path: "/events", body: {} });
+
+    const [refresh, events] = calls.map((call) => call.init);
+    expect(refresh?.headers).toEqual({ "X-Offcut-Csrf": "1" });
+    expect(events?.headers).toEqual({ "Content-Type": "application/json" });
+    expect(refresh?.credentials).toBe("same-origin");
+  });
+
   it("goes to /api/v1 plus the path, with same-origin credentials and no cache", async () => {
     const { request, calls } = setup([{ status: 204 }]);
     await request({ method: "GET", path: "/healthz" });

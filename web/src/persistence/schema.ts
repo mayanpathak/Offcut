@@ -11,8 +11,10 @@ import type {
   DetectedEvent,
   EditState,
   ExportId,
+  Plan,
   Prosody,
   Transcript,
+  UserId,
 } from "../gen/domain";
 
 export const DB_NAME = "offcut";
@@ -67,7 +69,8 @@ export type RenderCacheRecord = {
 
 export type EntitlementRecord = { token: string; storedAt: number };
 
-export type ReceiptOutboxRecord = { exportId: ExportId; enqueuedAt: number; attempts: number };
+/** The plan it was exported under and whose it is: `effective()` and `flushOutbox` read them (v6implementation D-267). */
+export type ReceiptOutboxRecord = { exportId: ExportId; enqueuedAt: number; attempts: number; plan: Plan; sub: UserId };
 
 /** One entry per store: its key and its value. Keys are given on every write, not read from the value. */
 export interface OffcutDb extends DBSchema {

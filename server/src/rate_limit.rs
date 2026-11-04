@@ -171,6 +171,13 @@ fn ceil_secs(wait: Duration) -> u32 {
     u32::try_from(secs).unwrap_or(u32::MAX)
 }
 
+/// Limits `group` by a key only a handler knows: a user or an address's hash
+/// (v6implementation D-263).
+pub fn limit(state: &AppState, group: RouteGroup, key: RateKey) -> Result<(), AppError> {
+    let checked = state.limiter.check(group, key, Instant::now());
+    checked.map_err(|retry_after_secs| AppError::RateLimited { retry_after_secs })
+}
+
 /// Middleware: limits `group` by the client's IP address. Use it through
 /// `axum::middleware::from_fn_with_state`. The server must be served with
 /// `into_make_service_with_connect_info::<SocketAddr>()`; without the peer

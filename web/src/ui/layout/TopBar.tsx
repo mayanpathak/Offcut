@@ -5,7 +5,8 @@
 // export runs and offers "Download again" after it (D-189). Undo and redo are enabled by the history (D-184) while the
 // clip is ready and no export has the preview; their tooltips name their
 // shortcuts (D-185). The save state is the interface store's, "Saving…"
-// while an edit is written to the device.
+// while an edit is written to the device. "Account" opens the account page in
+// a tab of its own: leaving this page would let go of the clip (v6implementation §13).
 
 import { messages } from "../../copy/messages";
 import { type BlockerCode, forImport } from "../../state/blockers";
@@ -23,6 +24,7 @@ import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import { Spinner } from "../primitives/Spinner";
 import styles from "../styles/editor.module.css";
+import primitives from "../styles/primitives.module.css";
 import type { StageView } from "./Stage";
 
 /** Why the clip cannot be let go now. While an export runs, the words of §17.2. */
@@ -113,7 +115,17 @@ function SaveState() {
   );
 }
 
-export function TopBar({ view }: { view: StageView }) {
+/** A link, drawn as the bar's quiet buttons are. */
+function AccountLink({ path }: { path: string }) {
+  return (
+    <a className={[primitives.button, primitives.ghost, primitives.md, styles.barLink].join(" ")} href={path} target="_blank" rel="noopener" data-testid="account-link">
+      {messages.editor.account}
+      <span className={styles.srOnly}> {messages.editor.newTab}</span>
+    </a>
+  );
+}
+
+export function TopBar({ view, accountPath }: { view: StageView; accountPath: string }) {
   const lengthMs = useClipStore((state) => state.clipInfo?.duration);
   const showShortcuts = useUiStore((state) => state.showShortcuts);
   const ready = view === "ready";
@@ -141,6 +153,7 @@ export function TopBar({ view }: { view: StageView }) {
         }}
         data-testid="shortcuts-open"
       />
+      <AccountLink path={accountPath} />
       <ExportControl />
     </header>
   );

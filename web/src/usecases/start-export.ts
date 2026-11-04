@@ -6,19 +6,23 @@
 // (TS §40.9 S-9). An export can be cancelled (v4implementation D-152): it ends
 // `idle`, with no file of it on this device.
 //
-// Until V6 the token is the one this device holds, and without one no export
-// can be made (v2implementation D-23). Nothing here calls the API.
+// The gate comes first (v6implementation §12): it needs an account, or a token this
+// device holds that has not expired, and what the plan allows. The only calls to the
+// API are a token that has expired, before anything begins, and the receipt, after.
 
 import { track } from "../analytics/client";
 import type { ExportedAs } from "../gen/api";
 import type { ChangeSummary, ClipId, DetectedEvent, ExportId, ExportProfile, ProfileKind } from "../gen/domain";
+import { getEntitlement } from "../net/api-client";
 import * as clipsRepo from "../persistence/clips-repo";
 import * as entitlementRepo from "../persistence/entitlement-repo";
 import * as opfs from "../persistence/opfs";
+import { enqueue, flushOutbox } from "../persistence/receipt-outbox";
 import * as renderCacheRepo from "../persistence/render-cache-repo";
 import type { RenderCacheRecord } from "../persistence/schema";
-import { type BlockerCode, forExport } from "../state/blockers";
+import { type BlockerCode, effectiveNow, forExport } from "../state/blockers";
 import { type ClipState, useClipStore } from "../state/clip-store";
+import { setToken, useEntitlementStore } from "../state/entitlement-store";
 import * as exportStore from "../state/export-store";
 import { EXPORT_MACHINE } from "../state/machines/export-machine";
 import { transition } from "../state/machines/transition";
@@ -38,7 +42,7 @@ const REVOKE_AFTER_MS = 60_000;
 const UUID_BYTES = 16;
 const TWO_POW_32 = 2 ** 32;
 
-/** The key's `theme` until a brand kit (V6.7): a function of the style and the renderer, both in the key (D-224). */
+/** The key's `theme` until a brand kit (V6.10): a function of the style and the renderer, both in the key (D-224). */
 const DEFAULT_THEME = "default";
 /** Bits per second times milliseconds, to bytes. */
 const BITS_MS_PER_BYTE_S = 8000;
@@ -66,35 +70,128 @@ export function newExportId(): ExportId {
 }
 
 /**
- * The plan a token names, read without verifying it (D-52). It feeds the two
- * analytics properties and nothing else: what the export is allowed comes
- * from the worker's verification alone. A token that cannot be read counts
- * as free.
+ * The repository is the truth across tabs and page loads (v6implementation D-294).
+ * Storage that cannot be read leaves what the page holds.
  */
-function planOf(token: string): ExportedAs {
+async function reloadToken(): Promise<void> {
+  let stored: Awaited<ReturnType<typeof entitlementRepo.get>>;
   try {
-    const payload = (token.split(".")[0] ?? "").replaceAll("-", "+").replaceAll("_", "/");
-    const claims: unknown = JSON.parse(atob(payload));
-    const creator = typeof claims === "object" && claims !== null && "plan" in claims && claims.plan === "creator";
-    return creator ? "creator" : "free";
+    stored = await entitlementRepo.get();
   } catch {
-    return "free";
+    // The page's token may be all there is: a write that failed keeps it for this page.
+    return;
+  }
+  setToken(stored?.token ?? null);
+}
+
+/**
+ * The plan of the token this device holds; `free` without one, or when it cannot
+ * be read. The preview's watermark badge shows for `free` (v4implementation
+ * D-172): what an export carries is still the worker's verification alone.
+ */
+export async function cachedPlan(): Promise<ExportedAs> {
+  await reloadToken();
+  return useEntitlementStore.getState().claims?.plan ?? "free";
+}
+
+/** A fetch of a new token is under way: a second click must not start another. */
+let renewing = false;
+
+/** A token that has expired, for a person signed in: a new one, then the gate is asked again. */
+async function renewToken(): Promise<void> {
+  const result = await getEntitlement();
+  if (!result.ok) {
+    return;
+  }
+  setToken(result.data.entitlement_token);
+  try {
+    await entitlementRepo.put(result.data.entitlement_token);
+  } catch {
+    track({ name: "client_error", props: { error_code: "E_STORAGE_IO", stage: "api" } });
   }
 }
 
 /**
- * The plan of the token this device holds, read as `planOf` reads it; `free`
- * without one, or when it cannot be read. The preview's watermark badge
- * shows for `free` (v4implementation D-172): what an export carries is still
- * the worker's verification alone.
+ * C-7. Whether the export may begin. If not, what the person needs is in the
+ * store; a blocker the button shows, it has already said. A cache hit is behind this
+ * too: C-7 runs before C-9 (v6implementation §12).
  */
-export async function cachedPlan(): Promise<ExportedAs> {
+async function passGate(lastConfirmed: boolean): Promise<boolean> {
+  await reloadToken();
+  if (forExport() === "B_ENTITLEMENT_EXPIRED") {
+    if (renewing) {
+      return false;
+    }
+    renewing = true;
+    try {
+      await renewToken();
+    } finally {
+      renewing = false;
+    }
+  }
+  const blocker = forExport();
+  switch (blocker) {
+    case null:
+      break;
+    case "B_NOT_SIGNED_IN":
+      exportStore.setGate("sign_in");
+      return false;
+    case "B_NO_FREE_EXPORTS":
+      // A click while the prompt is up shows nothing new.
+      if (exportStore.useExportStore.getState().gate !== "upgrade") {
+        track({ name: "upgrade_prompt", props: { placement: "limit_reached", action: "shown" } });
+      }
+      exportStore.setGate("upgrade");
+      return false;
+    case "B_ENTITLEMENT_EXPIRED":
+      exportStore.gateFailed({ code: "E_ENTITLEMENT_EXPIRED", stage: "api", retryable: true });
+      return false;
+    case "B_EXPORT_IN_PROGRESS":
+    case "B_PIPELINE_NOT_READY":
+    case "B_STORAGE_LOW":
+    case "B_UNSUPPORTED":
+    case "B_PIPELINE_BUSY":
+      return false;
+  }
+  const now = effectiveNow();
+  if (!lastConfirmed && now?.plan === "free" && now.freeExportsRemaining === 1) {
+    exportStore.setGate("confirm_last");
+    return false;
+  }
+  return true;
+}
+
+/** Closes what the gate opened. Nothing had begun. */
+export function closeGate(): void {
+  exportStore.setGate(null);
+}
+
+/** "Export it", in the last-export dialog: on with the export, without being asked again. */
+export function confirmLastExport(clipId: ClipId): Promise<void> {
+  exportStore.setGate(null);
+  return startExport(clipId, { lastConfirmed: true });
+}
+
+/** "Not now", on the upgrade prompt: the placement it was shown in. */
+export function dismissUpgrade(): void {
+  const placement = exportStore.useExportStore.getState().gate === "upgrade" ? "limit_reached" : "after_export";
+  track({ name: "upgrade_prompt", props: { placement, action: "dismissed" } });
+  exportStore.dismissOffer();
+}
+
+/** After a watermarked export (PS §11), once per export until it is dismissed: a hit shares its export's id. */
+function offerUpgrade(): void {
+  if (exportStore.offerUpgrade()) {
+    track({ name: "upgrade_prompt", props: { placement: "after_export", action: "shown" } });
+  }
+}
+
+/** What a receipt says of a file the person has. A write that fails does not take the file back (§12). */
+async function writeReceipt(exportId: ExportId, exportedAs: ExportedAs, sub: Parameters<typeof enqueue>[2]): Promise<void> {
   try {
-    const record = await entitlementRepo.get();
-    return record === undefined ? "free" : planOf(record.token);
+    await enqueue(exportId, exportedAs, sub);
   } catch {
-    // A device whose storage cannot be read holds no token the badge can trust.
-    return "free";
+    track({ name: "client_error", props: { error_code: "E_STORAGE_IO", stage: "storage" } });
   }
 }
 
@@ -282,14 +379,14 @@ async function deliverStored(clipId: ClipId, hit: RenderCacheRecord): Promise<vo
  * for them, so the transitions are taken here, through the same table.
  */
 function exportCancelled(): void {
-  const { status, unavailable } = exportStore.useExportStore.getState();
+  const { status } = exportStore.useExportStore.getState();
   const stopped = transition("export", EXPORT_MACHINE, status, "cancel");
   if (stopped === status) {
     return;
   }
   exportStore.useExportStore.setState({ status: stopped });
   const idle = transition("export", EXPORT_MACHINE, stopped, "cancel_done");
-  exportStore.useExportStore.setState({ status: idle, done: 0, total: 0, unavailable, answered: false }, true);
+  exportStore.useExportStore.setState({ status: idle, done: 0, total: 0, gate: null, upgradeOffer: false, answered: false }, true);
 }
 
 /**
@@ -333,21 +430,15 @@ function exportDone(values: ReturnType<typeof editValues>, profile: ExportedAs, 
  * its partial nor its finished file left (D-152). A blocked one ends `idle`
  * with its reason in the store, and nothing on the device touched (D-231).
  */
-export async function startExport(clipId: ClipId): Promise<void> {
-  // 1. The component shows the words of the blocker.
-  if (forExport() !== null || useClipStore.getState().clipId !== clipId) {
+export async function startExport(clipId: ClipId, options: { lastConfirmed?: boolean } = {}): Promise<void> {
+  // 1, 2. The gate (v6implementation §12).
+  if (useClipStore.getState().clipId !== clipId || !(await passGate(options.lastConfirmed === true))) {
     return;
   }
-
-  // 2. V6: the token comes from the account. Until then it is the one this
-  //    device holds, and tests are what put one there (D-23).
-  const record = await entitlementRepo.get();
-  if (record === undefined) {
-    exportStore.setUnavailable(true);
-    return;
-  }
-  // The read took a moment: a second click may have started an export meanwhile.
-  if (forExport() !== null) {
+  // The gate took a moment: a second click may have started an export meanwhile.
+  // Nothing waits from here to `start`.
+  const { token: entitlementToken, claims } = useEntitlementStore.getState();
+  if (forExport() !== null || entitlementToken === null || claims === null) {
     return;
   }
 
@@ -373,9 +464,8 @@ export async function startExport(clipId: ClipId): Promise<void> {
   let summary: ChangeSummary;
   try {
     goOn(signal);
-    // 5. The token as the worker verifies it: this, and never `planOf`, says
-    //    what the device may be given (D-220, INV-9).
-    const entitlementToken = record.token;
+    // 5. The token as the worker verifies it: this, and never the claims the page
+    //    read, says what the device may be given (D-220, INV-9).
     const profile = answered(await whenFree(() => pool.render.exportProfile({ entitlementToken })));
     exportedAs = profile.kind === "creator" ? "creator" : "free";
 
@@ -389,6 +479,9 @@ export async function startExport(clipId: ClipId): Promise<void> {
       await deliverStored(clipId, hit);
       unlockAfterExport();
       exportDone(values, exportedAs, startedAt, true);
+      if (exportedAs === "free") {
+        offerUpgrade();
+      }
       return;
     }
 
@@ -433,7 +526,7 @@ export async function startExport(clipId: ClipId): Promise<void> {
       exportStore.clear();
     }
     if (!started) {
-      track({ name: "export_started", props: { profile: planOf(record.token) } });
+      track({ name: "export_started", props: { profile: claims.plan } });
     }
     const known = failureOf(error);
     const failure = known ?? { code: "E_INTERNAL", stage: "render_encode", retryable: false };
@@ -450,10 +543,15 @@ export async function startExport(clipId: ClipId): Promise<void> {
     return;
   }
 
-  // 12.
+  // 12. A new render is what a receipt counts: a hit, a cancel or a failure writes none (C-12).
+  await writeReceipt(exportId, exportedAs, claims.sub);
   exportStore.saved(summary, false);
   unlockAfterExport();
   exportDone(values, exportedAs, startedAt, false);
+  if (exportedAs === "free") {
+    offerUpgrade();
+  }
+  void flushOutbox();
 }
 
 /**
@@ -480,7 +578,11 @@ export async function downloadAgain(): Promise<void> {
 
 /** "Close" on a failed export's card (D-190): back to the editor, the Export button ready again. */
 export function dismissExport(): void {
-  if (exportStore.useExportStore.getState().status === "failed") {
+  const { status, gateFailure } = exportStore.useExportStore.getState();
+  if (status === "failed") {
     exportStore.reset();
+  }
+  if (gateFailure !== undefined) {
+    exportStore.setGate(null);
   }
 }

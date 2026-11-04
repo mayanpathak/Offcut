@@ -14,6 +14,7 @@
 
 import { useEffect } from "react";
 
+import { useExportStore } from "../../state/export-store";
 import { usePreviewStore } from "../../state/preview-store";
 import { useUiStore } from "../../state/ui-store";
 import { stepFrame, stepSecond, togglePlay } from "../../usecases/control-preview";
@@ -56,7 +57,9 @@ function takesArrows(target: Element | null): boolean {
 
 function onKeyDown(e: KeyboardEvent): void {
   const ui = useUiStore.getState();
-  if (e.defaultPrevented || e.altKey || ui.shortcuts) {
+  const { gate } = useExportStore.getState();
+  // While a dialog is open, the keys are the dialog's.
+  if (e.defaultPrevented || e.altKey || ui.shortcuts || gate === "sign_in" || gate === "confirm_last") {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;

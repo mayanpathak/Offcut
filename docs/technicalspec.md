@@ -1,16 +1,16 @@
-# technicalspec.md - Offcut Technical Specification (v1.2)
+# technicalspec.md - Offcut Technical Specification (v1.3)
 
-**Status:** v1.2. Implements `product.md` "Offcut Product Spec v1.2". Changes since v1 are listed in Section 0. **v1.2 adds §40 (Edit Plan Architecture), which wins over any older section it contradicts**; older sections describe the identity case (no cuts, AI plan off) unless they were rewritten for v1.2.
+**Status:** v1.3. Implements `product.md` "Offcut Product Spec v1.3". Changes since v1 are listed in Section 0. **v1.2 added §40 (Edit Plan Architecture). v1.3 adds §41-§53 (the compatibility contract, the version map, long videos, shorts, vision, layers, chat, brand and memory, person mask, AI cost). Later sections win over any older section they contradict**; older sections describe the clip path with every flag off unless they were rewritten. **§41 is binding on every release: read it first.**
 
 **Precedence.** The product spec (PS) wins on scope, priority, pricing and success numbers. This document only adds technical precision. It adds no feature, changes no priority and restates no product number differently. Labels P0/P1/P2, M0-M4, E-1 to E-10, H1-H4, A-1 to A-12 and reason codes (a)-(f) keep their PS meaning.
 
 **Founder constraints (fixed inputs to this version).**
 - Frontend: React + Vite, deployed on Vercel.
 - Backend: deployed on Render.
-- Recurring infrastructure cost: 0 USD/month, with no paid fallback (PS A-3, PS A-10). Every component below runs on a free tier or has no fixed fee; when a free tier stops fitting, the component moves to another free tier, never to a paid one. Free-tier terms are external facts: each is verified by a named experiment (§37), never assumed.
+- Recurring infrastructure cost: 0 USD/month, with no paid fallback (PS A-3, PS A-10), **except the AI provider, allowed with a monthly spend cap from v1.3 (§52).** Every component below runs on a free tier or has no fixed fee; when a free tier stops fitting, the component moves to another free tier, never to a paid one. Free-tier terms are external facts: each is verified by a named experiment (§37), never assumed.
 
 **Timeline principles (v1.2; PS §8 principle 7, PS §9.2.1).** The user provides the take; the edit plan proposes cuts the user can see and restore.
-- **`TIMELINE_INTEGRITY` (INV-5, rewritten in v1.2).** Every removed span of the recording is a validated `Cut` of the clip's stored plan that the user has not restored; no cut starts or ends inside a word; nothing is reordered or retimed. Two timelines exist: recording time (`TimeMs`) and program time (`OutMs`), related only by the clip's `TimeMap` (§40.1). With no cuts and no hold (always so in V4-V6, and whenever the AI plan is off), the map is the identity and source time equals output time, as in v1.1.
+- **`TIMELINE_INTEGRITY` (INV-5, rewritten in v1.2).** Every removed span of the recording is a validated `Cut` of the clip's stored plan that the user has not restored; no cut starts or ends inside a word; nothing inside a clip's recording is reordered or retimed. (v1.3: a short's parts are chosen and ordered by a validated `Assembly`, §44, which makes the recording that this rule then protects.) Two timelines exist: recording time (`TimeMs`) and program time (`OutMs`), related only by the clip's `TimeMap` (§40.1). With no cuts and no hold (always so in V4-V6, and whenever the AI plan is off), the map is the identity and source time equals output time, as in v1.1.
 - **`AUDIO_DURATION_PRESERVATION` (INV-10).** The audio enhancement chain does not change the duration of the recording. Only `offcut-dsp::program::assemble` (§40.6) produces audio of another duration, and only as the `TimeMap` states.
 - **Audio enhancement is not audio editing.** Enhancement keeps the timeline and changes signal quality (high-pass, denoise, compression, loudness normalization, limiting): the chain (§18). Editing changes the timeline: `assemble`, driven by the plan's cuts. They stay separate stages.
 
@@ -34,11 +34,18 @@
 
 ## 0. Changes From v1
 
+**v1.3 (founder decisions of 2026-11-02) adds the long path: a long video becomes 5-10 finished shorts.**
+
+- **Added.** §41 the compatibility contract, the rule every release obeys; §42 the version map; §43 long sources (20 minutes, 16 GB, 4K, HEVC), windowed audio, resumable transcription; §44 the `Assembly`, a short as a virtual clip; §45 the Director (`/shorts`, whole-sentence selection, stitching); §46 local vision and face-tracked framing; §47 the launch catalog; §48 layers, B-roll, asset box, join transitions; §49 chat editing through typed `PlanOp`s; §50 creator memory and the back-catalogue queue; §51 person mask; §52 paid AI with a spend cap; §53 experiments TE-17 to TE-25, INV-25 to INV-31, long-path budgets, and what was learned from studying Tooscut.
+- **Changed.** V6.x renumbered (§42). INV-2, INV-5, INV-12, P-1, P-5, P-11, §36, §23, §31, A-3. Every change to a protected behaviour is a numbered row of §41.2.
+- **Moved to post-launch.** Chapter markers and the lower third.
+- **Unchanged.** The clip path. A clip of at most 90 seconds with flags off is V5, byte for byte (INV-26).
+
 **v1.2 (founder decision of 2026-10-21) makes Offcut an AI-planned editor; §40 is the design.**
 
-- **Added.** `EditPlan` produced by the rule detector (V4) or by a cloud LLM through `POST /api/v1/plan` (V6.1); the capability catalog that generates the prompt and output schema (§40.3); the validator (§40.4); `OutMs` and `TimeMap` (two timelines, identity until V6.2); `offcut-dsp::program::assemble` for cuts, music and ducking (§40.6); `DrawCmd::Video` and `DrawCmd::Image`, `FontKey`/`FontSet`, `Theme`, `StyleSpec.motion`, a zone table (§40.5); the `plans` store; `plan_usage` table; TE-15, TE-16, E-11; INV-21 to INV-24; TDR-18 to TDR-21.
-- **Changed.** INV-2, INV-5, INV-10, P-1, P-5, the §36 rows on cuts, time maps, music, brand kits and cloud LLM, TDR-4, TDR-7. V4-V6 build the seams of §40.9; V6.1-V6.7 build the features (§40.10, `buildplan.md` §8A).
-- **Reversed from v1.1.** The ban on a source-to-output time map "kept for later" (§36, TDR-7): v1.2 builds it in V4 on purpose, as the identity, so that V6.2 changes data, not types.
+- **Added.** `EditPlan` produced by the rule detector (V4) or by a cloud LLM through `POST /api/v1/plan` (V6.2); the capability catalog that generates the prompt and output schema (§40.3); the validator (§40.4); `OutMs` and `TimeMap` (two timelines, identity until V6.3); `offcut-dsp::program::assemble` for cuts, music and ducking (§40.6); `DrawCmd::Video` and `DrawCmd::Image`, `FontKey`/`FontSet`, `Theme`, `StyleSpec.motion`, a zone table (§40.5); the `plans` store; `plan_usage` table; TE-15, TE-16, E-11; INV-21 to INV-24; TDR-18 to TDR-21.
+- **Changed.** INV-2, INV-5, INV-10, P-1, P-5, the §36 rows on cuts, time maps, music, brand kits and cloud LLM, TDR-4, TDR-7. V4-V6 build the seams of §40.9; V6.1-V6.11 build the features (§40.10, `buildplan.md` §8A).
+- **Reversed from v1.1.** The ban on a source-to-output time map "kept for later" (§36, TDR-7): v1.2 builds it in V4 on purpose, as the identity, so that V6.3 changes data, not types.
 
 **v1.1 removes automatic timeline editing from the architecture. It is not disabled; it does not exist.** (Superseded in part by v1.2 above.)
 
@@ -94,13 +101,13 @@ RENDER (one free web service, Docker image `offcut-api`)
     ├── /api/v1/billing/*            checkout URL, portal URL, provider webhook
     ├── /api/v1/events               allowlisted analytics ingestion
     ├── /api/v1/notify-me            waitlist / unsupported-platform email capture
-    ├── /api/v1/plan                 edit plan: transcript → AI provider → EditPlan (v1.2, V6.1; §40.7)
+    ├── /api/v1/plan                 edit plan: transcript → AI provider → EditPlan (v1.2, V6.2; §40.7)
     └── /api/v1/account/*            delete, export
 
 MANAGED POSTGRES (free tier, external to Render; TE-6)   users, sessions, subscriptions, receipts, events
-EMAIL PROVIDER (HTTPS API, free tier; TE-8)              magic-link delivery
+EMAIL PROVIDER (SMTP relay, Brevo free tier; TE-8)      magic-link delivery, STARTTLS on port 2525 (V6, D-248, D-252)
 AI PROVIDER (HTTPS API, free tier; TE-15; v1.2)          edit-plan completions, called by the server only
-MERCHANT OF RECORD (TE-9)                                hosted checkout, customer portal, webhooks
+MERCHANT OF RECORD (Dodo Payments; TE-9)                 hosted checkout, customer portal, webhooks; test mode until the founding release (D-285)
 UPTIME MONITOR (free tier)                               GET /api/v1/healthz every 5 min
 ```
 
@@ -114,7 +121,7 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 - **Postgres provider:** the only durable server-side state.
 - **Asset CDN:** immutable, content-hashed public files. Receives no user data.
 - **Merchant of record:** card data, tax, invoices, refunds, subscription lifecycle. Source of truth for subscription state (PS §16).
-- **Email provider:** delivers one template (magic link).
+- **Email provider:** delivers one template (magic link). Brevo's SMTP relay, through `lettre` (V6, D-248).
 - **The backend explicitly does not:** transcode, transcribe, render, store or proxy media; store or log transcripts, captions, edits, file names or paths (it forwards the transcript of a plan request to the AI provider and forgets it); validate plans against user edits (the client does, §40.4); hold prices; run scheduled jobs outside its own process; keep in-memory state that must survive a restart (Render restarts free services at any time).
 
 ---
@@ -137,7 +144,7 @@ UPTIME MONITOR (free tier)                               GET /api/v1/healthz eve
 | `crates/offcut-wasm-{core,render}` | `wasm-bindgen` exports, JS-value conversion | the pure crates, `serde-wasm-bindgen`, `web-sys` | product rules (no branching on domain values beyond argument decoding) |
 | `crates/offcut-entitlement` | Token format, verification; signing behind feature `sign` | `ed25519-dalek`, `offcut-types` | network, storage |
 | `crates/offcut-api-types` | Every client-server DTO and the analytics allowlist | `serde`, `ts-rs`, `offcut-types` | server or client code |
-| `server` (`offcut-api`) | Routes, DB access, signing, provider adapters | Postgres, email API, merchant API, AI provider API (v1.2) | any media handling; storing or logging a transcript; client crates other than `offcut-types`, `offcut-api-types`, `offcut-entitlement` and `offcut-plan` (v1.2: catalog, prompt, schema; §40.7) |
+| `server` (`offcut-api`) | Routes, DB access, signing, provider adapters | Postgres, SMTP relay, merchant API, AI provider API (v1.2) | any media handling; storing or logging a transcript; client crates other than `offcut-types`, `offcut-api-types`, `offcut-entitlement` and `offcut-plan` (v1.2: catalog, prompt, schema; §40.7) |
 | `crates/offcut-plan` (v1.2, V4) | Plan types' logic: catalog, prompt and schema generation, validation, rules producer, time-map construction | `offcut-types`, `offcut-text` (tokenize, `parse_quantity`, `format_quantity`), `serde`, `thiserror`; `serde_json` behind the default feature `prompt` (v4implementation D-122) | `web-sys`, `wasm-bindgen`, `wgpu`, network, clocks, randomness, `offcut-scene`, `offcut-render` |
 | Vercel config | Headers, rewrite | Render origin | functions, middleware, edge config |
 
@@ -191,7 +198,8 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 |---|---|---|
 | `axum`, `tokio`, `tower`, `tower-http` | HTTP service | Pinned |
 | `sqlx` (Postgres, rustls, offline query cache) | DB access with compile-time-checked SQL | Pinned; `.sqlx/` committed |
-| `reqwest` (rustls) | Email and merchant API calls | Pinned |
+| `reqwest` (rustls, `rustls-no-provider`, `ring` installed once in `main.rs`) | Merchant API calls (V6, D-281) | Pinned |
+| `lettre` (`smtp-transport`, `tokio1-rustls`, `ring`; no default features) | Magic-link mail over SMTP with STARTTLS (V6, D-248, D-249) | Pinned |
 | `ed25519-dalek` | Entitlement and access-token signing | Pinned |
 | `tracing`, `tracing-subscriber` (JSON) | Logs to stdout | Pinned |
 | `uuid` (v7), `time` | Ids, timestamps | Pinned |
@@ -204,8 +212,8 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 | Render free web service (prebuilt Docker image from GHCR) | API | TE-11 |
 | Managed Postgres, free tier. Candidates: Neon, Supabase | Server state | TE-6 decides |
 | Object storage with free egress. Candidates: Cloudflare R2, Hugging Face Hub | Model files, demo video, sample clip | TE-7 decides |
-| Transactional email API, free tier. Candidates: Resend, Brevo | Magic links | TE-8 decides |
-| Merchant of record. Candidates: Paddle, Lemon Squeezy, Dodo Payments (PS A-4) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 decides |
+| Transactional email, free tier: **Brevo's SMTP relay**, port 2525, as Render's free services block 25, 465 and 587 (V6, D-252) | Magic links; 300 a day | TE-8 (cut down by the founder, `docs/v6/experiments.md`) |
+| Merchant of record: **Dodo Payments** (PS A-4; founder, 2026-11-02) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 (test mode read in V6; live approval belongs to the founding release, BP §8A.6) |
 | Free uptime monitor (candidate: UptimeRobot) | PS §20.1 uptime monitor; keeps the API warm | TE-11 |
 | GitHub Actions + GHCR | CI, image registry | TE-10 |
 
@@ -281,6 +289,13 @@ offcut/
 │   │   │   ├── lib.rs
 │   │   │   ├── units.rs               [ONLY] unit newtypes and conversions
 │   │   │   ├── timemap.rs             [ONLY] recording ↔ program time; identity only in V4 (v4implementation D-125)
+│   │   │   ├── assembly.rs            [ONLY] (V6.3) Part, Assembly: a short's parts of its source (§44)
+│   │   │   ├── source.rs              (V6.1, V6.4) SourceInfo, Route, ShortDraft, ShortsPlan, ShortSpec
+│   │   │   ├── frame_path.rs          [ONLY] (V6.5) FramePath
+│   │   │   ├── vision.rs              (V6.5) Shot, ShotKind, FacePos, ShotSummary
+│   │   │   ├── assets.rs              (V6.8) AssetId, AssetMeta, AssetRef
+│   │   │   ├── plan_ops.rs            [ONLY] (V6.9) PlanOp, ChatReply
+│   │   │   ├── creator.rs             (V6.10) CreatorMemory, CreatorMemorySummary
 │   │   │   ├── ids.rs                 [ONLY] id newtypes
 │   │   │   ├── limits.rs              [ONLY] every PS limit as a typed constant
 │   │   │   ├── media.rs               ProbeInfo, ClipInfo, RejectReason, Orientation, Rotation
@@ -307,6 +322,7 @@ offcut/
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
 │   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
+│   │   │   ├── hevc.rs                (V6.1) hvcC, the HEVC codec string, HDR flags
 │   │   │   ├── validate.rs            [ONLY] validate_probe(): PS §9.4 limits -> RejectReason
 │   │   │   ├── mux.rs                 Mp4Muxer (faststart)
 │   │   │   └── mux_boxes.rs           box writers for the muxer (v2implementation D-55)
@@ -324,6 +340,7 @@ offcut/
 │   │   │   ├── sentences.rs           segment_sentences()
 │   │   │   ├── numbers.rs             [ONLY] spoken/written number parsing and display formatting
 │   │   │   ├── units_lex.rs           unit and currency lexicon
+│   │   │   ├── rebase.rs              [ONLY] (V6.3) a short's transcript from the master's (§44.4)
 │   │   │   └── normalize.rs           normalize_transcript()
 │   │   └── tests/
 │   │       ├── numbers_table.rs
@@ -360,28 +377,49 @@ offcut/
 │   │   │   ├── chain.rs               run_chain() (length-preserving)
 │   │   │   ├── prosody.rs             measure_prosody()
 │   │   │   ├── program.rs             [ONLY place that changes duration] assemble(); identity in V4 (v4implementation D-127)
-│   │   │   └── silence.rs             silence_profile() (first reader V6.2)
+│   │   │   ├── regions.rs             [ONLY] (V6.3) concat_parts: a short's audio from its parts (§44.5)
+│   │   │   └── silence.rs             silence_profile() (first reader V6.3)
 │   │   └── tests/
 │   │       ├── loudness_target.rs
 │   │       ├── chain_no_clicks.rs
 │   │       ├── duration_preserved.rs
 │   │       ├── prosody.rs
 │   │       └── program_identity.rs    the program audio equals the cleaned voice (S-6)
+│   ├── offcut-vision/                 (V6.5) pure: shot boundaries, kinds, face tracking; depends only on offcut-types (§46)
+│   │   ├── Cargo.toml
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── shots.rs               histogram boundaries; ShotKind rules
+│   │   │   ├── tracking.rs            [ONLY constructor of a non-empty FramePath] dead zone, smoothing, resets
+│   │   │   └── summary.rs             ShotSummary → ShotLine, within the request's budget
+│   │   └── tests/
+│   │       ├── shots.rs
+│   │       └── tracking.rs
 │   ├── offcut-plan/                   (V4) the edit plan: catalog, prompt, validation, rules producer (v4implementation D-122)
 │   │   ├── Cargo.toml                 default feature "prompt" (serde_json, the schema generator); the binding turns it off
 │   │   ├── src/
 │   │   │   ├── lib.rs                 module list; re-exports; PlanError
 │   │   │   ├── catalog.rs             [ONLY] CATALOG_VERSION, ItemSpec, ParamSpec, the four kinds (D-123)
-│   │   │   ├── prompt.rs              system_prompt, output_schema, user_message (feature "prompt"; first caller V6.1)
+│   │   │   ├── prompt.rs              system_prompt, output_schema, user_message (feature "prompt"; first caller V6.2)
 │   │   │   ├── config.rs              [ONLY] PlanConfig and its defaults (D-165)
 │   │   │   ├── resolve.rs             QuantityRef -> Quantity over the effective tokens (D-121)
 │   │   │   ├── validate.rs            [ONLY constructor of ValidPlan] the rules V-1 to V-8 (D-121, D-122)
 │   │   │   ├── validate_params.rs     validate.rs's per-kind parameter checks, if it nears 400 lines (v4implementation C.1)
+│   │   │   ├── shorts.rs              [ONLY constructor of ShortSpec] (V6.4) rules S-1 to S-10 (§45.5)
+│   │   │   ├── shorts_prompt.rs       (V6.4) the Director's prompt and schema (feature "prompt")
+│   │   │   ├── shorts_rules.rs        (V6.4) shorts_from_rules: the offline list (§45.6)
+│   │   │   ├── plan_ops.rs            [ONLY] (V6.9) effective_plan, validate_ops (§49.2)
+│   │   │   ├── chat_prompt.rs         (V6.9) the chat prompt and schema (feature "prompt")
 │   │   │   └── from_rules.rs          DetectedEvent[] -> EditPlan, the rules producer
 │   │   └── tests/
 │   │       ├── catalog_snapshot.rs    the prompt and the schema, version-named snapshots
 │   │       ├── validate.rs            one case per rule
 │   │       ├── plan_from_rules.rs
+│   │       ├── shorts.rs              one case per rule S-1 to S-10
+│   │       ├── shorts_prompt_snapshot.rs
+│   │       ├── shorts_rules.rs
+│   │       ├── plan_ops.rs            each op: apply, refuse, undo
+│   │       ├── chat_prompt_snapshot.rs
 │   │       ├── validate_rules_plans.rs  no rules plan of fixtures/labeled/ loses an item (D-165)
 │   │       ├── ui.rs                  trybuild driver
 │   │       ├── ui/valid_plan_private.rs  ValidPlan has no public constructor (INV-21); its .stderr beside it
@@ -491,6 +529,7 @@ offcut/
 │   ├── Dockerfile
 │   ├── .sqlx/                         sqlx offline query cache (generated, committed)
 │   ├── migrations/
+│   │   ├── 0002_ai_usage.sql          (V6.2) ai_usage, ai_shorts_grants, ai_spend (§52)
 │   │   └── 0001_init.sql
 │   ├── src/
 │   │   ├── main.rs
@@ -530,8 +569,16 @@ offcut/
 │   │   │   └── notify.rs
 │   │   ├── mail/
 │   │   │   ├── mod.rs                 Mailer trait
-│   │   │   ├── http_mailer.rs         the chosen provider's adapter (TE-8)
+│   │   │   ├── smtp_mailer.rs         SMTP over STARTTLS through the chosen provider (TE-8)
 │   │   │   └── templates.rs           magic-link email
+│   │   ├── plan/                      (V6.2, V6.4, V6.9) the only code that calls the AI provider
+│   │   │   ├── mod.rs
+│   │   │   ├── provider.rs            PlanProvider trait and the TE-15 adapter
+│   │   │   ├── route.rs               POST /plan
+│   │   │   ├── shorts.rs              POST /shorts
+│   │   │   ├── chat.rs                POST /chat-edit
+│   │   │   ├── quota.rs               ai_usage, grants, in-memory anonymous bucket
+│   │   │   └── spend.rs               [ONLY] AI_MONTHLY_CAP_USD and ai_spend
 │   │   └── db/
 │   │       ├── mod.rs                 pool
 │   │       ├── users.rs
@@ -549,9 +596,17 @@ offcut/
 │       ├── usage_receipts.rs
 │       ├── webhook_idempotency.rs
 │       ├── billing_events.rs
+│       ├── billing_routes.rs          checkout and the portal, on the fake merchant
+│       ├── dodo_adapter.rs            the adapter, from fixtures/dodo/, with no network
+│       ├── fixtures/dodo/             real test-mode deliveries, with people's details and ids replaced
 │       ├── analytics_allowlist.rs
 │       ├── rate_limit.rs
 │       ├── account_delete.rs
+│       ├── plan_route.rs
+│       ├── shorts_route.rs
+│       ├── chat_route.rs
+│       ├── ai_quota.rs
+│       ├── ai_cap.rs
 │       ├── account_export.rs
 │       ├── log_redaction.rs
 │       ├── no_media_routes.rs
@@ -581,6 +636,8 @@ offcut/
 │   │   │   ├── allowlist-hosts.ts     [ONLY] hosts the client may contact
 │   │   │   ├── pricing.ts             [ONLY] display prices (PS §11)
 │   │   │   ├── model-manifest.json    model files: path, size, sha256
+│   │   │   ├── models/                (V6.5, V6.11) one manifest per extra model: face, person; the ASR manifest stays above (DC-4)
+│   │   │   ├── features.ts            [ONLY] (V6.1) FeatureFlags from a Vite define (§41.3)
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
 │   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code
@@ -589,7 +646,8 @@ offcut/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
 │   │   │   ├── http.test.ts
 │   │   │   ├── asset-fetch.ts         [ONLY] fetch to the asset CDN
-│   │   │   └── api-client.ts          typed route functions
+│   │   │   ├── api-client.ts          typed route functions
+│   │   │   └── api-client.test.ts
 │   │   ├── platform/
 │   │   │   ├── capability.ts
 │   │   │   ├── capability.test.ts
@@ -599,10 +657,15 @@ offcut/
 │   │   │   ├── capability-store.ts
 │   │   │   ├── model-store.ts
 │   │   │   ├── clip-store.ts
+│   │   │   ├── source-store.ts        (V6.1) the long job's state
+│   │   │   ├── shorts-store.ts        (V6.4) the list of shorts
+│   │   │   ├── chat-store.ts          (V6.9) the conversation of the open short
+│   │   │   ├── queue-store.ts         (V6.10) queued sources; holds File objects in memory only
 │   │   │   ├── preview-store.ts
 │   │   │   ├── export-store.ts
 │   │   │   ├── auth-store.ts
 │   │   │   ├── entitlement-store.ts
+│   │   │   ├── entitlement-store.test.ts
 │   │   │   ├── ui-store.ts            selected tab, follow switch, editing word, toasts, save state (v4implementation §17)
 │   │   │   ├── history.ts             undo and redo of EditState, 50 steps (D-184)
 │   │   │   ├── history.test.ts
@@ -616,6 +679,8 @@ offcut/
 │   │   │       ├── clip-machine.test.ts
 │   │   │       ├── export-machine.ts
 │   │   │       ├── export-machine.test.ts
+│   │   │       ├── source-machine.ts  (V6.1) §43.8
+│   │   │       ├── source-machine.test.ts
 │   │   │       ├── auth-machine.ts
 │   │   │       └── auth-machine.test.ts
 │   │   ├── usecases/
@@ -633,6 +698,19 @@ offcut/
 │   │   │   ├── replace-all.ts         (V4) "Change all N" for a repeated mis-hearing (D-175)
 │   │   │   ├── undo-redo.ts           (V4) D-184
 │   │   │   ├── review-update.ts       (V4) the shared update rule of an edit: pause, queue, setScene, restore, undo (D-147)
+│   │   │   ├── import-source.ts       (V6.1) probe, gate, quota check, copy
+│   │   │   ├── run-source-pipeline.ts (V6.1, V6.4, V6.5) the long job, resumable
+│   │   │   ├── run-source-pipeline.test.ts
+│   │   │   ├── request-plan.ts        (V6.2) POST /plan and its fallbacks
+│   │   │   ├── prepare-short.ts       (V6.3, V6.4) one ShortSpec → a ready virtual clip (§45.7)
+│   │   │   ├── request-shorts.ts      (V6.4) POST /shorts and its fallback
+│   │   │   ├── open-short.ts          (V6.4) load a short into the editor
+│   │   │   ├── export-shorts.ts       (V6.4) sequential batch export
+│   │   │   ├── add-asset.ts           (V6.8)
+│   │   │   ├── remove-asset.ts        (V6.8)
+│   │   │   ├── send-chat-edit.ts      (V6.9) POST /chat-edit; validates and applies ops
+│   │   │   ├── manage-queue.ts        (V6.10)
+│   │   │   ├── prepare-matte.ts       (V6.11) §51.1
 │   │   │   ├── preview-interact.ts    (V4) hover and click hit tests, drag commits (D-183)
 │   │   │   ├── style-thumbnails.ts    (V4) the style cards rendered from the clip (D-186)
 │   │   │   ├── control-preview.ts
@@ -641,6 +719,10 @@ offcut/
 │   │   │   ├── cancel-job.ts
 │   │   │   ├── dev-faults.ts          (V4) development builds only: crash, hang, fail a call on purpose (v4implementation D-155, G 14.5)
 │   │   │   ├── restore-clip.ts
+│   │   │   ├── restore-session.ts     (V6) C-1's session step; hands `net` and the outbox what they may not import
+│   │   │   ├── restore-session.test.ts
+│   │   │   ├── sign-in.test.ts        (V6) request-magic-link, complete-sign-in and sign-out
+│   │   │   ├── account.test.ts        (V6) start-checkout, confirm-checkout, open-billing-portal, delete-account and export-account-data
 │   │   │   ├── request-magic-link.ts
 │   │   │   ├── complete-sign-in.ts
 │   │   │   ├── sign-out.ts
@@ -671,6 +753,11 @@ offcut/
 │   │   │   ├── clips-repo.ts
 │   │   │   ├── transcript-repo.ts
 │   │   │   ├── edits-repo.ts
+│   │   │   ├── plans-repo.ts          (V6.2) the plans store and its op log
+│   │   │   ├── sources-repo.ts        (V6.1) sources, checkpoints, master transcripts
+│   │   │   ├── shorts-repo.ts         (V6.4)
+│   │   │   ├── assets-repo.ts         (V6.8)
+│   │   │   ├── creator-memory-repo.ts (V6.10)
 │   │   │   ├── render-cache-repo.ts
 │   │   │   ├── entitlement-repo.ts
 │   │   │   ├── receipt-outbox.ts
@@ -687,15 +774,19 @@ offcut/
 │   │   │   ├── media.worker.ts
 │   │   │   ├── media/import.ts
 │   │   │   ├── media/audio-decode.ts
+│   │   │   ├── media/file-random-access.ts  (V6.1) probe a File before any copy
 │   │   │   ├── asr.worker.ts
 │   │   │   ├── asr/whisper-runtime.ts
 │   │   │   ├── asr/model-cache-adapter.ts   serves model files from OPFS; blocks remote loads
 │   │   │   ├── asr/word-timestamps.ts
+│   │   │   ├── asr/vision-runtime.ts      (V6.5) the face detector session (DC-10)
+│   │   │   ├── asr/person-runtime.ts      (V6.11) the person-matte session (DC-10)
 │   │   │   ├── audio.worker.ts
 │   │   │   ├── render.worker.ts
 │   │   │   ├── render/video-source.ts       demux + VideoDecoder + frame queue
 │   │   │   ├── render/video-source.test.ts  the decoder while a call holds the session (v5implementation D-240)
 │   │   │   ├── render/frame-decoder.ts      the VideoDecoder's management, out of video-source.ts (v4implementation D-150)
+│   │   │   ├── render/source-position.ts  (V6.3) recording time → source time, through the Assembly (INV-27)
 │   │   │   ├── render/preview-job.ts        play, pause, seek, clock, the resize rule (D-148, D-149, D-150)
 │   │   │   ├── render/export-job.ts         the export handlers, out of render.worker.ts (D-150)
 │   │   │   ├── render/preview-loop.ts
@@ -711,6 +802,7 @@ offcut/
 │   │       │   ├── AuthCallbackPage.tsx
 │   │       │   ├── AccountPage.tsx
 │   │       │   ├── SettingsPage.tsx
+│   │       │   ├── ShortsPage.tsx     (V6.4) the list of shorts (§45.8)
 │   │       │   └── LegalPage.tsx
 │   │       ├── assets/
 │   │       │   └── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
@@ -751,9 +843,14 @@ offcut/
 │   │       │   ├── StylePicker.tsx
 │   │       │   ├── FramingPanel.tsx       caption position and crop
 │   │       │   ├── CropOffsetControl.tsx
-│   │       │   ├── CutsSection.tsx        renders nothing in V4 (V6.2)
+│   │       │   ├── CutsSection.tsx        renders nothing in V4 (V6.3)
 │   │       │   ├── ShortcutsSheet.tsx     (D-185)
 │   │       │   ├── ToastHost.tsx
+│   │       │   ├── SourceProgress.tsx  (V6.1) the long job's stages, pause and continue
+│   │       │   ├── ShortCard.tsx      (V6.4) poster, title, length, reason, keep or delete
+│   │       │   ├── AssetBox.tsx       (V6.8)
+│   │       │   ├── ChatPanel.tsx      (V6.9)
+│   │       │   ├── QueuePanel.tsx     (V6.10)
 │   │       │   ├── ExportButton.tsx
 │   │       │   ├── ExportProgress.tsx
 │   │       │   ├── SignInDialog.tsx
@@ -799,6 +896,20 @@ offcut/
 │       ├── failure-recovery.spec.ts
 │       ├── api-cold-start.spec.ts
 │       ├── privacy-network.spec.ts
+│       ├── flags_identity.spec.ts     (V6.1) flags on, AI off equals flags off (INV-26)
+│       ├── route_long.spec.ts         (V6.1)
+│       ├── high-res.spec.ts           (V6.1)
+│       ├── long-resume.spec.ts        (V6.1) tab killed, tab hidden, source evicted
+│       ├── cuts_applied.spec.ts       (V6.3)
+│       ├── stitched.spec.ts           (V6.3) out-of-order parts
+│       ├── long-to-shorts.spec.ts     (V6.4)
+│       ├── vision-pass.spec.ts        (V6.5)
+│       ├── music-import.spec.ts       (V6.7)
+│       ├── join_transition.spec.ts    (V6.8)
+│       ├── asset-box.spec.ts          (V6.8)
+│       ├── chat-edit.spec.ts          (V6.9)
+│       ├── queue.spec.ts              (V6.10)
+│       ├── prepare-matte.spec.ts      (V6.11)
 │       ├── settings-what-leaves.spec.ts
 │       └── clear-local-data.spec.ts
 ├── verify/
@@ -837,7 +948,7 @@ offcut/
 └── docs/
     ├── product.md
     ├── technicalspec.md
-    ├── buildplan.md                   build order as versions V1-V10 and V6.1-V6.7 over the §28 steps
+    ├── buildplan.md                   build order as versions V1-V10 and V6.1-V6.11 over the §28 steps
     ├── v1/v1implementation.md         file-by-file implementation plan for V1 (M0.1)
     ├── v1/v1buildguide.md             step-by-step build order for V1, with a milestone per phase
     ├── v1/coding-prompts.md           the 30 V1 coding prompts, run in order
@@ -865,6 +976,11 @@ offcut/
     ├── v5/v5buildguide.md             step-by-step build guide for V5: phases, steps, milestones
     ├── v5/coding-promptsv5.md         the V5 coding prompts (Setup, 129 to 136), run in order
     ├── v5/v5changelog.md              record of every change made while building V5
+    ├── v6/v6implementation.md         plan for V6 (M1.7, M1.8, the seam S-10, DC-11, DC-12)
+    ├── v6/v6buildguide.md             step-by-step build guide for V6: phases, steps, milestones
+    ├── v6/coding-promptsv6.md         the V6 coding prompts (Setup, 137 to 150), run in order
+    ├── v6/v6changelog.md              record of every change while building V6 and V6.1-V6.11; Entry 0 is the v1.3 revision
+    ├── v6/experiments.md              outcome of TE-8 and TE-9 (v6implementation section 17), from Prompt 149
     ├── v5/experiments.md              outcome of every reading V5 takes (v5implementation section 20), from Prompt 136
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
@@ -955,6 +1071,7 @@ everything ─► gen (types only)
 - `workers/protocol.ts` imports only `gen`; workers and `pool.ts` both import it, never each other.
 - `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call, and the two pairs of §2 "Edges added in V2" (`import-clip.ts` to `run-pipeline.ts`, `start-export.ts` to `control-preview.ts`); checked by a `boundaries` rule.
 - Stores never import use-cases; use-cases write stores through exported action functions only.
+- **Edges added in V6.** `start-app.ts` to `restore-session.ts`: `connectAccount()` runs first in `start-app.ts` and hands `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links, so `net` and `persistence` import no store (v6implementation D-306). `blockers.ts` to `entitlement.ts`, as §12.5 asks `effective()` (D-309). `offcut-api` uses `getrandom` directly, as a wrapper in `deny.toml`, for the 32 random bytes of a link and a refresh token (D-257).
 
 ---
 
@@ -1025,6 +1142,8 @@ main.tsx → startApp()
   → modelManager.inspect()                  ⇒ model: unknown → absent | partial | ready
   → restoreClip()                           (C-13)
 ```
+
+As built in V6 (v6implementation D-289, D-296, D-306, D-308): `connectAccount()` from `restore-session.ts` runs first, before anything else, as the callback page may verify when it mounts; `restoreSession()` starts at `start-app.ts`'s marker and nothing waits for it (INV-3). `main.tsx` tells `startApp` whether to restore: on `/auth/callback` it does not. Refresh runs after `ready()`, under `navigator.locks`, with a 25 s budget (D-297).
 
 **C-2. Drop a clip and validate (J2, J5)**
 ```text
@@ -1128,6 +1247,8 @@ no edit changes the audio, the clip duration or any timestamp
   → C-9
 ```
 
+As built in V6 (v6implementation D-290, D-294, D-309, D-310, D-314): the three account arms open a dialog from a button that stays enabled; `B_ENTITLEMENT_EXPIRED` that cannot be renewed is `gateFailure`, shown by the export-failed card with no `export_started`; the last Free export's question is a dialog of its own; the token is reloaded from `entitlement-repo` first. While the sign-in or last-export dialog is open, the editor's shortcuts stand aside (D-311).
+
 As built in V5 (v5implementation §13, D-229, D-231): the sign-in and limit arms are V6's. `B_STORAGE_LOW` is evaluated inside C-9, after a cache miss, by `forExport({ freeBytes, neededBytes })`, since `navigator.storage.estimate()` is asynchronous and the button reads `forExport()` while drawing. A blocked export returns to `idle` and says why in the `export-status` line beside the button, with nothing swept: it is not an `ErrorPanel`, as nothing failed.
 
 **C-8. Magic-link sign-in (J9)**
@@ -1147,6 +1268,8 @@ user opens the emailed link (new tab): /auth/callback?token=…
 original tab: broadcast.on("signed_in") → restoreSession() ⇒ link_sent → signed_in → dialog closes; user clicks Export again
 original tab closed: /app in the new tab → restoreClip() (C-13)
 ```
+
+As built in V6 (v6implementation D-254, D-259, D-295): the magic-link request and the verify are one attempt each, after `ready()`, since a link is single-use and a retried verify would read a good link as used. A relay failure is 503 `email_unavailable` → `E_AUTH_EMAIL_UNAVAILABLE` in the dialog, not a waking API (D-287). The dialog says to open the link on this computer (D-302).
 
 **C-9. Render and export (J10)**
 ```text
@@ -1203,6 +1326,8 @@ merchant → browser: /account?checkout=success | cancel
       ✗ timeout → messages.E_BILLING_PENDING (retry button; webhook may still arrive)
 <AccountPage "Manage subscription"> → openBillingPortal() → GET /api/v1/billing/portal → navigate
 ```
+
+As built in V6 (v6implementation D-312 to D-315): the prompt comes once per watermarked export, until dismissed; "Make another clip" is in `after_export` only. `startCheckout` needs a session (`forCheckout`), sends the analytics queue before leaving (one request, not awaited), and on D-300's 403 opens the portal instead. The account page offers the two plans only on Free with no live subscription, and "Manage subscription" whenever a subscription row exists. The top bar's "Account" opens `/account` in a tab of its own, as leaving `/app` would let go of the clip until V7's `restoreClip`. The wait for Creator reads again after a failed read and stops when the session has ended.
 
 **C-12. Cancel**
 ```text
@@ -1274,10 +1399,11 @@ effects: import, processing, preview, review never call the API (INV-3)
 **C-19. Merchant webhook (server)**
 ```text
 POST /api/v1/billing/webhook → billing::webhook::handle
-  → adapter.verify_signature(headers, raw_body)     ✗ 401
-  → adapter.parse_event(raw_body) → BillingEvent     unknown type → 200 (ignored)
+  → adapter.verify_signature(headers, raw_body, now) ✗ 401
+  → adapter.parse_event(headers, raw_body) → BillingEvent   unknown type → 200 (ignored)
   → tx: webhook_events.insert(provider_event_id)     ✗ unique violation → 200 (already processed; no state change)
-        subscriptions.apply(event)  (§22.5)
+        resolve the owner (D-275); none, or a deleted user → 200, nothing changed (D-272, D-284)
+        subscriptions.apply(event)  (§22.5); a whole refund of a live subscription also cancels it at the provider
   → 200
 ```
 
@@ -1315,6 +1441,7 @@ pub struct OutSpan { pub start: OutMs, pub end: OutMs }  // V4: the same on the 
 impl FrameIdx { pub fn to_out_ms(self) -> OutMs; pub fn to_micros(self) -> Micros; }   // n * 1000 / 30, n * 1_000_000 / 30
                                                                                           // (as built in V4, D-125: to_out_ms replaces
                                                                                           // to_time_ms; saturates at u32::MAX ms)
+pub struct SourceMs(u32);     // v1.3, V6.3: a position in a long source file; related to TimeMs only by Assembly (§44.1)
 impl TimeMs   { pub fn to_micros(self) -> Micros; pub fn from_micros_floor(m: Micros) -> TimeMs; }
 // No From<u32>. A position (TimeMs) and a length (DurMs) are distinct types. TimeMs and OutMs never convert
 // except through TimeMap (§40.1); with the identity map they are numerically equal.
@@ -1358,6 +1485,7 @@ pub const LOUDNESS_TOLERANCE_LU: f32      = 1.0;                         // PS �
 pub const ANALYTICS_RETENTION_DAYS: u32   = 90;                          // PS §16
 pub const MIN_WORDS: u32                  = 3;                           // (assumption, E-2) below this → REJECT_NO_SPEECH
 pub const MAX_RECENT_CLIPS: u32           = 5;                           // (assumption, M2.1)
+// v1.3 additions, with their rules: §43.2
 ```
 
 ### 10.3 Media
@@ -1402,6 +1530,7 @@ pub struct ClipInfo {                                  // a validated clip; cons
 pub enum RejectReason {                                // serialized as REJECT_* strings; analytics enum
     Container, Corrupt, NoVideo, NoAudio, MultiAudioTrack, VideoCodec, Hevc, AudioCodec,
     Duration, FileSize, Resolution, FrameRate, DecodeUnsupported, NoSpeech,
+    Hdr,                                               // v1.3, V6.1 (§43.1); appended, so stored values read unchanged
 }
 ```
 
@@ -1474,8 +1603,9 @@ pub struct EditState {
 }                                                       // user choices only; no field changes audio, duration or timing.
                                                         // A V3 record has neither V4 field and reads with the defaults
 // v1.2 additions, each in the release that uses it (§40.10): item_overrides keyed by EventId (V4 reuses
-// event_overrides), cut_restores: BTreeSet<CutKey> and filler_cuts: bool (V6.2), music: Option<MusicChoice> (V6.3),
-// caption_preset (V6.5), brand_kit: bool (V6.7). Cuts are restored, never invented, by the user (PS §8 principle 7).
+// event_overrides), cut_restores: BTreeSet<CutKey> and filler_cuts: bool (V6.3), music: Option<MusicChoice> (V6.7),
+// caption_preset (V6.6), brand_kit: bool (V6.10), plan_ops: Vec<PlanOp> (V6.9, §49.2). Each has #[serde(default)] (§41.3).
+// Cuts are restored by the user; from V6.9 a user may also ask for one in chat (§49.2).
 
 // profile.rs
 pub enum Plan { Free, Creator }
@@ -1487,12 +1617,12 @@ pub struct ExportProfile { pub kind: ProfileKind, pub width: Px, pub height: Px,
 pub struct ChangeSummary { pub voice_cleaned: bool,          // the enhancement chain ran (§18)
                            pub captions_emphasized: u32,     // enabled KeywordPop events
                            pub visual_moments: u32 }         // enabled NumberReveal + ListReveal + FromTo
-// Lists only transformations that are performed. v1.2 adds pauses_shortened: u32 and time_removed: DurMs (V6.2),
-// music: bool (V6.3), chapters: u32 (V6.6); with no cuts nothing about cuts is reported.
+// Lists only transformations that are performed. v1.2 adds pauses_shortened: u32 and time_removed: DurMs (V6.3),
+// music: bool (V6.7); with no cuts nothing about cuts is reported. (v1.3: no chapters at launch, §42.)
 
 // stage.rs
 pub enum PipelineStage { ProbeAudio, Asr, AudioChain, DetectScene, RenderEncode, Mux }   // matches PS §20.2 rows
-// v1.2, V6.1: Plan (the plan request and validation) is added; DetectScene also covers time map and assemble
+// v1.2, V6.2: Plan (the plan request and validation) is added; DetectScene also covers time map and assemble
 
 // crates/offcut-entitlement/src/claims.rs
 pub struct EntitlementClaims {
@@ -1536,9 +1666,9 @@ All request structs use `#[serde(deny_unknown_fields)]`.
 
 ### 10.8 Notes
 
-- **Why these representations.** v1.2: two timeline types, `TimeMs` (recording) and `OutMs` (program), because from V6.2 cuts make them different instants; they are introduced in V4 with an identity map so that cuts change data, not types (§40.1, TDR-7). (v1.1 had one type because nothing was cut.) `DurMs` stays separate so a length is never passed where a position is expected. Integer milliseconds match the PS data model (PS §12.5) and are exact at 30 fps to within 1 ms; frame timestamps are derived from `FrameIdx`, never accumulated. `Sentence.words` is a range because sentences never overlap.
+- **Why these representations.** v1.2: two timeline types, `TimeMs` (recording) and `OutMs` (program), because from V6.3 cuts make them different instants; they are introduced in V4 with an identity map so that cuts change data, not types (§40.1, TDR-7). (v1.1 had one type because nothing was cut.) `DurMs` stays separate so a length is never passed where a position is expected. Integer milliseconds match the PS data model (PS §12.5) and are exact at 30 fps to within 1 ms; frame timestamps are derived from `FrameIdx`, never accumulated. `Sentence.words` is a range because sentences never overlap.
 - **Serialization.** Rust ↔ worker JS: `serde-wasm-bindgen` for structs; PCM as `Float32Array`; frames as `web_sys::VideoFrame` handles; file access through the `RandomAccess` callback. Worker ↔ main: structured clone of generated types; PCM buffers are transferred, never copied. Client ↔ server: JSON of `offcut-api-types`. Storage: IndexedDB structured clone of generated types wrapped in `{ schemaVersion, value }` (§23.2). Entitlement token: `base64url(JSON claims) "." base64url(Ed25519 signature)`, both without padding; the signature covers the ASCII bytes of the first segment, so no JSON canonicalization is needed. The claims JSON uses the Rust field names of §10.6, `plan` is `"free"` or `"creator"` and `sub` is a UUID string (v2implementation D-25).
-- **Ownership (who may write).** `ClipInfo`: `validate_probe` only. `Transcript`: `normalize_transcript` only; user edits never mutate it (they live in `EditState`). `DetectedEvent`: `offcut-detect` only; `enabled` is overlaid from `EditState.event_overrides` in `build_scene`. `EditPlan`: `offcut-plan::from_rules` or the server's `/plan` handler (which sets `source`); `ValidPlan`: `offcut-plan::validate` only. `TimeMap`: `TimeMap::identity` or `offcut-plan::timemap::build` only. `ProgramAudio`: `offcut-dsp::program::assemble` only (v1.2). `EditState`: use-cases through `edits-repo.ts`. `EntitlementClaims`: `server/src/entitlement/issue.rs` only. `ExportProfile`: `offcut-entitlement/src/profile.rs::export_profile` only.
+- **Ownership (who may write).** `ClipInfo`: `validate_probe` or `route_probe` (§43.1), and for a short `short_clip_info(&SourceInfo, &Assembly)` in the same file. `SourceInfo`: `route_probe` only. `Assembly`: `Assembly::whole` or `from_parts` only. `ShortSpec`: `validate_shorts` only. `FramePath`: `FramePath::none` or `offcut-vision::tracking` only. `Transcript`: `normalize_transcript` only; user edits never mutate it (they live in `EditState`). `DetectedEvent`: `offcut-detect` only; `enabled` is overlaid from `EditState.event_overrides` in `build_scene`. `EditPlan`: `offcut-plan::from_rules` or the server's `/plan` handler (which sets `source`); `ValidPlan`: `offcut-plan::validate` only. `TimeMap`: `TimeMap::identity` or `offcut-plan::timemap::build` only. `ProgramAudio`: `offcut-dsp::program::assemble` only (v1.2). `EditState`: use-cases through `edits-repo.ts`. `EntitlementClaims`: `server/src/entitlement/issue.rs` only. `ExportProfile`: `offcut-entitlement/src/profile.rs::export_profile` only.
 
 ---
 
@@ -1624,7 +1754,7 @@ Input rejections (`REJECT_*`) are listed with triggers and tests in §15.3. Unsu
 | `auth-store.ts` | Auth state, email, in-memory access token | `start-app.ts`, sign-in/out use-cases, `delete-account.ts` |
 | `entitlement-store.ts` | Latest entitlement token and decoded claims | `start-app.ts`, `complete-sign-in.ts`, `start-export.ts`, `confirm-checkout.ts`, `receipt-outbox.ts` callback |
 
-Stores hold no derived data that another store owns. `entitlement/entitlement.ts::effective()` is the only place that combines the token with the outbox length.
+Stores hold no derived data that another store owns. `entitlement/entitlement.ts::effective()` is the only place that combines the token with the outbox. As built in V6 (v6implementation D-267), it subtracts only the outbox rows recorded as Free exports of the token's own account (`sub`), so a Creator export never spends a Free count and another account's rows never count against this one. `entitlement-store` reads claims without verifying, for display and blockers only, and an undecodable token counts as none (D-292); the worker still verifies (INV-9).
 
 ### 12.2 State machines
 
@@ -1710,6 +1840,12 @@ As built in V5 (v5implementation D-230, D-231): the table is unchanged. A token 
 | link_sent → anonymous | dialog closed |
 | anonymous_offline → signed_in / anonymous | `online` event then refresh |
 | signed_in → anonymous | sign-out, `E_AUTH_SESSION_EXPIRED`, account deleted |
+| unknown, anonymous → signed_in (V6, D-295) | verify ok in this tab |
+| anonymous → signed_in (V6, D-295) | `signed_in` broadcast, then refresh ok |
+| unknown, anonymous_offline → link_sent (V6, D-295) | magic-link request accepted: the dialog can be sent from either |
+| link_sent → link_sent (V6, D-295) | a resend |
+
+As built in V6: the callback tab does not restore a session (D-296): `main.tsx` tells `startApp` whether to restore, by the path (D-308), so a refresh's answer cannot overwrite the session that verify has just made. A sign-out clears the entitlement token; a lost session does not, so offline exports work until the token's `exp` (D-291).
 
 Server-side subscription status transitions are in §22.5.
 
@@ -1725,7 +1861,7 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 - `export: rendering → rendering`, `done → rendering` (a new export starts from `idle` with a new `ExportId`).
 - `export: gating → rendering` while clip state is not `ready`.
 - `preview: detached → playing`.
-- `auth: anonymous → signed_in` without `link_sent` or a refresh.
+- `auth: anonymous → signed_in` without a verify in this tab or a refresh: the trigger names which (V6, D-295).
 
 ### 12.4 Cross-machine rules
 
@@ -1754,6 +1890,8 @@ Every machine goes through `state/machines/transition.ts::transition(machine, st
 | `B_NO_FREE_EXPORTS` | export | `plan == Free` and `effective().freeExportsRemaining == 0` |
 
 `B_MODEL_NOT_READY` is not a blocker: the pipeline waits in `processing(waitingModel = true)`.
+
+As built in V6 (v6implementation D-290, D-309, D-310): `forExport()` without `room` asks, after V5's three, the account: `B_NOT_SIGNED_IN` when not signed in and no unexpired token; `B_ENTITLEMENT_EXPIRED` when signed in with none; `B_NO_FREE_EXPORTS` on Free with `effective()` at 0. `disablesExport` disables the button only for `B_EXPORT_IN_PROGRESS` and `B_PIPELINE_NOT_READY`; the three account blockers let the click through, to open the sign-in dialog, renew the token, or open the last-export dialog. `forExport(room)`, in `gating` after a cache miss, asks only the room: the account was asked at the gate, and an export that has begun is not sent back to it. A token that cannot be renewed at the gate is `export-store`'s `gateFailure`, shown by the export-failed card; no machine state changes, and no `export_started` is sent. `forCheckout()` needs a session: a cached token is not one. `startExport` reloads the token from `entitlement-repo` before asking (D-294), as the repository is the truth across tabs. The counter sits outside the button's accessible name, which tests match as "Export" exactly (D-302).
 
 As built in V5 (v5implementation D-229): `forExport(room?)`. Without `room` it leaves `B_STORAGE_LOW` out, so the button is not disabled by a reading that may be stale; with `{ freeBytes, neededBytes }` it evaluates `freeBytes < neededBytes x 1.2`. `startExport` calls it after a cache miss, the cached file's bytes counted as free. A browser that gives no estimate is not blocked. V6 appends the last three codes.
 
@@ -1798,6 +1936,8 @@ runCapabilityCheck(): Promise<CapabilityReport>          // platform/capability.
 
 `gpuVendor ∈ {intel, amd, nvidia, apple, qualcomm, other, unknown}` from `adapter.info.vendor`; `memoryBucket ∈ {lt4, gb4, gb8plus, unknown}`; `platform ∈ {windows, macos, linux, chromeos, android, other, unknown}` from `navigator.userAgentData?.platform`. No other device attribute is read (PS §18: no fingerprinting beyond enums).
 
+As built in V6 (V6 CL Entry 12, founder's decision of 2026-11-03): `storageAnswer` asks check 5 once more when its first try has not answered in its time, and either try's answer counts; a no or a rejection is final at once. The other checks keep one wait. With a slow disk the run can take up to 4 s, past PS §9.3's 3 s; a normal run is unchanged. Reason: a capable browser on a busy laptop was told it cannot keep files.
+
 ### 13.3 Key components
 
 As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two rows. Components that later versions add (`SignInDialog`, `UpgradePrompt`, `RecentClips`) keep their rows of the version that builds them.
@@ -1817,7 +1957,9 @@ As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two 
 | `StylePanel` → `StylePicker` | clip store, preview store | `setStyle`, `setHighlightNumbers`; `styleThumbnails` |
 | `PlanItemList` → `CutsSection` | clip store (plan, overrides) | `toggleEvent`, `controlPreview.seek`; the empty state `NO_EVENTS_FOUND` (D-154); `CutsSection` renders nothing in V4 |
 | `FramingPanel` → `CropOffsetControl` | clip store | `setCaptionPosition`, `setCropOffset` |
-| `ExportButton` | export store, `entitlement.effective()`, blockers | `startExport` |
+| `ExportButton` → `LastExportDialog` (V6) | export store, `entitlement.effective()`, blockers | `startExport`, `confirmLastExport`, `closeGate`; the counter outside the button's accessible name; disabled only by D-290's two blockers |
+| `SignInDialog` → `SignInForm`, in `GateDialog` (V6) | auth store | `requestMagicLink`; the Free/Creator limits before the email field; "open the link on this computer" (D-302) |
+| `UpgradePrompt` (V6) | export store, entitlement store | `startCheckout`, "Make another clip" (`after_export` only), dismiss; non-modal, beside `ExportOutcome`, takes no focus (D-302, D-314) |
 | `ExportProgress` (the pill, D-189) | export store | `cancelJob("export")` |
 | `ChangeSummary`'s `ExportOutcome`, in `SidePanel`'s slot above the tabs (v5implementation D-232) | export store | none; closing is local, keyed by `exportId` |
 | `PostExportQuestion` (D-234) | export store | `answerPostExport` |
@@ -1826,6 +1968,8 @@ As built in V4 (the editor of the V4 plan's §17, D-178 to D-192), and V5's two 
 | `WhatLeavesTable` | `gen/api.ts::ANALYTICS_EVENT_DOCS` | none |
 | `RejectionPanel`, `ErrorPanel` (by context, D-190) | clip/export store failure | retry, `reloadPreview`, undo; `failureShown` sends `client_error` once |
 | `NotifyMeForm` | none | `submitNotifyMe` |
+| `AuthCallbackPage` (V6) | auth store | `completeSignIn` once, after `ready()`; never refreshes (D-296) |
+| `AccountPage` (V6) | auth store, entitlement store | `startCheckout`, `confirmCheckout`, `openBillingPortal`, `exportAccountData`, `deleteAccount` behind a question, sign-out (D-315) |
 
 The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`, `SegmentedControl`, `Skeleton`, `Slider`, `Spinner`, `Switch`, `Tabs`, `Toast`, `Tooltip`) take their values from `ui/styles/tokens.css` only (D-179, D-181); no component library is used.
 
@@ -1834,7 +1978,7 @@ The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`,
 - **Copy.** Every PS §10 microcopy string, every rejection, error, blocker and unsupported message is a key in `copy/messages.ts`. Numbers inside copy (90 seconds, 3 exports, prices, model size) are interpolated from `gen/domain.ts` limits, `config/pricing.ts` and `config/model-manifest.json`; none is typed into a sentence. Enforced by `messages.test.ts` (asserts no digit literals in message templates except through placeholders).
 - **Limits before the click (PS §10 J9).** `ExportButton` renders the counter and plan limits in its idle state; `SignInDialog` renders the Free/Creator comparison before the email field. `export-free.spec.ts` asserts the counter is visible before the first click.
 - **No upgrade prompts during processing or editing (PS §11).** `UpgradePrompt` renders only for placements `after_export` and `limit_reached`; the placement type has no other member.
-- **One prompt per export.** Dismissal is stored in `export-store` for that `ExportId`.
+- **One prompt per export.** Dismissal is stored in `export-store` for that `ExportId`. As built in V6 (D-314): once per watermarked export, until dismissed; at the limit, when Export is pressed, and a press while it is showing adds nothing.
 - **Edits are optimistic and local.** No edit ever awaits the network.
 
 ### 13.5 Acceptance targets
@@ -1954,7 +2098,7 @@ The development builds' fault messages (`devCrash`, `devHang`, `devFailNext`, `d
 
 **Contingency.** If hub forwarding of PCM shows up in profiles (over 50 ms per hop on R1; assumption, M2.4), switch `pcm48`/`out48` to `SharedArrayBuffer` views; message shapes do not change.
 
-**Seams (not built now).** A fifth worker for face tracking (P1) or a local LLM (P2) is a new `WorkerKind` and interface in `protocol.ts`; nothing else in the hub changes.
+**Seams.** v1.3: face and person models run inside `asr.worker` (DC-10), so the worker count stays four. A local LLM (P2) would be a new `WorkerKind` and interface in `protocol.ts`; nothing else in the hub changes.
 
 ---
 
@@ -2060,7 +2204,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
 
 **Contingency.** TE-12 fails (demux coverage under 90% of the corpus): replace `Demuxer` in the two workers with a maintained JS demuxer behind the same `SampleMeta` shape; `probe`/`validate_probe` keep consuming a `ProbeInfo`. PS §20.4: corpus pass rate under 90% at week 8 → remove the least valuable accepted input (first candidate: input above 30 fps) by tightening `limits.rs`.
 
-**Seams (not built now).** HEVC/AV1/WebM input, multi-track audio, clips longer than 90 s: constants and enum arms in `limits.rs`/`validate.rs` only.
+**Seams.** v1.3 builds the long-clip and HEVC seams in §43 (`route_probe`; this section stays exact for the clip path with flags off). AV1, WebM and multi-track audio on the clip path are still not built.
 
 ---
 
@@ -2152,7 +2296,7 @@ transcribe(pcm16):
 
 **Contingency (PS §20.4).** ASR median above 145 s for a 60 s clip on R1 (D-67; the line was 40 s) → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
-**Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker.
+**Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker. v1.3: the manifest becomes one file per model under `config/models/`, the ASR file unchanged (DC-4); the face and person models run in `asr.worker` through their own `*-runtime.ts` (DC-10).
 
 ---
 
@@ -2419,7 +2563,7 @@ pub enum DrawCmd {
     PopLayer,
     Video     { slot: VideoSlot, src: CropRect, dst: Rect, opacity: f32, mask: Option<Vec<PathEl>> },
                                                                       // src in source display pixels; dst an axis-aligned Rect in output
-                                                                      // pixels (D-130); mask is V6.5's
+                                                                      // pixels (D-130); mask is V6.6's
     Image     { image: ImageKey, rect: Rect, opacity: f32 },          // V6.x; V4 draws none
 }
 // offcut-render
@@ -2532,7 +2676,7 @@ Count-up values at frame time `t` are `round(lerp(0, value, ease(t)))`, formatte
 
 **Contingency (PS §20.4, E-4, TE-3).** If Vello on WebGPU in a worker fails or render + encode exceeds 150 s on R1: implement `Canvas2dBackend` in `render.worker` (TypeScript) that draws `drawImage(videoFrame)` then the serialized `DisplayList` with `fillText`/`fillRect`. `offcut-scene` does not change. Separate goldens are recorded for that backend. Decision at M0 and M1.
 
-**Seams.** v1.2 builds them in V4 (§40.9 S-2 to S-5): plan input, `Video` command with per-frame crop (face tracking and punch-in zoom change only that command), `Image` command, font registry, theme roles, motion data, zone table. Brand kit (V6.7): a `Theme` plus user fonts plus a logo. Other aspect ratios: constants in `safe_area.rs`. The Canvas2D backend exists only as the contingency above; if it is ever built it draws `Video` commands with `drawImage` and a clip path.
+**Seams.** v1.2 builds them in V4 (§40.9 S-2 to S-5): plan input, `Video` command with per-frame crop (face tracking and punch-in zoom change only that command), `Image` command, font registry, theme roles, motion data, zone table. Brand kit (V6.10): a `Theme` plus user fonts plus a logo. Other aspect ratios: constants in `safe_area.rs`. The Canvas2D backend exists only as the contingency above; if it is ever built it draws `Video` commands with `drawImage` and a clip path.
 
 ---
 
@@ -2614,7 +2758,7 @@ original video timeline + enhanced audio of the same duration + transcript / eve
   → render every output frame → H.264 encode + AAC encode → MP4 mux → OPFS
 ```
 
-**v1.2 (V5, §40.9 S-8):** the loop runs over program time: `N = ceil(time_map.out_duration x 30 / 1000)`, frame `n` renders the scene at `FrameIdx(n).to_out_ms()` with the source frame at `scene.source_at(t)`, and the audio encoded is `prog48`. With the identity map this is exactly the v1.1 model below; from V6.2 the export is as long as the map says (INV-5).
+**v1.2 (V5, §40.9 S-8):** the loop runs over program time: `N = ceil(time_map.out_duration x 30 / 1000)`, frame `n` renders the scene at `FrameIdx(n).to_out_ms()` with the source frame at `scene.source_at(t)`, and the audio encoded is `prog48`. With the identity map this is exactly the v1.1 model below; from V6.3 the export is as long as the map says (INV-5).
 
 **Model: an offline, frame-accurate loop in `render.worker` over the original timeline: for every output frame, take the source frame at that frame's own timestamp, render it with the scene to the WebGPU `OffscreenCanvas`, wrap it as a `VideoFrame`, encode H.264 with WebCodecs, encode `out48` (same duration as the source audio) to AAC, and write a faststart MP4 with the Rust muxer straight to OPFS. There is no audio trimming stage before AAC, no video trimming stage before H.264 and no time map. Rejected: `MediaRecorder` (real-time, not frame-accurate), FFmpeg.wasm (PS §9.8), server rendering (PS §11).**
 
@@ -2710,13 +2854,13 @@ AAC priming: the first audio chunk's timestamp/duration and the encoder's report
 ### 21.4 Rules and edge cases
 
 - **Frame accounting.** Every output frame `0..N` is rendered and encoded exactly once; the loop never drops or duplicates an output frame, and it runs from the first instant of the recording to the last. Source frames may repeat (VFR, source below 30 fps) or be skipped (source above 30 fps) only because of the frame-rate conversion to 30 fps; none is skipped or repeated because of what the audio contains.
-- **Duration.** Output duration equals `time_map.out_duration()` to within one video frame; with the identity map that is the source duration, for any amount of silence in the clip. `timeline-preserved.spec.ts` (identity) and `cuts_applied.spec.ts` (V6.2), verifier checks 5 and 8 against the expected duration the test supplies.
+- **Duration.** Output duration equals `time_map.out_duration()` to within one video frame; with the identity map that is the source duration, for any amount of silence in the clip. `timeline-preserved.spec.ts` (identity) and `cuts_applied.spec.ts` (V6.3), verifier checks 5 and 8 against the expected duration the test supplies.
 - **Frame ownership.** Each `VideoFrame` (decoded or canvas-made) is closed by the code that obtained it, in a `finally` block. `export-loop.ts` keeps a live-frame counter asserted to be 0 at the end. The counter runs in every build, since E2E runs production builds: a non-zero count at the end of an export or after a preview stop fails that call with `E_INTERNAL` (v2implementation D-45).
 - **Capture method.** `new VideoFrame(canvas)` after the render call is method A. TE-3 compares it with method B (`copyTextureToBuffer` readback) and picks one; the choice is local to `export-loop.ts`. TE-3 picked method A on 2026-10-09: a readback was 2.8 times slower, and a frame made from a buffer of RGBA bytes is encoded with full-range brightness that the stream does not declare (`docs/v2/experiments.md`; read on the development machine, v2implementation D-69).
 - **Encoder failure mid-export.** The export restarts from frame 0 with the next ladder entry; partial output is deleted. An audio encoder failure gets one more try on the same entry. `useTimeLeft` starts again when the frames fall back (v5implementation D-216 to D-238).
 - **GPU device lost.** `E_GPU_LOST`; the user retries; no partial resume.
 - **Encoder emits reordered frames.** The muxer writes composition offsets (`ctts`), read back on real B-frames by `mux_reorder.rs` through `ffprobe` and `ffmpeg`. D1's encoder never reorders; phone playback of such a file is V10's checklist.
-- **Render cache (S-9, as built in V5, §40.9).** Key = lower-case hex SHA-256, by `crypto.subtle` on the main thread, over a canonical JSON (sorted by key at every depth, `undefined` left out, arrays in their order) of ten inputs: source file hash prefix, `Transcript`, events, `EditState`, plan, `TimeMap`, theme (`"default"` until V6.7), music id (`null` until V6.3), the `ProfileKind` **of the token the worker verified** (never one the page read itself, INV-9) and `RENDERER_VERSION`, which `vite.config.ts` computes from `offcut_render_bg.wasm`, `export-loop.ts` and `encoders.ts` (16 hex; `"test"` where no bundler ran). One entry per clip: a miss deletes the row, then the file, then renders; so a hit is "the same edit as the last export", and undoing back to an earlier one misses until V7. An import clears the cache. A hit re-downloads the stored file under its original `ExportId`, renders nothing and sends no new receipt, `export_started` or `stage_timing`. A row without its file, one of another size or of a newer build is a miss; a failed lookup is a miss; a failed `put` is swallowed.
+- **Render cache (S-9, as built in V5, §40.9).** Key = lower-case hex SHA-256, by `crypto.subtle` on the main thread, over a canonical JSON (sorted by key at every depth, `undefined` left out, arrays in their order) of ten inputs: source file hash prefix, `Transcript`, events, `EditState`, plan, `TimeMap`, theme (`"default"` until V6.10), music id (`null` until V6.7), the `ProfileKind` **of the token the worker verified** (never one the page read itself, INV-9) and `RENDERER_VERSION`, which `vite.config.ts` computes from `offcut_render_bg.wasm`, `export-loop.ts` and `encoders.ts` (16 hex; `"test"` where no bundler ran). One entry per clip: a miss deletes the row, then the file, then renders; so a hit is "the same edit as the last export", and undoing back to an earlier one misses until V7. An import clears the cache. A hit re-downloads the stored file under its original `ExportId`, renders nothing and sends no new receipt, `export_started` or `stage_timing`. A row without its file, one of another size or of a newer build is a miss; a failed lookup is a miss; a failed `put` is swallowed.
 - **Download name.** `offcut-<yyyymmdd-hhmm>.mp4`; never derived from the source file name.
 
 **Acceptance.** Render + encode at most 90 s and mux at most 2 s for the reference clip on R1 (PS §20.2, E-4). `verify_mp4.py` passes on every export in `export-free.spec.ts`, `export-creator.spec.ts` and the corpus run (§27.2). Creator output is 1080x1920 without watermark; Free output is 720x1280 with watermark (PS §20.1). Manual at M2.5: plays in the default gallery apps on one Android and one iOS phone and uploads to at least two target platforms (PS §20.1).
@@ -2738,19 +2882,21 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | Route | Auth | Purpose | Body limit | Rate limit | Idempotency |
 |---|---|---|---|---|---|
 | `GET /healthz` | none | Liveness; touches no DB | none | 60/min per IP | n/a |
-| `POST /auth/magic-link` | none | Create link, send email; always 202 (no account enumeration) | 1 kB | 3 per 15 min per email; 10/h per IP | New request invalidates earlier unused links for that email |
+| `POST /auth/magic-link` | none | Create link, send email; 202 for any address (no account enumeration); 503 `email_unavailable` when the mail relay fails, sent inside the request with an 8 s timeout (V6, D-254) | 1 kB | 3 per 15 min per email; 10/h per IP | New request invalidates earlier unused links for that email |
 | `POST /auth/verify` | none | Consume link; create user if new; set refresh cookie; return `SessionResponse` | 1 kB | 10/min per IP | Token is single-use |
 | `POST /auth/refresh` | refresh cookie + CSRF header | Rotate refresh token; return `SessionResponse` | 0 | 30/min per IP | Previous token accepted for 30 s (multi-tab), then reuse revokes the session |
 | `POST /auth/logout` | refresh cookie + CSRF header | Revoke session; clear cookie | 0 | 30/min per IP | Idempotent |
 | `GET /me` | bearer | `MeResponse` | none | 60/min per user | n/a |
 | `GET /entitlement` | bearer | Fresh `EntitlementResponse` | none | 60/min per user | n/a |
 | `POST /usage/receipts` | bearer | Record one export; return fresh token | 1 kB | 30/min per user | `export_id` primary key; repeats return the same shape and change nothing |
-| `POST /billing/checkout` | bearer | Hosted-checkout URL for an `Offer` | 1 kB | 10/min per user | none |
+| `POST /billing/checkout` | bearer | Hosted-checkout URL for an `Offer`; 403 `forbidden` for an `active` or `past_due` subscription (V6, D-300) | 1 kB | 10/min per user | none |
 | `GET /billing/portal` | bearer | Customer-portal URL | none | 10/min per user | n/a |
 | `POST /billing/webhook` | provider signature over raw body | Apply subscription events | 64 kB | 120/min per IP | `provider_event_id` primary key; replays return 200 and change nothing |
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
 | `POST /notify-me` | none | Waitlist / unsupported-platform email | 1 kB | 5/h per IP | Primary key (email, wanted) |
-| `POST /plan` (v1.2, V6.1) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
+| `POST /plan` (v1.2, V6.2) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
+| `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | 64 kB | 6/min per user | A repeat for the same prefix in a month uses no new grant |
+| `POST /chat-edit` (v1.3, V6.9) | bearer | Chat: message and context → `ChatReply` (§49.3); body never stored or logged | 64 kB | 30/min per user | none |
 | `POST /account/delete` | bearer | Delete account (§22.7) | 0 | 3/h per user | Idempotent |
 | `GET /account/export` | bearer | `AccountExport` JSON | none | 6/h per user | n/a |
 
@@ -2763,7 +2909,8 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 - **Refresh token.** 32 random bytes; stored only as a hash (PS §17); cookie `offcut_rt; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=5184000` (60 days; assumption, M1.7); rotated on every use.
 - **CSRF.** The two cookie-authenticated routes require header `X-Offcut-Csrf: 1` and an `Origin` header equal to `APP_ORIGIN`. All other authenticated routes use the bearer token and ignore cookies.
 - **CORS.** The API emits no CORS headers. Browsers reach it only same-origin through the Vercel rewrite.
-- **Email normalization.** Trim + lower-case in `auth/magic_link.rs`; `users.email` keeps the address as given (PS §16).
+- **Email normalization.** Trim + lower-case in `auth/magic_link.rs`. `users.email` holds the normalized address, as `magic_links` keeps only the normalized one (V6, D-260; PS §16).
+- **Rotation (V6, D-258, D-297).** A session's previous refresh hash stays valid for 30 s from the first rotation, however often it is used, and every accepted refresh rotates and sends a new cookie; a use in the grace does not move or extend the previous hash. After the grace, a reuse revokes the session. The client refreshes under `navigator.locks` across tabs, after `ready()`, with a 25 s retry budget, so a retry never lands outside the grace. A session ends 60 days after sign-in, however active (no sliding).
 
 ### 22.3 Entitlement rules (`entitlement/issue.rs`, the only place)
 
@@ -2792,7 +2939,7 @@ issue(user_id, now) -> signed token
 3. Server computes the user's current plan and runs `INSERT … ON CONFLICT (export_id) DO NOTHING` with `plan_at_export`.
 4. Server calls `issue()` and returns the fresh token.
 5. Client stores the token and removes the outbox entry.
-6. Until step 5, `entitlement.effective()` = token remaining minus outbox length, floored at 0.
+6. Until step 5, `entitlement.effective()` = token remaining minus the outbox's Free rows of this account, floored at 0 (V6, D-267). A receipt without a session waits in the outbox (D-268); one answered 429 keeps its row, as does a 4xx with no readable body (D-307).
 7. The server never rejects a receipt for exceeding a limit: the export has already happened. A Creator account above `CREATOR_FAIR_USE_PER_MONTH` produces one `fair_use_exceeded` warning log line per day (hashed user id); no behaviour changes (PS §11 "soft").
 
 Limits are conversion mechanisms, not security controls (PS §11). No server logic trusts the client beyond counting what it reports.
@@ -2800,33 +2947,39 @@ Limits are conversion mechanisms, not security controls (PS §11). No server log
 ### 22.5 Billing
 
 ```rust
-// billing/provider.rs
+// billing/provider.rs (as built in V6: v6implementation D-274, D-275, D-301)
 #[async_trait]
 pub trait BillingProvider: Send + Sync {
-    async fn create_checkout_url(&self, user: UserId, email: &str, offer: Offer, return_url: &str) -> Result<String, BillingError>;
-    async fn create_portal_url(&self, customer_id: &str) -> Result<String, BillingError>;
-    async fn cancel_subscription(&self, subscription_id: &str) -> Result<(), BillingError>;
-    fn verify_signature(&self, headers: &HeaderMap, raw_body: &[u8]) -> Result<(), BillingError>;
-    fn parse_event(&self, raw_body: &[u8]) -> Result<Option<BillingEvent>, BillingError>;   // None = irrelevant type
+    async fn create_checkout_url(&self, user: UserId, email: &str, offer: Offer, return_url: &str, cancel_url: &str) -> Result<String, BillingError>;
+    async fn create_portal_url(&self, customer_id: &str, return_url: &str) -> Result<String, BillingError>;
+    async fn cancel_subscription(&self, subscription_id: &str) -> Result<(), BillingError>;   // "already cancelled" is Ok
+    fn verify_signature(&self, headers: &HeaderMap, raw_body: &[u8], now: UnixSecs) -> Result<(), BillingError>;
+    fn parse_event(&self, headers: &HeaderMap, raw_body: &[u8]) -> Result<Option<BillingEvent>, BillingError>;   // None = irrelevant type
 }
-pub enum BillingEventKind { Activated, Renewed, PastDue, CancelScheduled, Canceled, Refunded }
-pub struct BillingEvent { pub provider_event_id: String, pub user_id: UserId, pub customer_id: String,
-                          pub subscription_id: String, pub kind: BillingEventKind, pub interval: BillingInterval,
-                          pub current_period_end: UnixSecs, pub occurred_at: UnixSecs }
+pub enum BillingError { Unavailable, BadSignature, BadEvent }
+pub enum BillingEventKind { Activated, Renewed, PastDue, CancelScheduled, Canceled, Refunded, Resumed, PlanChanged }
+pub enum EventOwner { User(UserId), Customer(String) }
+pub struct BillingEvent { pub provider_event_id: String, pub owner: EventOwner, pub customer_id: String,
+                          pub subscription_id: Option<String>, pub kind: BillingEventKind, pub interval: Option<BillingInterval>,
+                          pub current_period_end: Option<UnixSecs>, pub occurred_at: UnixSecs }
 ```
 
-- **Checkout.** Hosted checkout by full-page navigation. `user_id` travels as the provider's custom/passthrough data and returns in every event (TE-9). Return URLs: `<APP_ORIGIN>/account?checkout=success|cancel`.
+- **Provider (TE-9, V6).** Dodo Payments, through `billing/adapter.rs`, against `BILLING_API_BASE_URL` (`https://test.dodopayments.com` or `https://live.dodopayments.com`, D-273). Its webhooks follow Standard Webhooks: `provider_event_id` is the `webhook-id` header, which is why `parse_event` reads the headers (D-274). The signature is checked in `adapter.rs` itself: `whsec_` secret, HMAC-SHA256 over `id.timestamp.body`, any `v1,` entry compared in constant time, a timestamp more than 5 minutes off refused (D-278). A secret that is not a `whsec_` value stops the server at boot. The mapping was read from real test-mode deliveries (V6 CL Entries 13 and 18): `subscription.active` → `Activated`; `renewed` → `Renewed`; `on_hold` and `past_due` → `PastDue`; `cancelled` and `expired` → `Canceled`; `plan_changed` → `PlanChanged`; `updated` → `CancelScheduled` or `Resumed` by its `cancel_at_next_billing_date`; a whole `refund.succeeded` → `Refunded`, a partial one (`is_partial`) → `None` (D-277); every `payment.*` → `None`. The interval comes from `offers.rs` by the event's product id; an unknown product is `billing_event_ignored`.
+- **Owner (D-275).** A subscription event names its user through `metadata.user_id`. A refund carries no metadata and no subscription id, only the customer: its owner is `Customer`, resolved through `subscriptions.provider_customer_id`. No resolvable owner, or a user since deleted, is 200 with nothing changed (D-272, D-284).
+- **Checkout.** Hosted checkout by full-page navigation. `user_id` travels as the provider's `metadata` and returns in every subscription event (TE-9, read). Return URLs: `<APP_ORIGIN>/account?checkout=success|cancel`. A user whose row is `active` or `past_due` is refused with 403 `forbidden`, and the client opens the portal instead (D-300). Any provider failure is 502 `billing_unavailable`. `GET /billing/portal` without a subscription row is 404.
 - **Offers (`billing/offers.rs`, the only place).** `Offer → env price id → (Plan::Creator, BillingInterval)`. `CreatorAnnualFounding` (E-5 presale, PS §19) is accepted only while `FOUNDING_OFFER_ENABLED=true`. Amounts (15 USD/month, 144 USD/year, 99 USD/year founding; PS §11, §19) are configured at the provider and displayed from `web/src/config/pricing.ts`; the server holds no amounts.
-- **Event application (one transaction with the dedupe insert, C-19).** Events older than `subscriptions.last_event_at` are ignored.
+- **Event application (one transaction with the dedupe insert, C-19).** Events older than `subscriptions.last_event_at` are ignored. An event whose `subscription_id` differs from the row's is ignored, except `Activated` (D-299).
 
 | From | Event | To | Fields set |
 |---|---|---|---|
-| none, canceled | `Activated` | active | all provider ids, interval, `current_period_end`, `cancel_at_period_end = false` |
+| none, canceled, past_due (V6, D-276: recovery) | `Activated` | active | all provider ids, interval, `current_period_end`, `cancel_at_period_end = false` |
 | active, past_due | `Renewed` | active | `current_period_end` |
-| active | `PastDue` | past_due | none |
+| active | `PastDue` | past_due | none: the paid period is not moved, as the provider moves `next_billing_date` before the charge |
 | active, past_due | `CancelScheduled` | unchanged | `cancel_at_period_end = true` |
+| active, past_due, with `cancel_at_period_end` (V6, D-301) | `Resumed` | unchanged | `cancel_at_period_end = false` |
+| active, past_due (V6, D-301) | `PlanChanged` | unchanged | interval, `current_period_end` |
 | active, past_due | `Canceled` | canceled | `current_period_end` as reported |
-| any | `Refunded` | canceled | `current_period_end = occurred_at` |
+| any | `Refunded` | canceled | `current_period_end = occurred_at`; a live subscription is also cancelled at the provider inside the transaction, as a refund does not stop it there (V6 CL Entry 13) |
 
 Any other (from, event) pair is logged as `billing_event_ignored` and changes nothing; `billing_events.rs` covers every cell.
 
@@ -2877,14 +3030,14 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 
 ### 22.8 Configuration (`config.rs`, the only place that reads the environment)
 
-`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `MAIL_API_KEY`, `MAIL_FROM`, `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRUSTED_PROXY_HOPS`. A missing or malformed variable aborts startup with the variable's name (never its value).
+`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
 
 ### 22.9 Free-tier behaviour (external facts: verified 2026-10, re-verified by TE-11)
 
 - The service sleeps after 15 minutes without inbound traffic and takes about one minute to wake.
 - **Keep-warm.** The uptime monitor that PS §20.1 requires calls `GET /api/v1/healthz` every 5 minutes. One always-on instance uses at most 24 x 31 = 744 h of the 750 free instance hours per month (derived).
 - **Client tolerance.** `apiClient.wake()` at app start; per-attempt timeout `API_TIMEOUT = 10 s`; retries while total wait is within `API_COLD_START_BUDGET = 70 s` (C-15). Import, processing, preview and review never call the API.
-- **Webhooks.** Delivered to the Render host directly. A request that hits a sleeping service may time out; the merchant's retry delivers it (TE-9 confirms the retry schedule).
+- **Webhooks.** Delivered to the Render host directly. A request that hits a sleeping service may time out; the merchant's retry delivers it. TE-9 read (V6): a failed delivery is retried after about 6 s with the same `webhook-id`; Dodo documents up to 8 attempts over about 27 hours.
 - **Boot.** `sqlx::migrate!` runs at startup; the retention purge runs at startup and every 6 h in-process.
 - **Memory.** DB pool `max_connections = 5`; no caches. Budget 512 MB (TE-11).
 
@@ -2906,7 +3059,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 |---|---|---|
 | `clips/<clipId>/source` | The imported file, byte-identical | `media.worker` |
 | `clips/<clipId>/out48.f32` | Enhanced audio (raw f32, 48 kHz mono), same length as the decoded source audio | main, after `measureProsody` |
-| `clips/<clipId>/prog48.f32` | The program's audio, what the export encodes (v5implementation D-213). `out48.f32` stays: V6.2 and V6.3 rebuild this from it | main, after `assemble` |
+| `clips/<clipId>/prog48.f32` | The program's audio, what the export encodes (v5implementation D-213). `out48.f32` stays: V6.3 and V6.7 rebuild this from it | main, after `assemble` |
 | `exports/tmp/<exportId>.mp4` | Export in progress | `render.worker` |
 | `exports/<exportId>.mp4` | Finished export (render cache) | `render.worker` |
 | `models/<modelId>/<file>.part`, `models/<modelId>/<file>` | Model download in progress / verified | `models/download.ts` |
@@ -2921,7 +3074,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 | `edits` | `clipId` | `{ editState }` |
 | `renderCache` | cache key (hex) | `{ clipId, exportId, opfsPath, bytes, createdAt, summary }` (a hit skips the worker, so the summary comes from the row, v5implementation D-226). Only `persistence/render-cache-repo.ts` writes it |
 | `entitlement` | `"current"` | `{ token, storedAt }` |
-| `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts }` |
+| `receiptOutbox` | `exportId` | `{ exportId, enqueuedAt, attempts, plan, sub }` (V6, D-267: the plan it was exported under and the account it belongs to; `flushOutbox` sends only the signed-in account's rows) |
 | `meta` | string | `anonId`, `persistRequested` |
 
 Every value is wrapped as `{ schemaVersion: number, value }`.
@@ -3019,9 +3172,9 @@ CREATE TABLE platform_waitlist (
 - **Server retention.** `analytics/retention.rs` deletes `analytics_events` older than 90 days (PS §16), `magic_links` older than 1 day, `webhook_events` older than 90 days (assumption, TE-9: longer than the provider's retry horizon), revoked or expired `sessions`.
 - **Backups.** None on a free database tier (assumption, TE-6). Accepted cost: subscription state is rebuilt from the merchant by replaying events; usage receipts and waitlist would be lost. Reversal: none inside the 0 USD constraint (PS A-10); a paid tier with backups needs a founder decision and a spec revision.
 
-**Acceptance.** `restore.spec.ts`: reload mid-review returns to `ready` with edits intact and no re-transcription. `clear-local-data.spec.ts`: OPFS empty and stores empty afterwards. `receipt-outbox.test.ts`: entries survive reload and are removed only on a 2xx. Estimated server data at base-case traffic: 12,000 visitors x 30 events x 200 B = 72 MB before retention (derived from PS §13.2; per-visitor event count is an assumption, TE-6).
+**Acceptance.** `restore.spec.ts`: reload mid-review returns to `ready` with edits intact and no re-transcription. `clear-local-data.spec.ts`: OPFS empty and stores empty afterwards. `receipt-outbox.test.ts`: entries survive reload and are removed only on a 2xx; as built in V6 (v6implementation §11.5, D-307), also on a 4xx with a readable body other than 401 and 429, as that receipt can never succeed. A 429, a 401, or a 4xx with no readable body keeps its row. Estimated server data at base-case traffic: 12,000 visitors x 30 events x 200 B = 72 MB before retention (derived from PS §13.2; per-visitor event count is an assumption, TE-6).
 
-**Seams (not built now).** `BrandPreset`, `BgmTrack`, `VersionSet`, `CloudJobConsent` (P1) and `StyleProfile`, `Workspace` (P2) from PS §16 are new stores/tables; none exists.
+**v1.3.** Long-path stores and paths: §43.4. Assets: §48.5. Memory: §50.2. Server tables: §52. **Seams (not built now).** `BrandPreset`, `VersionSet`, `CloudJobConsent` (P1) and `Workspace` (P2) from PS §16 are new stores/tables; none exists.
 
 ---
 
@@ -3039,7 +3192,7 @@ CREATE TABLE platform_waitlist (
 
 Nothing else: no font CDN, no analytics vendor, no error tracker, no tag manager, no third-party script (PS §17). `config/allowlist-hosts.ts` lists hosts 1 and 2 and is the only such list; `scripts/check-hosts.mjs` fails the build when the bundle contains any other `http(s)://` host literal.
 
-**From the server:** Postgres host; email API host; merchant API host; AI provider API host (v1.2, V6.1, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
+**From the server:** Postgres host; the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
 
 ### 24.2 Secrets
 
@@ -3105,6 +3258,7 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 | P-3 | Analytics carry only allowlisted names with numeric/enum properties; never file names, transcript or caption text, event parameters or free text (PS §17) | `AnalyticsEvent` has no `String` field; `deny_unknown_fields`; client `track()` accepts only the generated union | `events.types.test.ts` (type-level); `analytics_allowlist.rs` (server rejects extras and strings); `privacy-network.spec.ts` assertions 3 and 5 | Event list rendered on the settings page |
 | P-4 | The "What leaves your device" page matches the allowlist exactly (PS §20.1) | Page renders `ANALYTICS_EVENT_DOCS`, generated from `analytics.rs` | `settings-what-leaves.spec.ts` compares rendered rows with `gen/api.ts` | The page itself |
 | P-5 | No request during processing other than allowlisted beacons, the `GET /healthz` warm-up and (plan on) the one `POST /plan` (PS §17, v1.2) | Use-cases between import and `ready` import no `net` module except `request-plan.ts` (one boundaries exception) | `privacy-network.spec.ts` assertion 4 | Processing feed copy "Everything is rendering on your computer" |
+| P-15 | (v1.3) No pixel or audio sample of a source or an asset leaves the browser; vision reaches the AI only as enums and indexes (INV-28); chat text, sentence text and asset labels leave only in the AI request bodies, only with the AI switch on, and the server neither stores nor logs them | Types of `ShotLine`, `AssetLine`, `ChatEditRequest`; one use-case per route | `privacy-network.spec.ts` (long path, chat, assets); `log_redaction.rs` | The settings table lists each |
 | P-14 | The server never stores or logs a plan request's transcript, and forwards it only to the configured AI provider (v1.2) | `/plan` handler holds the body in memory only; no DB write of `PlanRequest`; `log.rs` logs no body; one provider adapter selected by config | `log_redaction.rs` (marker words in a plan request); a grep test that no `sqlx` query in `server/src/plan/` writes text | Settings names the provider and its data-use terms (TE-15) |
 | P-6 | The model stays in the browser and is verified (PS §10 J4, §17) | Bundled manifest hashes; OPFS-only cache adapter | `download.test.ts`; `model-download.spec.ts` | Settings shows model version, cache size |
 | P-7 | "Clear local data" removes clips, transcripts and render cache (PS §20.1) | §23.3 | `clear-local-data.spec.ts` | Settings button |
@@ -3148,7 +3302,7 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | Export receipts (`export_id`, time, plan) | `usage_receipts` | Until account deletion |
 | Processed webhook ids | `webhook_events` | 90 days |
 | Anonymous allowlisted events | `analytics_events` | 90 days |
-| Plan-request counts per user per month (v1.2) | `plan_usage` | Until account deletion |
+| AI request counts per user per month (v1.3) | `ai_usage`, `ai_shorts_grants` | Until account deletion |
 | Plan-request bodies (transcript text and timings) (v1.2) | none: memory only, for the duration of the request | Not stored |
 
 **Seams (not built now).** Consented cloud transcription fallback (P1, PS §12.6): per-clip consent prompt, per-export mode display on the settings page, legal review. It would send audio, changes P-1 for consenting clips only and requires a revision of this section before any code. (The v1.2 plan request sends text only and is specified in §40.7 and P-1, P-14.)
@@ -3250,7 +3404,7 @@ The generator takes 118-166 s on D1 and 83-94 s on the CI runners, where it runs
 
 ### 27.2 Independent verifier (`verify/verify_mp4.py`)
 
-Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothing from `crates/` or `web/`, and no library that those use. Invocation: `verify_mp4.py <file> --profile free|creator --expected-duration-ms N [--source <fixture>]`. `N` is the duration the map says, which the test works out and passes apart from the source: with the identity map it is the source's, and from V6.2 the two differ (v5implementation D-210). A file `verify/test_verify_mp4.py` makes with `ffmpeg` shows each check telling good from bad, in CI, where no real export can be made (D-209). Lines `INFO <n>: …` report a reading and judge nothing; a reason names a tag's key, never its value.
+Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothing from `crates/` or `web/`, and no library that those use. Invocation: `verify_mp4.py <file> --profile free|creator --expected-duration-ms N [--source <fixture>]`. `N` is the duration the map says, which the test works out and passes apart from the source: with the identity map it is the source's, and from V6.3 the two differ (v5implementation D-210). A file `verify/test_verify_mp4.py` makes with `ffmpeg` shows each check telling good from bad, in CI, where no real export can be made (D-209). Lines `INFO <n>: …` report a reading and judge nothing; a reason names a tag's key, never its value.
 
 | # | Check |
 |---|---|
@@ -3291,13 +3445,20 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 | M1.6 | Export, verifier, render cache | M1.4 | `export-creator.spec.ts` with all 11 verifier checks; `timeline-preserved.spec.ts`; `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` | E-4 re-measured |
 | M1.7 | Backend: auth, entitlement, receipts, account; client sign-in and gate | M0.1 | `auth_flow.rs`, `entitlement_rules.rs`, `usage_receipts.rs`, `account_delete.rs`, `account_export.rs`, `rate_limit.rs`, `log_redaction.rs`, `no_media_routes.rs`, `token_roundtrip.rs`, `profile.rs`, `auth-machine.test.ts`, `entitlement.test.ts`, `http.test.ts`, `signin.spec.ts`, `export-free.spec.ts` | TE-8 |
 | M1.8 | Billing | M1.7 | `webhook_idempotency.rs`, `billing_events.rs`, `checkout.spec.ts`; provider test-mode purchase updates `subscriptions` | TE-9. **M1 gate: all P0 working on dev machines (PS §9.9)** |
-| M1.9 | (v1.2, V6.1) Edit plan: `/plan`, provider adapter, quotas, `plans` store, settings switch, V6.1 catalog kinds, text extras | M1.8 | `validate.rs`, `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (fallbacks), `privacy-network.spec.ts` (plan on/off) | TE-15; E-11 instrumentation |
-| M1.10 | (V6.2) Cuts: `timemap::build`, `assemble` splices, jump-cut zoom, cuts review | M1.9 | `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts` | none |
-| M1.11 | (V6.3) Music and ducking | M1.10 | `mix_ducking.rs`, `music-import.spec.ts`; verifier check 7 on a music export | TE-16 |
-| M1.12 | (V6.4) Structure visuals | M1.9 | Goldens per kind and style; V-5 cases | none |
-| M1.13 | (V6.5) Kinetic presets, video masks, shape transitions | M1.12 | Goldens; `frame_at` budget at the heaviest preset | none |
-| M1.14 | (V6.6) Furniture and topic-shift transitions; end card `Hold` | M1.13 | Goldens; end-card export duration test | none |
-| M1.15 | (V6.7) Brand kit | M1.14 | Golden matrix under a test kit; `profile.rs` brand-kit cases (INV-9) | none. **M1.x gate: every PS §9.5 V6.x row works on dev machines** |
+| M1.16 | (v1.3, V6.1) Long source: `route_probe`, HEVC and 4K, copy, windowed audio, checkpointed ASR, source machine, flags | M1.8 | `route_probe.rs`, `audio_region.rs`, `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` | TE-17, TE-18, TE-20, TE-21 |
+| M1.9 | (V6.2) Edit plan: `/plan`, provider adapter, spend cap, quotas, `plans` store, settings switch, catalog kinds, text extras | M1.8 | `validate.rs`, `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `ai_cap.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (fallbacks), `privacy-network.spec.ts` (plan on/off) | TE-15; E-11 instrumentation |
+| M1.10 | (V6.3) Cuts and `Assembly`: `timemap::build`, `assemble` splices, jump-cut zoom, cuts review, regions, rebase | M1.9 | `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `stitched.spec.ts` | TE-22 |
+| M1.17 | (V6.4) Director: `/shorts`, `validate_shorts`, rules producer, list page, batch export | M1.16, M1.10 | `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts`, `long-to-shorts.spec.ts` | TE-19; E-13 instrumentation |
+| M1.18 | (V6.5) Vision and framing | M1.17 | `shots.rs`, `tracking.rs`, `framing.rs`, `vision-pass.spec.ts` | TE-23 |
+| M1.12 | (V6.6, parts A and B) Structure visuals | M1.9 | Goldens per kind and style; V-5 cases; V-9 | none |
+| M1.13 | (V6.6, parts C and D) Kinetic presets, video masks, shape transitions | M1.12 | Goldens; `frame_at` budget at the heaviest preset; `composite.rs` simple-path identity | none |
+| M1.14 | (V6.6, part E) Hook title, progress bar, end card `Hold` | M1.13 | Goldens; end-card export duration test | none |
+| M1.11 | (V6.7) Music, ducking, sound cues | M1.10 | `mix_ducking.rs`, `music-import.spec.ts`, `sound_cues.rs`; verifier check 7 on a music export | TE-16 |
+| M1.19 | (V6.8) Layers, B-roll, asset box, join transitions, split layout | M1.13, M1.18 | `layers_goldens`, `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`; verifier 11/11 | TE-14 re-read |
+| M1.20 | (V6.9) Chat editing | M1.19 | `plan_ops.rs`, `chat_prompt_snapshot.rs`, `chat_route.rs`, `chat-edit.spec.ts`, `privacy-network.spec.ts` (chat) | E-14 instrumentation |
+| M1.15 | (V6.10) Brand kit | M1.14 | Golden matrix under a test kit; `profile.rs` brand-kit cases (INV-9) | none |
+| M1.21 | (V6.10) Creator memory, queue | M1.17 | `creator_memory.rs`, `queue.spec.ts` | none |
+| M1.22 | (V6.11) Person mask | M1.19 | `matte_goldens`, `prepare-matte.spec.ts`; verifier 11/11 | TE-24, TE-25. **M1.x gate: every PS §9.5 V6.x row works on dev machines** |
 | M2.1 | Persistence, restore, quota, clear data, failure recovery | M1.5 | `restore.spec.ts`, `clear-local-data.spec.ts`, `failure-recovery.spec.ts`, `receipt-outbox.test.ts` | none |
 | M2.2 | Privacy proof and settings | M1.7 | `privacy-network.spec.ts`, `settings-what-leaves.spec.ts`, `events.types.test.ts`, `messages.test.ts`, `client.test.ts`, `unsupported.spec.ts`, `capability.spec.ts` | E-8 continues |
 | M2.3 | Corpus hardening (checkpoint: end of week 8, Sun 6 Dec 2026) | M1.6, M2.1 | `corpus/run_corpus.ts`: at least 90% export and pass the verifier, rest rejected with a code, zero crashes | TE-12 re-checked; PS §20.4 week-8 rule |
@@ -3466,7 +3627,7 @@ First, on every event, the job `changes`: the secret scan, and whether code chan
 | Render (`render.yaml`) | One web service, runtime `image` from GHCR, plan `free`, `healthCheckPath: /api/v1/healthz`, environment variables of §22.8 set in the dashboard (`sync: false`) |
 | Postgres | External free-tier instance; TLS required; connection string in `DATABASE_URL` |
 | Asset CDN | `scripts/upload-assets.sh` uploads content-hashed files; CORS for `APP_ORIGIN`; `Cache-Control: public, max-age=31536000, immutable` |
-| Email | API key in Render; sender identity per TE-8 |
+| Email | The five SMTP variables of §22.8 in Render; one verified Gmail sender, no domain (TE-8; D-256's risk accepted by the founder) |
 | Uptime monitor | `GET https://<render-host>/api/v1/healthz` every 5 min |
 
 **Deployment consequences of the architecture**
@@ -3474,6 +3635,8 @@ First, on every event, the job `changes`: the secret scan, and whether code chan
 - **Deploy order.** Server first, then web. The server rejects unknown request fields, so a new client must never reach an old server. Additive response fields are safe (the client ignores unknown fields).
 - **Version skew in open tabs.** A tab loaded before a deploy may request a hashed worker or WASM file that the new deployment no longer serves. `pool.ts` therefore preloads all four worker scripts and both WASM bundles into the HTTP cache at app start (immutable caching makes later instantiation offline-safe).
 - **Stateless API.** Render may restart or sleep the instance at any time; nothing but rate-limit buckets is lost.
+- **Test-mode production (V6, D-285, D-303).** From V6's merge until the founding release after V6.6, production runs Dodo's test-mode keys, with `BILLING_API_BASE_URL=https://test.dodopayments.com` and a test-mode webhook endpoint: a test card buys Creator and no money moves. The founding release switches four variables and registers a live endpoint, then wipes any test-mode `subscriptions` row.
+- **Mail from Render (V6, D-252).** Render's free web services block outbound 25, 465 and 587; the relay is reached on 2525 with STARTTLS.
 - **Model updates.** A new `modelId` is a new CDN path; old files stay until no deployed manifest references them.
 - **Domain.** The system works on the hosts' default domains. A custom domain is not required by the architecture but is likely required by the email provider for sender verification (TE-8); its registration fee is outside the 0 USD infrastructure target.
 - **CI minutes.** `e2e-media.yml` runs on a Windows runner; if free minutes are insufficient for a private repository (TE-10), it runs on `main` only and before release, and `pnpm e2e:device` covers pull requests locally.
@@ -3587,11 +3750,11 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | INV-2 | No request URL, header or body contains media bytes, caption text as edited, event or plan parameters, or a file name; transcript text appears only in the body of `POST /api/v1/plan`, and never while "AI edit plan" is off (v1.2) | `privacy-network.spec.ts` (3, 4b) |
 | INV-3 | Import, processing, preview and review complete with the API unreachable | `api-cold-start.spec.ts` |
 | INV-4 | The server has no route that accepts more than 64 kB or a media content type | `no_media_routes.rs` |
-| INV-5 | `TIMELINE_INTEGRITY` (v1.2). Every removed span is a validated, unrestored `Cut` of the stored plan; no cut starts or ends inside a word; nothing is reordered or retimed; the export has `ceil(time_map.out_duration x 30 / 1000)` frames. With the identity map (V4-V6, and whenever the plan has no applied cuts) source time equals output time and the export has `ceil(source duration x 30 / 1000)` frames | `timeline-preserved.spec.ts` (identity); `timemap_build.rs`, `cuts_applied.spec.ts` (V6.2); `verify_mp4.py` (3, 5, 8) |
+| INV-5 | `TIMELINE_INTEGRITY` (v1.2). Every removed span is a validated, unrestored `Cut` of the stored plan; no cut starts or ends inside a word; nothing is reordered or retimed; the export has `ceil(time_map.out_duration x 30 / 1000)` frames. With the identity map (V4-V6, and whenever the plan has no applied cuts) source time equals output time and the export has `ceil(source duration x 30 / 1000)` frames | `timeline-preserved.spec.ts` (identity); `timemap_build.rs`, `cuts_applied.spec.ts` (V6.3); `verify_mp4.py` (3, 5, 8) |
 | INV-6 | No `DetectedEvent` exists with confidence below its kind's threshold | `rules_table.rs`; assertion in `precision_recall.rs` |
 | INV-7 | Equal scene inputs and renderer version give byte-identical display lists for every frame | `offcut-scene/tests/determinism.rs` |
 | INV-8 | Every export has exactly `frame_count` frames at exactly 30 fps and passes the independent verifier | `verify_mp4.py` (3) in both export suites and the corpus run |
-| INV-9 | Output size, watermark and (v1.2, V6.7) whether the brand kit is applied to an export are functions of the verified entitlement token only, computed in `export_profile` | `offcut-entitlement/tests/profile.rs`; `export-free.spec.ts`; `export-creator.spec.ts` |
+| INV-9 | Output size, watermark and (v1.2, V6.10) whether the brand kit is applied to an export are functions of the verified entitlement token only, computed in `export_profile` | `offcut-entitlement/tests/profile.rs`; `export-free.spec.ts`; `export-creator.spec.ts` |
 | INV-10 | `AUDIO_DURATION_PRESERVATION`. The audio enhancement chain does not change the duration of the recording: `out48.len() == pcm48.len()`, aligned within `ALIGN_TOLERANCE`; no sample is deleted or shifted because it is quiet. Only `program::assemble` produces another length, exactly `time_map.out_duration` at 48 kHz; with the identity map and no music it returns `out48` sample for sample (v1.2) | `duration_preserved.rs`; `program_identity.rs`; `timeline-preserved.spec.ts`; `verify_mp4.py` (5, 8) |
 | INV-11 | Every obtained `VideoFrame` is closed; the live-frame counter is 0 after preview stop and after export | Counter in every build; a non-zero count fails the call with `E_INTERNAL` (v2implementation D-45), exercised by `pipeline-preview.spec.ts` and `export-creator.spec.ts` |
 | INV-12 | The ASR session and the render session never coexist | `run-pipeline.test.ts` (ordering of `unload` and `openSession`) |
@@ -3616,21 +3779,24 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 |---|---|
 | FFmpeg compiled to WASM | Rejected by PS §0 item 4 and §9.8: size, licensing review (c)(f). `ffmpeg` appears only as a development CLI in `fixtures/` and `verify/` |
 | Local LLM for semantics | PS §9.2 (f); P2: a third producer of `EditPlan` (§40) |
-| Cloud transcription (audio upload), even "temporarily" | Breaks P-1; P1 with consent and a spec revision (PS §12.6). The cloud LLM over transcript **text** is built from V6.1 (§40.7) |
+| Cloud transcription (audio upload), even "temporarily" | Breaks P-1; P1 with consent and a spec revision (PS §12.6). The cloud LLM over transcript **text** is built from V6.2 (§40.7) |
 | The browser calling an AI provider; a provider key in the client; streaming model output to the browser | §40.7: the server is the only caller; the browser's allowlist stays two hosts |
-| Cuts decided by rules (silence thresholds, pause-length rules) without a plan; cuts inside a word; removing whole sentences or retakes; reordering; speed changes | PS v1.2 §9.2, §9.2.1: cuts come only from a validated plan and are shortened pauses, lead/trail silence and (opt-in) fillers and false starts. With the plan off, nothing is cut |
+| Cuts decided by rules (silence thresholds, pause-length rules) without a plan; cuts inside a word; reordering inside a `TimeMap`; speed changes | PS §9.2, §9.2.1: cuts come only from a validated plan and are shortened pauses, lead/trail silence and (opt-in) fillers and false starts. With the plan off, nothing is cut. v1.3: choosing and ordering whole sentences is the `Assembly`'s job (§44, DC-6); a user-asked cut is a chat op (§49.2) |
 | Any `TimeMap` constructor other than `TimeMap::identity` and `offcut-plan::timemap::build`; any time conversion outside `TimeMap` | §40.1 (replaces the v1.1 ban on a mapping layer; the map is built in V4 on purpose, TDR-7) |
-| Timeline editor, keyframe UI, sliders, user-invented cuts | PS §9.2 (d)(f); principle 3 allows toggles, cut restores and one crop offset |
-| Style DNA, three versions, remix, multi-brand | PS §9.2 (d)(a)(e). One brand kit per account is built in V6.7 |
-| Bundled music without a licence TE-16 has confirmed | PS §9.2 (c). User-supplied music with ducking is built in V6.3 |
-| Face-tracking reframe | PS §9.2 (f); P1: it only changes the per-frame `Video` command (§40.5) |
+| Timeline editor, keyframe UI, sliders | PS §9.2 (d)(f); principle 3 allows toggles, cut and part restores, one crop offset, and from V6.9 chat |
+| Style DNA, three versions, remix, multi-brand | PS §9.2 (d)(a)(e). One brand kit per account is built in V6.10 |
+| Bundled music without a licence TE-16 has confirmed | PS §9.2 (c). User-supplied music with ducking is built in V6.7 |
 | A plug-in system for item kinds; an item kind without drawing code and a golden | §40.3: a kind is a catalog entry plus its layout and draw files (INV-23) |
-| User-inserted plan items | Rejected PS §12.4 (e); the user toggles what the plan proposed |
-| Stock or generated B-roll, avatars, scheduling, public API, native app, teams | PS §9.2 (d)(c); B-roll is PS §21 item 14 |
+| User-inserted plan items through any control other than chat | PS §12.4 (e); the user toggles what the plan proposed, and from V6.9 asks in words, through the same validator (§49) |
+| Stock or generated B-roll, avatars, scheduling, public API, native app, teams | PS §9.2 (d)(c); stock is PS §21 item 14. The user's own B-roll is built in V6.8 (§48) |
+| Sending frames to any server, a local caption model, diarization | §46: the founder's decision of 2026-11-02 |
+| YouTube-link import, a server that fetches or holds video | INV-4 and the platform's terms |
+| A virality score | §45: unverifiable; the reason is shown instead |
+| Copying or translating Tooscut's code, or adding that folder to this repository | §53.4 |
 | Pro/Studio plan code, coupons, credit metering | PS §9.2 (a); flat pricing (PS §11) |
 | Safari, Firefox, Linux or mobile workarounds | PS §9.2 (f); unsupported page only |
 | Multi-language text shaping, i18n framework | PS §9.2 (f)(e); English only |
-| 4K, 60 fps output, other aspect ratios | PS §9.4 (f)(e) |
+| 4K, 60 fps output, other aspect ratios | PS §9.4 (f)(e). 4K **input** is built in V6.1 (§43) |
 | Server-side rendering, obfuscation or DRM to enforce the watermark or export limit | PS §11: limits are conversion mechanisms; harder enforcement breaks the cost model |
 | `MediaRecorder` export, `HTMLVideoElement` frame capture, DOM/CSS overlays | Rejected in §19-§21: not frame-accurate or not deterministic |
 | Canvas2D backend "just in case" | Built only if E-4/TE-3 fail (§19) |
@@ -3648,7 +3814,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | CSS-in-JS runtime, component library | CSP `style-src 'self'`; about 20 components |
 | Storing file names "for the recent clips list" | Breaks P-11; date and duration are shown instead |
 | Joining analytics to accounts | PS §16 requires consent; no consent UI exists |
-| Resumable exports | An export of at most 90 s restarts faster than a resume protocol can be verified |
+| Resumable exports | An export of at most 90 s restarts faster than a resume protocol can be verified. Long jobs resume between stages and windows (§43.7), never inside an export |
 
 ---
 
@@ -3677,16 +3843,18 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | TE-5 | Is the static host usable as specified: plan terms for a paid product, COOP/COEP headers, `/api/v1` rewrite, proxy timeout against a cold API, forwarded-IP header shape? | Read the current plan terms; deploy the shell; call a deliberately slow endpoint through the rewrite; inspect `X-Forwarded-For` | Terms permit the use (or the founder accepts the terms risk in writing; no paid plan, PS A-10); `crossOriginIsolated` true; a 60 s upstream delay survives the proxy; hop count known | M0.1; decision before week 8 | Reversal path of TDR-12; if only the timeout fails, the client calls `/healthz` until warm before any real request |
 | TE-6 | Which free Postgres provider persists beyond 30 days, accepts 5 connections, and fits the data estimate? | Read current terms; run migrations; idle for a week; measure reconnect time | No expiry; reconnect under 2 s; storage quota at least 5x the §23.3 estimate | M0.1 | Other candidate; then any other free Postgres provider (no paid tier, PS A-10) |
 | TE-7 | Which asset host gives free egress, HTTP Range, CORS that works under COEP, and files of 150 MB? | Upload a 150 MB file; ranged fetch from the deployed shell | 206 responses; CORS readable; no egress charge in terms | M0.1-M0.2 | Other candidate; then split the model into parts under the host's limit |
-| TE-8 | Which email provider delivers magic links within its free quota, and does it require a verified sender domain? | Send 50 links to major mailbox providers; read quota terms | At least 95% inbox delivery within 30 s; quota at least 100 emails/day | M1.7 | Other candidate; prefer one that verifies a single sender address without a custom domain, because a domain registration is a cost outside PS A-10 |
-| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | Account approved within 2 weeks; all six `BillingEventKind`s observed; a timed-out webhook is retried | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18) |
+| TE-8 | Which email provider delivers magic links within its free quota, and does it require a verified sender domain? | Send 50 links to major mailbox providers; read quota terms | At least 95% inbox delivery within 30 s; quota at least 100 emails/day | M1.7 | Other candidate; prefer one that verifies a single sender address without a custom domain, because a domain registration is a cost outside PS A-10. **Read in V6 (`docs/v6/experiments.md`):** Brevo over SMTP on 2525, one verified Gmail sender, 300 a day. Cut down by the founder on 2026-11-02 to two Gmail mailboxes, every mail in the inbox; Outlook and Yahoo unproven, and Brevo calls a free-mail sender "not recommended". A real send from Render worked |
+| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed; a timed-out webhook is retried; a test purchase turns the next token Creator. **v1.3 (V6): live approval moves to the founding release (BP §8A.6)** | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18). **Read in V6, test mode (`docs/v6/experiments.md`): Dodo Payments; all six kinds and `PlanChanged` observed from real deliveries; a failed delivery retried after about 6 s with the same `webhook-id`; a test purchase on D1 turned the next token Creator. On 2026-11-04 Dodo approved the identity and bank and held the product review until the live site is public** |
 | TE-10 | Can CI run the media suites (WebGPU + H.264 + AAC encode) on a hosted Windows runner within free minutes? | Run `e2e-media.yml` | Suites pass headless; monthly minutes within the free allowance | M0.4 | Run on `main` and pre-release only; `pnpm e2e:device` locally |
 | TE-11 | Does the API fit the Render free instance: memory, cold-start time, instance hours with keep-warm, image deploy, log retention? | Deploy; measure RSS, cold start over 10 sleeps, monthly hour use | RSS under 400 MB; cold start under 70 s; one always-on service fits the monthly hours | M0.1, M2.4 | Another free container host for the same image (§22.9) |
 | TE-12 | Does `offcut-mp4` demux the real-clip corpus (edit lists, rotation, VFR, phone encoders)? | `corpus/run_corpus.ts` | At least 90% of clips demux and export; "inconclusive" with fewer than 10 corpus clips (V3: 2 clips, inconclusive, v3implementation D-88) | M1.1, re-checked at V9 and M2.3 | JS demuxer behind the same interface (§15) |
 | TE-13 | Does the denoiser fit the audio budget in WASM on R1? | `bench/device-bench.ts`, stage `audio_chain` | Chain at most 4 s for the reference clip | M1.2 | `ChainConfig.denoise = false` (PS §20.4) |
 | TE-14 | Is peak memory within budget on R1 for a 90 s, 1080p, 60 fps input? | Memory measurement per phase (§31) | Peak under 1.5 GB; no tab crash in 10 runs | M0.4, M2.4 | Smaller queues; preview at 360x640; smaller model |
-| TE-15 | (v1.2) Which AI provider gives a free tier that fits the plan quotas, structured JSON output, a latency we can wait for, and data terms we can state? | Read current terms (free-tier request and token limits per minute and per day; whether free-tier data is used for training or retained); run the 31 labeled transcripts through two candidates with the generated prompt and schema; measure parse rate, V-rule drop rate, p50/p90 latency through the Render proxy | Parse rate at least 98% after one retry; median V-rule drops at most 10% of items; p90 latency at most 20 s; daily free capacity at least the launch-month estimate (anonymous + Free + Creator quotas x expected users); terms recorded in `docs/` and summarised on the settings page | V6.1 (before the route ships); re-verified by `check-external-facts.mjs` before launch | Second candidate; lower quotas; if no free tier fits or the terms say free-tier data trains models, the founder decides between a paid tier (A-3), accepting and disclosing the terms, or making the AI plan opt-in |
-| TE-16 | (v1.2) Is there a music source whose licence allows bundling tracks inside a paid app, with no attribution the export cannot carry? | Read licences of candidate libraries; check redistribution and "in an app" clauses | A written licence that allows it; otherwise none | V6.3 | Ship user-supplied music only |
-| E-11 | (v1.2, PS §19) Is the AI plan better than the rules? | `plan_result`, `export_done` (`items_kept`, `items_disabled`, `cuts_restored`), `post_export_answer` split by plan source | PS §19 E-11 targets | V6.1 → M3 | PS §19 E-11 action |
+| TE-15 | (v1.2) Which AI provider gives a free tier that fits the plan quotas, structured JSON output, a latency we can wait for, and data terms we can state? | Read current terms (free-tier request and token limits per minute and per day; whether free-tier data is used for training or retained); run the 31 labeled transcripts through two candidates with the generated prompt and schema; measure parse rate, V-rule drop rate, p50/p90 latency through the Render proxy | Parse rate at least 98% after one retry; median V-rule drops at most 10% of items; p90 latency at most 20 s; daily free capacity at least the launch-month estimate (anonymous + Free + Creator quotas x expected users); terms recorded in `docs/` and summarised on the settings page | V6.2 (before the route ships); re-verified by `check-external-facts.mjs` before launch | Second candidate; lower quotas; if no free tier fits or the terms say free-tier data trains models, the founder decides between a paid tier (A-3), accepting and disclosing the terms, or making the AI plan opt-in |
+| TE-16 | (v1.2) Is there a music source whose licence allows bundling tracks inside a paid app, with no attribution the export cannot carry? | Read licences of candidate libraries; check redistribution and "in an app" clauses | A written licence that allows it; otherwise none | V6.7 | Ship user-supplied music only |
+| E-11 | (v1.2, PS §19) Is the AI plan better than the rules? | `plan_result`, `export_done` (`items_kept`, `items_disabled`, `cuts_restored`), `post_export_answer` split by plan source | PS §19 E-11 targets | V6.2 → M3 | PS §19 E-11 action |
+
+**v1.3 experiments:** TE-17 to TE-25 are in §53.1. E-12, E-13, E-14 are PS §19's.
 
 **Non-blocking decisions**
 - Router and store libraries may be swapped; only `routes.tsx` and `state/` depend on them.
@@ -3709,7 +3877,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 
 **TDR-6. WebCodecs plus an in-house Rust MP4 demuxer and muxer.** Chosen over FFmpeg.wasm and over JS container libraries. Why: PS §0 item 4 names a Rust muxer; one crate owns sample tables in both directions; no licensing review. Cost: real-world MP4 variety is a stabilization risk. Reversal: JS demuxer behind `SampleMeta` (TE-12); the muxer stays.
 
-**TDR-7 (v1.2, replaces the v1.1 record). Two timelines and a `TimeMap` from V4, identity until V6.2.** Chosen over v1.1's single timeline. Why: PS v1.2 §9.2.1 makes plan-driven cuts launch scope (V6.2); introducing `OutMs` after the scene, preview, export and audio are written would touch every timestamp in them, while introducing it in V4 costs one type and an identity map whose consumers (scene, preview, export, `assemble`) all exist in V4-V5. Cost: one conversion step everywhere and a type that is the identity for three versions. Reversal: none needed; with the plan off the map is the identity. (v1.1 record: one timeline, no map, because nothing was cut.)
+**TDR-7 (v1.2, replaces the v1.1 record). Two timelines and a `TimeMap` from V4, identity until V6.3.** Chosen over v1.1's single timeline. Why: PS v1.2 §9.2.1 makes plan-driven cuts launch scope (V6.3); introducing `OutMs` after the scene, preview, export and audio are written would touch every timestamp in them, while introducing it in V4 costs one type and an identity map whose consumers (scene, preview, export, `assemble`) all exist in V4-V5. Cost: one conversion step everywhere and a type that is the identity for three versions. Reversal: none needed; with the plan off the map is the identity. (v1.1 record: one timeline, no map, because nothing was cut.)
 
 **TDR-18. Cloud LLM edit plan through our server.** Chosen over a local LLM (download size, device variance; PS §9.2 (f)) and over browser-to-provider calls (key exposure, a third browser host). Why: semantic judgments (intentional pause, implied list, topic shift) beyond rules (PS §8 principle 7); only text leaves, media stays local. Cost: a per-plan cost and quota (PS §11), provider dependence (TE-15), latency in the pipeline, nondeterminism. Containment: plan stored per clip; validator (INV-21, INV-22); rules fallback (INV-24). Reversal: rules as default and the AI plan opt-in (E-11 failure), or a local producer of the same `EditPlan` (P2).
 
@@ -3718,6 +3886,14 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 **TDR-20. Numbers are pointers, not values.** Chosen over letting the model write the numbers it shows. Why: PS §8 principle 2; a hallucinated or re-rounded number on screen is the worst failure; a `QuantityRef` is checked by parsing the spoken words and follows the user's word corrections. Cost: the model cannot show a computed number (a sum, a percentage it derived). Reversal: none planned.
 
 **TDR-21. Video is a draw command.** Chosen over compositing the overlay over a fixed full-frame video (v1.1 §19). Why: punch-in and jump-cut zooms, video inside shapes, shape transitions and face tracking all become changes to one per-frame command instead of renderer modes. Cost: the compositor splits each frame into Vello runs around the video commands. Reversal: none needed; one full-frame `Video` command is the v1.1 picture.
+
+**TDR-22 (v1.3). A short is a virtual clip behind an `Assembly`.** Chosen over stretching `TimeMap` and over a new timeline through the scene. Why: every proven stage keeps its contract; reordering costs nothing (§44); the founder's rule against needless breakage. Cost: a third clock and a second decode session at joins. Reversal: none needed; `Assembly::whole` is V5.
+
+**TDR-23 (v1.3). Sentence-level selection for the Director.** Chosen over word-level. Why: mid-sentence cuts become impossible by type, and the body stays under INV-4's 64 kB. Cost: depends on sentence segmentation (`sentences_long.rs`); a sentence cannot be split by the model. Reversal: `SentenceRange` becomes a word range with a validator rule; not planned.
+
+**TDR-24 (v1.3). Chat returns typed operations.** Chosen over a whole new plan and over scripts. Why: small requests stay small, undo is the existing history, the validator stays the only gate. Cost: a request with no op fitting it gets "I can't do that yet". Reversal: more ops.
+
+**TDR-25 (v1.3). Matte as a stored low-resolution video.** Chosen over running the model during render. Why: INV-12, memory, and no new playback code. Cost: a pass per short and H.264 on alpha. Reversal: a lossless frame file (§51.1).
 
 **TDR-8. Preview uses the export renderer and the audio clock.** Chosen over a `<video>` element with overlays. Why: what the user approves is what exports, frame for frame. Cost: a decode loop and clock sync to maintain. Reversal: pre-rendered preview file (§20).
 
@@ -3879,7 +4055,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 
 1. Hosting plan for a paid product on the static host (TE-5, TDR-12): the founder stays on Vercel's free plan and pays nothing; the plan's non-commercial terms remain an accepted risk, with another free static host as the only remedy.
 2. All free-tier facts for Render, Postgres, asset storage, email, CI minutes, uptime monitor (TE-5 to TE-11); re-listed by `scripts/check-external-facts.mjs` before launch.
-3. Email sender verification without a registered domain (TE-8): a domain costs money and is outside PS A-10, so the provider must accept a single verified sender address; deliverability of magic links under that setup is unproven.
+3. Email sender verification without a registered domain (TE-8): a domain costs money and is outside PS A-10, so the provider must accept a single verified sender address; deliverability of magic links under that setup is unproven. V6: Brevo accepts one Gmail sender; two Gmail mailboxes received every mail; other providers are unread (`docs/v6/experiments.md`). Read with real sign-ups: `signin_step` `link_requested` without `completed`.
 4. Mobile detection via `navigator.userAgentData.mobile` (§3) — E-8 data at M2.2.
 5. `MAX_FILE_SIZE` read as 500,000,000 bytes; `INPUT_FPS_TOLERANCE`; `MIN_WORDS`; `MAX_RECENT_CLIPS` (§10.2) — M1.1, E-2, M2.1.
 6. First video track used when several exist; fragmented MP4 rejected (§15.4) — TE-12.
@@ -3894,28 +4070,28 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 15. Preview size, queue length, late-frame and first-frame targets, seek target (§20) — M1.5. Measured in V4 on D1 (not R1, D-114): first frame 76-94 ms after `ready` (500 ms), seek 78-94 ms (300 ms), drift at most 26.9 ms over 60 s with 0% late frames (80 ms, 5%), never downscaled; the queue of 6 and the 360 x 640 downscale size are kept.
 16. Video and audio bitrates, keyframe interval, 2-channel audio, encoder ladder order (§21.2) — TE-4.
 17. `CANCEL_TIMEOUT`; `API_TIMEOUT`; `API_COLD_START_BUDGET` (§14.3, §22.9) — M1.5, TE-11. Measured in V4 on D1: a hung render worker's run is back at `accepted` 2.4-2.5 s after Cancel; `CANCEL_TIMEOUT_MS = 2000` kept.
-18. Magic-link, access-token and refresh-token lifetimes; all rate-limit values in §22.1 — M1.7.
+18. Magic-link, access-token and refresh-token lifetimes; all rate-limit values in §22.1 — M1.7. Built in V6 as written: a link 15 minutes, single-use; an access token 15 minutes; a session 60 days from sign-in, however active (founder's confirmation), with a 30 s grace for a rotated refresh token (D-258).
 19. Free quota month = UTC calendar month (§22.3) — product confirmation at M1.7.
-20. Creator until `current_period_end` for canceled and past-due; refund ends access immediately (§22.3, §22.5) — TE-9.
+20. Creator until `current_period_end` for canceled and past-due; refund ends access immediately (§22.3, §22.5) — TE-9. Read in V6 test mode: a cancel keeps the paid date; a declined renewal is `on_hold` and does not move it; a refund does not stop the subscription at Dodo, so the webhook cancels it there.
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
-22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6.
+22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6. Dodo's documented retries span about 27 hours, inside 90 days.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
 24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.
 28. Left open by V3, each with the version that handles it (v3implementation §23): an `Edit` that ignores `media_rate` (a dwell edit taken as a media edit) — TE-12, V9; Indian digit grouping not parsed — E-7; no `Unit` for terabytes — a shared-type revision; the `events` store without a writer (§23.1) — V7; KeywordPop precision measured on synthetic emphasis — E-7 from V10; the derived portrait clip is an enlarged 405-pixel strip, cheaper to decode than a real phone clip — a real portrait recording; the capability check admits a software adapter, on which a clip takes over 20 minutes — V8; the cleaned audio of a clip that ends early stays in `audio.worker` until the next clip (C-4) — V4; the 40-word split's tie-break makes one-word sentences (§17.2) — M1.3.
-29. (v1.2) Every value marked (assumption) in §40: `CUT_SNAP`, `MIN_KEEP_GAP`, lead/trail keeps, `MAX_CUT_SHARE`, `CUT_XFADE`, `JUMP_ZOOM`, `END_CARD_DUR`, `MUSIC_BED`, `DUCK_DEPTH` and its attack/release, `PLAN_UPSTREAM_TIMEOUT`, `PLAN_CLIENT_TIMEOUT`, the plan quotas — V6.2, V6.3, TE-15, E-2.
+29. (v1.2) Every value marked (assumption) in §40: `CUT_SNAP`, `MIN_KEEP_GAP`, lead/trail keeps, `MAX_CUT_SHARE`, `CUT_XFADE`, `JUMP_ZOOM`, `END_CARD_DUR`, `MUSIC_BED`, `DUCK_DEPTH` and its attack/release, `PLAN_UPSTREAM_TIMEOUT`, `PLAN_CLIENT_TIMEOUT`, the plan quotas — V6.3, V6.7, TE-15, E-2.
 30. (v1.2) The AI provider, its free-tier limits and its data-use terms — TE-15. If its free tier trains on inputs, the founder decides (PS §17 edit-plan row).
 31. (v1.2) Music licensing for bundled tracks — TE-16.
-32. (v1.2) The launch date: V6.1-V6.7 sit before V7; the founder re-sets M2 when V6.7 closes (PS A-2).
-33. (v1.2) Colour emoji: the embedded emoji font is monochrome (§19.6); whether V6.1's emoji items need a colour font (and whether Vello draws its colour tables) is decided in V6.1.
+32. (v1.3) The launch date: V6.1-V6.11 sit before V7; the founder re-sets M2 when V6.11 closes (PS A-2).
+33. (v1.2) Colour emoji: the embedded emoji font is monochrome (§19.6); whether V6.2's emoji items need a colour font (and whether Vello draws its colour tables) is decided in V6.2.
 
 ---
 
 ## 40. Edit Plan Architecture (v1.2)
 
-**Model: one edit plan per clip is the only description of the edit. Two producers write it: the rule detector (V4, offline, always available) and a cloud LLM reached through our server (V6.1, the default). One validator in Rust checks every plan against the transcript before anything reads it. The scene, the program audio and the time map are pure functions of (transcript, valid plan, edit state, clip, profile, theme, assets). The LLM sees transcript text, word timings and prosody scores; it never sees audio or video, and it never writes a number that is shown on screen. Rejected: letting the LLM emit draw commands or timestamps (unverifiable, breaks determinism), a second rule engine for cuts (cannot tell an intentional pause, PS §9.2), calling the provider from the browser (exposes the key, a third host in the allowlist), a local LLM at launch (PS §9.2 (f); P2 seam: a third producer of the same `EditPlan`).**
+**Model: one edit plan per clip is the only description of the edit. Two producers write it: the rule detector (V4, offline, always available) and a cloud LLM reached through our server (V6.2, the default). One validator in Rust checks every plan against the transcript before anything reads it. The scene, the program audio and the time map are pure functions of (transcript, valid plan, edit state, clip, profile, theme, assets). The LLM sees transcript text, word timings and prosody scores; it never sees audio or video, and it never writes a number that is shown on screen. Rejected: letting the LLM emit draw commands or timestamps (unverifiable, breaks determinism), a second rule engine for cuts (cannot tell an intentional pause, PS §9.2), calling the provider from the browser (exposes the key, a third host in the allowlist), a local LLM at launch (PS §9.2 (f); P2 seam: a third producer of the same `EditPlan`).**
 
 Precedence: this section implements PS v1.2 §8 principles 2, 3, 4 and 7, §9.2.1 and §12.8. Where an older section of this document says "one timeline", "no time map", "nothing leaves", "no cuts" or "four event kinds only", this section wins and the older section is read as describing the identity case (no cuts, plan off).
 
@@ -3942,7 +4118,7 @@ impl TimeMap {
 ```
 
 - Transcript, prosody, detector events and plans keep `TimeMs` (what was said, when). `build_scene` maps every time it uses through `to_out` exactly once. The scene, the preview clock, frame indexes, the export loop and the program audio run on `OutMs`. `VideoSource` reads source frames at `to_src(t)`.
-- `timemap::build(cuts, transcript, silence, end_card) -> TimeMap` in `offcut-plan` is the only constructor besides `identity`. Splice points are snapped to the quietest 10 ms window of `SilenceProfile` within `CUT_SNAP = 40 ms` of the planned boundary and never move into a word (assumption, V6.2).
+- `timemap::build(cuts, transcript, silence, end_card) -> TimeMap` in `offcut-plan` is the only constructor besides `identity`. Splice points are snapped to the quietest 10 ms window of `SilenceProfile` within `CUT_SNAP = 40 ms` of the planned boundary and never move into a word (assumption, V6.3).
 - V4-V6: every map is `identity(clip.duration)`; `is_identity()` is true; program time equals recording time; INV-5's v1.1 behaviour is the identity case.
 
 ### 40.2 The plan
@@ -3953,11 +4129,11 @@ pub struct EditPlan {
     pub format: u16,                    // PLAN_FORMAT = 1
     pub catalog: u32,                   // CATALOG_VERSION the plan was produced against
     pub source: PlanSource,
-    pub cuts: Vec<Cut>,                 // empty until V6.2
+    pub cuts: Vec<Cut>,                 // empty until V6.3
     pub items: Vec<PlanItem>,
-    pub chapters: Vec<Chapter>,         // empty until V6.1
-    pub extras: TextExtras,             // empty until V6.1
-    pub music: Option<MusicCue>,        // None until V6.3
+    pub chapters: Vec<Chapter>,         // empty until V6.2
+    pub extras: TextExtras,             // empty until V6.2
+    pub music: Option<MusicCue>,        // None until V6.7
 }
 pub enum PlanSource { Rules, Model { provider: ProviderId, model: String } }   // set by the producer, never by the LLM
 pub enum Cut {
@@ -3981,12 +4157,12 @@ pub struct MusicCue { pub fits: bool, pub energy: MusicEnergy }   // MusicEnergy
 | Release | Kinds (params in brief) |
 |---|---|
 | V4 | `NumberReveal { value: QuantityRef, label }`, `ListReveal { header: Label, items: [{ at: WordIdx, label: Label }] }`, `FromTo { from: QuantityRef, to: QuantityRef, label }`, `KeywordPop { word }` |
-| V6.1 | `Emphasis { word, treatment: Colour | Underline | Highlight }`, `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong }`, `Emoji { word, emoji: EmojiId }` |
-| V6.4 | `ListBuilder`, `NumberMoment { value: QuantityRef, form: Count | Bar }`, `QuoteCard { quote: WordRange }`, `DefinitionCard { term: Label, gloss: Label }`, `Versus { left: Label, right: Label, values: Option<(QuantityRef, QuantityRef)> }`, `StepTracker { steps: [{ at, label }] }`, `Timeline { points: [{ at, label }] }`, `Checklist { items: [{ at, label }] }` |
-| V6.5 | `ShapeFrame { shape: ShapeId }` (video inside a shape), `Transition { at: WordIdx, kind: TransitionId }` |
-| V6.6 | `HookTitle`, `LowerThird { title: Label, subtitle: Option<Label> }`, `ChapterMarker` (from `chapters`), `ProgressBar`, `EndCard { cta: Label }` (adds a `Hold` segment of `END_CARD_DUR = 2.5 s`, assumption) |
+| V6.2 (v1.3: launch list in §47) | `Emphasis { word, treatment: Colour | Underline | Highlight }`, `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong }`, `Emoji { word, emoji: EmojiId }` |
+| V6.6 | `ListBuilder`, `NumberMoment { value: QuantityRef, form: Count | Bar }`, `QuoteCard { quote: WordRange }`, `DefinitionCard { term: Label, gloss: Label }`, `Versus { left: Label, right: Label, values: Option<(QuantityRef, QuantityRef)> }`, `StepTracker { steps: [{ at, label }] }`, `Timeline { points: [{ at, label }] }`, `Checklist { items: [{ at, label }] }` |
+| V6.6 | `ShapeFrame { shape: ShapeId }` (video inside a shape), `Transition { at: WordIdx, kind: TransitionId }` |
+| V6.6 | `HookTitle`, `ProgressBar`, `EndCard { cta: Label }`; `LowerThird` and `ChapterMarker` moved post-launch (§42) (adds a `Hold` segment of `END_CARD_DUR = 2.5 s`, assumption) |
 
-The rules producer (`offcut-plan::from_rules(&[DetectedEvent], &Transcript) -> EditPlan`) emits the four V4 kinds, converting each `Quantity` of a `DetectedEvent` into a `QuantityRef` to the `NormalizedSpan` it came from (the n-th span inside the event's anchors). `DetectedEvent`, `offcut-detect` and its tests are unchanged. From V6.4 the rules producer may map its kinds onto `ListBuilder` and `NumberMoment`; codes 0-3 stay reserved.
+The rules producer (`offcut-plan::from_rules(&[DetectedEvent], &Transcript) -> EditPlan`) emits the four V4 kinds, converting each `Quantity` of a `DetectedEvent` into a `QuantityRef` to the `NormalizedSpan` it came from (the n-th span inside the event's anchors). `DetectedEvent`, `offcut-detect` and its tests are unchanged. From V6.6 the rules producer may map its kinds onto `ListBuilder` and `NumberMoment`; codes 0-3 stay reserved.
 
 ### 40.3 The capability catalog (the renderer's menu)
 
@@ -4021,14 +4197,15 @@ pub struct Dropped { pub kind: ItemKind, pub reason: DropReason }   // DropReaso
 
 | # | Rule | On failure |
 |---|---|---|
-| V-1 | `format == PLAN_FORMAT` and `catalog == CATALOG_VERSION` | Whole plan rejected; rules fallback |
+| V-1 | `format == PLAN_FORMAT` and `catalog == CATALOG_VERSION` for a new response; `catalog <= CATALOG_VERSION` for a stored plan (v1.3, DC-7) | Whole plan rejected; rules fallback |
 | V-2 | Kind is in this build's catalog; params match its `ParamSpec`s | Item dropped |
 | V-3 | Anchors are inside the transcript, non-empty, and satisfy the kind's `AnchorRule`; `at` points lie inside the anchors | Item dropped |
 | V-4 | Every `Label` is within `max_chars`; every digit run in a `Label` or in `post_caption` equals a digit run of the effective transcript words; hashtags match `#[A-Za-z][A-Za-z0-9]{0,29}`, at most 8 | Item (or that extra) dropped |
 | V-5 | Every `QuantityRef` parses (`parse_quantity` over the effective words in range) to a `Quantity` | Item dropped |
 | V-6 | Per-kind `max_per_clip` and `min_gap`; at most one item per zone at a time (earlier anchor wins, then catalog order) | Later items dropped |
-| V-7 | Cuts: `Gap.keep >= MIN_KEEP_GAP (150 ms)` and shorter than the real gap; no `Gap` at a `KeepGap`; `Lead.keep >= 250 ms`, `Trail.keep >= 400 ms`; a `Words` cut overlaps no kept item's anchors; total removed at most `MAX_CUT_SHARE = 40%` of the clip (assumptions, V6.2, E-2) | Cut dropped; over `MAX_CUT_SHARE` all cuts dropped |
+| V-7 | Cuts: `Gap.keep >= MIN_KEEP_GAP (150 ms)` and shorter than the real gap; no `Gap` at a `KeepGap`; `Lead.keep >= 250 ms`, `Trail.keep >= 400 ms`; a `Words` cut overlaps no kept item's anchors; total removed at most `MAX_CUT_SHARE = 40%` of the clip (assumptions, V6.3, E-2) | Cut dropped; over `MAX_CUT_SHARE` all cuts dropped |
 | V-8 | Chapters strictly increasing, at most 6, each at least 8 s of program time | Extra chapters dropped |
+| V-9 | (v1.3, V6.6) For `PlanSource::Model` only, at most one visual item in any 2.5 s window, excluding caption emphasis (§47). A rules plan is exempt, so `validate_rules_plans.rs` and every golden stay as they are | Later item dropped |
 
 - A rules plan passes the same validator. A word edit re-runs `validate` on the stored plan (not a new request): a corrected number shows the corrected value (V-5 reads effective words), an item whose number no longer parses is dropped, and `redetect_sentence` still serves the rules plan.
 - `ValidPlan` is the only plan type `build_scene`, `timemap::build` and `assemble` accept. It has no public constructor (INV-21, `tests/ui.rs`).
@@ -4046,7 +4223,7 @@ pub struct KindLimits { pub max_per_clip: u8, pub min_gap: DurMs, pub label_char
 
 - **Numbers are resolved here, not in the scene.** `validate` turns every `QuantityRef` into a `Quantity` with `parse_quantity` over the effective words of its range (V-5) and hands the scene `EventParams` with resolved values; the scene parses nothing (INV-24).
 - **`marks`** are the recording times a visual steps at, read from the words: a FromTo's second value, which a `DetectedEvent` has no time for.
-- **V4's limits** (`catalog.rs`, (assumption, V6.1, E-11)): NumberReveal 8 per clip, min gap 1,500 ms; ListReveal 3, 10,000 ms; FromTo 4, 3,000 ms; KeywordPop 12, 800 ms; labels 32 characters, list headers 24. Every rules plan of the 31 labeled files validates with nothing dropped (`validate_rules_plans.rs`).
+- **V4's limits** (`catalog.rs`, (assumption, V6.2, E-11)): NumberReveal 8 per clip, min gap 1,500 ms; ListReveal 3, 10,000 ms; FromTo 4, 3,000 ms; KeywordPop 12, 800 ms; labels 32 characters, list headers 24. Every rules plan of the 31 labeled files validates with nothing dropped (`validate_rules_plans.rs`).
 - In V4, V-7 and V-8 drop every cut, chapter and text extra: no producer makes them yet.
 
 ### 40.5 Scene and renderer contracts
@@ -4068,9 +4245,9 @@ pub enum DrawCmd {
     Video { slot: VideoSlot, src: CropRect, dst: Affine, mask: Option<Vec<PathEl>>, opacity: f32 },
     Image { image: ImageKey, rect: Rect, opacity: f32 },
 }
-pub enum VideoSlot { Main }                                // a B-roll slot is a later variant (PS §21 item 14)
+pub enum VideoSlot { Main }                                // v1.3: V6.8 adds Asset, V6.11 adds Matte (§48.1)
 pub struct FontKey(u16);                                   // replaces the closed FontId enum (v2implementation D-29)
-pub struct FontSet { /* embedded fonts + user fonts */ }   // FontSet::embedded(); FontSet::with_user(fonts) in V6.7
+pub struct FontSet { /* embedded fonts + user fonts */ }   // FontSet::embedded(); FontSet::with_user(fonts) in V6.10
 pub struct Theme { pub text: Rgba, pub stroke: Rgba, pub accent: Rgba, pub accent_alt: Rgba, pub panel: Rgba,
                    pub backdrop: Rgba, pub display_font: FontKey, pub body_font: FontKey }
 // offcut-render (V4 contract)
@@ -4080,13 +4257,13 @@ impl Renderer {
 ```
 
 - **Video is a scene node.** Each frame's list contains the `Video { Main, … }` command; framing, crop offset, punch-in zoom, jump-cut zoom, face tracking (P1) and shapes all change that command, not the renderer.
-- **V4 implements:** one `Video` command per frame with any scale/translate `dst`, opacity 1.0, no mask; `Image` is in the type but returns `RenderError::Unsupported` until its first user (V6.1 icons if raster, else V6.7 logo); `mask` returns `Unsupported` until V6.5. Display lists and goldens use the new shape from V4, so V6.x adds drawing code, not contract changes.
-- **Styles are data on theme roles.** `StyleSpec` names theme roles, never `Rgba` literals (`styles_use_theme.rs`); `StyleSpec.motion: CaptionMotion { unit: Word | Glyph, enter: MotionPreset, stagger: DurMs, active: ActiveTreatment }` expresses Clean, Bold and Tech in V4, and V6.5's kinetic presets are more rows of data plus any new `MotionPreset` arm.
+- **V4 implements:** one `Video` command per frame with any scale/translate `dst`, opacity 1.0, no mask; `Image` is in the type but returns `RenderError::Unsupported` until its first user (V6.2 icons if raster, else V6.10 logo); `mask` returns `Unsupported` until V6.6. Display lists and goldens use the new shape from V4, so V6.x adds drawing code, not contract changes.
+- **Styles are data on theme roles.** `StyleSpec` names theme roles, never `Rgba` literals (`styles_use_theme.rs`); `StyleSpec.motion: CaptionMotion { unit: Word | Glyph, enter: MotionPreset, stagger: DurMs, active: ActiveTreatment }` expresses Clean, Bold and Tech in V4, and V6.6's kinetic presets are more rows of data plus any new `MotionPreset` arm.
 - **Zones.** `safe_area.rs` holds a named zone table (`Top`, `Event`, `Caption`, `LowerThird`, `Full`) in place of the two constants; items claim zones through the catalog (V-6).
 
 **As built in V4** (§19.2 holds the full signatures):
-- `SceneInput` has no `assets` field yet: no V4 kind draws an image, so `SceneAssets` comes with `Image`'s first user (V6.1 icons if raster, else V6.7).
-- `Video.dst` is an axis-aligned `Rect` in output pixels, not an `Affine` (D-130): every V4-V6.5 framing is a scale and a translate, and the list's scaling leaves `dst` alone.
+- `SceneInput` has no `assets` field yet: no V4 kind draws an image, so `SceneAssets` comes with `Image`'s first user (V6.2 icons if raster, else V6.10).
+- `Video.dst` is an axis-aligned `Rect` in output pixels, not an `Affine` (D-130): every V4-V6.6 framing is a scale and a translate, and the list's scaling leaves `dst` alone.
 - `Theme` also has `on_accent` (the word on Clean's pill), `shadow`, and **`mono_font`** (D-136: the font of code-style captions, Tech/"Mono"'s JetBrains Mono): `Theme { text, stroke, accent, accent_alt, panel, backdrop, on_accent, shadow, display_font, body_font, mono_font }`, made by `Theme::default_for(StyleId)`.
 - `Renderer::render(&mut self, sources: &VideoSources<'_>, list: &DisplayList, fonts: &FontSet)` takes the `FontSet` the glyph runs are set in; `VideoSources` is `{ main: (&VideoFrame, Rotation) }`.
 - The renderer's V4 support rule (D-133): exactly one `Video`, the first command, of the `Main` slot, opaque, with no mask, `src` inside the frame and `dst` inside the canvas, and no `Image`; any other list is `RenderError::Unsupported`.
@@ -4102,11 +4279,11 @@ pub struct ProgramAudio { pub samples: Vec<f32>, pub loudness: Lufs }   // sampl
 ```
 
 - **Splices:** an equal-power cross-fade of `CUT_XFADE = 20 ms` centred on every join; a `Hold` segment is silent speech (music continues).
-- **Music:** looped with a 2 s cross-fade or trimmed; bed at `MUSIC_BED = -20 dB` relative to speech loudness; ducked by `DUCK_DEPTH = -12 dB` while speech is active, attack 80 ms, release 400 ms; faded out over the last 1.5 s or the end card; then the v1.1 loudness stage and limiter run over the mix (all assumption, V6.3, E-2).
+- **Music:** looped with a 2 s cross-fade or trimmed; bed at `MUSIC_BED = -20 dB` relative to speech loudness; ducked by `DUCK_DEPTH = -12 dB` while speech is active, attack 80 ms, release 400 ms; faded out over the last 1.5 s or the end card; then the v1.1 loudness stage and limiter run over the mix (all assumption, V6.7, E-2).
 - **Identity case (V4-V6):** `assemble(out48, identity, speech, None, cfg)` returns `out48` sample for sample (`program_identity.rs`). INV-10 now reads: the enhancement chain preserves duration; `assemble` alone produces the program duration.
 - Runs in `audio.worker` behind `AudioWorkerApi.assemble` (added in V4). The preview plays and the export encodes `prog48`; OPFS `clips/<clipId>/prog48.f32` beside `out48.f32`.
 
-### 40.7 Server: `POST /api/v1/plan` (V6.1)
+### 40.7 Server: `POST /api/v1/plan` (V6.2)
 
 | Item | Value |
 |---|---|
@@ -4116,14 +4293,14 @@ pub struct ProgramAudio { pub samples: Vec<f32>, pub loudness: Lufs }   // sampl
 | Errors | `E_PLAN_QUOTA` (429), `E_PLAN_CATALOG` (409, version mismatch), `E_PLAN_UNAVAILABLE` (502/504), `E_PLAN_INVALID` (502: the model's output did not parse after one retry) |
 | Provider | `server/src/plan/provider.rs::PlanProvider` trait, one adapter per candidate (TE-15); `system_prompt()`, `user_message()` and `output_schema()` from `offcut-plan`; structured-output mode where the provider has one; `PLAN_UPSTREAM_TIMEOUT = 25 s`; one retry when the output fails to parse, with the parse error appended |
 | Server checks | Parse into `EditPlan`; set `source = Model { provider, model }` itself; check V-1 and sizes. Transcript-level validation (V-2 to V-8) is the client's, because only the client has the user's edits |
-| Quotas | In-memory per-IP bucket: 10/min and `ANON_PLANS_PER_DAY = 3` for anonymous requests; `plan_usage (user_id, month, count)` for signed-in users: `FREE_PLANS_PER_MONTH = 30`, `CREATOR_PLANS_PER_MONTH = 300` soft (logged above, blocked at 900). Counted only on success (assumptions, TE-15) |
-| Storage and logs | The body is never written to the database or to a log; logged: route, status, latency, provider latency bucket, input and output token counts. `log_redaction.rs` runs a plan request with marker words. Account deletion removes `plan_usage` rows; account export includes them |
+| Quotas | In-memory per-IP bucket: 10/min and `ANON_PLANS_PER_DAY = 3` for anonymous requests; `ai_usage` for signed-in users (v1.3, §52): `FREE_PLANS_PER_MONTH = 40`, `CREATOR_PLANS_PER_MONTH = 1000` soft (logged above, blocked at 3×). Counted only on success (assumptions, TE-15). The spend cap of §52 applies |
+| Storage and logs | The body is never written to the database or to a log; logged: route, status, latency, provider latency bucket, input and output token counts. `log_redaction.rs` runs a plan request with marker words. Account deletion removes `ai_usage` and `ai_shorts_grants` rows; account export includes them |
 | Config | `PLAN_ENABLED`, `PLAN_PROVIDER`, `PLAN_MODEL`, `PLAN_API_KEY` (Render environment only; `PLAN_ENABLED=false` makes the route answer `E_PLAN_UNAVAILABLE`) |
 | Network | Server → provider API host (HTTPS) joins §24.1 "From the server". The browser's allowlist does not change: it calls the app origin |
 
 `server` may depend on `offcut-plan` (a pure crate: catalog, prompt, schema, types), added to the §2 row for `server`.
 
-### 40.8 Client flow (C-4 from V6.1)
+### 40.8 Client flow (C-4 from V6.2)
 
 ```text
 ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (PLAN_CLIENT_TIMEOUT = 30 s)
@@ -4137,7 +4314,7 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 - `PipelineStage::Plan` joins `stage_timing`. New analytics (enum and count properties only): `plan_result { source, outcome, latency_bucket, items, dropped_by_reason, cuts }`; `export_done` gains `items_kept`, `items_disabled`, `cuts_kept`, `cuts_restored`, `music_on`, `brand_kit_on`.
 - Settings: the "AI edit plan" switch (default on), provider name and data-use summary; with the switch off, no plan request is sent and no transcript word appears in any request (`privacy-network.spec.ts` case "plan off").
 
-### 40.9 Seams V4, V5 and V6 must build (so V6.1 starts without rework)
+### 40.9 Seams V4, V5 and V6 must build (so V6.2 starts without rework)
 
 | # | Version | Seam | Replaces | Proof |
 |---|---|---|---|---|
@@ -4150,26 +4327,1010 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 | S-7 | V4 | Review UI generic over plan items (`PlanItemList`), a cuts section that renders nothing when the plan has no cuts | `EventToggleList` | `review-edit.spec.ts` |
 | S-8 | V5, built | Export loop over `OutMs`: `session.source_at(t)`, then `frameAtBlocking(recorded(pos))`; encodes `prog48`, read from `clips/<id>/prog48.f32` beside `out48.f32`; `frame_count` from `out_duration`; the test passes the expected duration as an argument apart from the source, with no sidecar file (v5implementation D-210), and `verify_mp4.py` checks 5 and 8 compare against it (the verifier still shares no code with the product) | Export reading `TimeMs` and `out48` | `timeline-preserved.spec.ts` (identity case) unchanged in outcome; the seam case of `export-loop.test.ts` (a map that jumps and holds), which no browser can reach while `set_scene` refuses other maps |
 | S-9 | V5, built | Render-cache key: canonical JSON of ten inputs (§21.4), with the plan, the time map, a theme string and a music id as they are rather than hashes of each, since the whole is hashed; the profile kind from the token the worker verified (v5implementation D-220 to D-224) | §21.4 cache key | The `render-cache` group of `start-export.test.ts`, a case per input |
-| S-10 | V6 | Account delete and export iterate a list of per-user tables, so `plan_usage` is one more entry | Hard-coded table list | `account_delete.rs` |
+| S-10 | V6 | Account delete and export iterate a list of per-user tables, so `ai_usage` and `ai_shorts_grants` are two more entries | Hard-coded table list | `account_delete.rs` |
 
-Nothing else is reserved, except the plan's wire format, fixed at `PLAN_FORMAT = 1` in V4 (D-119, D-163): from V6.1 a stored or sent plan is a contract, and fixing it once costs less than changing it. Each later variant (`ItemKind` codes 4+, `Cut` arms used, `VideoSlot` members, masks) is added by the release that draws or applies it.
+Nothing else is reserved, except the plan's wire format, fixed at `PLAN_FORMAT = 1` in V4 (D-119, D-163): from V6.2 a stored or sent plan is a contract, and fixing it once costs less than changing it. Each later variant (`ItemKind` codes 4+, `Cut` arms used, `VideoSlot` members, masks) is added by the release that draws or applies it.
 
 ### 40.10 The V6.x releases
 
-| Release | Builds | Done when |
-|---|---|---|
-| V6.1 Edit plan | `/plan` route, provider adapter, quotas and `plan_usage` migration; `request-plan.ts`, `plans` store, settings switch; catalog V6.1 kinds (emphasis, icon pop, punch-in, emoji) with drawing; text extras panel (copy buttons); chapters stored (not drawn) | AI plans validate and render on the reference clip; fallback works with the API down; `privacy-network.spec.ts` revised and passing; E-11 instrumentation live; TE-15 recorded |
-| V6.2 Cuts | `Cut` arms, `timemap::build` with silence snapping, `assemble` with cross-fades, jump-cut punch-in alternation (`JUMP_ZOOM = 1.08`, assumption), cuts list in review with restore, filler switch | `cuts_applied.spec.ts`: fixed test plan on the long-pause fixtures exports at the map's duration, no splice inside a word, no click (peak step under `CLICK_LIMIT`), A/V sync both sides of every join (verifier checks 5, 8 with the expected duration) |
-| V6.3 Music | Music import to OPFS, optional bundled tracks (TE-16), ducking, mix loudness, music cue from the plan | `mix_ducking.rs`: speech segments at least 12 dB above the bed; mix within ±1 LU of the target; verifier check 7 on a music export |
-| V6.4 Structure visuals | List builder, number moments, the six cards; rules producer optionally mapped onto them | Goldens per kind and style; V-5 tests for every number-bearing kind |
-| V6.5 Motion | Kinetic caption presets (`CaptionMotion` rows), per-glyph animation, `Video.mask` (video inside shapes), shape transitions at `Transition` items and at topic shifts | Goldens; `frame_at` within budget at the heaviest preset |
-| V6.6 Furniture | Progress bar, chapter markers, hook title card, lower third, end card with CTA (`Hold` segment) | Goldens; end-card export duration = map duration |
-| V6.7 Brand kit | `BrandKit` (logo via `DrawCmd::Image`, colours into `Theme`, user fonts into `FontSet`), one per account, stored locally; the scene applies the kit to an export only when the profile is Creator (INV-9 extended: a function of the verified token only); Free sees it in preview | Golden matrix: every template under a test kit; Free sees the kit in preview with the upgrade prompt rule of PS §11 |
+v1.3 reorders them; §42 maps the old numbers. Each row's detail is in the section named; `buildplan.md` §8A gives the build order, demo and exit checklist.
+
+| Release | Builds | Section | Done when |
+|---|---|---|---|
+| V6.1 Long source | `route_probe`, 4K and HEVC input, copy, windowed audio, checkpointed ASR, source machine, flags, multi-manifest | §43 | A 20-minute file reaches a resumable master transcript; flags off equals V5 |
+| V6.2 Edit plan | `/plan`, provider adapter, spend cap, quotas, `ai_usage`; `request-plan.ts`, `plans` store, settings switch; `Emphasis`, `IconPop`, `PunchIn`, `Emoji`; `DrawCmd::Image`; text extras panel | §40.7, §40.8, §47, §52 | AI plans validate and render on the reference clip; fallback works with the API down; `privacy-network.spec.ts` revised; E-11 instrumentation; TE-15 recorded |
+| V6.3 Cuts and Assembly | `Cut` arms, `timemap::build`, `assemble` splices, jump-cut alternation (`JUMP_ZOOM = 1.08`, assumption), cuts list, filler switch; `Assembly`, regions, rebase | §40.1, §40.6, §44 | `cuts_applied.spec.ts`; `stitched.spec.ts`: out-of-order parts export correctly |
+| V6.4 Director | `/shorts`, `validate_shorts`, rules producer, shorts list, batch export | §45 | A long fixture gives 5 exported shorts passing 11 checks, with the API up or down |
+| V6.5 Vision and framing | Coarse and fine passes, `ShotSummary`, `FramePath` | §46 | A moving speaker stays framed; the Director reads shot lines; `FramePath::none` equals V5 |
+| V6.6 Finished look | Parts A-E of §47: cards, number moments, kinetic presets, masks and shape transitions, hook title, progress bar, end card | §47, §40.5 | Goldens per kind and style; heaviest preset within budget; simple lists unchanged |
+| V6.7 Music and sound | Music import, ducking, mix loudness, music cue, sound cues | §40.6, §47.1 | `mix_ducking.rs`; verifier check 7 on a music export |
+| V6.8 Layers | `VideoSlot`, multi-run compositor, asset box, B-roll, join transitions, split and full layouts | §48 | Verifier 11/11 with B-roll and transitions; simple lists unchanged |
+| V6.9 Chat | `PlanOp`, `effective_plan`, `/chat-edit`, `ChatPanel` | §49 | Each op applies, refuses and undoes; privacy test covers chat; non-part ops within the edit budget |
+| V6.10 Brand, memory, queue | `BrandKit`, `CreatorMemory`, queue | §50 | Golden matrix under a kit; memory changes the next prompt; a queue of three finishes around a failure |
+| V6.11 Person mask | Matte pass, `Video.matte`, text behind, background | §51 | TE-25's gate, per effect; verifier 11/11 |
 
 ### 40.11 Still forbidden
 
 - An item kind in the catalog without drawing code and a golden frame; a number on screen that is not parsed from the transcript; a timestamp written by the model.
-- A cut inside a word, a reorder, a speed change, removing a whole sentence (PS §9.2).
+- A cut inside a word, a reorder inside a `TimeMap`, a speed change (PS §9.2). (v1.3: choosing and ordering whole sentences is §44's; a user-asked whole-sentence cut is §49's.)
 - The browser calling the AI provider, the key in the client bundle, streaming provider output to the browser.
-- Storing or logging the transcript on the server; sending media, music, logos, fonts or edits anywhere.
-- Stock or generated B-roll (PS §21 item 14).
+- Storing or logging the transcript, sentence list, chat text or asset labels on the server; sending media, music, logos, fonts, frames or edits anywhere.
+- Stock or generated B-roll (PS §21 item 14). The user's own B-roll is §48.
+
+---
+
+## 41. The Compatibility Contract (v1.3)
+
+**Model: everything added by V6.1-V6.11 is added beside what exists. A clip of at most 90 seconds, dropped with every feature flag off, behaves exactly as V5 does: the same rejections, the same frames, the same audio samples. A release that cannot prove this does not ship. Rejected: rewriting the clip path around long videos (it would put five versions of proven work at risk for no user gain), a second pipeline for shorts (two implementations of every output rule), a branch per release that merges at the end (nothing is proven against production until the end).**
+
+This section is the founder's rule of 2026-11-02 written as checks: nothing that works is broken without being certain the new thing works; each release leaves the code ready for the next one; a feature not worth what it would break goes back to the founder.
+
+### 41.1 Protected behaviour
+
+These are the proofs that must pass, unchanged, on every commit of V6, V6.1-V6.11 and V7-V10. A file in this list changes only through a row of §41.2.
+
+| Protected | Proof | Why it is enough |
+|---|---|---|
+| Frames of every existing style, event and framing | `golden_frames.rs`, `display_list_snapshots.rs`, `layout_safe_area.rs`, `determinism.rs`: the stored `.snap` files and golden PNGs have an empty diff | A pixel or a command that moves fails here first |
+| The identity case of the audio | `program_identity.rs`: `assemble` with the identity map and no music returns `out48` sample for sample | Cuts, music and regions all add to `assemble`; this keeps the old path exact |
+| The identity case of time | `timemap_identity.rs`, `timeline-preserved.spec.ts`: export duration equals source duration within one frame | |
+| The export | `export-creator.spec.ts`, `export-free.spec.ts`: all 11 checks of `verify_mp4.py` | The verifier shares no code with the product |
+| Preview | `preview-sync.spec.ts`, `pipeline-preview.spec.ts`: first frame, seek, edit and drift within their V5 readings' budgets | |
+| Review | `review-edit.spec.ts` with axe at 0 violations | |
+| Rejections | `probe_rejections.rs`, `rejections.spec.ts`, with the rows of §41.2 | |
+| Failure handling | `cancel.spec.ts`, `failure-recovery.spec.ts` (V7) | |
+| Privacy | `privacy-network.spec.ts` from V8; until then `check-hosts.mjs` and the V5 network reading | |
+
+**Test counts only rise.** The Rust, Vitest, `pnpm e2e` and media counts recorded at each release's close may not fall below the previous release's. The baseline is V5's close: Rust 657 passed, 0 failed, 4 ignored; Vitest 336; `pnpm e2e` 12; verifier self-test 16; media 94 passed, 1 skipped.
+
+**The two-path proof.** From V6.1, CI runs the media suites twice in the release's one full run: all feature flags off, and all flags that have shipped on. Both must pass. A reference clip with flags on and the AI plan off must produce the same frames and samples as with flags off (`flags_identity.spec.ts`).
+
+### 41.2 Declared changes
+
+A protected behaviour changes only here. Each row names what changes, when, what stays and which test proves it. Any other change needs a new row, and a new row needs the founder (§41.4).
+
+| # | Release | What changes | What stays | Proof |
+|---|---|---|---|---|
+| DC-1 | V6.1, flag `long_video` | A file longer than 90 s routes to the long path instead of `REJECT_DURATION`. `REJECT_DURATION` now fires above 20 minutes. Fixture `rej_too_long_91s.mp4` moves to `route_long.spec.ts`; `rej_too_long_21min.mp4` (a sparse low-bitrate file) joins `rejections.spec.ts` | Flag off: exact V5 behaviour | `route_probe.rs`; both test runs of §41.1 |
+| DC-2 | V6.1, flag `high_res` | Inputs up to 3840 px on the long side and HEVC where `isConfigSupported` says yes are accepted on both paths. `rej_4k.mp4` moves to an acceptance case; `rej_8k.mp4` takes its place. `REJECT_HEVC` fires only when the browser cannot decode it | Output sizes; every H.264 clip decodes as before | `demux_fixtures.rs` (hvcC), `high-res.spec.ts` |
+| DC-3 | V6.1, flag `long_video` | `MAX_FILE_SIZE` becomes 16 GB. The in-page `REJECT_FILE_SIZE` fixture references 15,259 × 1 MiB. The check still runs before any copy | Flag off: 500 MB | `rejections.spec.ts` |
+| DC-4 | V6.1 | `model-manager.ts` removes a directory only if no manifest in `config/models/` names it, instead of "any other model" | The ASR manifest, hashes, and download behaviour | `download.test.ts`, `model-download.spec.ts` |
+| DC-5 | V6.3 | `set_scene` stops refusing a non-identity `TimeMap`, and refuses only a map whose duration disagrees with the program audio | Identity behaviour | `scene_api.rs`, `cuts_applied.spec.ts` |
+| DC-6 | V6.3 | §36's "no reorder" and "no removing a whole sentence" apply to `Cut`s only. Selecting and ordering whole sentences belongs to the `Assembly` (§44). `TimeMap` keeps refusing out-of-order segments | `TimeMap`, its deserializer and `Cut` are unchanged | `timemap_identity.rs`, `assembly.rs` |
+| DC-7 | V6.2 | Rule V-1 reads `catalog <= CATALOG_VERSION` for a stored plan, so a deploy that bumps the catalog does not throw away users' plans. A new response must still equal `CATALOG_VERSION` | `PLAN_FORMAT = 1` | `validate.rs` |
+| DC-8 | V6.6, V6.8 | The renderer's support rule (D-133) widens: `Image`, then masks, then several `Video` commands | **A list that meets the old rule takes the old code path, byte for byte.** Goldens unchanged | `golden_frames.rs`, `composite.rs` tests |
+| DC-9 | V6.5 | `Video.src` may change per frame through a `FramePath` | With no `FramePath`, `framing.rs` gives V5's crop | `framing.rs` |
+| DC-10 | V6.1, V6.5, V6.11 | `asr.worker` hosts every inference session (TDR-3 widens from one file to `workers/asr/*-runtime.ts`). INV-12 reads "no inference session and the render session coexist" | Worker count stays four; `whisper-runtime.ts`'s interface is unchanged | `run-pipeline.test.ts` |
+| DC-11 | V6 | Comment-only cleanup of the old V6.x numbers (§42), including regenerated `web/src/gen/domain.ts` comments | No token changes outside comments | `check-gen-clean.sh`; an empty diff with comments stripped |
+| DC-12 | V6 | `export-creator.spec.ts`, the case "no token" only: what the person is told changes from "accounts are not open yet" to the sign-in dialog with the limits. Founder's yes of 2026-11-02, "carefully": its title and one assertion change, and one line closes the dialog | Every other assertion of that case, and every other case of the file, unchanged: no download, no `export_started`, nothing in `exports`, the button still enabled. No exported file changes | The spec's diff read in P147; the file's other cases passing unchanged; `verify_mp4.py`'s 11 checks |
+
+### 41.3 How each release is made safe
+
+1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
+2. **Baseline read first.** Before a release's first code commit, read the protected proofs and record them in its changelog.
+3. **Additive data.** A new field on a stored or sent type has `#[serde(default)]` and a default that means "the V5 behaviour". A new IndexedDB store comes through a numbered migration. A server migration stays compatible with the previously deployed binary (§23.3). The plan's wire format stays `PLAN_FORMAT = 1`; new kinds take new codes (§40.2).
+4. **Old callers keep their function.** `transcribe`, `decodeAudio`, `importClip`, `run-pipeline.ts` and `validate_probe` keep their signatures. New paths call new functions, which call shared stages.
+5. **Identity constructors.** Every new abstraction has a do-nothing constructor (`Assembly::whole`, `FramePath::none`, `SceneAssets::empty`), and the clip path uses it. A test asserts that it changes nothing.
+6. **One release, one branch, one merge.** Build on `v6.n-build`; merge after the gate; tag. A failed gate leaves `main` untouched.
+7. **Kill switch.** A flag can be turned off by a redeploy of the static build. A plan, short or asset stored under a flag stays readable with the flag off: the clip opens without the feature, it never fails.
+
+### 41.4 Stop and ask the founder
+
+The implementer stops, writes the question into the changelog's "Open items" and asks, with a recommendation, whenever any of these is true. The founder decides to drop, defer or pay the cost.
+
+| Trigger | Example |
+|---|---|
+| A protected proof would have to change and §41.2 has no row for it | A caption preset needs a change to an existing golden |
+| A feature's cost looks out of proportion to its value | Video inside shapes needs more than one new render pass, or more than 2 days beyond its estimate |
+| A release runs over twice its estimate | A release estimated at 10 prompts reaches 20 |
+| A new runtime, a model download above 50 MB, a new browser host, or a new paid service | A second inference runtime for the face detector |
+| A stored or sent format needs a breaking change | A field that cannot default |
+| A promise changes | "Your video is not uploaded", "a number on screen was spoken", flat price |
+| An experiment fails and its row offers a choice | TE-20 says long jobs die in a hidden tab |
+
+### 41.5 What each release must leave for the next
+
+| Release | Leaves ready | Used by |
+|---|---|---|
+| V6 | Accounts, entitlement token, `ai_usage`-ready account lists (S-10) | V6.2 quotas, V6.4 long-video grant, V6.10 brand gating |
+| V6.1 | `route_probe`, `SourceInfo`, `sources/` storage, windowed ASR with checkpoints, the source machine, `features.ts`, multi-manifest model manager | V6.4, V6.5, V6.10 queue, V6.11 |
+| V6.2 | `/plan`, provider trait, spend cap, plan store, catalog growth rule, `DrawCmd::Image` | Every release that adds a kind; V6.4 and V6.9 routes share the provider |
+| V6.3 | Non-identity `TimeMap`, `Assembly`, `SourcePos`, region audio, rebased transcripts, join handling | V6.4 shorts, V6.8 transitions at joins |
+| V6.4 | Virtual clips, shorts list, batch export, `shorts_from_rules` | V6.5 framing per short, V6.9 chat over a short, V6.10 queue |
+| V6.5 | `ShotSummary`, `FramePath`, sampled-frame hand-off | V6.8 split layout, V6.11 mask pass |
+| V6.6 | Mask path in the renderer, kinds and cards, kinetic motion rows | V6.8 layers, V6.10 brand theme coverage, V6.11 matte |
+| V6.7 | Multi-source `assemble`, sound items | V6.8 B-roll audio, V6.9 chat music ops |
+| V6.8 | `VideoSlot`, multi-run compositor, asset store, `SceneAssets` | V6.9 `PlaceAsset`, V6.11 background and matte |
+| V6.9 | `PlanOp` log, `effective_plan`, op validation | V6.10 memory reads ops |
+| V6.10 | Theme from kit, `CreatorMemory`, queue | Launch |
+| V6.11 | Person matte, background layer | Launch; catalog additions after it |
+
+---
+
+## 42. Version Map (v1.3)
+
+On 2026-11-02 the founder set the order: **V6 first, then V6.1-V6.11, then V7-V10.** Older documents, changelogs and code comments use the v1.2 numbers. This table reads them. `M` ids keep their meaning; they are labels, not an order.
+
+| v1.2 name | Contents | v1.3 name | Step |
+|---|---|---|---|
+| none | Long source: long files, 4K and HEVC input, windowed audio, resumable transcription | **V6.1** | M1.16 |
+| V6.1 | AI edit plan backbone, emphasis, icons, emoji, text extras | **V6.2** | M1.9 |
+| V6.2 | Pause and silence cuts; now also the `Assembly` for stitched parts | **V6.3** | M1.10 |
+| none | Director: a long video becomes a list of shorts | **V6.4** | M1.17 |
+| none | Local vision signals and face-tracked framing | **V6.5** | M1.18 |
+| V6.4, V6.5, V6.6 | Finished look: structure visuals, kinetic presets, video inside shapes, shape transitions, hook title, progress bar, end card | **V6.6** | M1.12, M1.13, M1.14 |
+| V6.3 | Music and ducking; now also sound effects | **V6.7** | M1.11 |
+| none | Layers: B-roll, asset box, transitions at joins, split layout | **V6.8** | M1.19 |
+| none | Chat editing | **V6.9** | M1.20 |
+| V6.7 | Brand kit; now also creator memory and the back-catalogue queue | **V6.10** | M1.15, M1.21 |
+| none | Person mask: text behind the speaker, background change | **V6.11** | M1.22 |
+
+**Moved to post-launch (founder, 2026-11-02):** chapter markers and the lower third (PS §21 item 15). `Chapter` stays in the plan's wire format, always empty, so `PLAN_FORMAT` does not change.
+
+**Code comments.** About 57 comments in `crates/`, `web/src` and `verify/` use the v1.2 numbers. V6's first prompt rewrites them (DC-11). Closed changelogs and V1-V5 plans stay as written, as history.
+
+---
+
+## 43. The Long Path: Source, Route, Storage, Transcription (V6.1)
+
+**Model: a file longer than 90 seconds is a source, not a clip. A source is copied once into OPFS, its audio is decoded in windows onto disk, its transcript is built in checkpointed windows, and nothing else in the product reads it directly: shorts read it through an `Assembly`. Rejected: reading the original file in place with a `FileSystemFileHandle` (the handle's name is a file name stored in the browser, against P-11; permission prompts on every return; `render.worker` and `media.worker` both open OPFS sync handles today), YouTube-link import (a server that downloads video breaks INV-4 and the platform's terms), cloud transcription (P-1).**
+
+### 43.1 Routing
+
+```rust
+// offcut-types/src/source.rs
+pub struct SourceId(Uuid);                // ids.rs: created on import of a long file
+pub struct SourceInfo {                   // constructed only by route_probe
+    pub duration: DurMs,
+    pub display_width: Px, pub display_height: Px,
+    pub rotation: Rotation,
+    pub orientation: Orientation,
+    pub is_vfr: bool,
+    pub is_hdr: bool,                     // true is refused unless TE-21 accepted it
+    pub video_codec_string: String,
+    pub audio_codec_string: String,
+    pub audio_sample_rate: Hz, pub audio_channels: u32,
+    pub audio_track: u32,                 // the first enabled track; the long path accepts more than one
+}
+pub enum Route { Clip(ClipInfo), Long(SourceInfo) }
+pub struct RouteFlags { pub long_video: bool, pub high_res: bool, pub hdr_ok: bool }   // from features.ts; hdr_ok from TE-21
+
+// offcut-mp4/src/validate.rs  [ONLY]
+pub fn validate_probe(p: &ProbeInfo, decode_supported: bool) -> Result<ClipInfo, RejectReason>;   // unchanged
+pub fn route_probe(p: &ProbeInfo, decode_supported: bool, flags: RouteFlags) -> Result<Route, RejectReason>;
+```
+
+`route_probe`, first failing rule wins:
+
+```text
+ 1 flags.long_video == false && flags.high_res == false  → validate_probe(p).map(Route::Clip)     // exact V5
+ 2 container, no video, no audio                          → as validate_probe
+ 3 video.codec == Hevc && !flags.high_res                 → Hevc                       // V5's rule while the flag is off
+ 4 video.codec not in {H264, Hevc}                        → VideoCodec
+ 5 video.codec == Hevc && !decode_supported               → Hevc
+ 6 audio.codec != Aac                                     → AudioCodec
+ 7 max(display_w, display_h) > (high_res ? MAX_INPUT_LONG_SIDE : MAX_LONG_SIDE) → Resolution
+ 8 video.avg_fps > MAX_INPUT_FPS + INPUT_FPS_TOLERANCE    → FrameRate
+ 9 is_hdr && !flags.hdr_ok                                → Hdr
+10 !decode_supported                                      → DecodeUnsupported
+11 p.duration <= MAX_CLIP_DURATION && audio_tracks == 1   → Route::Clip
+12 p.duration <= MAX_CLIP_DURATION                        → MultiAudioTrack            // clip path keeps its rule
+13 !flags.long_video                                      → Duration                   // V5's rule while the flag is off
+14 p.duration > MAX_SOURCE_DURATION                       → Duration
+15 else                                                   → Route::Long
+```
+
+`RejectReason::Hdr` joins the enum with `REJECT_HDR`, copy ("This video is HDR. Export it as SDR, then drop it again.") and fixture `rej_hdr_hlg.mov`.
+
+### 43.2 Limits
+
+```rust
+// limits.rs, additions (PS §9.4)
+pub const MAX_SOURCE_DURATION: DurMs   = DurMs::new(1_200_000);         // 20 minutes
+pub const MAX_SOURCE_FILE_SIZE: Bytes  = Bytes::new(16_000_000_000);    // (assumption, TE-17)
+pub const MAX_INPUT_LONG_SIDE: Px      = Px::new(3840);
+pub const MAX_SHORTS_PER_SOURCE: u32   = 10;
+pub const MIN_SHORTS_PER_SOURCE: u32   = 3;                             // ask for 5-10; accept 3
+pub const MIN_SHORT_DURATION: DurMs    = DurMs::new(15_000);            // (assumption, E-12)
+pub const MAX_SHORT_DURATION: DurMs    = DurMs::new(90_000);            // equals MAX_CLIP_DURATION by a test
+pub const MAX_PARTS_PER_SHORT: u32     = 4;                             // (assumption, E-12)
+pub const FREE_LONG_VIDEOS_PER_MONTH: u32 = 1;                          // PS §11
+pub const CREATOR_LONG_SOFT_PER_MONTH: u32 = 200;                       // (assumption, TE-15); logged above, blocked at 3×
+pub const MAX_QUEUED_SOURCES: u32      = 50;                            // (assumption, V6.10)
+```
+
+`MAX_CLIP_DURATION`, `MAX_LONG_SIDE` and `MAX_FILE_SIZE` stay in the file, and each rules exactly as in V5 while its flag is off. `MAX_CLIP_DURATION` remains the clip path's limit with flags on too. The generated `LIMITS` the copy reads gains the new constants; `messages.ts` picks by flag.
+
+### 43.3 Probing before the copy
+
+Copying 10 GB to discover the file is unusable is not acceptable, so the probe runs on the `File` first:
+
+```ts
+// workers/media/file-random-access.ts
+export function fileRandomAccess(file: File): RandomAccessReader;   // FileReaderSync over file.slice; 1 MiB read cache
+// workers/media/import.ts, addition
+export function probeFile(file: File): Promise<ProbeResult>;
+export function importSourceToOpfs(sourceId: SourceId, file: File, onBytes: (n: Bytes) => void,
+                                   isCancelled: () => boolean): Promise<void>;   // 8 MiB chunks; sync access handle
+```
+
+`offcut-mp4` gains `hvcC` parsing behind `video_decoder_description` (`hevc.rs`), the HEVC codec string, and `is_hdr` from the `colr` box and the HEVC VUI. Its `RandomAccess` trait does not change. `moof` stays a rejection unless TE-12 reads at least 10% of the long corpus fragmented; then it joins V6.1's scope through §41.4.
+
+**Why a copy is still right.** Chrome's quota is a share of the free disk, an SSD copies 10 GB in about 1-2 minutes (assumption, TE-17), and every worker keeps the handle it has. The cost is disk: `import-source.ts` calls `navigator.storage.estimate()` and shows `B_STORAGE_LOW` before the copy when free quota is under `file.size + LONG_SCRATCH` (`LONG_SCRATCH = 2 GB`, assumption, TE-17). **Reversal:** a `RandomAccess` over the `File` already exists from §43.3; a future File-backed source is one more implementation, with P-11 revisited.
+
+### 43.4 Local storage
+
+**OPFS additions** (`persistence/opfs.ts`):
+
+| Path | Contents | Written by |
+|---|---|---|
+| `sources/<sourceId>/source` | The long file, byte-identical | `media.worker` |
+| `sources/<sourceId>/pcm16.f32` | 16 kHz mono, whole duration: about 77 MB for 20 minutes | `media.worker`, in windows |
+| `sources/<sourceId>/thumbs/<n>.jpg` | Poster frames, one per short, at most 360 px wide | `render.worker` |
+| `assets/<assetId>/source` (V6.8) | A user's B-roll or image | `media.worker` |
+| `clips/<clipId>/matte.mp4` (V6.11) | Person matte of one short | `render.worker` |
+
+A short's `out48.f32` and `prog48.f32` live in `clips/<clipId>/` exactly as a clip's do. A short has no `clips/<clipId>/source`.
+
+**IndexedDB version 3** (`persistence/schema.ts`):
+
+| Store | Key | Value |
+|---|---|---|
+| `sources` | `sourceId` | `{ sourceId, createdAt, lastOpenedAt, sourceInfo, sourceBytes, sourceHashPrefix, stage, windowsDone, windowsTotal }`. No name, no path (P-11) |
+| `sourceTranscripts` | `[sourceId, window]` | `{ words }` of one ASR window, the checkpoint |
+| `masterTranscripts` | `sourceId` | `{ transcript, shotSummary }` |
+| `shorts` | `[sourceId, shortId]` | `{ spec: ShortSpec, clipId, state }` |
+| `plans` | `clipId` | `{ plan, opLog }`, V6.2 (§40.8) with V6.9's log |
+| `assets` | `assetId` | V6.8 |
+| `creatorMemory` | `"current"` | V6.10 |
+| `queue` | `queueIndex` | V6.10 |
+
+The `clips` record gains `sourceRef: Option<SourceId>` and `assembly: Option<Assembly>`, both default `None`, which reads as "this clip owns its file", so a V5 record is valid unchanged.
+
+**Eviction (§23.3 addition).** A source and all its shorts count as one entry against `MAX_RECENT_CLIPS`. `ensureFree` deletes a source's `pcm16.f32` first, then the `source` file of a source all of whose shorts are exported, keeping transcript, shorts and plans so that a re-dropped file with an equal `sourceHashPrefix` resumes without re-transcribing. A short's export is evicted before its source.
+
+### 43.5 Audio in windows
+
+The clip path's `decodeAudio` allocates the whole duration. The long path does not:
+
+```ts
+// workers/media/audio-decode.ts, additions; decodeAudio stays
+export function decodeAudioRegion(handle: FileSystemSyncAccessHandle, info: SourceInfo, from: SourceMs, to: SourceMs,
+                                  onChunk: (mono: Float32Array, at: SourceMs) => void,
+                                  isCancelled: () => boolean): Promise<void>;
+export function writeWholePcm16(sourceId: SourceId, info: SourceInfo, onProgress: (done: DurMs) => void,
+                                isCancelled: () => boolean): Promise<void>;   // decode → resample → append to pcm16.f32
+```
+
+- `decodeAudioRegion` starts at the audio sample whose time is at most `from - AAC_PREROLL` (`AAC_PREROLL = 100 ms`, assumption), decodes forward, and hands chunks of at most 10 s. Peak audio memory on the long path is under 50 MB (assumption, TE-14). **Learned from Tooscut's `audio-render.worker.ts`:** decode only the regions that are needed, in windows. Our code, our types; §54.
+- **Sample-rate correction.** If a decoded chunk's rate differs from the container's (HE-AAC commonly reports half), the region continues at the decoded rate and the resampler is rebuilt. The clip path's `decodeFailure("SampleRate")` stays as it is; TE-12 decides whether to bring the correction to the clip path through §41.4.
+- `pcm16.f32` is read by windows from OPFS, never held whole in memory.
+
+### 43.6 Transcription in checkpointed windows
+
+```ts
+// workers/asr/whisper-runtime.ts, addition; transcribe stays
+export function transcribeWindows(windows: AsyncIterable<AsrWindowInput>, onWindow: (done: number, total: number) => void,
+                                  onResult: (w: AsrWindowResult) => Promise<void>, isCancelled: () => boolean): Promise<void>;
+export type AsrWindowInput = { index: number; startMs: SourceMs; pcm16: Float32Array };
+```
+
+- Windows are the existing `ASR_WINDOW_S = 30` and `ASR_OVERLAP_S = 5`, so a 20-minute file is 48 windows (`1200 ÷ 25`). Merging uses the same `mergeWindows`.
+- After each window the result is written to `sourceTranscripts`. A resume reads which windows exist and starts at the next. The merge runs when all exist.
+- `normalize_transcript` runs once on the merged words and gives the **master transcript**: `Transcript` with `SourceMs` numerically in its `TimeMs` fields. It is never given to the scene (§44.4).
+- **Sentence quality.** The Director selects by sentence (§45), so `sentences.rs` now carries weight it did not have. V6.1 adds `sentences_long.rs` over the long corpus: no sentence longer than `MAX_SENTENCE_MS = 25 s` (assumption, E-12), split at the longest pause inside otherwise.
+
+**Time budget.** On D1 the small-size model reads 80 s for a 60 s clip, about 21-27 minutes for 20 minutes of speech (derived, unmeasured at this length). TE-18 reads it. **Two-pass seam (only if TE-18 says so):** a base-size model over the whole file, with the small-size model re-run on the chosen parts, behind `AsrPass` in `run-source-pipeline.ts`. This adds a second manifest entry and a re-anchoring step; it is not built unless the budget fails.
+
+### 43.7 Staying alive
+
+| Threat | Answer | Test |
+|---|---|---|
+| The screen sleeps | `navigator.wakeLock.request("screen")` while a source job runs; re-acquired on `visibilitychange`; released at end, on pause and on cancel | `long-resume.spec.ts` |
+| The laptop sleeps or the tab is discarded | Checkpoints: at most one ASR window and one short's render are lost | `long-resume.spec.ts`, kills the tab mid-run |
+| The tab is hidden | Workers keep running under Chrome's rules; TE-20 reads throttling. The copy advises "Keep this tab open" | TE-20 |
+| A worker or GPU device dies | `pool.ts` restart budget (§14.3) per window; `E_ASR_DEVICE_LOST` falls back to `wasm` once | `failure-recovery.spec.ts` |
+| Reload mid-job | `start-app.ts` finds a `sources` row with `stage` below `shorts_ready` and shows "Continue your video" | `long-resume.spec.ts` |
+| The source was evicted | The row stays; "Drop the same file to continue" compares `sourceHashPrefix` | `long-resume.spec.ts` |
+
+Progress also goes into `document.title` ("42% - Offcut"), so a hidden tab shows it. No notification permission is requested.
+
+### 43.8 The source machine
+
+`state/machines/source-machine.ts`, under the same `transition()` rule as the other four (INV-16):
+
+```text
+idle → probing → gated_signin? → copying → extracting_audio → transcribing → scanning(V6.5) → directing(V6.4)
+     → preparing_shorts → shorts_ready
+any working state → paused (wake lost, user pause) → the state it left
+any working state → cancelled | failed
+```
+
+The clip machine is not changed. Opening a short loads it as a clip (§45.7).
+
+### 43.9 Errors and copy
+
+`E_SOURCE_COPY`, `E_SOURCE_AUDIO`, `E_SOURCE_ASR_STALLED`, `E_SHORTS_QUOTA` join `ErrorCode` and `messages.ts`, each with a `.persistent` variant (`check-copy-codes.mjs`). Every string comes from `messages.ts` (INV-15).
+
+**Acceptance (V6.1).** `route_probe.rs` (one case per rule, and rule 1's exact equality with `validate_probe` on every existing fixture); `demux_fixtures.rs` (hvcC); `audio_region.rs`; `route_long.spec.ts`; `high-res.spec.ts`; `long-resume.spec.ts`; `flags_identity.spec.ts`. Peak memory read on a 20-minute 4K file. TE-17, TE-18, TE-20, TE-21 recorded.
+
+---
+
+## 44. The Assembly: One Short Is One Virtual Clip (V6.3)
+
+**Model: a short is a virtual clip. An `Assembly` lists the parts of the source file that make it, in play order. The virtual clip has its own continuous `TimeMs` from 0, its own `pcm48`, its own transcript and its own plan. Everything downstream (detect, plan, cuts, `TimeMap`, `assemble`, scene, preview, export, cache) sees an ordinary clip. Only the two places that read the file ask the `Assembly` where a moment really is. Rejected: stretching `TimeMap` to reorder (its contract is ascending source time, `to_out` is single-valued, and every consumer relies on both), a new timeline type through the scene (a rewrite of proven code), rendering each part and concatenating files (a re-encode per part, no captions across joins).**
+
+This is the design that keeps the founder's rule. Moving a hook to the front, which would have broken `TimeMap`, costs nothing here, because the virtual clip's time still only goes forward.
+
+### 44.1 Three clocks
+
+| Clock | Type | Meaning | Converted by |
+|---|---|---|---|
+| Source | `SourceMs` (new, `units.rs`) | A position in the long file | `Assembly` only |
+| Recording | `TimeMs` (existing) | A position in the clip. For a dropped clip this is the file; for a short, the virtual clip | `Assembly`, `TimeMap` |
+| Program | `OutMs` (existing) | A position in the export | `TimeMap` only |
+
+For a dropped clip the `Assembly` is `Assembly::whole(duration)`: `SourceMs` and `TimeMs` are numerically equal, exactly as `TimeMs` and `OutMs` are under the identity map. **There is no `From` between any two.**
+
+### 44.2 Type
+
+```rust
+// offcut-types/src/assembly.rs  [ONLY]
+pub struct SourceSpan { pub start: SourceMs, pub end: SourceMs }          // non-empty
+pub struct Part { pub src: SourceSpan, pub role: PartRole }
+pub enum PartRole { Whole, Hook, Setup, Body, Payoff, Cta }               // for the review list and the LLM's reasons
+pub struct Assembly { parts: Vec<Part> }                                  // private
+pub struct SourcePos { pub at: SourceMs, pub part: u32 }
+
+impl Assembly {
+    pub fn whole(duration: DurMs) -> Assembly;
+    pub fn from_parts(parts: Vec<Part>, source_duration: DurMs) -> Result<Assembly, AssemblyError>;
+    pub fn is_whole(&self) -> bool;
+    pub fn duration(&self) -> DurMs;                                      // the sum of the parts
+    pub fn to_source(&self, t: TimeMs) -> SourcePos;                      // clamps to the last part's end
+    pub fn to_recording(&self, s: SourceMs) -> Option<TimeMs>;            // None outside every part
+    pub fn joins(&self) -> Vec<TimeMs>;                                   // the time of each boundary, ascending
+    pub fn parts(&self) -> &[Part];
+}
+```
+
+`from_parts` refuses: no parts; an empty part; a part outside the source; two overlapping parts in any order; more than `MAX_PARTS_PER_SHORT` parts; a sum over `MAX_SHORT_DURATION`. `Serialize` writes the parts; `Deserialize` runs the same checks. **Order is free; overlap is not**, so `to_recording` stays single-valued.
+
+### 44.3 What reads it
+
+Exactly four places, in a test-enforced list (`assembly_readers.rs`, a grep test):
+
+| Reader | Change | Identity |
+|---|---|---|
+| `workers/render/video-source.ts` (through `source-position.ts`) | `frameAt(t: TimeMs)` asks `to_source(t)` | `Assembly::whole` returns the same number |
+| `workers/render/export-loop.ts` | `recorded(pos)` then `to_source`; the file's frame index comes from the source time | Same |
+| `usecases/prepare-short.ts` | Decodes the regions into `pcm48` | Not used for dropped clips |
+| `crates/offcut-wasm-render/src/scene_api.rs` | Hands `assembly.joins()` to the scene as `join_points` | Empty for `whole` |
+
+**Decoding across a join.** A jump needs a decoder restart at a keyframe. Export is already blocking and needs nothing new. **Preview must not stall:** `video-source.ts` keeps a second decode session (`#next`, at most two alive) that starts `JOIN_LEAD = 2 s` before a join at `keyframe_at_or_before(next part's start)`, and swaps at the join. At most two decoders exist at once per slot. Measured by `preview-sync.spec.ts`'s new join case: no gap above the late-frame budget across a join on the reference fixture, and TE-22 on 4K with long GOPs. **Learned from Tooscut's `frame-renderer.worker.ts`:** request frames per source in ascending time and keep one iterator per contiguous run (§54).
+
+### 44.4 Rebased transcript
+
+```rust
+// offcut-text/src/rebase.rs  [ONLY]
+pub fn rebase_transcript(master: &Transcript, assembly: &Assembly, ranges: &[SentenceRange]) -> Transcript;
+```
+
+For each part in play order, takes its words, keeps their text and confidence, and shifts their times onto the virtual clip's clock. It re-runs `normalize_transcript`'s sentence and number passes on the result, so `numbers` and `sentences` are valid for the clip, and a number spoken across a boundary is not joined (a `join_points` check). The output obeys every invariant a `Transcript` has. `WordIdx` is the clip's own. `model_version` is copied. **So `detect`, `from_rules`, `/plan`, `validate`, `build_scene` and the review editor take it unchanged.**
+
+### 44.5 Audio of a short
+
+```rust
+// offcut-dsp/src/regions.rs  [ONLY]
+pub fn concat_parts(chunks: &[&[f32]], rate: Hz, xfade: DurMs) -> Vec<f32>;
+pub const JOIN_XFADE: DurMs = DurMs::new(30);      // (assumption, V6.3) equal-power
+```
+
+`prepare-short.ts`: for each part, `decodeAudioRegion` into a 48 kHz buffer; `concat_parts`; pad or trim by at most one sample so `pcm48.len() == round(assembly.duration × 48)`. Then the existing stages run: `runChain` → `out48` (INV-10 holds on the virtual clip) → `measureProsody` → `silence_profile` → plan → `timemap::build` → `assemble` → `prog48`. One loudness target applies to the whole short, so parts recorded at different levels do not jump. **`assemble` is unchanged by this section.**
+
+**Part edges.** A part extends `PART_LEAD = 120 ms` before its first word and `PART_TAIL = 200 ms` after its last word, never past the neighbouring sentence's word (assumptions, E-12). The `Cut` rules then treat lead-in and tail as usual.
+
+### 44.6 Cuts and non-identity maps (the old V6.2 scope, unchanged)
+
+`Cut` arms, `timemap::build` with silence snapping, `assemble` splices with cross-fades, jump-cut alternation, the cuts list with restore and the filler switch all ship in this release as §40.1, §40.6 and §40.10 specify, for dropped clips and for shorts alike. `set_scene` stops refusing a non-identity map (DC-5).
+
+**Video at a join.** A short's `join_points` get the same jump-cut punch-in alternation as a `Cut` by default. V6.8 adds real transitions there.
+
+### 44.7 Render cache and restore
+
+The cache key's canonical JSON gains `assembly` and, for a short, `sourceHashPrefix` of the source instead of the clip's. With `Assembly::whole` the key's field is omitted, so a V5 key stays valid. `restore-clip.ts` loads a short by its `clips` row, opening `sources/<sourceRef>/source`.
+
+**Acceptance (V6.3).** `assembly.rs` (every refusal, round trip, property: `to_recording(to_source(t).at) == t`); `assembly_readers.rs`; `rebase.rs`; `regions.rs` (no click across a join; length exact); `stitched.spec.ts`: a fixed `Assembly` with three parts out of order over the 60 s fixture, exported, passes checks 1-11 with the expected duration, and every white marker frame comes from the source time it should; `cuts_applied.spec.ts`; all §41.1 proofs unchanged.
+
+---
+
+## 45. The Director: From a Long Video to a List of Shorts (V6.4)
+
+**Model: one LLM request per source reads the master transcript by sentence and returns a `ShortsPlan`: which sentences make each short, in what order, and why. A validator checks it like a plan. Each accepted short becomes a virtual clip, then gets its own ordinary `/plan`. If the service fails, local rules produce a smaller list, so no job dead-ends. Rejected: one giant call that also writes every short's visuals (a 180 kB word-level body breaks INV-4's 64 kB, and a failed part loses everything), word-level selection (allows the mid-sentence cuts users complain about in other tools), a virality score (unverifiable; `why` is shown instead).**
+
+### 45.1 Types
+
+```rust
+// offcut-types/src/source.rs
+pub struct ShortId(u32);                                     // index in the validated list
+pub struct SentenceRange { pub start: SentenceIdx, pub end: SentenceIdx }  // half-open
+pub enum ShortStyle { Hook, Story, Listicle, Explainer, Quote, Reaction, Trivia }
+pub struct ShortDraft { pub title: Label, pub style: ShortStyle, pub parts: Vec<PartDraft>, pub why: Label }
+pub struct PartDraft { pub sentences: SentenceRange, pub role: PartRole }
+pub struct ShortsPlan { pub format: u16, pub source: PlanSource, pub shorts: Vec<ShortDraft> }   // SHORTS_FORMAT = 1
+pub struct ShortSpec { pub id: ShortId, pub title: Label, pub style: ShortStyle, pub why: Label,
+                       pub assembly: Assembly, pub ranges: Vec<SentenceRange> }
+```
+
+`source` is set by the server or the rules producer, never by the model, as for `EditPlan`.
+
+### 45.2 Request
+
+```rust
+// offcut-api-types/src/ai.rs
+pub struct ShortsRequest { pub duration: DurMs, pub sentences: Vec<ShortsSentence>, pub shots: Vec<ShotLine>,
+                           pub memory: Option<CreatorMemorySummary>, pub want: u8 }
+pub struct ShortsSentence { pub text: String, pub start: SourceMs, pub end: SourceMs,
+                            pub energy_z: f32, pub pause_before: DurMs }
+pub struct ShotLine { pub start: SentenceIdx, pub kind: ShotKind, pub face: FacePos }   // §46; empty until V6.5
+```
+
+Size: 20 minutes at 200 words a minute is 4,000 words, about 24 kB of text; about 300 sentences at about 40 B each is 12 kB; 100 shot lines at 16 B is 1.6 kB; the total is under 40 kB, inside INV-4's 64 kB. `no_media_routes.rs` keeps passing. **A body above the limit is trimmed by the client:** shot lines first, then `energy_z`; a test proves a 20-minute worst case fits.
+
+Prosody here is per sentence (`energy_z` averaged), read cheaply from `pcm16`; the word-level pass stays per short.
+
+### 45.3 Route
+
+| Item | Value |
+|---|---|
+| Route | `POST /api/v1/shorts`, bearer **required**, 64 kB, 6/min per user |
+| Response | `ShortsResponse { plan: ShortsPlan, long_videos_remaining: Option<u32> }`, at most 32 kB |
+| Errors | `E_SHORTS_QUOTA` (429), `E_PLAN_UNAVAILABLE` (502/504, or at the spend cap §52), `E_PLAN_INVALID` (502 after one retry) |
+| Timeout | `SHORTS_UPSTREAM_TIMEOUT = 60 s` (assumption, TE-15), client 75 s |
+| Storage and logs | As §40.7: body never stored or logged; `log_redaction.rs` gains the route |
+| Prompt | `offcut-plan::shorts_prompt` (feature `prompt`), snapshot-tested with `SHORTS_PROMPT_VERSION` |
+| Retry of a source | A second call for the same `sourceHashPrefix` in a month does not use another grant (the client sends the prefix's hash; the server keeps `(user, month, prefix_hash)`), so a failed run is not charged twice |
+
+**Why sign-in is required.** PS §10 keeps the AHA before sign-in for clips. A long video costs the user 30 minutes and costs money per call, and a limit must be shown before the work (PS §8 principle 5). So the long path gates at the drop (`gated_signin`), not after the transcript. Anonymous users keep the whole clip path.
+
+### 45.4 What the prompt asks for
+
+Generated text, in `shorts_prompt.rs`, snapshot-tested. Its content rules:
+
+1. Choose moments that stand alone for a viewer who never saw the video. A short opens with a hook in its first sentence, delivers one idea, and ends on a payoff. Do not end on a setup.
+2. Prefer whole thoughts over a fixed length. Target 30-60 seconds; allow 15-90.
+3. A short may join up to 4 runs of sentences from anywhere in the video when that makes one complete point: a claim from minute 3 with its proof from minute 8. Do not join sentences whose meaning changes when moved. Do not create a claim the speaker did not make.
+4. A hook may be moved to the front only if it still means the same out of its place.
+5. Vary the styles. Do not reuse a sentence across shorts unless asked.
+6. Give each short a short title and a one-line reason a person can read.
+7. Skip intros, sponsor reads, "like and subscribe", and sections that lean on on-screen visuals the words do not explain (the shot lines show these).
+
+### 45.5 Validation
+
+```rust
+// offcut-plan/src/shorts.rs  [ONLY constructor of ShortSpec]
+pub fn validate_shorts(plan: ShortsPlan, t: &Transcript, cfg: &ShortsConfig) -> Result<(Vec<ShortSpec>, Vec<DroppedShort>), ShortsRejected>;
+```
+
+| # | Rule | On failure |
+|---|---|---|
+| S-1 | `format == SHORTS_FORMAT` | Whole plan rejected; rules producer |
+| S-2 | Every `SentenceRange` is inside the transcript and non-empty | Short dropped |
+| S-3 | **Parts are made of whole sentences**, by type, so no cut can land mid-sentence | Structural |
+| S-4 | `MIN_SHORT_DURATION <= total <= MAX_SHORT_DURATION`; at most `MAX_PARTS_PER_SHORT` | Short dropped |
+| S-5 | Parts of one short do not overlap | Short dropped |
+| S-6 | Two shorts share at most 20% of their duration (assumption, E-12) | The later is dropped |
+| S-7 | A `Label` passes V-4: length limit, every digit run in it was spoken in that short's sentences | Label replaced by the short's first words; short kept |
+| S-8 | A short has at least `MIN_WORDS_PER_SHORT = 25` words (assumption) | Short dropped |
+| S-9 | At most `MAX_SHORTS_PER_SOURCE`, in the plan's order | Later dropped |
+| S-10 | Fewer than `MIN_SHORTS_PER_SOURCE` survive | The rules producer tops up the list, marked as such |
+
+`ShortSpec` has no public constructor besides this function (INV-25, `tests/ui.rs`).
+
+### 45.6 The rules producer
+
+`offcut-plan::shorts_from_rules(&Transcript, &[DetectedEvent], &[ShotLine]) -> ShortsPlan` gives the offline answer with the rules' honesty: single runs of sentences (no joins, no reorder) of 25-75 s that contain a detected list, a number or a from-to, or the highest mean energy, ranked, at most 5, labelled "Picked without AI". Deterministic and unit-tested. It is used when the request fails, is over the cap, or is refused. **A failed plan service never blocks a long video (INV-24 extended).** A signed-in Free user over the monthly grant is told before the job starts; the rules producer does not replace a spent grant silently.
+
+### 45.7 From specs to ready shorts
+
+```text
+usecases/run-source-pipeline.ts
+  probe → gate → copy → pcm16 → windowed ASR → master transcript → [V6.5 coarse vision]
+  → request-shorts.ts → validate_shorts → for each ShortSpec in order: prepare-short.ts
+usecases/prepare-short.ts (one short)
+  rebase_transcript → decodeAudioRegion×parts → concat_parts → runChain → measureProsody → silence_profile
+  → detect → request-plan.ts (existing, per short, or rules) → validate → timemap::build → assemble → store
+  → poster frame → state = ready
+```
+
+- Shorts prepare in order, and each appears in the list as it finishes, so the user can start reviewing the first one while the rest prepare.
+- `audio.worker` runs one at a time. ASR is unloaded before any render session (INV-12). The list needs posters only; a render session opens when a short is opened.
+- Preparing does not render or encode. **Only what the user keeps is encoded.**
+
+### 45.8 Reviewing and exporting
+
+| UI | Behaviour |
+|---|---|
+| `ui/pages/ShortsPage.tsx` | The list: poster, title, length, parts count, reason. Keep or delete; "Open" |
+| Opening a short | Loads it as a clip into the existing editor (`clip-machine`, `EditorLayout`). Everything from V4-V5 works: words, toggles, style, undo, export. A "Back to all shorts" link is the only addition to that page |
+| Parts list (in `CutsSection`) | Each part with its text and role; delete a part; restore a deleted one. The user cannot type a new range before V6.9 (chat). Deleting a part rebuilds the virtual clip without re-requesting the plan: the plan's items outside it are dropped by V-3 |
+| `usecases/export-shorts.ts` | "Export kept shorts": sequential, one `start-export` at a time, each with its own `ExportId`, each counted as one export. Free users see "3 exports left" before the click (INV-14). A failure skips to the next and reports at the end |
+| Downloads | One file per short through the existing download path (`offcut-<yyyymmdd-hhmm>-<n>.mp4`). No zip at launch |
+
+### 45.9 Analytics (enum and count properties only)
+
+`long_source_accepted { duration_bucket, resolution_bucket, codec }`, `source_stage_timing { stage, ms_bucket }`, `director_result { source, outcome, shorts, dropped_by_reason, joined_shorts }`, `short_action { action: opened | kept | deleted | part_deleted | exported, style, parts_bucket }`. `export_done` gains `from_short: bool`. The E-12 and E-13 readings need these.
+
+**Acceptance (V6.4).** `shorts.rs` (one case per rule), `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts` (each failure kind ends in a usable list), `long-to-shorts.spec.ts`: a 12-minute fixture with a fake provider goes to 5 exported shorts, each passing all 11 checks. E-13 instrumentation live.
+
+---
+
+## 46. Vision: Local Signals and Face-Tracked Framing (V6.5)
+
+**Model: small local models give the LLM and the framing code facts as text and numbers. No frame leaves the device. Rejected: sending frames to the provider (the founder's decision of 2026-11-02; it changes the privacy promise, kept as a possible later opt-in only if E-13 shows clip choice needs it), a local caption model (a large download and unmeasured speed for little gain on talking-head footage), speaker diarization (one speaker at launch).**
+
+### 46.1 Two passes
+
+| Pass | When | Reads | Gives |
+|---|---|---|---|
+| **Coarse**, whole source | After ASR, before the Director | Keyframes only, at most 1 per 3 s (`COARSE_STEP`, assumption). A long GOP gives fewer | `ShotSummary`: shot boundaries, kind, face presence |
+| **Fine**, per short | In `prepare-short.ts` | Decoded frames at `FACE_FPS = 5` (assumption, TE-23) over the short's parts | `FramePath` |
+
+**Frame hand-off.** `media.worker` decodes and scales to at most 320 px on the long side, and transfers `ImageBitmap`s through the main hub to `asr.worker` (no worker-to-worker channel, §36).
+
+### 46.2 Models
+
+| Model | Purpose | Runtime | Size limit |
+|---|---|---|---|
+| Face detector (candidates decided by TE-23: YuNet or a BlazeFace-class ONNX export) | Face boxes | ONNX Runtime already shipped; `workers/asr/vision-runtime.ts` | At most 5 MB |
+
+Shot boundaries and kinds need no model: a luma histogram difference for boundaries (`offcut-vision::shots`), and rules over face presence and edge density for `ShotKind`. **A licence check is part of TE-23;** the licence is recorded in `docs/` and in `model-manifest`. Downloads are verified as for the ASR model (INV-20) from the same asset host, so the host list does not change.
+
+### 46.3 Types
+
+```rust
+// offcut-types/src/vision.rs
+pub enum ShotKind { TalkingHead, ScreenWithFace, Screen, Footage }
+pub enum FacePos { None, Left, Centre, Right }
+pub struct Shot { pub start: SourceMs, pub end: SourceMs, pub kind: ShotKind, pub face: FacePos }
+pub struct ShotSummary { pub shots: Vec<Shot> }                 // at most MAX_SHOTS = 400; merged beyond it
+
+// offcut-types/src/frame_path.rs  [ONLY]
+pub struct FrameKey { pub at: TimeMs, pub cx: f32 }             // centre of the crop, 0.0..=1.0 of source width
+pub struct FramePath { keys: Vec<FrameKey> }                    // private; made by offcut-vision or FramePath::none()
+impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub fn cx_at(&self, t: TimeMs) -> Option<f32>; }
+```
+
+### 46.4 Tracking
+
+`offcut-vision::tracking::build_path(faces: &[FaceSample], shots: &[Shot], joins: &[TimeMs]) -> FramePath`, pure, deterministic and native-tested:
+
+- **Dead zone:** the crop holds still until the face leaves the middle `DEAD_ZONE = 30%` of the crop (assumption, E-2). A locked shot looks shot; a jittery one does not.
+- **Smooth, then ease:** one-euro filter on the face centre; moves use `ease_in_out` over at least `MIN_PAN = 400 ms`.
+- **Hard reset at a shot change or a join:** the crop jumps with the cut and does not pan across it.
+- **Lost face:** hold for 2 s, then ease to the last confident position; a shot with no face holds the shot's centre.
+- **Limits:** the crop stays inside the source; `cx` is clamped.
+
+### 46.5 Scene and user control
+
+`SceneInput` gains `frame_path: &FramePath`. `framing.rs`: with `is_none()`, V5's crop, which keeps every golden (DC-9). Otherwise `Video.src` centres at `cx_at(recording(t))` plus the user's `crop_offset` as a shift. Dragging still works, so a wrong track is fixed by hand. A portrait source takes no path. A `screen` or `footage` shot on landscape uses the shot's centre until V6.8's layouts.
+
+**A 4K source helps here.** A vertical crop of 3840 × 2160 is 1215 px wide before scaling to 1080, so face-tracked 4K stays sharp; a 1080p crop is upscaled from 607 px. The review shows a one-time note: "Filmed in 4K? Use the 4K file for a sharper short."
+
+**Acceptance (V6.5).** `shots.rs`, `tracking.rs` (table of paths: still face, walking face, cut, lost face), `vision_summary_prompt.rs` (the lines reach the prompt within budget), `framing.rs` (none equals V5), `vision-pass.spec.ts`. Reads: coarse pass under 3 minutes on a 20-minute file; fine pass under 20 s per 60 s short on D1 (assumptions, TE-23). TE-23 recorded.
+
+---
+
+## 47. The Catalog at Launch (V6.2, V6.6, V6.7, V6.8, V6.11)
+
+`CATALOG_VERSION` bumps with each release's kinds. Codes stay in catalog order (§40.2). Every kind has a draw function, at least one golden per style, and `catalog_complete.rs` proves it. `EventKind` in `events.rs` is the code's name for the §40.2 `ItemKind`.
+
+| Release | Kinds | Notes |
+|---|---|---|
+| V4 | `NumberReveal`, `ListReveal`, `FromTo`, `KeywordPop` | Built |
+| V6.2 | `Emphasis`, `IconPop`, `PunchIn`, `Emoji` | `DrawCmd::Image` first used here, for raster emoji and icons from a closed bundled set (licence recorded) |
+| V6.6, part A | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus` | The cards shorts use most, first |
+| V6.6, part B | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Kept by the founder |
+| V6.6, part C | Kinetic `CaptionMotion` rows, per-glyph animation | Data in `StyleSpec` plus `MotionPreset` arms |
+| V6.6, part D | `ShapeFrame`, `Transition` (shape wipes at topic shifts) | First use of `Video.mask`; kept by the founder. §41.4's cost trigger applies here by name |
+| V6.6, part E | `HookTitle`, `ProgressBar`, `EndCard` | `EndCard` adds a `Hold` |
+| V6.7 | `SoundCue { at: WordIdx, sound: SoundId }` | A closed bundled set if TE-16 passes |
+| V6.8 | `Broll { anchors, asset: AssetRef, fit: Cover \| Contain \| Pip, keep_audio: bool }`, `JoinTransition { after_part, kind: Dissolve \| Whip \| SlideUp }`, `Layout { from_word, kind: FollowFace \| ScreenAndFace \| Full }` | Non-text assets only from the asset box |
+| V6.11 | `TextBehind { anchors, text: Label }`, `Background { from_word, background: BackgroundRef }` | Gated by TE-25 |
+| Post-launch | `ChapterMarker`, `LowerThird` | PS §21 item 15 |
+
+**Limits per short** (`max_per_clip`, assumptions, E-11): `HookTitle` 1, `EndCard` 1, `Broll` 6, `SoundCue` 8, `TextBehind` 2, `Background` 1, `QuoteCard` 2, `Versus` 2. **Density rule (V-9, new, model plans only):** at most one visual item in any 2.5 s window, excluding emphasis in captions (assumption, E-11), so an AI plan cannot make a short look busy. Rules plans are exempt, which keeps their frames as they are (§41.1).
+
+**Prompt additions (V6.2 onward).** The prompt tells the model what a finished short looks like, in generated text: open with a hook title only if the first sentence does not already hook; punch in on the sentence's key claim; never stack two visuals; end on the payoff, not a call to action, unless the speaker asks for one. `catalog_snapshot.rs` covers all of it.
+
+### 47.1 Sound (V6.7)
+
+Music, ducking and bed values are §40.6, unchanged. Sound cues are short bundled sounds mixed in `assemble` after ducking at `SFX_LEVEL = -18 dB` (assumption, E-2). `assemble`'s `MusicInput` becomes part of a `MixInput { music, sounds, broll_audio }`, and `MixInput::none()` is the identity (`program_identity.rs` unchanged).
+
+---
+
+## 48. Layers: B-roll, Asset Box, Transitions, Split Layout (V6.8)
+
+**Model: a frame's display list may hold several `Video` commands from several sources, drawn in list order with Vello runs between them. Assets are user files stored locally, labelled by the user. The plan, and later chat, places them by pointing at words. Rejected: stock footage at launch (the founder's decision of 2026-11-02: licences, a server search route, a new browser host), a timeline for placing them (PS §8 principle 3), a second compositor (one list, one renderer).**
+
+### 48.1 Slots and sources
+
+```rust
+// offcut-scene: VideoSlot (§40.5 reserved this)
+pub enum VideoSlot { Main, Asset(AssetSlot), Matte }      // Matte: V6.11
+pub struct AssetSlot(u8);                                  // at most MAX_ASSET_SLOTS = 1 live per frame
+// offcut-render
+pub struct VideoSources<'a> { pub main: (&'a VideoFrame, Rotation), pub asset: Option<(&'a VideoFrame, Rotation)>,
+                              pub matte: Option<&'a VideoFrame> }
+```
+
+- `Scene::source_at(t)` keeps its signature for `Main`. New `Scene::asset_at(t) -> Option<(AssetRef, AssetTime)>` tells the loops what else to fetch.
+- **At most three decoders run at once** (`Main`, one asset, one matte), plus a join's lead decoder on `Main`. An asset that starts soon gets its decoder `JOIN_LEAD` ahead. Tested at the budget on D1, then R1 in V9.
+- **Learned from Tooscut's `RenderFrameTask.textureRequests`:** each frame states which sources and times it needs; the worker groups them by source. Ours sits behind `Scene::asset_at`, and the frames stay `VideoFrame`s (§54).
+
+### 48.2 Compositor
+
+`composite.rs` gets two paths:
+
+```text
+is_simple_list(list)      // the D-133 rule: one Video, first, Main, opaque, no mask, no Image
+  → the existing path, byte for byte (DC-8)
+otherwise
+  → walk the list: a run of Vello commands renders into a texture (reused; at most RUNS_PER_FRAME = 4, assumption);
+    each Video draws with its dst, opacity and mask; results composite in order
+```
+
+Masks (V6.6 part D) and mattes (V6.11) use the same path. `golden_frames.rs` adds cases; existing ones stay untouched. The heaviest list must hold the `frame_at` and render budgets on D1, or the kind is dropped through §41.4.
+
+### 48.3 Transitions at joins
+
+`JoinTransition` overlaps the two sides around `join_points[n]`, half its length on each side, using a `boundary` and an outgoing and incoming role. **Learned from Tooscut's `CrossTransitionRef`.** Because the virtual clip has no frames past a part's end, `prepare-short.ts` extends the `Assembly` with **handles**:
+
+```rust
+pub struct Part { pub src: SourceSpan, pub role: PartRole, pub handle: DurMs }   // #[serde(default)]: zero
+```
+
+A handle is frames available past `src.end`, at most `MAX_HANDLE = 500 ms`, read only for a transition. The audio keeps `JOIN_XFADE` regardless. Kinds: `Dissolve`, `Whip` (a blur and slide), `SlideUp`. **Text and captions never slide with the video**; they are laid out in program time, above it. Tooscut's transitions move only media, and for us that is correct.
+
+### 48.4 Layouts
+
+`Layout` (see §47) changes `Video` commands, not modes: `ScreenAndFace` puts two `Video { Main }` commands in the list with different `src` and `dst`, from the same decoded frame; the top shows the screen region, the bottom the face crop. The regions come from `Shot` and `FramePath`. `Full` shows the whole landscape frame fitted over a blurred copy of itself, for footage shots. The blur is a pass at reduced resolution, never a per-pixel 169-sample loop.
+
+### 48.5 Asset box
+
+```rust
+// offcut-types/src/assets.rs
+pub struct AssetId(Uuid);
+pub enum AssetKind { Video, Image }
+pub struct AssetMeta { pub id: AssetId, pub kind: AssetKind, pub label: Label, pub note: Option<Label>,
+                       pub duration: Option<DurMs>, pub width: Px, pub height: Px, pub has_audio: bool, pub added_at: UnixSecs }
+pub struct AssetRef { pub id: AssetId, pub start_in_asset: DurMs }
+```
+
+| Rule | Value |
+|---|---|
+| Accepted | MP4, MOV with H.264 or HEVC; JPEG, PNG, WebP. At most 2 minutes, 2 GB, 3840 px (assumptions, E-2) |
+| Storage | `assets/<assetId>/source` in OPFS and the `assets` store. `AssetMeta` has no file name (P-11). "Clear local data" removes them |
+| Limits | At most 50 assets, 10 GB, per browser (assumptions) |
+| Label | The user types a label ("my office", "product demo") and an optional note, at most `ASSET_NOTE_CHARS = 120`. **Label and note leave the device in plan requests while the AI plan is on, and the settings table says so.** The asset's pixels and audio never do |
+| Placement by plan | The plan request lists `AssetLine { id, kind, label, note, duration_bucket }`. The model places `Broll` items pointing at words where they fit |
+| Placement by the user | From V6.9, by chat: "use my office clip when I say headquarters". Before V6.9 the review toggles what the plan placed, and offers "Place again" |
+| Audio | `keep_audio` is off by default; speech stays on top, ducked like music |
+| Failure | A missing asset drops the item (V-2), and the review says so |
+
+**Acceptance (V6.8).** `composite.rs` (simple path identical), `layers_goldens` (B-roll cover, contain, picture-in-picture, split, full), `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`, verifier 11/11 on an export with B-roll and transitions, memory read at three decoders (TE-14 re-read).
+
+---
+
+## 49. Chat Editing (V6.9)
+
+**Model: chat is a typed client over the plan. The model reads the request and returns a list of closed operations; the client validates and applies them locally; the preview updates at once. No operation contains a timestamp or a shown number. Rejected: the model returning a whole new plan (a small request could silently change everything), free-form scripts (unverifiable), a server-side edit state (P-1).**
+
+### 49.1 Operations
+
+```rust
+// offcut-types/src/plan_ops.rs  [ONLY]
+pub enum PlanOp {
+    SetStyle { style: StyleId },
+    SetItemEnabled { id: EventId, enabled: bool },
+    RemoveItem { id: EventId },
+    AddItem { item: PlanItem },                                // the same catalog rules as any plan item
+    SetLabel { id: EventId, field: LabelField, text: Label },
+    SetHook { text: Option<Label> },
+    RestoreCut { key: CutKey },
+    CutWords { range: WordRange },                             // user-asked: must be whole sentences or a filler run
+    SetFillerCuts { on: bool },
+    RemovePart { part: u32 },
+    AddSentences { range: SentenceRange, position: u32 },       // from the master transcript; shorts only
+    MovePart { from: u32, to: u32 },
+    SetMusic { on: bool, energy: Option<MusicEnergy> },
+    PlaceAsset { asset: AssetId, words: WordRange, fit: BrollFit },
+    RemoveAsset { id: EventId },
+    SetLayout { from_word: WordIdx, kind: LayoutKind },
+    SetCaptionPosition { snap: CaptionSnap },
+    SetBrandKit { on: bool },
+}
+pub struct ChatReply { pub ops: Vec<PlanOp>, pub message: Label /* at most 200 chars */, pub needs_clarifying: bool }
+```
+
+`Label` here is V-4's type, so its digit rule applies: a digit the speaker did not say is refused.
+
+### 49.2 Applying
+
+```rust
+// offcut-plan/src/plan_ops.rs  [ONLY]
+pub fn effective_plan(base: &EditPlan, ops: &[PlanOp]) -> EditPlan;     // pure
+pub fn validate_ops(ops: &[PlanOp], ctx: &OpContext) -> Vec<OpVerdict>;  // each op: applied or refused with a reason enum
+```
+
+- The stored plan never changes. `EditState` gains `plan_ops: Vec<PlanOp>` (`#[serde(default)]`), so the existing history (`history.ts`, 50 steps) gives chat undo at no extra cost: one chat message is one undo step.
+- Everything downstream reads `validate(effective_plan(base, ops), ...)`. INV-21 holds: **chat cannot put anything on screen that the validator has not returned.**
+- An op that changes parts (`RemovePart`, `AddSentences`, `MovePart`) rebuilds the `Assembly` and re-runs `prepare-short.ts` from the audio step; the UI says "Rebuilding this short" for those only. Every other op reaches the preview through the existing `review-update` path, within the existing 150 ms budget.
+- `CutWords` is user-invented cutting, which §36 used to forbid. It is allowed here because the user asked in words, it must be whole sentences or a detected filler, and it appears in the cuts list with a restore (PS §8 principle 7).
+
+### 49.3 Route
+
+| Item | Value |
+|---|---|
+| Route | `POST /api/v1/chat-edit`, bearer required, 64 kB, 30/min per user |
+| Body | `ChatEditRequest { message: String /* at most 500 chars */, recent: Vec<ChatTurn> /* at most 6, each at most 200 chars */, words: Vec<PlanWord>, items: Vec<PlanItemSummary>, parts: Vec<PartSummary>, assets: Vec<AssetLine>, master_outline: Option<Vec<OutlineLine>> }` |
+| Response | `ChatReply`, at most 8 kB. The server parses and checks size only; the client validates |
+| Errors | `E_CHAT_QUOTA` (429), `E_PLAN_UNAVAILABLE`, `E_PLAN_INVALID` |
+| Provider | Same `PlanProvider`, `chat_prompt.rs` generated from the catalog and `PlanOp`; structured output; timeout 20 s |
+| Storage and logs | As §40.7. **Chat text is a new class of user text:** not stored on the server, never logged, never in analytics. Local history lives only in the clip's state and is cleared with it |
+
+**`master_outline`** gives the model a compact view of the whole video (one line per sentence, trimmed to fit 64 kB) for "add the part where I talk about pricing".
+
+### 49.4 Interface
+
+`ui/components/ChatPanel.tsx`, a tab beside Captions and Visuals. A text box, the conversation, and for every applied message a one-line summary with an Undo button. Refused ops are explained in plain words ("I can't show a number you didn't say"). Three starter suggestions come from `messages.ts`. **All the review controls stay;** chat is another way to do the same things, and no feature is chat-only except typed requests for new placement.
+
+**Failure.** Chat offline or over quota never blocks review: the panel shows why, and every control still works.
+
+**Acceptance (V6.9).** `plan_ops.rs` (each op: apply, refuse, undo equals before; property: `validate` output for any op list contains no unspoken number), `chat_prompt_snapshot.rs`, `chat_route.rs`, `log_redaction.rs` (marker in a chat message), `privacy-network.spec.ts` (chat on and off), `chat-edit.spec.ts` with a fake provider, edit-to-preview budget held for non-part ops.
+
+---
+
+## 50. Brand Kit, Creator Memory, Back-catalogue Queue (V6.10)
+
+### 50.1 Brand kit
+
+As §40.10's old V6.7 row: `BrandKit` (logo via `DrawCmd::Image`, colours into `Theme`, user fonts into `FontSet`), one per account, in this browser; applied to an export only when the profile is Creator (INV-9). Its golden matrix now covers every kind of §47, plus each kinetic preset.
+
+### 50.2 Creator memory
+
+The real switching cost: each edit a creator makes teaches the next plan.
+
+```rust
+// offcut-types/src/creator.rs
+pub struct CreatorMemory {                     // local only; IndexedDB `creatorMemory`
+    pub kind_kept: BTreeMap<EventKind, u32>, pub kind_removed: BTreeMap<EventKind, u32>,
+    pub style_counts: BTreeMap<ShortStyle, ShortCounts>,   // kept, deleted, exported
+    pub length_buckets: [u32; 5],                          // lengths of exported shorts
+    pub parts_buckets: [u32; 4],                           // how often joined shorts are kept
+    pub caption_style: Option<StyleId>,
+    pub cuts_restored_rate_permille: u32,
+}
+pub struct CreatorMemorySummary { /* at most 1 kB: enums and small integers only */ }
+```
+
+- **Written by** `export-short` and `short_action` use-cases, only from enums and counts already allowed in analytics. No transcript text, no labels, no titles (`creator_memory.rs` proves this by type).
+- **Read by** the Director and plan prompts as a preference block: "This creator keeps Story and Listicle, deletes Trivia; usually exports 35-50 s; removes most emoji." The validator's rules do not change.
+- **Controls:** settings shows it in plain words, with "Reset". A switch turns it off.
+- **Local means not synced.** A second browser starts fresh; sync is PS §21 item 17.
+- **Performance data** (views per short from platform APIs) is post-launch, PS §21 item 18. It is the longer-term moat and needs OAuth, which §36 excludes for now.
+
+### 50.3 Back-catalogue queue
+
+```text
+ui/components/QueuePanel.tsx          drop up to MAX_QUEUED_SOURCES files; Creator only
+usecases/manage-queue.ts              one source at a time, through run-source-pipeline.ts
+state/queue-store.ts                  order, state, estimate; `File` objects live for the tab's life
+```
+
+- A queued `File` stays an in-memory reference, not a copy. Only the running source is copied. After its shorts are prepared and the disk is short, its `source` copy is evicted (§43.4); opening a short then asks for the same file again, verified by hash prefix.
+- **A reload loses queued `File`s** (they cannot be persisted without a handle, P-11): the queue shows the finished ones and asks to drop the rest again.
+- Wake lock for the whole queue. A running estimate: "about 9 hours left on this computer." No promise of background work with the tab closed.
+- Each source uses one Director call, counted toward `CREATOR_LONG_SOFT_PER_MONTH`.
+
+**Acceptance (V6.10).** `profile.rs` brand cases; golden matrix; `creator_memory.rs`; prompt snapshot with a fixed memory; `queue.spec.ts` (three small sources, one failing: the others finish; state correct after a reload).
+
+---
+
+## 51. Person Mask: Text Behind the Speaker, Background Change (V6.11)
+
+**Model: a person-matte model runs once per short in an offline pass, and its result is stored as a low-resolution matte video. The renderer then uses it like any other source. Rejected: running the model during render or preview (INV-12, GPU contention, memory), a matte per frame in raw form (about 200 MB per minute), a green-screen look (the output must pass for shot footage).**
+
+### 51.1 The matte pass
+
+```text
+usecases/prepare-matte.ts (on demand: when a short first uses TextBehind or Background)
+  asr.worker: load person-runtime.ts (one model, TE-24)
+  media.worker: decode the short's frames at MATTE_FPS = 15 (assumption), scaled so the long side is 512 px
+  for each frame: model → alpha 0-255; temporal smoothing with a one-pole filter on the alpha (TE-25 tunes it)
+  render.worker: encode alpha as luma H.264 to clips/<clipId>/matte.mp4       // the existing encoders
+  unload the model before any render session (INV-12)
+```
+
+- **Budget:** at most 2× the short's duration on D1 (assumption, TE-24). A demo of MODNet in Transformers.js read about 20 fps on one machine (unverified here); TE-24 measures ours.
+- **Why a video:** the matte goes through `VideoSource`, so seek, preview and export need no new code, and the frame index maps as for `Main`. Tooscut has no matte; this is our design. **Rejected:** an H.264 alpha artefact worse than the model's edge would fail TE-25, and the fallback is a losslessly compressed frame file.
+- Disk: about 5 MB per minute (assumption). Evicted with the clip.
+
+### 51.2 Drawing
+
+```text
+TextBehind list:      Video{Main} → GlyphRun(hook text, large) → Video{Main, matte: Matte}
+Background list:      Video{Asset | Image | Blur of Main} → Video{Main, matte: Matte}
+```
+
+`Video` gains `matte: Option<VideoSlot>` beside `mask` (`#[serde(default)]`), with feather `MATTE_FEATHER = 1.5 px` at output scale (assumption, TE-25). The text sits over the background and behind the person because the list draws it there. **Tooscut draws all text last, above every layer, so this order is impossible in its design;** Offcut's list-order rule (§40.5) is what makes it cheap.
+
+### 51.3 Backgrounds
+
+From the asset box, or a closed set of bundled gradients. Only when the shot is `TalkingHead` and the face stays in frame. With a moving camera the plan's `Background` is refused (V-2); a static background behind a moving camera looks fake.
+
+### 51.4 The quality gate (founder, 2026-11-02: both in V6.11, gated)
+
+| Check (TE-25) | Pass | If it fails |
+|---|---|---|
+| Flicker: mean frame-to-frame alpha change in still regions, on 20 corpus shorts | At most `MATTE_FLICKER` (a value set by the labelled clips in TE-25) | Stronger smoothing; then the feature stays off |
+| Edge quality: a founder panel marks each of 20 shorts postable or not | At least 16 of 20 for text behind; at least 16 of 20 for background | **That kind's flag stays off at launch, and the founder is asked (§41.4).** One can ship without the other |
+| Budget | §51.1 on D1 | Lower resolution or `MATTE_FPS`; then off |
+
+A short whose own matte confidence is low (a mean alpha in the uncertain band above a threshold) is not offered the effect, and review says why.
+
+**Acceptance (V6.11).** `matte_goldens` (a fixed matte frame: text behind, background), `prepare-matte.spec.ts`, verifier 11/11 on an export with each, INV-12 test extended, memory read. TE-24, TE-25 recorded.
+
+---
+
+## 52. AI Provider, Cost and the Spend Cap (V6.2)
+
+**The founder's decision of 2026-11-02 changes PS A-3 for AI only:** a paid AI provider is allowed with a monthly spending cap. Hosting, database, email and storage stay on free tiers.
+
+```sql
+-- server/migrations/0002_ai_usage.sql
+CREATE TABLE ai_usage (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month   DATE NOT NULL,
+  kind    TEXT NOT NULL CHECK (kind IN ('plan','shorts','chat')),
+  count   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, month, kind)
+);
+CREATE TABLE ai_shorts_grants (
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month       DATE NOT NULL,
+  prefix_hash BYTEA NOT NULL,                -- hash of the client's sourceHashPrefix; no content
+  PRIMARY KEY (user_id, month, prefix_hash)
+);
+CREATE TABLE ai_spend (
+  month     DATE PRIMARY KEY,
+  micro_usd BIGINT NOT NULL DEFAULT 0
+);
+```
+
+`ai_usage` replaces the v1.2 `plan_usage` table name; it was never created. S-10's list gets `ai_usage` and `ai_shorts_grants`.
+
+| Quota | Anonymous | Free | Creator |
+|---|---|---|---|
+| Plans (`/plan`) | 3 per day per network | 40 per month | 1,000 per month soft, blocked at 3× |
+| Long videos (`/shorts`) | Not available | 1 per month | 200 per month soft, blocked at 3× |
+| Chat (`/chat-edit`) | Not available | 20 per month | 1,000 per month soft, blocked at 3× |
+
+All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLANS_PER_MONTH` rises from 30 to 40 so that one long video's ten per-short plans leave room for ordinary clips.
+
+**The cap.**
+
+| Item | Value |
+|---|---|
+| `AI_MONTHLY_CAP_USD` | Render environment; the founder sets it; starting value 50 |
+| Counting | After each provider call: `input_tokens × price_in + output_tokens × price_out`, prices in config, added to `ai_spend` |
+| At 80% | One warning in the server log (a status line, no content) |
+| At 100% | Every AI route answers `E_PLAN_UNAVAILABLE` until the next month; clients fall back to rules (INV-24). Chat says so. **The founder can raise the cap in a redeploy** |
+| Secret | No client sees a price or the cap |
+
+**Cost model (PS §11; re-read in TE-15).** A 20-minute Director call is about 12,000 input tokens at about 3 tokens per word plus overhead, and about 1,500 output tokens. A per-short plan is about 3,000 input and 1,000 output. One long video with 8 shorts is about 36,000 input and 9,500 output. At the Gemini Flash-Lite rates seen on 2026-11-01 ($0.10 and $0.40 per million, from aggregators, unverified at the source) that is about 0.7 cents; at Gemini Flash ($0.30 and $2.50) about 3.5 cents. **Model choice is TE-15's, by quality on the labelled set rather than by price:** clip choice is the product, so a stronger model is worth 10× this.
+
+**Provider rules.** The `PlanProvider` trait gets `complete(request: ProviderRequest) -> ProviderOutput` with token counts. One adapter per candidate. A provider whose terms train on this data is not used. The settings page names the provider and its data terms (P-1, P-14).
+
+---
+
+## 53. New Experiments, Invariants and Reads (v1.3)
+
+### 53.1 Technical experiments
+
+| ID | Question | Method | Pass | When | If it fails |
+|---|---|---|---|---|---|
+| TE-17 | Does a large file copy into OPFS within reason, and does the quota hold? | Copy 2, 8 and 16 GB on D1, R1, R2; `storage.estimate` | 10 GB in at most 3 min; no quota error at 2× the file on a 256 GB disk at 50% full | V6.1 | Lower `MAX_SOURCE_FILE_SIZE`; ask (§41.4) about reading in place |
+| TE-18 | Whole-file ASR time and memory | 20-min fixture, `bench/device-bench.ts --long` | Total pipeline at most 60 min p90 on R1 (PS §20.2A) | V6.1, V9 | Two-pass ASR (§43.6) |
+| TE-19 | Director quality with sentences only | The labelled long set (E-13's) through two candidates | At least 60% of the model's shorts rated postable by the panel | V6.4 | Tune prompt; stronger model; more shot lines |
+| TE-20 | Do long jobs survive a hidden tab, Memory Saver and sleep? | Run a 20-min job hidden; with Memory Saver on; with a sleep mid-job | Progress continues hidden, at most 2× slower; after discard or sleep it resumes with at most one window lost | V6.1 | Copy tells the user to keep the tab visible; ask (§41.4) |
+| TE-21 | HDR (HLG, PQ) from phones and cameras | Decode through `importExternalTexture`; compare with an SDR render on `verify_mp4.py` | No washed or clipped frames on 5 clips | V6.1 | `REJECT_HDR`; with advice |
+| TE-22 | Preview across a join on long-GOP 4K | `preview-sync.spec.ts` join case at 4K | Late frames within budget | V6.3 | Lower the lead's resolution; a longer `JOIN_LEAD` |
+| TE-23 | Which face detector: speed, accuracy, licence | Three candidates on 20 corpus shorts | Under 15 ms a frame on D1; at least 95% of faces found on frontal shots; a licence that allows bundling in a paid product | V6.5 | Next candidate; a coarser `FACE_FPS` |
+| TE-24 | Which person-matte model: speed, size, licence | MODNet-class, RVM-class and others | At most 2× duration on D1; at most 30 MB; licence recorded and acceptable (a GPL model is not) | V6.11 | Next; then ask |
+| TE-25 | Matte quality | §51.4 | §51.4 | V6.11 | §51.4 |
+
+TE-15 now also covers the paid provider: price, the `/shorts` and `/chat-edit` latency, data terms. Its "free tier" pass line becomes "free tier for development; the cost model of §52 fits the cap".
+
+E-12 and E-13 are PS §19's. Their instrument is §45.9's analytics plus `scripts/metrics.sql`.
+
+### 53.2 Invariants
+
+| # | Invariant | Test |
+|---|---|---|
+| INV-25 | Nothing reads a shorts plan that `validate_shorts` has not returned; every part is whole sentences | `shorts.rs`; trybuild on `ShortSpec` |
+| INV-26 | With every flag off and with `Assembly::whole`, frames and samples equal V5's | `flags_identity.spec.ts`, §41.1 |
+| INV-27 | Source time reaches recording time only through `Assembly`; only the four files of §44.3 call it | `assembly_readers.rs`; types with no `From` |
+| INV-28 | No pixel, audio sample or frame of a source or asset leaves the browser. The vision signals sent are enums and sentence indexes | `privacy-network.spec.ts`; `ShotLine` type has no float coordinates or bytes |
+| INV-29 | `plan_ops` are applied only through `effective_plan`, and the result only reaches the scene through `validate` | `plan_ops.rs`; INV-21's test |
+| INV-30 | AI spend never passes `AI_MONTHLY_CAP_USD` by more than one in-flight call per worker | `ai_cap.rs` |
+| INV-31 | `CreatorMemory` holds no text | Type-level test: no `String` reachable from it |
+
+**INV-5 is reread:** every removed span of **a clip's recording** is a validated, unrestored `Cut`; a short's parts are a validated `Assembly`; nothing inside a clip's recording is reordered (`TimeMap` ascending). **INV-12 is reread** per DC-10. **INV-2 and P-1 add:** the chat message, its short history, and asset labels and notes, each only in the AI request bodies, only with the AI switch on.
+
+### 53.3 Performance budgets for the long path (assumptions, TE-18)
+
+Reference: a 20-minute 1080p H.264 source, model cached, shorts 60 s each, 5 kept.
+
+| Stage | Budget on R1 | Note |
+|---|---|---|
+| Probe | 2 s | |
+| Copy to OPFS | 60 s per 5 GB | |
+| Audio to `pcm16` | 90 s | |
+| ASR | 40 min | D1 estimate 21-27 min |
+| Coarse vision | 3 min | |
+| Director | 75 s | |
+| Prepare 8 shorts (audio chain, plan, fine vision) | 8 min | |
+| **To the list of shorts** | **at most 55 min** | |
+| Export 5 × 60 s | 5 × 90 s = 7.5 min | |
+| Peak tab memory | at most 1.5 GB | Unchanged; ASR is the peak |
+
+Clip budgets of §30 do not change. A 4K source is read separately and has no budget in its first read.
+
+### 53.4 What we learned from the study folder (Tooscut, read 2026-11-01)
+
+`old_project_study_editor/` holds parts of Tooscut (`github.com/mohebifar/tooscut`), Elastic License 2.0. **Rule (founder, 2026-11-02): we read it to learn how a problem is solved, then design and write Offcut's version in Offcut's types with Offcut's tests. No copying or line-by-line translation of code, shaders, structs or constants. It is outside this repository and is never added.** Mediabunny, which it uses, is MPL-2.0; it is not a dependency of Offcut, and using it would need the §41.4 question.
+
+| Idea | Where it applies here | What differs |
+|---|---|---|
+| Decode audio regions in windows | §43.5 | PCM goes to `out48`, not a real-time mixer |
+| Per-frame source requests, grouped by source, in time order | §44.3, §48.1 | Our scene answers; frames stay `VideoFrame` |
+| Layered, z-ordered frame description | §48.2 | Our list-order `DisplayList`; Vello runs between videos |
+| Cross-transition with a boundary and an outgoing and incoming side | §48.3 | At `join_points`; handles from the `Assembly` |
+| Generic keyframes with bezier easing | §46.4, zooms | Evaluated in pure Rust inside `frame_at` |
+| Sample-rate mismatch correction for HE-AAC | §43.5 | Region decoder |
+| 3D LUT colour looks | Post-launch candidate, PS §21 item 16 | |
+| Not adopted | Text drawn last above all layers; slides on media only as a general rule; a 13×13 blur sample per pixel; preview and export through different decoders; a uniform buffer per layer per frame | Each would cost us something we already have |
+
+### 53.5 Analytics and the crate graph
+
+**Allowlist additions** (`offcut-api-types/src/analytics.rs`, enum and count properties only, INV-18; each is added by the release named):
+
+| Event | Release | Properties |
+|---|---|---|
+| `long_source_accepted` | V6.1 | `duration_bucket`, `resolution_bucket`, `codec` |
+| `source_stage_timing` | V6.1 | `stage`, `ms_bucket`, `resumed: bool` |
+| `plan_result` | V6.2 | As §40.8 |
+| `director_result` | V6.4 | `source`, `outcome`, `shorts`, `dropped_by_reason`, `joined_shorts` |
+| `short_action` | V6.4 | `action`, `style`, `parts_bucket` |
+| `vision_result` | V6.5 | `shots_bucket`, `face_share_bucket`, `backend` |
+| `chat_edit` | V6.9 | `ops`, `refused`, `outcome`, `changed_parts: bool` |
+| `queue_result` | V6.10 | `done`, `failed`, `cancelled` |
+| `export_done` gains | V6.2-V6.11 | `from_short`, `items_kept`, `items_disabled`, `cuts_kept`, `cuts_restored`, `music_on`, `brand_kit_on`, `broll_items`, `framed: bool`, `chat_ops` |
+
+No property holds text. The settings page's list is generated, so it stays exact (P-4).
+
+**Crate graph (§7).** `offcut-vision` is new and depends only on `offcut-types`; `offcut-wasm-core` may depend on it (V6.5). `ALLOWED_CRATE_DEPS` in `check-file-tree.mjs` gets its row in that release. `offcut-text` keeps its dependencies; `rebase.rs` reads `Assembly` from `offcut-types`. `offcut-plan` keeps `offcut-text` and `offcut-types`. The server's dependency on `offcut-plan` covers the Director and chat prompts (feature `prompt`).
+
+### 53.6 v1.3 open items
+
+Each (assumption) of §41-§52 is measured by the experiment or release named beside it, and joins §39.3's reading when read. The founder's open decisions:
+
+1. `AI_MONTHLY_CAP_USD` (starting value 50), at V6.2.
+2. Which provider and model, at TE-15, by quality first (§52).
+3. Whether to run E-12 (optional; recommended).
+4. Which V6.8-V6.11 release to reorder or drop after the alpha (§8A.0 of `buildplan.md`).
+5. Each person-mask effect after TE-25.
+6. A 10-minute cap if TE-18 or TE-20 fails on real laptops.
+7. The launch date, when V6.11 closes.
+8. Paid hosting, once there is revenue (`buildplan.md` Appendix D).
