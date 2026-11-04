@@ -623,6 +623,7 @@ offcut/
 │   ├── LICENSES.md                    licences of shipped assets: Inter (OFL-1.1), Lucide icons (ISC) (v4implementation D-180)
 │   ├── public/
 │   │   ├── robots.txt
+│   │   ├── og.png                     the open-graph image of a shared link, 1200 × 630, from the hero clip's poster (designimplementation D-335)
 │   │   └── ort/                       ONNX Runtime .wasm files copied at build by vite.config.ts
 │   ├── src/
 │   │   ├── main.tsx
@@ -640,7 +641,8 @@ offcut/
 │   │   │   ├── features.ts            [ONLY] (V6.1) FeatureFlags from a Vite define (§41.3)
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
-│   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code
+│   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
+│   │   │   ├── landing.ts             the landing page's and the prices' copy, imported by messages.ts (designimplementation D-321)
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
@@ -804,8 +806,28 @@ offcut/
 │   │       │   ├── SettingsPage.tsx
 │   │       │   ├── ShortsPage.tsx     (V6.4) the list of shorts (§45.8)
 │   │       │   └── LegalPage.tsx
+│   │       ├── landing/               the landing page's sections (designimplementation D-322); the only files that may import GSAP and Motion (D-319)
+│   │       │   ├── TopBar.tsx         section 0: wordmark, anchors, "Start free", the progress bar
+│   │       │   ├── Hero.tsx           section 1: the headline, the way in, the capability line, the hero clip
+│   │       │   ├── CaptionedHeadline.tsx  the captioned headline and the final call's pill (M1, M10)
+│   │       │   ├── Marquee.tsx        section 2
+│   │       │   ├── BeforeAfter.tsx    section 3
+│   │       │   ├── Features.tsx       section 4: the eight feature cards
+│   │       │   ├── HowItWorks.tsx     section 5
+│   │       │   ├── TryIt.tsx          section 6: the unchanged DropZone
+│   │       │   ├── Privacy.tsx        section 7
+│   │       │   ├── Pricing.tsx        section 8: the plans, from PRICES_USD and LIMITS
+│   │       │   ├── ComingSoon.tsx     section 9: every post-V6 feature, marked "Coming soon"
+│   │       │   ├── Updates.tsx        section 10: the unchanged NotifyMeForm
+│   │       │   ├── FinalCall.tsx      section 11
+│   │       │   ├── SiteFooter.tsx     section 12: legal links, contact, settings
+│   │       │   ├── LoopVideo.tsx      the one player of the landing clips (designimplementation §9.5)
+│   │       │   ├── parts.tsx          PhoneFrame, Chip, SectionHead, CtaLink, BentoCard, the Motion scope
+│   │       │   └── gsap.ts            loadGsap() and useGsap(): GSAP by import(), inside matchMedia, reverted on unmount
 │   │       ├── assets/
-│   │       │   └── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
+│   │       │   ├── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
+│   │       │   ├── jetbrains-mono-latin.woff2  the landing page's accent face: JetBrains Mono 700, Latin subset (designimplementation D-330)
+│   │       │   └── landing/           the landing clips' WebP posters, one per slot, emitted hashed (designimplementation §9.4)
 │   │       ├── icons.tsx              inline SVG icons (D-181)
 │   │       ├── dev-hooks.ts           `__offcutDev`: the page's development hooks, never in a production build (v4implementation D-155, v4changelog Entry 21)
 │   │       ├── hooks/
@@ -870,7 +892,9 @@ offcut/
 │   │           ├── panel.module.css       the side panel and its tabs
 │   │           ├── primitives.module.css  the primitives (D-181)
 │   │           ├── controls.module.css    the primitives that hold a value: Tabs, Switch, SegmentedControl, Slider (v4changelog Entry 19)
-│   │           └── preview.module.css     the player, its transport and the direct-manipulation chrome
+│   │           ├── preview.module.css     the player, its transport and the direct-manipulation chrome
+│   │           ├── landing.module.css     the landing page: root, tokens, top bar, hero, shared parts (designimplementation §7)
+│   │           └── landing-sections.module.css  the landing page's sections after the hero
 │   └── tests-e2e/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
@@ -3760,7 +3784,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | INV-12 | The ASR session and the render session never coexist | `run-pipeline.test.ts` (ordering of `unload` and `openSession`) |
 | INV-13 | A usage receipt is stored at most once per `export_id`; a webhook is applied at most once per `provider_event_id` | `usage_receipts.rs`; `webhook_idempotency.rs` |
 | INV-14 | Limits are visible before the action they gate; no upgrade prompt renders during processing, editing or rendering | `export-free.spec.ts` |
-| INV-15 | All user-facing text and every number inside it come from `copy/messages.ts` and the generated limits | `messages.test.ts`; `react/jsx-no-literals` |
+| INV-15 | All user-facing text and every number inside it come from `copy/messages.ts` and the files it imports (`copy/landing.ts`, designimplementation D-321), and the generated limits | `messages.test.ts`; `react/jsx-no-literals` |
 | INV-16 | Every state change goes through `transition()`; an illegal transition changes nothing | The four machine test files |
 | INV-17 | The main thread performs no decode, inference, DSP, render or encode | Boundaries lint; long-task assertion in `pipeline-preview.spec.ts` |
 | INV-18 | Analytics events have no free-text property and no user identifier | `events.types.test.ts`; `analytics_allowlist.rs` |

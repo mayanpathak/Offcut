@@ -128,3 +128,72 @@ Wherever the plan says "stop and ask", the agent follows `overnight-run.md` §6 
 - Each entry records both results.
 
 **Not done yet.** Prompt 151 comes next.
+
+## Entry 4 - 2026-11-05: P151, foundations (dependencies, copy, lint)
+
+**What changed.**
+
+- **Dependencies.** `gsap` 3.15.1 and `motion` 14.9.1, pinned exactly (`pnpm --filter web add -E`).
+- **`web/src/copy/landing.ts` (new).** It holds `landingCopy` and `pricingCopy`.
+  - It holds all the copy of §4 to §6: the eyebrows (timecodes made by a function from seconds), the 8 feature cards, the 12 "Coming soon" rows in two groups, the CTAs, the marquee, the clip labels, `playClip`, the final call and the footer.
+  - Kept word for word: `supportedBrowsers`, `privacyLine`, `whatLeavesLink`, every price and plan feature, and `merchant`.
+  - Reworded as P151 point 4 says:
+    - `hero`: "Say it once. Post it finished." (F-1).
+    - `subhead`: §6's draft.
+    - `demoCaption`: D-324's words.
+    - `pricing.notOnSale`: "Start on Free with a free account. Creator goes on sale soon." (F-2, option (a)).
+    - `waitlistHeading` is replaced by `updatesHeading`, "Hear when the next features open.".
+  - Numbers in sentences come from `LIMITS`, or from named constants for the long path's planned figures (20 minutes, 5 to 10 shorts).
+- **`messages.ts`.**
+  - It imports both: `landing: landingCopy`, `pricing: pricingCopy`. No caller changed.
+  - `notifyMe.label` is now "Email me when new features open" (D-328).
+  - It went from 679 to 652 lines.
+- **`LandingPage.tsx`.** One line: the waitlist heading reads `updatesHeading`.
+- **`eslint.config.js`.**
+  - `LANDING_CLIPS`, `LandingClip` and `LandingSlot` are added to the `ui` → `net/asset-fetch.ts` names.
+  - D-319: `no-restricted-imports` refuses `gsap`, `gsap/*`, `motion` and `motion/*` everywhere in `src/` except `src/ui/landing/**`.
+  - ESLint replaces a rule's options instead of adding to them. So the rule now holds both restrictions, the speech runtime's and D-319's, through a small `restrictedImports()` helper. The landing folder keeps the speech runtime's.
+  - `workers/asr/whisper-runtime.ts` had the rule `off`. It now keeps D-319's half, so that file still may not import GSAP or Motion. This is stricter than before and changes nothing else.
+- **TS.** §5 has a row for every new file of §10.1: `copy/landing.ts`, the `ui/landing/` folder and its 18 files, the two CSS modules, the JetBrains Mono subset, the posters folder and `public/og.png`. INV-15 now reads "`copy/messages.ts` and the files it imports".
+
+**GSAP's licence, as read.** The package ships no licence text, only a pointer:
+
+- `package.json`: "Standard 'no charge' license: https://gsap.com/standard-license."
+- Each file's banner: "@license Copyright 2008-2026, GreenSock. All rights reserved. Subject to the terms at https://gsap.com/standard-license".
+
+The text at that address was read on 2026-11-05. Quoted:
+
+- **Grant (§II):** "Subject to the terms and conditions of this GSAP License, Webflow grants you a non-exclusive, worldwide license to use, reproduce, display, and implement GSAP Products solely for Permitted Uses."
+- **Permitted Uses:** "the implementation and/or use of GSAP Products on any website, web application, or digital interface … by any person or entity … (which may include, for clarity, those of companies that compete with Webflow in other areas of business)".
+- **Prohibited Uses:** "any implementation and/or use of GSAP Products in tools that allow users to build visual animations without code … that encourages, induces, or materially assists in creating a solution that competes with Webflow's visual animation building capabilities."
+- **Restrictions (§III):**
+  - no Prohibited Uses without consent;
+  - no reverse engineering "for the purpose of creating Competitive Products";
+  - no removing or altering "proprietary notices or branding".
+- **Also in the text:** termination (stop using it and destroy copies) and amendments (a later version is used only under the revised licence).
+
+**The reading.** The one restriction on use is the Webflow-competitor one, which §10.2 describes. The other clauses are ordinary licence terms, and Offcut keeps them:
+
+- GSAP is used on a marketing page, not in a tool for building animations;
+- Offcut does not reverse engineer GSAP;
+- the bundle keeps GSAP's banner comments.
+
+So F-8 stands, under `overnight-run.md` §6's test. **For the founder:** this reading is the agent's. If you read the other clauses as "more than the Webflow restriction", P155's GSAP work can be replaced by Motion and CSS, as §6 of that file says.
+
+**What differs from the plan.** One thing: whisper-runtime.ts's rule, above.
+
+**Checks (Tier 2).**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. `check-file-tree`: 491 files; longest is `messages.ts`, 652 lines |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **354.0 kB** (main chunk 165.9 kB, up 2.3 kB for the copy). Neither library is in the bundle yet: nothing imports them |
+| `pnpm e2e --workers=4` | 45 of 45 passed, all 18 landing cases unchanged ("two tabs" passed this time) |
+| D-319 lint | A deliberate `import { gsap } from "gsap"` in `ui/pages/LandingPage.tsx` failed lint with D-319's message. The same import in a probe file under `ui/landing/` passed. Both were removed |
+| `git grep -n "not open yet" web/src` | one hit: the terms' "parts of it are not open yet", which stays |
+| Frozen check | empty |
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

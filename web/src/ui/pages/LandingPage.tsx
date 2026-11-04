@@ -116,7 +116,7 @@ export function LandingPage({
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>{copy.waitlistHeading}</h2>
+        <h2 className={styles.heading}>{copy.updatesHeading}</h2>
         <NotifyMeForm wanted={["launch"]} />
       </section>
 
