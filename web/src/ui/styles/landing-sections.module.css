@@ -455,9 +455,9 @@
 }
 
 /* While GSAP pins the section, the step the scroll has reached stands out;
-   the others stay readable (M9). */
-.how[data-pinned] .howStep {
-  opacity: 0.5;
+   the others keep text of full contrast, with a quieter title (M9). */
+.how[data-pinned] .howStep:not([data-active]) .howStepTitle {
+  color: var(--text-2);
 }
 
 .how[data-pinned] .howStep[data-active] {

@@ -88,9 +88,12 @@ export function LoopVideo({
     const play = () => {
       if (inView && document.visibilityState === "visible") {
         element.muted = true;
-        void element.play().catch((): void => {
+        void element.play().catch((error: unknown): void => {
           // The browser refused to start it: the poster stays, with the button.
-          setRefused(true);
+          // A play cut short by a pause (`AbortError`, a quick scroll past) is no refusal.
+          if (error instanceof DOMException && error.name === "NotAllowedError") {
+            setRefused(true);
+          }
         });
       }
     };

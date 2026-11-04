@@ -8,7 +8,7 @@ This file covers the design release between V6 and the cloud-transcription relea
 |---|---|---|---|
 | 1 | F-3: hide the in-app offers until live mode, as a small change of its own after this release (V6 CL open item 17) | Founder | §18 |
 | 2 | ~~The upload of the seven re-encoded clips~~: **closed** 2026-11-05, uploaded under `overnight-run.md` §3.2 | Agent | Entry 9 |
-| 3 | Design review 3 (P158) | Founder | guide Phase 8 |
+| 3 | Design review 3 (P158): done as a self-review under `overnight-run.md` §5, rubric passed in round 2. The founder reads `~/design-review/` and `copy/landing.ts` in the morning | Founder | Entry 11 |
 | 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
 | 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
 
@@ -538,5 +538,54 @@ Every frame count is unchanged. A middle frame of each was read on D1 beside the
 | Frozen check | `web/src/ui/components/CapabilityGate.tsx` only, the named exception |
 
 **Open.** Nothing new.
+
+**Found, not fixed.** None.
+
+## Entry 11 - 2026-11-05: P158, axe, the captures, design review 3
+
+**L-11.** The first run of `axe(page)` on `/` at 1280 × 800 found `color-contrast` (serious) on 4 nodes at the top, and 4 at the end. They were the step numbers and lines of the pinned "How it works" steps that the scroll had not reached (P155's `opacity: 0.5`: 2.94:1 and 2.77:1).
+
+The fix: a resting step keeps text of full contrast, and only its title takes `--text-2`. The active step still stands out by its violet border and glow. After it, axe reports nothing serious or critical at the top or at the end, at 1280 × 800, 390 × 844 and 1920 × 1080. The case L-11 covers 1280 × 800.
+
+**The captures.** `screens.spec.ts` has a new loop, "landing", over 1280 × 800, 1920 × 1080 and 390 × 844, with and without movement:
+
+- a scroll through, then 3 s at the top;
+- a full-page and a first-screen picture each.
+
+They were made from the development build (`vite build --mode development`, as `pnpm screens` does), running only `--grep landing` (the screens project's other states need a clip end to end and are unchanged). The 12 pictures are in `~/design-review/`, none staged. Each full page was also cut into strips and read at full size.
+
+**Design review 3, self-review** (`overnight-run.md` §5: the founder delegated it tonight). Two rounds.
+
+| # | Rubric | Round 1 | Round 2 |
+|---|---|---|---|
+| 1 | The complaint answered; the first screen at 1280 × 800 has the headline, subhead, "Start free" and the hero clip; nothing looks like default browser styling | yes | yes |
+| 2 | Every feature of §4 for the page named in plain words; every row of §5 with "Coming soon" | yes (Entry 6's table; L-1, L-2) | yes |
+| 3 | No overlap, no cut-off words, no sideways scroll at 390 | yes ("talking-head" breaks at its own hyphen) | yes |
+| 4 | One content width, even rhythm, grids that line up | yes | yes |
+| 5 | Readable contrast; the yellow pill only in the H1, the final call and the Captions card | **no**: axe's 4 nodes (above), and the wordmark's "O" was a yellow pill (§6's draft for section 0) | yes: the pinned steps fixed; the wordmark's "O" is now violet (`--brand-hover`, white text) |
+| 6 | No placeholder text, no invented number or testimonial, no other company's name or logo | yes. The only company named is "Dodo Payments", in the merchant line kept from V6 because the law asks for it. The clips' sample captions ("3,000 hours", "10,000 subscribers") are example content inside the product's own frames, read at G-1 | yes |
+| 7 | Under reduced motion everything present and still | yes: no pill, no pin, every clip on its poster with "Play the clip" | yes |
+| 8 | Drop zone, "Try a sample" and the email form look like what they are and work | yes; their cases pass unchanged | yes |
+
+**Found in the review and fixed (round 1).** At 1920 × 1080 the hero clip stood on its poster with "Play the clip", although movement was allowed.
+
+- The scroll through had paused it before its `play()` had started.
+- The browser rejects that `play()` with an `AbortError`, and `LoopVideo` treated every rejection as a refusal, for good.
+- Now only `NotAllowedError` counts as a refusal. In round 2 every clip played.
+
+**The result: self-review, rubric passed** (round 2, 2026-11-05), in place of the founder's "go". The founder reads the same captures and the copy of `copy/landing.ts` in the morning, and can still ask for changes after the release is live.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. Longest file `landing.module.css`, 676 lines |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok; app shell, gzip, **444.3 kB** |
+| `pnpm e2e --workers=4` | **57 of 57** passed, L-11 among them |
+| Captures | 12 in `~/design-review/`, none staged |
+| Frozen check | `CapabilityGate.tsx` only (P157's exception) |
+
+**Open.** Item 3 (design review 3) is done as a self-review; the founder's own read is in the morning report.
 
 **Found, not fixed.** None.

@@ -276,12 +276,13 @@
   text-decoration: none;
 }
 
+/* The brand's violet: the yellow pill is kept for the captions alone (§7.3). */
 .wordmarkO {
   margin-right: 1px;
   padding: 0 5px;
   border-radius: 6px;
-  background: var(--lp-pill);
-  color: var(--lp-pill-ink);
+  background: var(--brand-hover);
+  color: #fff;
   line-height: 1.25;
 }
 

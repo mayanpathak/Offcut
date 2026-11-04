@@ -224,3 +224,35 @@ for (const size of WIDTHS) {
     });
   });
 }
+
+// The landing page for design review 3 (designimplementation §12.5): the whole
+// page at the two reference widths and a phone's, with movement and without,
+// after a scroll through so that every entrance has played.
+const LANDING_SIZES = [...WIDTHS, { width: 390, height: 844 }];
+const MOTIONS = [
+  { name: "normal", reducedMotion: "no-preference" },
+  { name: "reduced", reducedMotion: "reduce" },
+] as const;
+/** Long enough for the headline's pill to come to rest (M1). */
+const HEADLINE_MS = 3000;
+
+for (const size of LANDING_SIZES) {
+  for (const motion of MOTIONS) {
+    test(`landing, ${motion.name} motion, ${String(size.width)} x ${String(size.height)}`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await page.emulateMedia({ reducedMotion: motion.reducedMotion });
+      await installFakeApi(page);
+      await page.goto("/");
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      for (let top = 0; top < height; top += Math.round(size.height * 0.6)) {
+        await page.evaluate((y) => window.scrollTo(0, y), top);
+        await page.waitForTimeout(200);
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(HEADLINE_MS);
+      await page.screenshot({ path: `${OUT}/landing-${motion.name}-${String(size.width)}x${String(size.height)}.png`, fullPage: true });
+      await page.screenshot({ path: `${OUT}/landing-${motion.name}-${String(size.width)}x${String(size.height)}-first-screen.png` });
+    });
+  }
+}

@@ -617,3 +617,14 @@ test("L-12: the settings and a legal page, on the dark system, have no serious o
     expect(await violations(page), `axe on ${path}`).toEqual([]);
   }
 });
+
+test("L-11: the landing page has no serious or critical accessibility violation, at the top or at the end", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await installFakeApi(page);
+  await page.goto("/");
+  await capabilityChecked(page);
+  expect(await violations(page), "axe at the top").toEqual([]);
+  await scrollThrough(page);
+  await page.waitForTimeout(500);
+  expect(await violations(page), "axe at the end").toEqual([]);
+});
