@@ -23,7 +23,7 @@ import { MotionScope } from "../landing/parts";
 import { Pricing } from "../landing/Pricing";
 import { Privacy } from "../landing/Privacy";
 import { SiteFooter } from "../landing/SiteFooter";
-import { TopBar } from "../landing/TopBar";
+import { Playhead, TopBar } from "../landing/TopBar";
 import { TryIt } from "../landing/TryIt";
 import { Updates } from "../landing/Updates";
 import styles from "../styles/landing.module.css";
@@ -56,6 +56,7 @@ export function LandingPage({
     <MotionScope>
       <div className={styles.landing} data-landing data-theme="dark">
         <TopBar appPath={appPath} />
+        <Playhead />
         <main>
           <Hero appPath={appPath} settingsPath={settingsPath} />
           <Marquee />

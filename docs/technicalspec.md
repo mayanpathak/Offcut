@@ -823,7 +823,8 @@ offcut/
 │   │       │   ├── SiteFooter.tsx     section 12: legal links, contact, settings
 │   │       │   ├── LoopVideo.tsx      the one player of the landing clips (designimplementation §9.5)
 │   │       │   ├── parts.tsx          PhoneFrame, Chip, SectionHead, CtaLink, BentoCard, the Motion scope
-│   │       │   └── gsap.ts            loadGsap() and useGsap(): GSAP by import(), inside matchMedia, reverted on unmount
+│   │       │   ├── gsap.ts            loadGsap() and useGsap(): GSAP by import(), inside matchMedia, reverted on unmount
+│   │       │   └── gsap-runtime.ts    GSAP and its scroll plugin, registered: the one module gsap.ts imports with import(), so both share one chunk
 │   │       ├── assets/
 │   │       │   ├── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
 │   │       │   ├── jetbrains-mono-latin.woff2  the landing page's accent face: JetBrains Mono 700, Latin subset (designimplementation D-330)

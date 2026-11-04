@@ -3,19 +3,55 @@
 // advance with the scroll (M9); otherwise, and under reduced motion, the
 // steps stand stacked, every one of them in full.
 
+import { useRef } from "react";
+
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
+import { type GsapSetup, useGsap } from "./gsap";
 import { LoopVideo } from "./LoopVideo";
 import { SectionHead } from "./parts";
 
 const stepNumber = (index: number) => String(index + 1).padStart(2, "0");
 
+/** M9: the section stays pinned for this much of a screen's scroll (§8.2). */
+const PIN_LENGTH = "+=150%";
+
+/**
+ * M9: on wide screens the section is pinned while the scroll moves its steps
+ * on, one after another. Every step stays readable; the current one stands out.
+ */
+const pinSetup: GsapSetup = ({ trigger }, section) => {
+  const steps = [...section.querySelectorAll<HTMLElement>("[data-step]")];
+  const show = (current: number) => {
+    steps.forEach((step, index) => {
+      step.toggleAttribute("data-active", index === current);
+    });
+  };
+  section.toggleAttribute("data-pinned", true);
+  show(0);
+  trigger.create({
+    trigger: section,
+    start: "top top",
+    end: PIN_LENGTH,
+    pin: true,
+    onUpdate: (self) => {
+      show(Math.min(steps.length - 1, Math.floor(self.progress * steps.length)));
+    },
+  });
+  return () => {
+    section.toggleAttribute("data-pinned", false);
+    show(-1);
+  };
+};
+
 export function HowItWorks() {
   const copy = messages.landing;
+  const section = useRef<HTMLElement>(null);
+  useGsap(section, pinSetup, "(min-width: 1024px)");
   return (
-    <section className={[landing.section, styles.how].join(" ")} id="how" aria-labelledby="how-heading" data-how>
+    <section className={[landing.section, styles.how].join(" ")} id="how" aria-labelledby="how-heading" ref={section}>
       <div className={landing.container}>
         <div className={styles.howGrid}>
           <div className={styles.howText}>

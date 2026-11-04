@@ -507,6 +507,11 @@ test("L-5: with reduced motion the page is complete and still", async ({ page })
   await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
   await expect(page.getByRole("heading", { name: messages.landing.final.line })).toBeAttached();
   await expect(page.locator(".pin-spacer")).toHaveCount(0);
+  // No caption pill: the headlines are plain text (M1, M10).
+  for (const pill of await page.locator("[data-pill]").all()) {
+    await expect(pill).toHaveCSS("opacity", "0");
+  }
+  await expect(page.locator("[data-lit]")).toHaveCount(0);
 });
 
 test("L-7: scrolling the whole page breaks no rule of the security policy, and the page stays isolated", async ({ page }) => {
@@ -524,4 +529,42 @@ test("L-7: scrolling the whole page breaks no rule of the security policy, and t
 
   expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+});
+
+test("L-8: the editor's route downloads no GSAP, and the landing page does", async ({ page }) => {
+  await installFakeApi(page);
+  const scripts: Promise<string>[] = [];
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname.endsWith(".js")) {
+      scripts.push(response.text().catch(() => ""));
+    }
+  });
+  await page.goto("/app");
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1000);
+  const onApp = await Promise.all(scripts);
+  expect(onApp.length).toBeGreaterThan(0);
+  expect(onApp.filter((body) => body.includes("ScrollTrigger"))).toEqual([]);
+
+  scripts.length = 0;
+  await page.goto("/");
+  await scrollThrough(page, 5);
+  await expect.poll(async () => (await Promise.all(scripts)).some((body) => body.includes("ScrollTrigger"))).toBe(true);
+});
+
+test("L-9: leaving for /app inside the app leaves nothing of the landing page behind", async ({ page }) => {
+  await installFakeApi(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await scrollThrough(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
+
+  await startFree(page.getByRole("banner")).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".pin-spacer")).toHaveCount(0);
+  await expect(page.locator("[data-landing]")).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

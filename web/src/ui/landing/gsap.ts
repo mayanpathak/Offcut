@@ -1,20 +1,20 @@
 // GSAP, loaded once the landing page has rendered (designimplementation D-318).
-// `import()` puts it in a chunk of its own: it never blocks the first paint,
-// and the editor's route never downloads it (case L-8). Only files under
-// ui/landing/ may import GSAP (D-319).
+// `import()` of `gsap-runtime.ts` puts GSAP and its scroll plugin in a chunk
+// of their own: it never blocks the first paint, and the editor's route never
+// downloads it (case L-8). Only files under ui/landing/ may import GSAP (D-319).
 //
 // Every animation runs inside `gsap.matchMedia()` under
 // `(prefers-reduced-motion: no-preference)`, so with reduced motion nothing
-// is registered, and `revert()` on unmount removes every tween, ScrollTrigger
-// and pin it made (§8.1 rules 1 and 6). If the chunk fails to load, the page
+// is registered, and `revert()` on unmount removes every tween, trigger and
+// pin it made (§8.1 rules 1 and 6). If the chunk fails to load, the page
 // stays as it is: complete and still (rule 2.5).
 
 import { type RefObject, useEffect, useRef } from "react";
 
-export type GsapTools = {
-  gsap: (typeof import("gsap"))["gsap"];
-  ScrollTrigger: (typeof import("gsap/ScrollTrigger"))["ScrollTrigger"];
-};
+import type { runtime } from "./gsap-runtime";
+
+/** GSAP, and its scroll plugin under a name of our own. */
+export type GsapTools = typeof runtime;
 
 /** What a setup may return: its own clean-up, for listeners GSAP does not own. */
 export type GsapSetup = (tools: GsapTools, scope: HTMLElement) => (() => void) | undefined;
@@ -24,12 +24,9 @@ const MOTION_OK = "(prefers-reduced-motion: no-preference)";
 
 let loading: Promise<GsapTools> | undefined;
 
-/** GSAP and ScrollTrigger, imported once and registered. */
+/** GSAP and its scroll plugin, imported once and registered. */
 export function loadGsap(): Promise<GsapTools> {
-  loading ??= Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(([core, scroll]) => {
-    core.gsap.registerPlugin(scroll.ScrollTrigger);
-    return { gsap: core.gsap, ScrollTrigger: scroll.ScrollTrigger };
-  });
+  loading ??= import("./gsap-runtime").then((module) => module.runtime);
   return loading;
 }
 
@@ -46,6 +43,10 @@ export function useGsap(scope: RefObject<HTMLElement | null>, setup: GsapSetup, 
   });
 
   useEffect(() => {
+    // A visitor who asks for reduced motion gets none, so GSAP is not even downloaded.
+    if (!window.matchMedia(MOTION_OK).matches) {
+      return undefined;
+    }
     let live = true;
     let revert: (() => void) | undefined;
     void loadGsap().then(

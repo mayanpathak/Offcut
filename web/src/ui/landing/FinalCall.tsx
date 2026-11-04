@@ -5,6 +5,7 @@
 import { messages } from "../../copy/messages";
 import landing from "../styles/landing.module.css";
 import styles from "../styles/landing-sections.module.css";
+import { CaptionedHeadline } from "./CaptionedHeadline";
 import { CtaLink, Eyebrow } from "./parts";
 
 export function FinalCall({ appPath }: { appPath: string }) {
@@ -13,9 +14,7 @@ export function FinalCall({ appPath }: { appPath: string }) {
     <section className={[landing.section, styles.final].join(" ")} id="start" aria-labelledby="final-heading">
       <div className={[landing.container, styles.finalInner].join(" ")}>
         <Eyebrow {...copy.eyebrows.final} />
-        <h2 className={styles.finalLine} id="final-heading">
-          {copy.final.line}
-        </h2>
+        <CaptionedHeadline text={copy.final.line} restsOn={copy.final.restsOn} level={2} id="final-heading" className={styles.finalLine} />
         <CtaLink variant="primary" to={appPath}>
           {copy.cta.startFree}
         </CtaLink>

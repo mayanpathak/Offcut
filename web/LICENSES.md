@@ -119,7 +119,7 @@ The licence is the SIL Open Font License 1.1, whose full text is quoted under In
 
 ## GSAP 3.15.1 (an npm package, noted here)
 
-The landing page's animations use `gsap` (designimplementation D-318). It is not open source: it is licensed under GreenSock's "Standard 'no charge' license", https://gsap.com/standard-license, which grants its use "on any website, web application, or digital interface" and forbids its use in tools that compete with Webflow's visual animation building. Offcut uses it on its landing page only (D-319). The bundle keeps its copyright banners, as the licence asks. The licence was read on 2026-11-05 (designchangelog Entry 4).
+The landing page's animations use `gsap` (designimplementation D-318). It is not open source: it is licensed under GreenSock's "Standard 'no charge' license", https://gsap.com/standard-license, which grants its use "on any website, web application, or digital interface" and forbids its use in tools that compete with Webflow's visual animation building. Offcut uses it on its landing page only (D-319). The production build minifies it and does not keep its copyright banner comments; its notice is kept here and in the package. Whether the banners must be kept in the bundle is for the founder (designchangelog, open items). The licence was read on 2026-11-05 (designchangelog Entry 4).
 
 ## Lucide 1.61.0
 

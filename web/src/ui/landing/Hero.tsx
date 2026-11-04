@@ -3,12 +3,15 @@
 // that the video is not uploaded; beside them, the hero clip in a phone.
 
 import { m, useReducedMotion } from "motion/react";
+import { useRef } from "react";
 import { Link } from "react-router";
 
 import { messages } from "../../copy/messages";
 import { LANDING_CLIPS } from "../../net/asset-fetch";
 import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
 import styles from "../styles/landing.module.css";
+import { CaptionedHeadline } from "./CaptionedHeadline";
+import { type GsapSetup, useGsap } from "./gsap";
 import { LoopVideo } from "./LoopVideo";
 import { Chip, CtaLink, EASE, Eyebrow, PhoneFrame } from "./parts";
 
@@ -60,18 +63,52 @@ function FloatingChip({ text, index }: { text: string; index: number }) {
   );
 }
 
+/** M4: the phone turns towards the pointer by up to this much (§8.2). */
+const TILT_DEG = 6;
+const TILT_S = 0.6;
+const PERSPECTIVE_PX = 1200;
+
+/** M4: the phone follows a fine pointer over the hero; touch screens keep it still. */
+const tiltSetup: GsapSetup = ({ gsap }, visual) => {
+  const phone = visual.querySelector("[data-phone]");
+  const hero = visual.closest("section");
+  if (phone === null || hero === null) {
+    return undefined;
+  }
+  gsap.set(phone, { transformPerspective: PERSPECTIVE_PX });
+  const turnX = gsap.quickTo(phone, "rotationX", { duration: TILT_S, ease: "power3" });
+  const turnY = gsap.quickTo(phone, "rotationY", { duration: TILT_S, ease: "power3" });
+  const onMove = (event: PointerEvent) => {
+    const box = visual.getBoundingClientRect();
+    const across = Math.max(-1, Math.min(1, ((event.clientX - box.left) / box.width - 0.5) * 2));
+    const down = Math.max(-1, Math.min(1, ((event.clientY - box.top) / box.height - 0.5) * 2));
+    turnY(across * TILT_DEG);
+    turnX(-down * TILT_DEG);
+  };
+  const onLeave = () => {
+    turnX(0);
+    turnY(0);
+  };
+  hero.addEventListener("pointermove", onMove);
+  hero.addEventListener("pointerleave", onLeave);
+  return () => {
+    hero.removeEventListener("pointermove", onMove);
+    hero.removeEventListener("pointerleave", onLeave);
+  };
+};
+
 export function Hero({ appPath, settingsPath }: { appPath: string; settingsPath: string }) {
   const capability = capabilityLine(useCapabilityStore());
   const copy = messages.landing;
+  const visual = useRef<HTMLDivElement>(null);
+  useGsap(visual, tiltSetup, "(pointer: fine)");
   return (
     <section className={styles.hero} id="top" aria-labelledby="hero-heading">
       <div className={styles.heroBackdrop} aria-hidden="true" />
       <div className={[styles.container, styles.heroGrid].join(" ")}>
         <div className={styles.heroCopy}>
           <Eyebrow {...copy.eyebrows.hero} />
-          <h1 className={styles.h1} id="hero-heading">
-            {copy.hero}
-          </h1>
+          <CaptionedHeadline text={copy.hero} restsOn={copy.heroRestsOn} level={1} id="hero-heading" className={styles.h1} />
           <p className={styles.heroLead}>{copy.subhead}</p>
           <div className={styles.ctaRow}>
             <CtaLink variant="primary" to={appPath}>
@@ -96,10 +133,12 @@ export function Hero({ appPath, settingsPath }: { appPath: string; settingsPath:
           </ul>
         </div>
 
-        <div className={styles.heroVisual}>
-          <PhoneFrame>
-            <LoopVideo clip={LANDING_CLIPS.hero} label={copy.clipLabels.hero} eager />
-          </PhoneFrame>
+        <div className={styles.heroVisual} ref={visual}>
+          <div data-phone>
+            <PhoneFrame>
+              <LoopVideo clip={LANDING_CLIPS.hero} label={copy.clipLabels.hero} eager />
+            </PhoneFrame>
+          </div>
           {copy.heroChips.map((chip, index) => (
             <FloatingChip key={chip} text={chip} index={index} />
           ))}

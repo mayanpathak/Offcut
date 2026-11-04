@@ -10,6 +10,7 @@ This file covers the design release between V6 and the cloud-transcription relea
 | 2 | The upload of the seven re-encoded clips needs the founder's go (P156) | Founder | guide Step 6.3 |
 | 3 | Design review 3 (P158) | Founder | guide Phase 8 |
 | 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
+| 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
 
 ## Entry 1 - 2026-11-04: the plan
 
@@ -176,7 +177,7 @@ The text at that address was read on 2026-11-05. Quoted:
 
 - GSAP is used on a marketing page, not in a tool for building animations;
 - Offcut does not reverse engineer GSAP;
-- the bundle keeps GSAP's banner comments.
+- the bundle was expected to keep GSAP's banner comments. **Corrected in Entry 8:** the minified build does not, and this is open item 5.
 
 So F-8 stands, under `overnight-run.md` §6's test. **For the founder:** this reading is the agent's. If you read the other clauses as "more than the Webflow restriction", P155's GSAP work can be replaced by Motion and CSS, as §6 of that file says.
 
@@ -382,5 +383,54 @@ All 12 rows of §5 are cards with "Coming soon" (case L-2).
 | Frozen check | empty |
 
 **Open.** Nothing new.
+
+**Found, not fixed.** None.
+
+## Entry 8 - 2026-11-05: P155, GSAP
+
+**What changed.** Each animation runs through `useGsap()`: after `loadGsap()`, inside `gsap.matchMedia()` under `(prefers-reduced-motion: no-preference)`, and reverted on unmount.
+
+| # | Where | What |
+|---|---|---|
+| M1 | `CaptionedHeadline.tsx` (new) | The H1's words are spans with real spaces, so its accessible name is unchanged. A yellow pill (`aria-hidden`) slides from word to word, 0.28 s each, `power3.out`, lights each word in turn (`data-lit`), and rests on "finished.". It is measured with `getBoundingClientRect`, and measured again on resize |
+| M2 | `TopBar.tsx` | The 2 px bar's `scaleX` is scrubbed over the whole page (`scrub: 0.3`) |
+| M3 | `TopBar.tsx`, `Playhead` | At 1280 px and wider, a dot travels a line down the left gutter. Each section's eyebrow gets `isLive` between `top center` and `bottom center`. `Playhead` is a sibling of the bar, not inside it: the bar's `backdrop-filter` would make it the box a fixed child is placed in |
+| M4 | `Hero.tsx` | The phone turns towards a fine pointer, up to 6° (`quickTo`). It is off for touch (`(pointer: fine)`) |
+| M6 | `Marquee.tsx` | `xPercent: -50`, repeating, 40 s a loop. It slows to 0.3 on hover, and moves only while on screen |
+| M9 | `HowItWorks.tsx` | At 1024 px and wider the section is pinned (`end: "+=150%"`), and the scroll moves the active step on. The others stay readable at opacity 0.5 (`data-pinned`, `data-active`) |
+| M10 | `FinalCall.tsx` | M1's pill runs once over the final line and rests on "away.", from `top 60%` |
+
+**What differs from the plan.**
+
+- **One runtime module, `gsap-runtime.ts` (new, with its TS §5 row).** It imports `gsap` and `gsap/ScrollTrigger` statically, and `gsap.ts` imports it with `import()`. With two separate `import()`s, the main bundle would have held the chunk name `ScrollTrigger-<hash>.js`, and a `.ScrollTrigger` property name survives minification. Either would put the text "ScrollTrigger" in `/app`'s scripts and fail L-8, though GSAP never loads there. The tools object therefore calls the plugin `trigger`.
+- **No GSAP download under reduced motion.** `useGsap()` returns before `loadGsap()` when `(prefers-reduced-motion: no-preference)` does not match: nothing would run anyway. Without this, ScrollTrigger kept its own 60 fps keep-alive loop running with no trigger registered.
+- **`check-hosts.mjs`** (§10.1 allows this change) tolerates one literal, `https://gsap.com`, exactly, in `assets/gsap-runtime-*.js` only. It is the address in the text of GSAP's console warning for a missing target, and the library makes no request. "Every request of a session goes to the page's own origin or to the asset host" still passes.
+- **GSAP's banner.** The production build minifies GSAP and keeps none of its `@license` banner comments. Entry 4 and `web/LICENSES.md` assumed it would: both are corrected. Keeping the banners needs a `vite.config.ts` option, outside §10.1's files. It is listed under Open items for the founder.
+
+**The page under `page.clock` (found here, kept).**
+
+- `landing_view` and `capability_check` install a fake clock, then advance it 10 s. That replays about 600 animation frames in a row.
+- ScrollTrigger keeps a trivial `requestAnimationFrame` loop alive while it is in use. GSAP's own comment says this is for consistent repaints.
+- Replaying it makes the two cases slower: alone about 10 s, where they took 3-4 s at P154; 12-13 s in the full run at 4 workers. They pass, and their code is unchanged.
+- In a normal browser the same page costs **32 ms of script and 0 ms of layout in 3 s of idle** (CDP `Performance.getMetrics`). So visitors are not affected.
+- With 6 workers on D1 the load made three cases fail once (L-5 among them). They passed with 4 workers and alone. The gate's 4 workers are unchanged.
+- CI runs fewer workers, with one retry. **For the merge:** CI's timings for these two cases are read before merging.
+
+**The long-task read (guide Phase 5).** On a production build in Chrome on D1 at 1280 × 800, scrolling the whole page by wheel with a `longtask` observer recorded **no task over 50 ms**, with movement on and under reduced motion.
+
+**New cases.** L-8 (the scripts of `/app` hold no "ScrollTrigger"; after a scroll of `/`, one does) and L-9 (after "Start free" in the top bar: no `.pin-spacer`, no `[data-landing]`, no page error). L-5 also checks that every pill has opacity 0 and that no word is `data-lit`.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. 513 files in the tree |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok (one new tolerated literal, above); app shell, gzip, **443.4 kB** (main chunk 205.3 kB, **GSAP chunk 44.1 kB**, CSS 13.2 kB), under the 500 kB of D-320 |
+| `pnpm e2e --workers=4` | 53 of 54 passed. "Two tabs" failed and passed alone (Entry 3). J1 and both `page.clock` cases passed unchanged |
+| Captures | The pill rests on "finished." and on "away."; the hero's timecode is lit by the playhead |
+| Frozen check | empty |
+
+**Open.** Item 5 (new): GSAP's banner comments in the bundle.
 
 **Found, not fixed.** None.
