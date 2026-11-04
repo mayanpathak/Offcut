@@ -9,7 +9,7 @@ This file covers the design release between V6 and the cloud-transcription relea
 | 1 | F-3: hide the in-app offers until live mode, as a small change of its own after this release (V6 CL open item 17) | Founder | §18 |
 | 2 | ~~The upload of the seven re-encoded clips~~: **closed** 2026-11-05, uploaded under `overnight-run.md` §3.2 | Agent | Entry 9 |
 | 3 | Design review 3 (P158): done as a self-review under `overnight-run.md` §5, rubric passed in round 2. The founder reads `~/design-review/` and `copy/landing.ts` in the morning | Founder | Entry 11 |
-| 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
+| 4 | The Dodo resubmission (V6 CL open item 10). The tag `design` is done (Entry 13) | Founder | guide Phase 10 |
 | 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
 
 ## Entry 1 - 2026-11-04: the plan
@@ -636,3 +636,42 @@ They were made from the development build (`vite build --mode development`, as `
 **Open.** Nothing new.
 
 **Found, not fixed.** None.
+
+## Entry 13 - 2026-11-05: Parts A and C merged, deployed, checked and tagged
+
+**The last gate.** CI on the pull request's head `d8618b6` (run 41913861090) passed in every job:
+
+- `changes`;
+- `ci` on its one re-run, 13 min 12 s;
+- `e2e-media`, 14 min 57 s.
+
+The first attempt of `ci` stopped in "Golden frames, with their readings". Every golden had passed, then the test process died with SIGSEGV. `git diff 8d94a06 -- crates fixtures` is empty, so the crash was the runner's software GPU (lavapipe), not this code. One re-run is allowed (`overnight-run.md` §6), and it passed.
+
+On CI, `landing_view` took 5.1 s and `capability_check` 4.8 s (Entry 8's watch), and `pnpm e2e` passed 57 of 57 with no flake.
+
+**The merge.** `gh pr ready 13`, then `gh pr merge 13 --merge`: merge commit **`80d611e`**. The `main` run 41920213592 passed in every job:
+
+- `ci`, 13 min 42 s;
+- `e2e-media`, 14 min 50 s;
+- `deploy-api`, 2 min 18 s;
+- `deploy-web`, 1 min 18 s: the build for Vercel, the test-key guard, the deploy, the API through the rewrite, the headers, and the smoke case against the deployment, every step green.
+
+**The live checks of `overnight-run.md` §7.3** (2026-11-05, about 04:00 IST, from D1):
+
+- `E2E_BASE_URL=https://offcut-one.vercel.app pnpm --filter web exec playwright test --project=non-media --grep @smoke`: 1 passed.
+- `node scripts/check-headers.mjs https://offcut-one.vercel.app`: "sends the 7 headers of web/vercel.json, value for value". The policy and both isolation headers are present.
+- `https://offcut-api.onrender.com/api/v1/healthz`: `{"ok":true,"version":"80d611e…"}`.
+- `/` in Chrome, 1280 × 800, analytics answered locally so that no row is added:
+  - the H1 reads "Say it once. Post it finished.";
+  - all 7 clips reach `readyState` 4 with no error;
+  - `crossOriginIsolated` is true;
+  - no security-policy violation;
+  - the top bar's "Start free" leads to `/app` inside the app, which shows the drop zone with "Try a sample" enabled;
+  - no `.pin-spacer` and no `[data-landing]` are left behind.
+- One console line was seen, a `401` on `POST /api/v1/auth/refresh`. That is the session check of a visitor who is not signed in, which V6 treats as normal ("a refusal is not an error"). It is not from this release.
+- The screenshots are `~/design-review/live/live-top.png`, `live-end.png` and `live-app.png`, none staged.
+- The editor is unharmed: on the live `/app` the drop zone shows and "Try a sample" is enabled. Nothing was exported, and nobody signed in.
+
+**The tag.** `git tag -a design -m "Design release: landing page, clips" 80d611e`, pushed. So open item 4's tag part is done; the Dodo resubmission stays the founder's.
+
+**Next.** Part B, lower captions (P159), on its own branch `design-captions` from `origin/main`. This entry is that branch's first commit.
