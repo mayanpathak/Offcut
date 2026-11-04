@@ -223,7 +223,7 @@ If GSAP fails to load, or the visitor asks for reduced motion, the page shows th
 
 **D-332. Lower captions are a separate commit, under DC-13, after the founder picks from rendered stills (§14).** No caption, golden or snapshot changes in Part A's commits.
 
-**D-333. Section copy is drafted in this file and finalised in `copy/landing.ts`.** The founder reads the copy at the design review (G-step "copy read" in §16), as with the legal pages.
+**D-333. Section copy is drafted in this file and finalised in `copy/landing.ts`.** The founder reads the copy at design review 3 (P158), as with the legal pages.
 
 **D-334. Test strings that must stay unique on the page.**
 
@@ -451,6 +451,14 @@ The founder makes the clips with the Remotion prompts of 2026-11-04, kept in `do
 | `privacy` | privacy | 1280 × 720 | 6 s | 1.5 MB | No; a CSS illustration otherwise |
 | `comingSoon` | coming-soon | 1280 × 720 | 8 s | 1.5 MB | No; nothing otherwise |
 
+**G-1, read on 2026-11-05.** All seven web files exist in `C:\Users\Mayan\Desktop\sh2clips\offcut-remotion\out\`, each with its master and its WebP poster. Results:
+
+- **What passes.** H.264 High, 30 fps, the right dimensions, durations of 10/12/9/12/12/6/8 s, no audio stream, faststart, and sizes of 0.05-0.99 MB, well under every cap.
+- **Loops.** Every first frame matches its last.
+- **Truth rules.** No other company's name or UI. "Coming soon" stays on screen for the whole coming-soon clip. The how-it-works clip uses real app screenshots.
+- **What fails.** The pixel format is `yuvj420p` (full range), not `yuv420p`. P156 re-encodes the seven web files from their masters to `yuv420p`, limited range, BT.709, before the upload (the guide, Phase 6).
+- **Footage.** `public/footage/` was never filled, so the clips show a drawn silhouette, not the founder. That is allowed (no stock person, no other company). A later re-render with real footage is a new upload and a new path, with no code change.
+
 ### 9.2 Checks before an upload
 
 These run on the founder's `out/` folder and are recorded in DCL:
@@ -657,10 +665,10 @@ These go in `landing.spec.ts` (non-media; about 30 s added).
 | L-5 | Reduced motion (`page.emulateMedia({ reducedMotion: "reduce" })`): every clip is paused with its poster showing and a "Play the clip" button; the H1 has no pill; after 1 s `document.getAnimations()` is empty and no pin spacer exists (the static final state) |
 | L-6 | Each clip in `LANDING_CLIPS` loads under the isolation headers: `readyState >= 2` once scrolled into view, with no error event (skipped for slots without a clip) |
 | L-7 | Scrolling from top to bottom in 20 steps records zero security policy violations, and `crossOriginIsolated` stays true |
-| L-8 | Opening `/app` directly requests no chunk that `/` alone requests for GSAP (the chunk's name read from `dist`) |
-| L-9 | After a drop moves the page to `/app`, no ScrollTrigger pin spacer (`.pin-spacer`) and no landing element stays in the DOM, and `document.getAnimations()` is empty |
+| L-8 | Opening `/app` directly downloads no GSAP: of every `.js` response of the session, none contains the text `ScrollTrigger`. On `/`, after a scroll, one does |
+| L-9 | After "Start free" moves the page to `/app` inside the app (no reload), no ScrollTrigger pin spacer (`.pin-spacer`) and no landing root (`[data-landing]`) stays in the DOM, and no `pageerror` was raised |
 | L-10 | The strings of §12.1 each match once (`toHaveCount(1)`) |
-| L-11 | axe-core on `/` at 1280 × 800, with 0 violations (wcag2a and wcag2aa), as `review-edit.spec.ts` does for the editor |
+| L-11 | The `axe(page)` helper of `tests-e2e/helpers/fixtures.ts` (serious and critical violations, D-192) on `/` at 1280 × 800, at the top and after scrolling to the end: an empty list, as `review-edit.spec.ts` case 16 asks of the editor |
 
 ### 12.4 DECLARED CHANGES to existing cases
 
@@ -757,26 +765,23 @@ The founder chooses from rendered stills: the reference clip at Bottom, one-line
 
 ## 16. Build order
 
-Each step is one prompt and one commit on `design-build`. Coding prompts follow once this file is approved.
+Each prompt makes one commit on `design-build`. The prompts are in `coding-promptsdesign.md` and the commands in `designbuildguide.md`. Prompt numbers continue V6's (P150).
 
-| Step | Work | Proof |
+| Prompt | Work | Proof |
 |---|---|---|
-| G-0 | Baseline: run `pnpm check`, `pnpm test`, `pnpm e2e` and the app-shell size, and record them in DCL | Counts recorded |
-| P-1 | Dependencies (`gsap`, `motion`), the GSAP licence read, `copy/landing.ts` with all copy of §4-6 (drafts), `messages.ts` importing it, the ESLint rules, the TS §5 rows | `pnpm check`; Vitest unchanged; the J1 case passes |
-| P-2 | Tokens, fonts, `landing.module.css`, `parts.tsx`, `LoopVideo`, `gsap.ts`; `LandingPage.tsx` re-composed with Hero, TopBar and SiteFooter; the other sections as plain markup | All 18 existing cases pass; L-3, L-4, L-10 |
-| P-3 | Sections 2-12 complete (static), Pricing with D-329 (declared change of §12.4), Updates with D-328 | Existing cases plus L-1, L-2; the pricing case changed as declared |
-| P-4 | Motion: M5, M7, M8 (Motion) and M11 (CSS) | L-5 (reduced motion), L-7 |
-| P-5 | GSAP: M1, M2, M3, M4, M6, M9, M10 | L-7, L-8, L-9; size recorded; no long task |
-| G-1 | **Founder:** clips from Remotion, the checks of §9.2, then the upload | ffprobe table in DCL |
-| P-6 | `LANDING_CLIPS`, posters, `DEMO_VIDEO_PATH` repointed, `og.png` and the meta tags | L-6; `@smoke`; the unsupported page shows the new clip |
-| P-7 | axe (L-11), `screens.spec.ts` landing captures, and fixes from both | 0 violations |
-| G-2 | **Design review 3**: the founder and the creator friend read the captures and the live preview of the branch; copy is read (D-333) | The founder says "go", in DCL |
-| P-8 | Part B, after G-3 below: DC-13 code and goldens | §14.3's proofs, with one full media run |
-| G-3 | **Founder:** the caption option, from the stills (before P-8) | Recorded in DCL |
-| P-9 | Part C (if yes) | L-12; signin and checkout unchanged |
-| P-10 | Copy-back (§20), the closing entry; the founder merges, and the deploy checks follow (`@smoke` against the deployment, the live page read on D1); Dodo resubmission (open item 10) | Tag `design` (founder) |
+| Setup | The baseline: `pnpm check`, `pnpm test`, `pnpm e2e`, the app-shell size, and the counts, recorded in DCL. The draft pull request | Counts recorded |
+| P151 | Dependencies (`gsap`, `motion`), the GSAP licence read, `copy/landing.ts` with all copy of §4-6, `messages.ts` importing it, the ESLint rules, the TS §5 rows | Tier 1; all 18 landing cases unchanged |
+| P152 | Tokens, fonts, `landing.module.css`, `parts.tsx`, `LoopVideo`, `gsap.ts` (the loader only); `LandingPage.tsx` re-composed with TopBar, Hero, TryIt, Pricing (unchanged content), Updates and SiteFooter | The 18 cases unchanged; L-3, L-10 |
+| P153 | Sections 2-5 and 7-11 complete (static), Pricing with D-329 (the declared change of §12.4), Updates with D-328 | 17 cases unchanged, plus the pricing case as declared; L-1, L-2, L-4 |
+| P154 | Motion: M5, M7, M8 (Motion) and M11 (CSS) | L-5 (reduced motion), L-7 |
+| P155 | GSAP: M1, M2, M3, M4, M6, M9, M10 | L-7, L-8, L-9; size recorded; no long task |
+| P156 | The clips: re-encode (§9, G-1), upload (with the founder's go), `LANDING_CLIPS`, the posters, `DEMO_VIDEO_PATH` repointed, `og.png` and the meta tags | L-6; `@smoke`; the unsupported page shows the new clip |
+| P157 | Part C: the other pages on the dark tokens | L-12; `signin` and `checkout` unchanged |
+| P158 | axe (L-11), the `screens.spec.ts` captures of `/`, and the fixes from both; then design review 3 (**founder**) | 0 serious or critical; the founder's "go" in DCL |
+| P159 | Part B: the stills, then DC-13's code and goldens | §14.3's proofs; one full media run |
+| P160 | Copy-back (§20), the closing entry. The founder merges, the deploy checks follow, Dodo resubmission | Tag `design` (founder) |
 
-**Estimate.** 6-8 working days with the clips, matching the founder's "about a week". The clips are the founder's critical path. P-1 to P-5 do not wait for them.
+**Estimate.** About 5-7 working days. The clips already exist (G-1, §9.1), so nothing waits on the founder before P158's review.
 
 ---
 
@@ -797,6 +802,18 @@ Each step is one prompt and one commit on `design-build`. Coding prompts follow 
 ---
 
 ## 18. Founder decisions, with recommendations
+
+**Decided on 2026-11-05.** The founder took every recommendation below ("do what you recommend"):
+
+- **F-1:** the H1 is "Say it once. Post it finished."
+- **F-2:** option (a).
+- **F-3:** a separate change after this release.
+- **F-4:** option A. The stills are still rendered in P159 as a check: if A reads worse in any style, the prompt stops, and "keep as is" stays an allowed answer.
+- **F-5:** yes.
+- **F-6:** yes.
+- **F-7:** yes.
+- **F-8:** yes, after the read of §10.2.
+- **F-9:** all three optional clips exist, so all seven slots are filled.
 
 | # | Decision | Recommendation |
 |---|---|---|
@@ -819,7 +836,7 @@ Each step is one prompt and one commit on `design-build`. Coding prompts follow 
 - [ ] The 17 unchanged cases of `landing.spec.ts` pass unmodified. The pricing case changed only as §12.4 declares.
 - [ ] L-1 to L-11 pass, and L-12 passes with Part C.
 - [ ] `signin`, `checkout` and the media suites pass (one full media run, for Part B).
-- [ ] Rust, Vitest and E2E counts are not below G-0's.
+- [ ] Rust, Vitest and E2E counts are not below Setup's baseline.
 - [ ] App shell is 500 kB or less. The size is recorded, with the GSAP chunk alone.
 - [ ] `check-hosts.mjs` is ok: no new host, and every tolerated literal has a reason.
 - [ ] axe reports 0 violations on `/`.

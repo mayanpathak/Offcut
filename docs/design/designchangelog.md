@@ -6,13 +6,10 @@ This file covers the design release between V6 and the cloud-transcription relea
 
 | # | Item | Who | Where |
 |---|---|---|---|
-| 1 | F-1: the H1 (recommended: "Say it once. Post it finished.") | Founder | §18 |
-| 2 | F-2: Creator's line on the page; resubmit to Dodo (recommended: option (a), "Creator goes on sale soon.") | Founder | §13, V6 CL open item 10 |
-| 3 | F-3: hide the in-app offers until live mode, as a small change of its own (V6 CL open item 17) | Founder | §18 |
-| 4 | F-4: the caption option, from rendered stills (recommended: A, bottom-hug) | Founder, at G-3 | §14 |
-| 5 | F-5: Part C, the other pages on the dark system (recommended: yes) | Founder | §15 |
-| 6 | F-6, F-7, F-8, F-9: the accent font, the open-graph image, GSAP's licence, the optional clips | Founder | §18 |
-| 7 | The clips, made with `remotion-prompts.md` and checked by §9.2 (G-1) | Founder | §9 |
+| 1 | F-3: hide the in-app offers until live mode, as a small change of its own after this release (V6 CL open item 17) | Founder | §18 |
+| 2 | The upload of the seven re-encoded clips needs the founder's go (P156) | Founder | guide Step 6.3 |
+| 3 | Design review 3 (P158) | Founder | guide Phase 8 |
+| 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
 
 ## Entry 1 - 2026-11-04: the plan
 
@@ -50,3 +47,39 @@ The branch `design-build` starts at `8d94a06` (V6's closing entry on `v6-build`,
 - TS §5 lists `copy/messages.test.ts`, which the repository does not have. This is not this release's to fix; it is noted for the copy-back.
 
 **Not done yet.** No code. The build guide and the coding prompts follow the founder's approval of this plan.
+
+## Entry 2 - 2026-11-05: the founder's answers, the clips read, the guide and the prompts
+
+**What.** This entry adds two files:
+
+- `designbuildguide.md`: the phases, commands, tiers and frozen check.
+- `coding-promptsdesign.md`: the SAB, Setup and Prompts 151-160.
+
+`designimplementation.md` changes in five places:
+
+- §18 records the answers.
+- §9.1 records the clip read.
+- §16 now names the prompts.
+- L-8, L-9 and L-11 are made testable (L-8 reads the `.js` bodies for `ScrollTrigger`; L-9 navigates in the app rather than dropping a file; L-11 uses the existing `axe(page)` helper, serious and critical).
+- D-333's review is P158.
+
+**The founder's answers (2026-11-05: "do what you recommend").** F-1 to F-9 are all as recommended in §18. Open items 1, 2 and 4 to 7 of Entry 1 are closed.
+
+**The clips (G-1), read from `offcut-remotion/out/`.** All seven web files, masters and posters exist.
+
+| Clip | Web size | Frames | Bytes | Cap |
+|---|---|---|---|---|
+| hero | 720 × 1280 | 300 | 773,591 | 2,500,000 |
+| before-after | 1280 × 720 | 360 | 486,785 | 3,000,000 |
+| caption-styles | 720 × 1280 | 270 | 360,621 | 2,000,000 |
+| visuals | 960 × 960 | 360 | 364,094 | 2,500,000 |
+| how-it-works | 1280 × 720 | 360 | 992,038 | 2,500,000 |
+| privacy | 1280 × 720 | 180 | 50,691 | 1,500,000 |
+| coming-soon | 1280 × 720 | 240 | 269,786 | 1,500,000 |
+
+- **What passes.** Each clip is H.264 High at 30 fps, with no audio stream, faststart, and is under its cap. Every first frame matches the last (six-frame contact sheets read).
+- **What fails.** Every file is `yuvj420p` (full range), not `yuv420p`. P156 re-encodes from the masters before the upload (guide Step 6.1).
+- **Truth rules.** They hold. No other company's name or UI appears. "Coming soon" stays on screen for the whole coming-soon clip. how-it-works uses the app's real screenshots.
+- **Footage.** `public/footage/` was never filled, so the other clips show a drawn silhouette in place of the founder. That is allowed; a later re-render is a new upload.
+
+**Not done yet.** No code. Setup comes next, and its baseline is Entry 3.
