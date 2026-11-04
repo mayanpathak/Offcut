@@ -18,6 +18,19 @@ export const DEMO_VIDEO_PATH = "media/demo.81cafa494d9c2b68.mp4";
  */
 export const SAMPLE_CLIP_PATH = "media/speech_scriptA_landscape_720p.7da948cecc39438a.mp4";
 
+/** The landing page's clip slots (designimplementation §9.1). */
+export type LandingSlot = "hero" | "beforeAfter" | "captionStyles" | "visuals" | "howItWorks" | "privacy" | "comingSoon";
+
+/** A clip on the asset host: its path as `scripts/upload-assets.sh` printed it, and its size in pixels. */
+export type LandingClip = { path: string; width: number; height: number };
+
+/**
+ * The landing page's clips that are on the asset host. A slot without one
+ * shows its still, never a broken video (D-325). A `<video>` element loads
+ * them from `assetUrl(...)`; they are not fetched here.
+ */
+export const LANDING_CLIPS: Partial<Record<LandingSlot, LandingClip>> = {};
+
 /**
  * The URL of a file on the asset host. `path` is relative to its base URL.
  * A request to the asset host carries no query string, and a path may not

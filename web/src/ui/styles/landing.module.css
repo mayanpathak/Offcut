@@ -1,0 +1,655 @@
+/* The landing page (designimplementation §7): the root and its tokens, the
+   top bar, the hero and the parts the sections share. The sections after the
+   hero are in landing-sections.module.css.
+
+   The root carries data-theme="dark", so it reads the editor's tokens of
+   tokens.css; the tokens below are the landing page's own (§7.1). Every
+   keyframe sits under (prefers-reduced-motion: no-preference): with reduced
+   motion the page is static and complete (§8.1). Nothing here is written in
+   a style attribute: the security policy has no 'unsafe-inline' for styles. */
+
+.landing {
+  --lp-max: 1200px;
+  --lp-gutter: clamp(20px, 4vw, 48px);
+  --lp-section: clamp(96px, 12vw, 160px);
+  --lp-h1: clamp(44px, 7vw, 96px);
+  --lp-h2: clamp(32px, 4.5vw, 56px);
+  --lp-lead: clamp(17px, 1.6vw, 20px);
+  --lp-radius-lg: 24px;
+  --lp-pill: #ffd60a;
+  --lp-pill-ink: #111114;
+  --lp-mono-green: #3ddc84;
+  --lp-glow: rgb(139 92 246 / 0.18);
+  --lp-hairline: rgb(255 255 255 / 0.06);
+  --lp-hairline-2: rgb(255 255 255 / 0.1);
+  --lp-violet-text: #b79dfb;
+  --lp-topbar: 64px;
+  --font-accent: "JetBrains Mono UI", ui-monospace, monospace;
+
+  /* The page's links, and the shared classes of DropZone and NotifyMeForm,
+     read V1's colour names (tokens.css :root). Here they take the dark ones. */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface-1);
+  --color-text: var(--text);
+  --color-muted: var(--text-2);
+  --color-border: #3a3a44;
+  --color-accent: var(--lp-violet-text);
+  --color-on-accent: #0e0e11;
+  --color-ok: var(--lp-mono-green);
+  --color-problem: var(--danger);
+
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The resets have no weight (`:where`), so that any class of the page wins. */
+:where(.landing) :where(h1, h2, h3, h4, p, ul, ol, figure) {
+  margin: 0;
+}
+
+:where(.landing) a {
+  color: var(--lp-violet-text);
+  text-underline-offset: 3px;
+}
+
+.landing ::selection {
+  background: var(--lp-pill);
+  color: var(--lp-pill-ink);
+}
+
+.container {
+  width: min(100% - 2 * var(--lp-gutter), var(--lp-max));
+  margin-inline: auto;
+}
+
+/* A section of the page: the rhythm between sections, and room under the
+   sticky top bar when a link of the bar jumps to it. */
+.section {
+  padding-top: var(--lp-section);
+  scroll-margin-top: var(--lp-topbar);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Type ------------------------------------------------------------------ */
+
+.h1 {
+  position: relative;
+  font-size: var(--lp-h1);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.h2 {
+  font-size: var(--lp-h2);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  max-width: 18em;
+  text-wrap: balance;
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sectionHeadCenter {
+  align-items: center;
+  text-align: center;
+}
+
+.sectionHeadCenter .h2,
+.sectionHeadCenter .sectionLead {
+  margin-inline: auto;
+}
+
+.sectionLead {
+  max-width: 40em;
+  color: var(--text-2);
+  font-size: var(--lp-lead);
+  line-height: 1.55;
+}
+
+/* The timecode eyebrow (D-317). The playhead lights it up (M3). */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-2);
+  font-family: var(--font-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.timecode {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgb(139 92 246 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(139 92 246 / 0.28);
+  color: var(--lp-violet-text);
+  letter-spacing: 0.04em;
+  transition:
+    background-color var(--base) var(--ease),
+    color var(--base) var(--ease);
+}
+
+.isLive .timecode {
+  background: var(--brand-hover);
+  color: #fff;
+}
+
+/* --- Calls to action ------------------------------------------------------- */
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 26px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    transform var(--fast) var(--ease),
+    background-color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+
+.landing .ctaPrimary {
+  background: var(--brand-hover);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 10px 30px -10px rgb(139 92 246 / 0.7);
+}
+
+.landing .ctaPrimary:hover {
+  background: #6d3fe0;
+  transform: translateY(-1px);
+}
+
+.landing .ctaSecondary {
+  background: rgb(255 255 255 / 0.04);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+}
+
+.landing .ctaSecondary:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.ctaSmall {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+/* --- Chips ----------------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+  color: var(--text);
+  font-family: var(--font-accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chipDot::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 3px rgb(139 92 246 / 0.2);
+}
+
+/* --- The top bar (section 0) ----------------------------------------------- */
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgb(14 14 17 / 0.72);
+  backdrop-filter: blur(12px) saturate(140%);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--base) var(--ease);
+}
+
+.topBar[data-scrolled] {
+  border-bottom-color: var(--lp-hairline-2);
+}
+
+.topBarInner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: var(--lp-topbar);
+}
+
+.landing .wordmark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+
+.wordmarkO {
+  margin-right: 1px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--lp-pill);
+  color: var(--lp-pill-ink);
+  line-height: 1.25;
+}
+
+.nav {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.landing .nav a {
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+.landing .nav a:hover {
+  background: rgb(255 255 255 / 0.05);
+  color: var(--text);
+}
+
+.topBarCta {
+  margin-left: 8px;
+}
+
+@media (max-width: 719px) {
+  .nav {
+    display: none;
+  }
+
+  .topBarCta {
+    margin-left: auto;
+  }
+}
+
+/* The 2 px progress bar of a short (D-317, M2): GSAP scrubs its scale. */
+.progress {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand), var(--lp-violet-text));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+/* The playhead (D-317, M3): a line down the left gutter on wide screens. */
+.playhead {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .playhead {
+    position: fixed;
+    top: calc(var(--lp-topbar) + 24px);
+    bottom: 24px;
+    left: max(16px, calc((100vw - var(--lp-max)) / 2 - 48px));
+    z-index: 40;
+    display: block;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(rgb(139 92 246 / 0.35), rgb(139 92 246 / 0.06));
+    pointer-events: none;
+  }
+
+  .playheadDot {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow:
+      0 0 0 4px rgb(139 92 246 / 0.25),
+      0 0 16px rgb(139 92 246 / 0.8);
+  }
+}
+
+/* --- The hero (section 1) -------------------------------------------------- */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  padding-block: clamp(40px, 7vw, 96px) clamp(48px, 7vw, 80px);
+  scroll-margin-top: var(--lp-topbar);
+}
+
+/* Two violet glows and a faint grid, masked (decoration). */
+.heroBackdrop {
+  position: absolute;
+  inset: calc(-1 * var(--lp-topbar)) 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 78% 38%, rgb(139 92 246 / 0.28), transparent 70%),
+    radial-gradient(35% 45% at 8% 0%, rgb(124 77 238 / 0.18), transparent 70%);
+}
+
+.heroBackdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 10%, transparent 75%);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: clamp(40px, 5vw, 72px);
+  align-items: center;
+}
+
+@media (max-width: 959px) {
+  .heroGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.heroCopy .h1 {
+  margin-top: 24px;
+}
+
+.heroLead {
+  max-width: 34em;
+  margin-top: 24px;
+  color: var(--text-2);
+  font-size: var(--lp-lead);
+  line-height: 1.55;
+}
+
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 36px;
+}
+
+/* The capability line (J3), kept as it was and drawn as a pill with a dot. */
+.capability {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 32px;
+  padding: 7px 14px 7px 12px;
+  border-radius: 16px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.capability::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b6b76;
+}
+
+.capabilitySupported {
+  color: var(--text);
+}
+
+.capabilitySupported::before {
+  background: var(--lp-mono-green);
+  box-shadow: 0 0 0 4px rgb(61 220 132 / 0.16);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  list-style: none;
+}
+
+.facts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+}
+
+.facts li::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  margin-right: 4px;
+  background: var(--border);
+}
+
+/* The phone and its chips. */
+.heroVisual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-block: 16px;
+  perspective: 1400px;
+}
+
+.heroVisual::before {
+  content: "";
+  position: absolute;
+  inset: 12% 8%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(139 92 246 / 0.35), transparent);
+  filter: blur(20px);
+}
+
+.phone {
+  position: relative;
+  width: min(300px, 72vw);
+  padding: 10px;
+  border-radius: 44px;
+  background: linear-gradient(155deg, #2a2a33, #15151a 55%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.09),
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 0 1px rgb(0 0 0 / 0.6),
+    0 50px 90px -30px rgb(0 0 0 / 0.85),
+    0 0 120px -30px rgb(139 92 246 / 0.45);
+  transform-style: preserve-3d;
+}
+
+.screen {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  border-radius: 34px;
+  background: #050507;
+}
+
+.notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 76px;
+  height: 20px;
+  margin-left: -38px;
+  border-radius: 12px;
+  background: #000;
+}
+
+.heroChip {
+  position: absolute;
+  z-index: 2;
+  background: rgb(29 29 35 / 0.82);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 0 0 1px var(--lp-hairline-2),
+    0 12px 30px -12px rgb(0 0 0 / 0.8);
+}
+
+.heroChip:nth-of-type(1) {
+  top: 14%;
+  left: 0;
+}
+
+.heroChip:nth-of-type(2) {
+  top: 46%;
+  right: 0;
+}
+
+.heroChip:nth-of-type(3) {
+  bottom: 12%;
+  left: 4%;
+}
+
+@media (max-width: 480px) {
+  .heroChip {
+    display: none;
+  }
+}
+
+/* --- The clips (§9.5) ------------------------------------------------------ */
+
+.clip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.clipMedia {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playClip {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(14 14 17 / 0.82);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+}
+
+.playClip:hover {
+  background: rgb(29 29 35 / 0.95);
+}
+
+/* --- The captioned headline's pill (M1, M10) ------------------------------- */
+
+.captionWord {
+  position: relative;
+  z-index: 1;
+  transition: color 120ms linear;
+}
+
+.captionWord[data-lit] {
+  color: var(--lp-pill-ink);
+}
+
+.captionPill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 0;
+  height: 0;
+  border-radius: 0.14em;
+  background: var(--lp-pill);
+  opacity: 0;
+  pointer-events: none;
+}

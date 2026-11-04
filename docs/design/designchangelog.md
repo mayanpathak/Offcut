@@ -197,3 +197,55 @@ So F-8 stands, under `overnight-run.md` §6's test. **For the founder:** this re
 **Open.** Nothing new.
 
 **Found, not fixed.** None.
+
+## Entry 5 - 2026-11-05: P152, the skeleton of the new page
+
+**What changed.**
+
+- **`tokens.css`.**
+  - The `@font-face` "JetBrains Mono UI" (weight 700, `swap`).
+  - D-316's rule `:root:has([data-theme="dark"]) body { background: #0e0e11 }`.
+  - The header comment and the dark section's comment now say the landing page uses Inter and the dark system.
+- **The font.** `web/src/ui/assets/jetbrains-mono-latin.woff2`, made as guide Phase 2 says:
+  - `varLib.instancer` with `wght=700`, then `pyftsubset` with the unicodes of the guide, WOFF2, no layout features;
+  - 99 code points, 104 glyphs, no `fvar`;
+  - 4,912 bytes, SHA-256 `146e9dd8…c2ee`, recorded in `web/LICENSES.md`.
+  - The build emits it as `assets/jetbrains-mono-latin-<hash>.woff2`.
+- **`web/LICENSES.md`.** Its row; a JetBrains Mono section, whose licence is the OFL text already quoted; and the GSAP note of §10.1.
+- **`net/asset-fetch.ts`.** The types `LandingSlot` and `LandingClip`, and `LANDING_CLIPS`, empty for now (D-325: every slot shows its still). P156 fills it.
+- **New in `ui/landing/`.**
+  - `parts.tsx`: `MotionScope`, `Eyebrow`, `SectionHead`, `CtaLink`, `PhoneFrame`, `Chip`.
+  - `LoopVideo.tsx`: §9.5 and D-326.
+  - `gsap.ts`: `loadGsap()` and `useGsap()`, unused for now.
+  - Sections: `TopBar`, `Hero`, `TryIt`, `Pricing` (today's content), `Updates`, `SiteFooter`.
+- **New styles.** `landing.module.css` (root, tokens, top bar, hero, shared parts) and `landing-sections.module.css`.
+- **`LandingPage.tsx`.**
+  - The root is `<div data-landing data-theme="dark">`, holding the top bar, `<main>` with the sections, and the footer.
+  - The props and the navigation effect are unchanged: `git diff 8d94a06` shows none of the effect's lines.
+  - `capabilityLine()` moved verbatim to `Hero.tsx`.
+- **`landing.spec.ts`.** Two new cases at the end, L-3 (for now: the top bar's and the hero's "Start free") and L-10. No existing case changed.
+
+**What differs from the plan.**
+
+- **The Motion scope is in `parts.tsx`.** §10.1 puts `<LazyMotion>`/`<MotionConfig>` in `LandingPage.tsx`, but D-319's lint rule refuses `motion` outside `ui/landing/`. So `LandingPage.tsx` renders `MotionScope` from `parts.tsx`.
+- **`LANDING_CLIPS` and its types come now, empty.** `LoopVideo` and the sections need the types. The paths still come in P156.
+- **The first design read** (captures at 1280, 1920 and 390, read on D1) found the page's margin reset outranking the section classes. The reset is now under `:where()`, which has no weight.
+- **The DropZone and NotifyMeForm restyle uses V1's colour names.** These are the names their shared classes read: the landing root sets `--color-*` to the dark tokens, as `.signIn` already does in `components.module.css`. The selectors of §11 adjust sizes. Neither component's file changed.
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass. `check-file-tree`: 503 files; longest is `landing.module.css`, 655 lines |
+| Vitest | 522 passed |
+| `pnpm build` | `check-hosts` ok, no new literal; app shell, gzip, **387.0 kB** (main chunk 195.6 kB, CSS 10.6 kB). The 33 kB rise is mostly Motion's `domAnimation` and `LazyMotion` |
+| `pnpm e2e --workers=4` | 46 of 47 passed: the 18 old landing cases, L-3 and L-10, signin and checkout. "Two tabs" failed, then passed alone (Entry 3's flake) |
+| Tier 3 | `pnpm build:e2e` (keyed) then `rejections.spec.ts --grep REJECT_FILE_SIZE`: passed, so `/app`'s drop zone is untouched |
+| Captures | No security-policy violation and no sideways scroll at 1280, 1920 and 390 |
+| Frozen check | empty |
+
+The first `build:e2e` failed in Cargo ("could not parse/generate dep info … os error 3"). The founder had deleted `target/` (84 GB) while it ran. The second, from a clean `target/`, passed.
+
+**Open.** Nothing new.
+
+**Found, not fixed.** None.

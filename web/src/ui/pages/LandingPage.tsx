@@ -1,31 +1,25 @@
-// J1: the landing page. What it promises, the demo, where it works, that the
-// video is not uploaded, and whether this browser can run it (J3). A clip
-// dropped here is taken, and the page moves on to the editor with it
-// (v2implementation D-48).
+// J1: the landing page. What Offcut does and what comes next, the way in,
+// where it works, that the video is not uploaded, and whether this browser
+// can run it (J3). A clip dropped here is taken, and the page moves on to the
+// editor with it (v2implementation D-48).
+//
+// The design release (designimplementation D-316 to D-335): the page is made
+// of the sections in ui/landing/, on the editor's dark tokens. This file keeps
+// its props and its navigation effect; the sections hold the rest.
 
 import { useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
-import { PRICES_USD } from "../../config/pricing";
-import { LEGAL_DOCS, type LegalDoc, messages } from "../../copy/messages";
-import { LIMITS } from "../../gen/domain";
-import { assetUrl, DEMO_VIDEO_PATH } from "../../net/asset-fetch";
-import { type CapabilityState, useCapabilityStore } from "../../state/capability-store";
+import type { LegalDoc } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
-import { DropZone } from "../components/DropZone";
-import { NotifyMeForm } from "../components/NotifyMeForm";
-import styles from "../styles/pages.module.css";
-
-/** The one line that says whether this browser can run Offcut. */
-function capabilityLine(state: CapabilityState): { text: string; supported: boolean } {
-  if (state.status === "supported") {
-    return { text: messages.capability.supported, supported: true };
-  }
-  if (state.status === "unsupported" && state.reason !== undefined) {
-    return { text: messages.unsupported.reasons[state.reason], supported: false };
-  }
-  return { text: messages.capability.checking, supported: false };
-}
+import { Hero } from "../landing/Hero";
+import { MotionScope } from "../landing/parts";
+import { Pricing } from "../landing/Pricing";
+import { SiteFooter } from "../landing/SiteFooter";
+import { TopBar } from "../landing/TopBar";
+import { TryIt } from "../landing/TryIt";
+import { Updates } from "../landing/Updates";
+import styles from "../styles/landing.module.css";
 
 export function LandingPage({
   settingsPath,
@@ -36,9 +30,6 @@ export function LandingPage({
   appPath: string;
   legalPath: (doc: LegalDoc) => string;
 }) {
-  const capability = capabilityLine(useCapabilityStore());
-  const copy = messages.landing;
-  const pricing = messages.pricing;
   const navigate = useNavigate();
   const clipStatus = useClipStore((state) => state.status);
   const lastClipStatus = useRef(clipStatus);
@@ -55,79 +46,17 @@ export function LandingPage({
   }, [clipStatus, appPath, navigate]);
 
   return (
-    <main className={styles.page}>
-      <section className={styles.section}>
-        <h1 className={styles.hero}>{copy.hero}</h1>
-        <p className={styles.lead}>{copy.subhead}</p>
-        <ul className={styles.facts}>
-          <li>{copy.supportedBrowsers}</li>
-          <li>
-            {copy.privacyLine} <Link to={settingsPath}>{copy.whatLeavesLink}</Link>
-          </li>
-        </ul>
-        <p
-          className={capability.supported ? styles.supported : styles.muted}
-          role="status"
-          data-testid="capability-line"
-        >
-          {capability.text}
-        </p>
-      </section>
-
-      <figure className={styles.demo}>
-        <video
-          className={styles.video}
-          controls
-          preload="metadata"
-          crossOrigin="anonymous"
-          src={assetUrl(DEMO_VIDEO_PATH)}
-        />
-        <figcaption className={styles.muted}>{copy.demoCaption}</figcaption>
-      </figure>
-
-      <DropZone />
-
-      <section className={styles.section} aria-labelledby="pricing-heading" data-testid="pricing">
-        <h2 className={styles.heading} id="pricing-heading">
-          {pricing.heading}
-        </h2>
-        <p className={styles.text}>{pricing.notOnSale}</p>
-        <div className={styles.plans}>
-          <div className={styles.plan}>
-            <h3 className={styles.planName}>{pricing.free.name}</h3>
-            <p className={styles.text}>{pricing.free.price(PRICES_USD.free)}</p>
-            <ul className={styles.planFeatures}>
-              {pricing.free.features(LIMITS).map((feature) => (
-                <li key={feature}>{feature}</li>
-              ))}
-            </ul>
-          </div>
-          <div className={styles.plan}>
-            <h3 className={styles.planName}>{pricing.creator.name}</h3>
-            <p className={styles.text}>{pricing.creator.price(PRICES_USD.creatorMonthly, PRICES_USD.creatorAnnual)}</p>
-            <ul className={styles.planFeatures}>
-              {pricing.creator.features.map((feature) => (
-                <li key={feature}>{feature}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <p className={styles.muted}>{pricing.merchant}</p>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.heading}>{copy.updatesHeading}</h2>
-        <NotifyMeForm wanted={["launch"]} />
-      </section>
-
-      <footer className={styles.footer} data-testid="site-footer">
-        {LEGAL_DOCS.map((doc) => (
-          <Link key={doc} to={legalPath(doc)}>
-            {messages.legal.docs[doc].linkLabel}
-          </Link>
-        ))}
-        <a href={`mailto:${messages.legal.contactEmail}`}>{messages.legal.footerContact}</a>
-      </footer>
-    </main>
+    <MotionScope>
+      <div className={styles.landing} data-landing data-theme="dark">
+        <TopBar appPath={appPath} />
+        <main>
+          <Hero appPath={appPath} settingsPath={settingsPath} />
+          <TryIt />
+          <Pricing />
+          <Updates />
+        </main>
+        <SiteFooter legalPath={legalPath} settingsPath={settingsPath} />
+      </div>
+    </MotionScope>
   );
 }

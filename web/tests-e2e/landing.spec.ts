@@ -385,3 +385,51 @@ test("a legal document that does not exist goes back to the landing page", async
   await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
 });
+
+// --- The design release (designimplementation §12.3) ---------------------------
+// New cases only: every case above is as it was, except the pricing case's
+// declared change (§12.4).
+
+/** Where "Start free" leads into the app: the top bar and the hero. */
+const START_FREE_LINKS = 2;
+const startFree = (scope: Pick<Page, "getByRole">) => scope.getByRole("link", { name: messages.landing.cta.startFree, exact: true });
+
+test("L-3: every Start free leads to /app, which shows the drop zone or the unsupported page", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+
+  const links = startFree(page);
+  await expect(links).toHaveCount(START_FREE_LINKS);
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("href", "/app");
+  }
+  await startFree(page.getByRole("banner")).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+});
+
+test("L-10: each string the tests look for is on the page once, by its name and by a part of it", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  const pricing = page.getByTestId("pricing");
+  const footer = page.getByTestId("site-footer");
+
+  for (const exact of [false, true]) {
+    await expect(page.getByRole("heading", { name: messages.landing.hero, exact })).toHaveCount(1);
+    await expect(page.getByText(messages.landing.supportedBrowsers, { exact })).toHaveCount(1);
+    await expect(page.getByRole("link", { name: messages.landing.whatLeavesLink, exact })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: messages.dropZone.sampleButton, exact })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: messages.notifyMe.submit, exact })).toHaveCount(1);
+    await expect(page.getByLabel(messages.notifyMe.emailLabel, { exact })).toHaveCount(1);
+    await expect(pricing.getByRole("heading", { name: messages.pricing.heading, exact })).toHaveCount(1);
+    await expect(page.getByText(messages.pricing.notOnSale, { exact })).toHaveCount(1);
+    for (const doc of LEGAL_DOCS) {
+      await expect(footer.getByRole("link", { name: messages.legal.docs[doc].linkLabel, exact })).toHaveCount(1);
+    }
+    await expect(footer.getByRole("link", { name: messages.legal.footerContact, exact })).toHaveCount(1);
+  }
+  // The privacy line shares its list item with the link, so only a part of that item is the line.
+  await expect(page.getByText(messages.landing.privacyLine)).toHaveCount(1);
+  // The waitlist cases read the status of the page's one form.
+  await expect(page.locator("form")).toHaveCount(1);
+});
