@@ -623,6 +623,7 @@ offcut/
 │   ├── LICENSES.md                    licences of shipped assets: Inter (OFL-1.1), Lucide icons (ISC) (v4implementation D-180)
 │   ├── public/
 │   │   ├── robots.txt
+│   │   ├── og.png                     the open-graph image of a shared link, 1200 × 630, from the hero clip's poster (designimplementation D-335)
 │   │   └── ort/                       ONNX Runtime .wasm files copied at build by vite.config.ts
 │   ├── src/
 │   │   ├── main.tsx
@@ -640,7 +641,8 @@ offcut/
 │   │   │   ├── features.ts            [ONLY] (V6.1) FeatureFlags from a Vite define (§41.3)
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
-│   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code
+│   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
+│   │   │   ├── landing.ts             the landing page's and the prices' copy, imported by messages.ts (designimplementation D-321)
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
@@ -804,8 +806,29 @@ offcut/
 │   │       │   ├── SettingsPage.tsx
 │   │       │   ├── ShortsPage.tsx     (V6.4) the list of shorts (§45.8)
 │   │       │   └── LegalPage.tsx
+│   │       ├── landing/               the landing page's sections (designimplementation D-322); the only files that may import GSAP and Motion (D-319)
+│   │       │   ├── TopBar.tsx         section 0: wordmark, anchors, "Start free", the progress bar
+│   │       │   ├── Hero.tsx           section 1: the headline, the way in, the capability line, the hero clip
+│   │       │   ├── CaptionedHeadline.tsx  the captioned headline and the final call's pill (M1, M10)
+│   │       │   ├── Marquee.tsx        section 2
+│   │       │   ├── BeforeAfter.tsx    section 3
+│   │       │   ├── Features.tsx       section 4: the eight feature cards
+│   │       │   ├── HowItWorks.tsx     section 5
+│   │       │   ├── TryIt.tsx          section 6: the unchanged DropZone
+│   │       │   ├── Privacy.tsx        section 7
+│   │       │   ├── Pricing.tsx        section 8: the plans, from PRICES_USD and LIMITS
+│   │       │   ├── ComingSoon.tsx     section 9: every post-V6 feature, marked "Coming soon"
+│   │       │   ├── Updates.tsx        section 10: the unchanged NotifyMeForm
+│   │       │   ├── FinalCall.tsx      section 11
+│   │       │   ├── SiteFooter.tsx     section 12: legal links, contact, settings
+│   │       │   ├── LoopVideo.tsx      the one player of the landing clips (designimplementation §9.5)
+│   │       │   ├── parts.tsx          PhoneFrame, Chip, SectionHead, CtaLink, BentoCard, the Motion scope
+│   │       │   ├── gsap.ts            loadGsap() and useGsap(): GSAP by import(), inside matchMedia, reverted on unmount
+│   │       │   └── gsap-runtime.ts    GSAP and its scroll plugin, registered: the one module gsap.ts imports with import(), so both share one chunk
 │   │       ├── assets/
-│   │       │   └── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
+│   │       │   ├── inter-latin.woff2  the interface font, Latin subset of the scene's Inter, emitted hashed under /assets/ (v4implementation D-180)
+│   │       │   ├── jetbrains-mono-latin.woff2  the landing page's accent face: JetBrains Mono 700, Latin subset (designimplementation D-330)
+│   │       │   └── landing/           the landing clips' WebP posters, one per slot, emitted hashed (designimplementation §9.4)
 │   │       ├── icons.tsx              inline SVG icons (D-181)
 │   │       ├── dev-hooks.ts           `__offcutDev`: the page's development hooks, never in a production build (v4implementation D-155, v4changelog Entry 21)
 │   │       ├── hooks/
@@ -870,7 +893,10 @@ offcut/
 │   │           ├── panel.module.css       the side panel and its tabs
 │   │           ├── primitives.module.css  the primitives (D-181)
 │   │           ├── controls.module.css    the primitives that hold a value: Tabs, Switch, SegmentedControl, Slider (v4changelog Entry 19)
-│   │           └── preview.module.css     the player, its transport and the direct-manipulation chrome
+│   │           ├── preview.module.css     the player, its transport and the direct-manipulation chrome
+│   │           ├── landing.module.css     the landing page: root, tokens, top bar, hero, shared parts (designimplementation §7)
+│   │           ├── landing-sections.module.css  the landing page's sections after the hero
+│   │           └── landing-cards.module.css  the features' bento cards and the "Coming soon" cards (split to stay under 700 lines)
 │   └── tests-e2e/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
@@ -1905,7 +1931,7 @@ As built in V5 (v5implementation D-229): `forExport(room?)`. Without `room` it l
 
 | Path | Page | Notes |
 |---|---|---|
-| `/` | `LandingPage` | J1: hero, before/after demo video (asset CDN), supported-browser line, "What leaves your device" link, `DropZone`, sample-clip button. Runs the capability check for the E-8 beacon |
+| `/` | `LandingPage` | J1 (design release, designimplementation §6): hero with the captioned headline and the hero clip (asset host), the capability line, the supported-browser line and the "What leaves your device" link; sections of features and "Coming soon"; `DropZone` with the sample-clip button; pricing with a way in ("Start free" to `/app`); the update form. Sections in `ui/landing/`, animated with Motion and GSAP (TDR-26). Runs the capability check for the E-8 beacon |
 | `/app` | `EditorPage` inside `CapabilityGate` | J2-J12. Unsupported → `UnsupportedPage` in place |
 | `/auth/callback` | `AuthCallbackPage` | Reads `token` from the query, then removes it with `history.replaceState` |
 | `/account` | `AccountPage` | Plan, export counter, checkout return, manage subscription, delete, export data |
@@ -1984,7 +2010,7 @@ The primitives (`ui/primitives/`: `Button`, `IconButton`, `Kbd`, `PanelSection`,
 ### 13.5 Acceptance targets
 
 - Capability check completes within 3 s (PS §9.3); `capability.spec.ts`.
-- App shell (HTML + JS + CSS, excluding WASM) at most 400 kB gzip (assumption, M2.4); `scripts/check-hosts.mjs` also reports bundle sizes.
+- App shell (HTML + JS + CSS, excluding WASM) at most 500 kB gzip (400 until the design release; the founder's yes of 2026-11-04, designimplementation D-320; assumption, M2.4); `scripts/check-hosts.mjs` also reports bundle sizes.
 - No main-thread task longer than 100 ms while a clip is processing (assumption, M2.4); `pipeline-preview.spec.ts` with `PerformanceObserver("longtask")`.
 
 **Contingency.** Bundle over budget: lazy-load `/account`, `/settings`, `/legal`. Long tasks: move the offending work behind a worker method.
@@ -3760,7 +3786,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | INV-12 | The ASR session and the render session never coexist | `run-pipeline.test.ts` (ordering of `unload` and `openSession`) |
 | INV-13 | A usage receipt is stored at most once per `export_id`; a webhook is applied at most once per `provider_event_id` | `usage_receipts.rs`; `webhook_idempotency.rs` |
 | INV-14 | Limits are visible before the action they gate; no upgrade prompt renders during processing, editing or rendering | `export-free.spec.ts` |
-| INV-15 | All user-facing text and every number inside it come from `copy/messages.ts` and the generated limits | `messages.test.ts`; `react/jsx-no-literals` |
+| INV-15 | All user-facing text and every number inside it come from `copy/messages.ts` and the files it imports (`copy/landing.ts`, designimplementation D-321), and the generated limits | `messages.test.ts`; `react/jsx-no-literals` |
 | INV-16 | Every state change goes through `transition()`; an illegal transition changes nothing | The four machine test files |
 | INV-17 | The main thread performs no decode, inference, DSP, render or encode | Boundaries lint; long-task assertion in `pipeline-preview.spec.ts` |
 | INV-18 | Analytics events have no free-text property and no user identifier | `events.types.test.ts`; `analytics_allowlist.rs` |
@@ -3892,6 +3918,8 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 **TDR-23 (v1.3). Sentence-level selection for the Director.** Chosen over word-level. Why: mid-sentence cuts become impossible by type, and the body stays under INV-4's 64 kB. Cost: depends on sentence segmentation (`sentences_long.rs`); a sentence cannot be split by the model. Reversal: `SentenceRange` becomes a word range with a validator rule; not planned.
 
 **TDR-24 (v1.3). Chat returns typed operations.** Chosen over a whole new plan and over scripts. Why: small requests stay small, undo is the existing history, the validator stays the only gate. Cost: a request with no op fitting it gets "I can't do that yet". Reversal: more ops.
+
+**TDR-26 (design release). GSAP and Motion, on the landing page only.** Chosen over hand-written CSS and requestAnimationFrame code for the landing page's animation (designimplementation D-318, D-319). Why: a page whose job is to sell needs timelines, scroll-scrubbed and pinned sections (GSAP with ScrollTrigger) and React-side entrances (Motion), and both libraries do this well with less code of our own. Cost: 44 kB gzip for GSAP in a chunk loaded with `import()` after the first paint, about 30 kB for Motion's `domAnimation` in the main chunk; GSAP's licence is GreenSock's own "no charge" licence, not an OSI one (read 2026-11-05, designchangelog Entry 4). Kept out of the product: ESLint refuses both outside `src/ui/landing/`, and case L-8 proves the editor's route downloads no GSAP. Reversal: Motion and CSS alone, about a day's work (§17 of the plan).
 
 **TDR-25 (v1.3). Matte as a stored low-resolution video.** Chosen over running the model during render. Why: INV-12, memory, and no new playback code. Cost: a pass per short and H.264 on alpha. Reversal: a lossless frame file (§51.1).
 
@@ -4076,7 +4104,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 21. Analytics never joined to accounts at MVP (§22.6) — M2.2.
 22. Retention of `webhook_events` (90 days) and `magic_links` (1 day); no database backups; 30 events per visitor (§23.3) — TE-9, TE-6. Dodo's documented retries span about 27 hours, inside 90 days.
 23. Memory estimates and the 1.5 GB peak budget (§31) — TE-14.
-24. App-shell size 400 kB; long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. R1 and M2.4 re-read them.
+24. App-shell size 500 kB (400 kB until the design release, designimplementation D-320); long-task limit 100 ms; `frame_at` 2 ms; `redetect` 50 ms; edit-to-preview 150 ms; API p95 150 ms (§13.5, §17, §19, §30) — M1.5, M2.4. Measured in V3: `redetect_sentence` 142-290 µs per call on a 157-word transcript, natively on D1 (§17.3). Measured in V4 on D1: app shell 337.2 kB gzip with the interface font (400); no main-thread task over 100 ms while processing (after Prompt 124's two fixes), none over 50 ms in a word edit, a style switch or a caption drag (D-193); `build_scene` 6.3 ms and `frame_at` 0.002 ms on average natively (1 s, 2 ms); edit-to-preview 90th percentile 25-29 ms (150); hit test median 0.5 ms, worst 7.6 ms (16); style thumbnails 18-81 ms (400). Measured in V5 on D1: app shell 339.6 kB; render and encode 30.9 s per 60 s (90), mux 21 ms (2 s); a render-cache hit 12-43 ms (2 s), its key 0.4-1.6 ms on the main thread. Measured in the design release on D1: app shell 444.3 kB gzip (500), of which the main chunk 205.8 kB and the landing page's GSAP chunk 44.1 kB, which the editor's route never downloads; no main-thread task over 50 ms while scrolling the landing page (designchangelog Entry 8). R1 and M2.4 re-read them.
 25. 700-line file limit (§29; 400 until 2026-10-28) — reviewed at each milestone.
 26. Word edits replace or hide text only; no insertion or retiming (§10.6) — E-2.
 27. PS experiments E-1 to E-10 and technical experiments TE-1 to TE-14: outcomes pending per §28. Read in V3 on D1 (docs/v3/experiments.md): TE-13 (pass); E-3 (transcription median 69.5 s per 60 s, the 20 s target missed, under the 145 s fallback line); E-4 (render and encode 30.8 s per 60 s, pass); TE-12 inconclusive (2 clips, re-checked in V9); E-10 carried to V9.

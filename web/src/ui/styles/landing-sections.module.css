@@ -1,0 +1,604 @@
+/* The landing page's sections after the hero (designimplementation §6, §7).
+   The root, its tokens and the shared parts are in landing.module.css.
+   Every keyframe sits under (prefers-reduced-motion: no-preference). */
+
+/* --- Try it (section 6) ---------------------------------------------------- */
+
+/* The unchanged DropZone, restyled from here only (§11): its classes are
+   shared with the sign-in dialog and the unsupported page. The frame sets
+   the colour names they read, and the selectors below reach its parts. */
+.tryFrame {
+  --color-surface: #121217;
+  --color-border: rgb(167 139 250 / 0.45);
+  --color-accent: var(--lp-violet-text);
+
+  position: relative;
+  max-width: 880px;
+  margin: 48px auto 0;
+  padding: 10px;
+  border-radius: 30px;
+  background:
+    linear-gradient(var(--surface-1), var(--surface-1)) padding-box,
+    linear-gradient(140deg, rgb(139 92 246 / 0.7), rgb(255 255 255 / 0.06) 40%, rgb(255 214 10 / 0.35)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 90px -30px rgb(139 92 246 / 0.5);
+  transition: box-shadow var(--base) var(--ease);
+}
+
+.tryFrame:has([data-testid="drop-zone"]:hover) {
+  box-shadow: 0 0 120px -20px rgb(139 92 246 / 0.7);
+}
+
+.tryFrame > div {
+  gap: 16px;
+  padding-bottom: 14px;
+}
+
+.tryFrame [data-testid="drop-zone"] {
+  padding: clamp(48px, 7vw, 88px) 24px;
+  border-width: 1.5px;
+  border-radius: 22px;
+  color: var(--text);
+  font-size: clamp(16px, 1.6vw, 19px);
+  font-weight: 500;
+  transition:
+    border-color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+.tryFrame [data-testid="drop-zone"]:hover {
+  border-color: var(--brand);
+  background: #16131f;
+}
+
+.tryFrame button {
+  height: 44px;
+  padding: 0 22px;
+  border-color: var(--lp-hairline-2);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.04);
+  color: var(--text);
+  font-weight: 600;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.tryFrame button:hover {
+  background: rgb(255 255 255 / 0.09);
+}
+
+.tryFrame [role="status"] {
+  min-height: 1.5em;
+  font-size: 14px;
+}
+
+/* --- Pricing (section 8) --------------------------------------------------- */
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  max-width: 880px;
+  margin: 48px auto 0;
+}
+
+@media (max-width: 719px) {
+  .plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(24px, 3vw, 36px);
+  border-radius: var(--lp-radius-lg);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.planCreator {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgb(139 92 246 / 0.16), transparent 60%),
+    var(--surface-1);
+  box-shadow:
+    inset 0 0 0 1px rgb(139 92 246 / 0.55),
+    0 0 70px -25px rgb(139 92 246 / 0.6);
+}
+
+.planTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.planName {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.planPrice {
+  font-size: clamp(24px, 2.6vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.planFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  color: var(--text-2);
+  list-style: none;
+}
+
+.planFeatures li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.planFeatures svg {
+  flex: none;
+  color: var(--lp-mono-green);
+}
+
+.planCta {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.merchant {
+  max-width: 880px;
+  margin: 20px auto 0;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* --- Updates (section 10) -------------------------------------------------- */
+
+.updates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  padding: clamp(28px, 4.5vw, 56px);
+  border-radius: var(--lp-radius-lg);
+  background:
+    radial-gradient(80% 120% at 0% 0%, rgb(139 92 246 / 0.16), transparent 60%),
+    var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+@media (max-width: 859px) {
+  .updates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.updatesText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.updatesHeading {
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+/* The unchanged NotifyMeForm, restyled from here only (§11). */
+.updates form {
+  --color-surface: var(--bg);
+  --color-border: #3a3a44;
+  --color-accent: var(--brand-hover);
+  --color-on-accent: #fff;
+  --radius: 999px;
+}
+
+.updates form label {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.updates form input {
+  height: 50px;
+  padding: 0 20px;
+}
+
+.updates form input:focus-visible {
+  border-color: var(--brand);
+}
+
+.updates form button {
+  height: 50px;
+  padding: 0 24px;
+  font-weight: 600;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.updates form button:hover:not(:disabled) {
+  background: #6d3fe0;
+}
+
+/* --- Footer (section 12) --------------------------------------------------- */
+
+.footer {
+  margin-top: var(--lp-section);
+  padding-block: 48px 56px;
+  border-top: 1px solid var(--lp-hairline);
+}
+
+.footerInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.footerBrand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footerLine {
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  font-size: 14px;
+}
+
+.footer .footerLinks a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.footer .footerLinks a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* --- Clip frames ----------------------------------------------------------- */
+
+.wideFrame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  margin-top: 48px;
+  border-radius: var(--lp-radius-lg);
+  background: #0a0a0d;
+  box-shadow:
+    inset 0 0 0 1px var(--lp-hairline-2),
+    0 40px 80px -40px rgb(0 0 0 / 0.8),
+    0 0 100px -40px rgb(139 92 246 / 0.4);
+}
+
+/* --- Marquee (section 2) --------------------------------------------------- */
+
+.marquee {
+  overflow: hidden;
+  padding-block: 22px;
+  border-block: 1px solid var(--lp-hairline);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+}
+
+.marqueeLine {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marqueeLine li {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
+  color: var(--text-2);
+  font-size: clamp(15px, 1.6vw, 19px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.marqueeLine li::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--brand);
+  transform: rotate(45deg);
+}
+
+/* --- Before and after (section 3) ------------------------------------------ */
+
+.beforeAfterStill,
+.appStill,
+.privacyStill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6%;
+  background: radial-gradient(60% 80% at 50% 50%, rgb(139 92 246 / 0.12), transparent);
+}
+
+.stillLandscape {
+  width: 36%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2a2a33, #1a1a20);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+}
+
+.stillArrow {
+  width: 8%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand));
+}
+
+.stillPortrait {
+  height: 78%;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #3a3550, #1d1d23);
+  box-shadow:
+    inset 0 0 0 1px rgb(139 92 246 / 0.4),
+    0 0 40px -10px rgb(139 92 246 / 0.5);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-weight: 600;
+}
+
+.stepIndex {
+  flex: none;
+  color: var(--lp-violet-text);
+  font-family: var(--font-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* --- How it works (section 5) ---------------------------------------------- */
+
+.howGrid,
+.privacy {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+}
+
+.howGrid .wideFrame,
+.privacy .wideFrame {
+  margin-top: 0;
+}
+
+@media (max-width: 1023px) {
+  .howGrid,
+  .privacy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.howSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 32px;
+  padding: 0;
+  list-style: none;
+}
+
+.howStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    opacity var(--base) var(--ease),
+    box-shadow var(--base) var(--ease);
+}
+
+.howStep .stepIndex {
+  padding-top: 4px;
+}
+
+/* While GSAP pins the section, the step the scroll has reached stands out;
+   the others keep text of full contrast, with a quieter title (M9). */
+.how[data-pinned] .howStep:not([data-active]) .howStepTitle {
+  color: var(--text-2);
+}
+
+.how[data-pinned] .howStep[data-active] {
+  opacity: 1;
+  box-shadow:
+    inset 0 0 0 1px rgb(139 92 246 / 0.6),
+    0 0 40px -16px rgb(139 92 246 / 0.6);
+}
+
+.howStepTitle {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.howStepBody {
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.appStill {
+  flex-direction: column;
+  gap: 4%;
+  padding: 5%;
+}
+
+.appStillBar {
+  width: 100%;
+  height: 8%;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.appStillStage {
+  width: 100%;
+  flex: 1;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d1d23, #121217);
+  box-shadow: inset 0 0 0 1px var(--lp-hairline-2);
+}
+
+.appStillPanel {
+  display: none;
+}
+
+/* --- Privacy (section 7) --------------------------------------------------- */
+
+.privacyText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.privacyFacts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 32px;
+  padding: 0;
+  font-size: 17px;
+  list-style: none;
+}
+
+.privacyFacts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.privacyCheck {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgb(61 220 132 / 0.12);
+  color: var(--lp-mono-green);
+}
+
+.privacyLink {
+  margin-top: 24px;
+  font-weight: 600;
+}
+
+.privacyShield {
+  width: 18%;
+  aspect-ratio: 4 / 5;
+  border-radius: 40% 40% 50% 50% / 30% 30% 70% 70%;
+  background: linear-gradient(180deg, rgb(61 220 132 / 0.5), rgb(61 220 132 / 0.08));
+  box-shadow: 0 0 60px -10px rgb(61 220 132 / 0.5);
+}
+
+/* --- Final call (section 11) ----------------------------------------------- */
+
+.finalInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding-block: clamp(56px, 7vw, 96px);
+  border-radius: 32px;
+  background: radial-gradient(60% 80% at 50% 0%, rgb(139 92 246 / 0.22), transparent 70%);
+  text-align: center;
+}
+
+.finalLine {
+  position: relative;
+  max-width: 13em;
+  font-size: clamp(40px, 6.5vw, 88px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* --- M11: Creator's slow violet sweep along its border --------------------- */
+
+@property --sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .planCreator::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--sweep), transparent 0 72%, rgb(196 181 253 / 0.95) 86%, transparent 100%);
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    pointer-events: none;
+    animation: sweep 6s linear infinite;
+  }
+}
+
+@keyframes sweep {
+  to {
+    --sweep: 360deg;
+  }
+}

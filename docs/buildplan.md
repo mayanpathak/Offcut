@@ -14,6 +14,8 @@
 
 ## 0. The ten versions at a glance
 
+**The design release (2026-11-05).** Between V6 and the cloud-transcription release that comes before V6.1: a new landing page (animated, every working feature named, everything after V6 marked "Coming soon", "Start free" into the app), seven product clips made with Remotion, the other pages on the dark system, and lower Bottom captions (DC-13) on a pull request of their own. Plan `docs/design/designimplementation.md`, record `docs/design/designchangelog.md`, tag `design`.
+
 **Where things stand (2026-11-02).** V1-V5 are closed, tagged and live. **V6 is next.** Dates below are as first written; V1-V5 ran ahead of them, and everything after V6 moves. Estimated public launch: about February 2027 (§8A.0); the founder sets it when V6.11 closes.
 
 | Version | Name | Spec steps | Calendar (build starts Mon 12 Oct 2026) | Gate at the end |

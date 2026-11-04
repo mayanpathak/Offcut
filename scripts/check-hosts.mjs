@@ -34,6 +34,8 @@ const ORT_OPERATOR_TEXT = "text of an operator's description compiled into ONNX 
 // hands to the GPU's shader compiler; an address in one of them is in a comment.
 const RENDER_MODULE = /^assets\/offcut_render_bg-[\w-]+\.wasm$/;
 const VELLO_SHADER_COMMENT = "an address in a comment of one of Vello's shader sources, which the module holds as text; the module makes no request";
+// The landing page's GSAP chunk (designimplementation D-318, §10.5).
+const GSAP_CHUNK = /^assets\/gsap-runtime-[\w-]+\.js$/;
 
 /**
  * URL literals in the bundle that are never requested. Each entry is the
@@ -77,6 +79,11 @@ const NON_NETWORK_LITERALS = [
   { prefix: "https://github.com/linebender/vello/issues/1061", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
   { prefix: "https://github.com/google/skia/blob/30bba741989865c157c7a997a0caebe94921276b/src/opts/SkRasterPipeline_opts.h#L5859", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
   { prefix: "https://en.wikipedia.org/wiki/Carry-less_product", exact: true, chunk: RENDER_MODULE, reason: VELLO_SHADER_COMMENT },
+
+  // GSAP, the landing page's animations (designimplementation §10.5).
+  { prefix: "https://gsap.com", exact: true, chunk: GSAP_CHUNK, reason: "the address in the text of GSAP's console warning for a target that is not found; the library makes no request" },
+  // The open-graph tags of index.html (designimplementation D-335).
+  { prefix: "https://offcut-one.vercel.app/", chunk: /^index\.html$/, reason: "the site's own address in the open-graph tags, which a link preview reads; the page makes no request to it" },
 ];
 
 const URL_LITERAL = /https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/g;

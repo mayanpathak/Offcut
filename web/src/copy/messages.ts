@@ -7,6 +7,7 @@
 
 import type { AnalyticsEvent, BillingInterval, Wanted } from "../gen/api";
 import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
+import { landingCopy, pricingCopy } from "./landing";
 
 type EventName = AnalyticsEvent["name"];
 
@@ -83,16 +84,8 @@ function clockTime(ms: number): string {
 const FAILED_ON_DEVICE = "Something went wrong on this device.";
 
 export const messages = {
-  landing: {
-    hero: "Turn what you say into a finished vertical short.",
-    subhead:
-      "Drop in a raw talking-head clip. Get back a vertical short with a cleaned voice, animated captions, and visuals for the numbers and lists you spoke.",
-    supportedBrowsers: "Works in Chrome or Edge on Windows and Mac.",
-    privacyLine: "Your video stays on your computer.",
-    whatLeavesLink: "What leaves your device",
-    demoCaption: "A demo, made by hand, of the kind of short Offcut will make.",
-    waitlistHeading: "Offcut is not open yet. Leave your email and we will tell you when it is.",
-  },
+  // The landing page and its prices: copy/landing.ts (designimplementation D-321).
+  landing: landingCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
@@ -255,7 +248,7 @@ export const messages = {
   },
 
   notifyMe: {
-    label: "Email me when Offcut opens",
+    label: "Email me when new features open",
     labelUnsupported: "Email me when Offcut supports",
     emailLabel: "Email address",
     submit: "Notify me",
@@ -329,27 +322,7 @@ export const messages = {
     B_NO_FREE_EXPORTS: "You have used your free exports this month.",
   },
 
-  // The landing page's prices (PS §11). Accounts are open, so Free is; Creator
-  // goes on sale with the founding release (v6implementation D-303), and until
-  // then the section has no way to buy. It lists only what the plans hold.
-  pricing: {
-    heading: "Pricing",
-    notOnSale: "The Free plan comes with a free account. Creator is not on sale yet: leave your email below to hear when it is.",
-    free: {
-      name: "Free",
-      price: (usd: number) => `$${String(usd)}`,
-      features: (limits: Pick<typeof LIMITS, "FREE_EXPORTS_PER_MONTH">) => [
-        `${String(limits.FREE_EXPORTS_PER_MONTH)} exports a month`,
-        "720p, with a small watermark",
-      ],
-    },
-    creator: {
-      name: "Creator",
-      price: (monthlyUsd: number, annualUsd: number) => `$${String(monthlyUsd)}/month or $${String(annualUsd)}/year`,
-      features: ["Unlimited exports", "1080p, no watermark"],
-    },
-    merchant: "Prices are in US dollars. Dodo Payments, our merchant of record, will handle payment and tax.",
-  },
+  pricing: pricingCopy,
 
   // Written to match what the app does today, and read by the founder before
   // each change (buildplan.md §10.3). Not reviewed by a lawyer. The wording rules

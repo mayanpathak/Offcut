@@ -1,4 +1,4 @@
-// The asset host: model files, the demo video, the sample clip (TS §24.1).
+// The asset host: model files, the landing page's clips, the sample clip (TS §24.1).
 // This is the only file that may `fetch` from it. The demo video is not
 // fetched here: a `<video>` element loads it from `assetUrl(...)`.
 
@@ -6,17 +6,43 @@ import { env } from "../config/env";
 import type { Bytes } from "../gen/domain";
 
 /**
- * The demo video of the landing page (E-1), relative to the asset host's
- * base URL, as `scripts/upload-assets.sh` printed it. The name holds a hash
- * of the content: a new video is a new upload and a new path here.
- */
-export const DEMO_VIDEO_PATH = "media/demo.81cafa494d9c2b68.mp4";
-
-/**
  * The sample clip that the landing page offers in place of a dropped file,
  * as `scripts/upload-assets.sh` printed it (v2implementation D-39).
  */
 export const SAMPLE_CLIP_PATH = "media/speech_scriptA_landscape_720p.7da948cecc39438a.mp4";
+
+/** The landing page's clip slots (designimplementation §9.1). */
+export type LandingSlot = "hero" | "beforeAfter" | "captionStyles" | "visuals" | "howItWorks" | "privacy" | "comingSoon";
+
+/** A clip on the asset host: its path as `scripts/upload-assets.sh` printed it, and its size in pixels. */
+export type LandingClip = { path: string; width: number; height: number };
+
+/** The hero clip (designimplementation §9.1), which is also the demo of the unsupported page (D-324). */
+const HERO_CLIP: LandingClip = { path: "media/offcut-hero-720x1280.638a910246cea94f.mp4", width: 720, height: 1280 };
+
+/**
+ * The landing page's clips on the asset host, as `scripts/upload-assets.sh`
+ * printed their paths on 2026-11-05 (designchangelog Entry 9). A slot without
+ * one shows its still, never a broken video (D-325). A `<video>` element
+ * loads them from `assetUrl(...)`; they are not fetched here.
+ */
+export const LANDING_CLIPS: Partial<Record<LandingSlot, LandingClip>> = {
+  hero: HERO_CLIP,
+  beforeAfter: { path: "media/offcut-before-after-1280x720.8302b0f909c47763.mp4", width: 1280, height: 720 },
+  captionStyles: { path: "media/offcut-caption-styles-720x1280.d2b8c6103512e7d2.mp4", width: 720, height: 1280 },
+  visuals: { path: "media/offcut-visuals-960x960.7d7b21acf8b32466.mp4", width: 960, height: 960 },
+  howItWorks: { path: "media/offcut-how-it-works-1280x720.bf1c3a7343abb4b6.mp4", width: 1280, height: 720 },
+  privacy: { path: "media/offcut-privacy-1280x720.642f1e2cda617aaa.mp4", width: 1280, height: 720 },
+  comingSoon: { path: "media/offcut-coming-soon-1280x720.5fff4a66a864300e.mp4", width: 1280, height: 720 },
+};
+
+/**
+ * The demo video of the unsupported page (E-1), relative to the asset host's
+ * base URL: the hero clip since the design release (designimplementation
+ * D-324). The name holds a hash of the content: a new video is a new upload
+ * and a new path here.
+ */
+export const DEMO_VIDEO_PATH = HERO_CLIP.path;
 
 /**
  * The URL of a file on the asset host. `path` is relative to its base URL.

@@ -94,14 +94,15 @@ const layerPolicies = [
     from: { file: { categories: "test" } },
     allow: { dependency: INTERNAL },
   },
-  // A page shows the demo video, which is on the asset host. `ui` may take
-  // the two names that build its URL from net/asset-fetch.ts, and nothing
-  // from `net` that makes a request (v1implementation §11.12).
+  // A page shows the demo video and the landing page's clips, which are on
+  // the asset host. `ui` may take the names that build their URLs from
+  // net/asset-fetch.ts, and nothing from `net` that makes a request
+  // (v1implementation §11.12, designimplementation D-323).
   {
     from: from("ui"),
     allow: {
       to: to("net", "asset-fetch.ts"),
-      dependency: { specifiers: ["assetUrl", "DEMO_VIDEO_PATH"] },
+      dependency: { specifiers: ["assetUrl", "DEMO_VIDEO_PATH", "LANDING_CLIPS", "LandingClip", "LandingSlot"] },
     },
   },
   // `net` may name the types of the worker protocol, never its code (D-8).
@@ -219,6 +220,23 @@ const NO_ASR_RUNTIME = {
   patterns: [{ group: ASR_RUNTIME_PACKAGES.map((name) => `${name}/*`), message: asrRuntimeMessage }],
 };
 
+// --- The landing page's animation libraries (designimplementation D-319) ------
+
+// GSAP and Motion sell the product on the landing page; they are kept out of
+// the product itself. Only the files under src/ui/landing/ may import them.
+const LANDING_DIR = "src/ui/landing/**";
+const ANIMATION_PACKAGES = ["gsap", "motion"];
+const animationMessage = "GSAP and Motion are imported by src/ui/landing/** only (designimplementation D-319, TDR-26).";
+const NO_ANIMATION = {
+  paths: ANIMATION_PACKAGES.map((name) => ({ name, message: animationMessage })),
+  patterns: [{ group: ANIMATION_PACKAGES.map((name) => `${name}/*`), message: animationMessage }],
+};
+/** Two restrictions in one rule's options: a later config replaces a rule's options, it does not add to them. */
+const restrictedImports = (...groups) => [
+  "error",
+  { paths: groups.flatMap((group) => group.paths), patterns: groups.flatMap((group) => group.patterns) },
+];
+
 // --- Restricted syntax (TS §7, §11.3) ----------------------------------------
 
 // The branded unit and id types, read from the generated file so the list
@@ -321,7 +339,7 @@ export default defineConfig(
 
       "no-restricted-globals": ["error", ...restrictedGlobals(NETWORK_GLOBALS)],
       "no-restricted-properties": ["error", ...restrictedProperties(NETWORK_GLOBALS)],
-      "no-restricted-imports": ["error", NO_ASR_RUNTIME],
+      "no-restricted-imports": restrictedImports(NO_ASR_RUNTIME, NO_ANIMATION),
       "no-restricted-syntax": restrictedSyntax(NO_IMPORT_META_ENV, NO_BRAND_CAST, NO_SWALLOWED_ERROR),
 
       "@typescript-eslint/no-explicit-any": "error",
@@ -366,7 +384,13 @@ export default defineConfig(
   // The one file that may import the speech runtime.
   {
     files: [ASR_RUNTIME_FILE],
-    rules: { "no-restricted-imports": "off" },
+    rules: { "no-restricted-imports": restrictedImports(NO_ANIMATION) },
+  },
+
+  // The landing page's sections, which may import GSAP and Motion (D-319).
+  {
+    files: [LANDING_DIR],
+    rules: { "no-restricted-imports": restrictedImports(NO_ASR_RUNTIME) },
   },
 
   // The one exception to each restricted-syntax rule.

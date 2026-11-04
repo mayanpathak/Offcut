@@ -1,10 +1,11 @@
 # Licences of the assets the web app ships
 
-The page serves two things made by others, besides its npm packages: the interface font and the icons (v4implementation D-180, D-181). The fonts the captions are drawn with are embedded in the scene and listed in `crates/offcut-scene/assets/fonts/LICENSES.md`.
+The page serves three things made by others, besides its npm packages: the interface font, the landing page's accent font and the icons (v4implementation D-180, D-181; designimplementation D-330). The fonts the captions are drawn with are embedded in the scene and listed in `crates/offcut-scene/assets/fonts/LICENSES.md`.
 
 | Asset | What it is | Taken from | Licence |
 |---|---|---|---|
 | `src/ui/assets/inter-latin.woff2` | Inter, "Version 4.001;git-9221beed3" in its name table: the Latin subset of the scene's `Inter-Variable.ttf` (Inter 4.1), made with `pyftsubset` (fonttools 4.67.0) as WOFF2, with the `wght` (100-900) and `opsz` (14-32) axes and the features `calt kern ss01 tnum`. 65,508 bytes, SHA-256 `8792da2b49183db9439fd7b98655e65f4a8c43711c7cf37b7d32ee8b13c20a8c` | `InterVariable.ttf` of the release `v4.1` of `github.com/rsms/inter`, subset by us (v4changelog Entry 1) | SIL Open Font License 1.1. The font's copyright line: "Copyright 2016 The Inter Project Authors". No Reserved Font Name |
+| `src/ui/assets/jetbrains-mono-latin.woff2` | JetBrains Mono, "Version 2.304" in its name table, at weight 700: the scene's `JetBrainsMono-Variable.ttf` pinned to `wght` 700 with `fonttools varLib.instancer`, then subset with `pyftsubset` (fonttools 4.67.0) to U+0020-007E, U+00B7, U+00D7, U+2192 and U+2014, as WOFF2, with no layout features. The landing page's accent face for timecodes, chips and figures (designimplementation D-330). 4,912 bytes, SHA-256 `146e9dd8739aaf28576f88b034e2b6be8ea0819eaec1715b2015cd2dfdb6c2ee` | `fonts/variable/JetBrainsMono[wght].ttf` of the release `v2.304` of `github.com/JetBrains/JetBrainsMono` (`crates/offcut-scene/assets/fonts/LICENSES.md`), subset by us | SIL Open Font License 1.1. The font's copyright line: "Copyright 2020 The JetBrains Mono Project Authors". No Reserved Font Name. The licence text is in `crates/offcut-scene/assets/fonts/LICENSES.md` |
 | `src/ui/icons.tsx` | 22 icon paths | `lucide-static` 1.61.0 (`github.com/lucide-icons/lucide`), copied by hand; no package is installed | ISC (Lucide). Of the 22, `alert-triangle`, `arrow-down`, `arrow-right`, `arrow-up`, `check`, `download`, `hash`, `more-horizontal`, `type` and `x` come from Feather, under MIT |
 
 The licences ask that their notice goes with every copy. They follow as their projects ship them.
@@ -105,6 +106,20 @@ DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
+
+## JetBrains Mono 2.304
+
+```text
+Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+```
+
+The licence is the SIL Open Font License 1.1, whose full text is quoted under Inter 4.1 above.
+
+## GSAP 3.15.1 (an npm package, noted here)
+
+The landing page's animations use `gsap` (designimplementation D-318). It is not open source: it is licensed under GreenSock's "Standard 'no charge' license", https://gsap.com/standard-license, which grants its use "on any website, web application, or digital interface" and forbids its use in tools that compete with Webflow's visual animation building. Offcut uses it on its landing page only (D-319). The production build minifies it and does not keep its copyright banner comments; its notice is kept here and in the package. Whether the banners must be kept in the bundle is for the founder (designchangelog, open items). The licence was read on 2026-11-05 (designchangelog Entry 4).
 
 ## Lucide 1.61.0
 

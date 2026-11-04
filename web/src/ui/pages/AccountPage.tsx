@@ -396,7 +396,7 @@ export function AccountPage({ homePath }: { homePath: string }) {
   }, [signedIn]);
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-theme="dark">
       <section className={styles.section}>
         <Link to={homePath}>{messages.settings.backLink}</Link>
         <h1 className={styles.title}>{messages.account.title}</h1>

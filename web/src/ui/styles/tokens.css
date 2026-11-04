@@ -1,14 +1,26 @@
 /* Design tokens and the few rules that apply to the whole document.
-   The landing page uses system fonts. The editor uses Inter, self-hosted:
-   one file of our own origin that the build emits hashed under /assets/,
-   never a font CDN (TS §24.1, v4implementation D-180). */
+   The editor and the landing page use Inter, self-hosted: one file of our
+   own origin that the build emits hashed under /assets/, never a font CDN
+   (TS §24.1, v4implementation D-180, designimplementation D-316). The other
+   pages still use system fonts and V1's colours. */
 
 /* The interface font. A browser downloads it only for a page that uses it:
-   the editor, never the landing page. */
+   the editor and the landing page. */
 @font-face {
   font-family: "Inter UI";
   src: url("../assets/inter-latin.woff2") format("woff2");
   font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The landing page's accent face, for timecodes, chips and figures only:
+   JetBrains Mono 700, the caption style Mono's own font, subset to Latin
+   (designimplementation D-330, web/LICENSES.md). */
+@font-face {
+  font-family: "JetBrains Mono UI";
+  src: url("../assets/jetbrains-mono-latin.woff2") format("woff2");
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
@@ -84,9 +96,10 @@ a {
   outline-offset: 2px;
 }
 
-/* --- The editor (v4implementation D-179) -------------------------------------
-   The editor sets data-theme="dark" on its root. The landing page never does,
-   so everything above stays as it was. */
+/* --- The dark system (v4implementation D-179) --------------------------------
+   The editor and the landing page set data-theme="dark" on their roots
+   (designimplementation D-316). The other pages do not, so everything above
+   stays as it was for them. */
 
 [data-theme="dark"] {
   color-scheme: dark;
@@ -159,6 +172,12 @@ a {
     --fast: 0.01ms;
     --base: 0.01ms;
   }
+}
+
+/* A page on the dark system keeps the body dark too, so that overscroll
+   never shows V1's cream behind it (D-316). */
+:root:has([data-theme="dark"]) body {
+  background: #0e0e11;
 }
 
 [data-theme="dark"] :focus-visible {

@@ -606,16 +606,16 @@ Running `signin` and `checkout` without a browser GPU also puts them in CI's `pn
 
 ## 20. Exit checklist
 
-- [ ] BP §8.4's server, crate, client and E2E lists pass, plus `dodo_adapter.rs`, `receipt-outbox.test.ts`.
-- [ ] Every TS §41.1 proof holds; goldens and snapshots have an empty diff; DC-11 and DC-12 are the only rows used.
-- [ ] Counts at or above D-244's.
-- [ ] Render's port reading and its real send recorded. TE-8 and TE-9 recorded.
-- [ ] A real mail signs a real browser in on the deployed site.
-- [ ] A test-mode purchase on the deployed site updates `subscriptions`, and the next token says Creator (founder reads production).
-- [ ] An export on the deployed site: Free 720p with watermark, then Creator 1080p without, each verified by `verify_mp4.py` (G 14.6).
-- [ ] BP §8.3's M1 list walked by the founder.
-- [ ] `git grep -nE "\bV6\b" -- web/src crates server` shows no marker of work to do.
-- [ ] Copy-back done (§21). Merged, deployed, tagged `v6` by the founder.
+- [x] BP §8.4's server, crate, client and E2E lists pass, plus `dodo_adapter.rs`, `receipt-outbox.test.ts`. (Tier 4 and CI, V6 CL Entry 19)
+- [x] Every TS §41.1 proof holds; goldens and snapshots have an empty diff; DC-11 and DC-12 are the only rows used.
+- [x] Counts at or above D-244's. (Entry 19's table)
+- [x] Render's port reading and its real send recorded. TE-8 and TE-9 recorded. (`docs/v6/experiments.md`)
+- [x] A real mail signs a real browser in on the deployed site. (Founder, 2026-11-04)
+- [x] A test-mode purchase on the deployed site updates `subscriptions`, and the next token says Creator. (The live account page read Creator from the server, and the next export was Creator. The founder's direct read of the production row was not reported: Entry 20)
+- [x] An export on the deployed site: Free 720p with watermark, then Creator 1080p without, each verified by `verify_mp4.py` (G 14.6). (Entry 20)
+- [x] BP §8.3's M1 list walked by the founder. (On D1; rows the walk did not reach ticked by the founder on earlier proof: Entry 18)
+- [x] `git grep -nE "\bV6\b" -- web/src crates server` shows no marker of work to do. (Two stale comments in frozen crates, named in Entry 19)
+- [x] Copy-back done (§21). Merged by the founder; deployed; tagged `v6` on `f948429`, pushed by the agent at the founder's request.
 
 ---
 

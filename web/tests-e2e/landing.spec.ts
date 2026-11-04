@@ -12,7 +12,7 @@ import { LEGAL_DOCS, messages } from "../src/copy/messages";
 import { ANALYTICS_EVENT_DOCS, type CheckResult, type GpuVendor, type MemoryBucket, type Platform } from "../src/gen/api";
 import { LIMITS, UNSUPPORTED_REASONS } from "../src/gen/domain";
 import { installFakeApi } from "./helpers/fake-api";
-import { flushAnalytics } from "./helpers/fixtures";
+import { axe, flushAnalytics } from "./helpers/fixtures";
 
 declare global {
   interface Window {
@@ -344,7 +344,7 @@ test("@smoke the page is isolated and the WASM bundle compiles under the CSP", a
   expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
 });
 
-test("pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy", async ({ page }) => {
+test("pricing: the plans show their prices and limits, say they are not on sale, and offer no way to buy, only a way in", async ({ page }) => {
   await installFakeApi(page);
   await page.goto("/");
 
@@ -357,7 +357,8 @@ test("pricing: the plans show their prices and limits, say they are not on sale,
     await expect(pricing.getByText(feature)).toBeVisible();
   }
   await expect(pricing.getByRole("button")).toHaveCount(0);
-  await expect(pricing.getByRole("link")).toHaveCount(0);
+  await expect(pricing.getByRole("link")).toHaveCount(1);
+  await expect(pricing.getByRole("link", { name: messages.landing.cta.startFree, exact: true })).toHaveAttribute("href", "/app");
 });
 
 test("the footer reaches each legal page, and each has its title, its date and a contact link", async ({ page }) => {
@@ -384,4 +385,246 @@ test("a legal document that does not exist goes back to the landing page", async
   await page.goto("/legal/nothing");
   await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
+});
+
+// --- The design release (designimplementation §12.3) ---------------------------
+// New cases only: every case above is as it was, except the pricing case's
+// declared change (§12.4).
+
+/** Where "Start free" leads into the app: the top bar, the hero, pricing and the final call. */
+const START_FREE_LINKS = 4;
+const startFree = (scope: Pick<Page, "getByRole">) => scope.getByRole("link", { name: messages.landing.cta.startFree, exact: true });
+
+test("L-3: every Start free leads to /app, which shows the drop zone or the unsupported page", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+
+  const links = startFree(page);
+  await expect(links).toHaveCount(START_FREE_LINKS);
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("href", "/app");
+  }
+  await startFree(page.getByRole("banner")).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+});
+
+test("L-10: each string the tests look for is on the page once, by its name and by a part of it", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  const pricing = page.getByTestId("pricing");
+  const footer = page.getByTestId("site-footer");
+
+  for (const exact of [false, true]) {
+    await expect(page.getByRole("heading", { name: messages.landing.hero, exact })).toHaveCount(1);
+    await expect(page.getByText(messages.landing.supportedBrowsers, { exact })).toHaveCount(1);
+    await expect(page.getByRole("link", { name: messages.landing.whatLeavesLink, exact })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: messages.dropZone.sampleButton, exact })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: messages.notifyMe.submit, exact })).toHaveCount(1);
+    await expect(page.getByLabel(messages.notifyMe.emailLabel, { exact })).toHaveCount(1);
+    await expect(pricing.getByRole("heading", { name: messages.pricing.heading, exact })).toHaveCount(1);
+    await expect(page.getByText(messages.pricing.notOnSale, { exact })).toHaveCount(1);
+    for (const doc of LEGAL_DOCS) {
+      await expect(footer.getByRole("link", { name: messages.legal.docs[doc].linkLabel, exact })).toHaveCount(1);
+    }
+    await expect(footer.getByRole("link", { name: messages.legal.footerContact, exact })).toHaveCount(1);
+  }
+  // The privacy line shares its list item with the link, so only a part of that item is the line.
+  await expect(page.getByText(messages.landing.privacyLine)).toHaveCount(1);
+  // The waitlist cases read the status of the page's one form.
+  await expect(page.locator("form")).toHaveCount(1);
+});
+
+/** The sentences of the old waitlist, which no longer appear anywhere on the page (§13). */
+const WAITLIST_WORDS = [
+  "Offcut is not open yet. Leave your email and we will tell you when it is.",
+  "not open yet",
+  "Leave your email and we will tell you when it is",
+];
+
+/** The clips of the page, one per slot of designimplementation §9.1, all uploaded (Entry 9). */
+const CLIP_SLOTS = 7;
+
+/** The page's widths in the design reviews, and a phone's. */
+const REVIEW_SIZES = [
+  { width: 1280, height: 800 },
+  { width: 1920, height: 1080 },
+  { width: 390, height: 844 },
+];
+
+test("L-1: every feature card of the page is named, and the page never scrolls sideways", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  for (const card of Object.values(messages.landing.features.cards)) {
+    await expect(page.getByRole("heading", { name: card.title, exact: true })).toBeVisible();
+  }
+  for (const size of REVIEW_SIZES) {
+    await page.setViewportSize(size);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  }
+});
+
+test("L-2: every feature after V6 is on the page, each marked Coming soon", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  const soon = messages.landing.soon;
+  const items = [...soon.next.items, ...soon.later.items];
+  const cards = page.getByTestId("soon-card");
+  await expect(cards).toHaveCount(items.length);
+  for (const [index, item] of items.entries()) {
+    await expect(cards.nth(index)).toContainText(soon.chip);
+    await expect(cards.nth(index).getByRole("heading", { name: item.title, exact: true })).toBeVisible();
+    await expect(cards.nth(index)).toContainText(item.line);
+  }
+  await expect(page.getByText(soon.footnote)).toBeVisible();
+});
+
+test("L-4: no sentence on the page says that Offcut is not open", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: messages.landing.updatesHeading })).toBeVisible();
+  const text = await page.locator("body").innerText();
+  for (const words of WAITLIST_WORDS) {
+    expect(text).not.toContain(words);
+  }
+});
+
+/** Scrolls from the top of the page to its end in `steps` steps, as a reader would. */
+async function scrollThrough(page: Page, steps = 20): Promise<void> {
+  const height = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  for (let step = 1; step <= steps; step += 1) {
+    await page.evaluate((top) => window.scrollTo(0, top), Math.round((height * step) / steps));
+    await page.waitForTimeout(150);
+  }
+}
+
+test("L-5: with reduced motion the page is complete and still", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await installFakeApi(page);
+  await page.goto("/");
+  await scrollThrough(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1000);
+
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  await expect(page.getByRole("heading", { name: messages.landing.hero })).toBeVisible();
+  await expect(page.getByRole("heading", { name: messages.landing.final.line })).toBeAttached();
+  await expect(page.locator(".pin-spacer")).toHaveCount(0);
+  // No caption pill: the headlines are plain text (M1, M10).
+  for (const pill of await page.locator("[data-pill]").all()) {
+    await expect(pill).toHaveCSS("opacity", "0");
+  }
+  await expect(page.locator("[data-lit]")).toHaveCount(0);
+  // Every clip stands still on its poster, with a button to play it (D-326).
+  const clips = page.locator("[data-clip]");
+  await expect(clips).toHaveCount(CLIP_SLOTS);
+  for (const clip of await clips.all()) {
+    const video = clip.locator("video");
+    expect(await video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+    await expect(video).toHaveAttribute("poster", /\/assets\/.+\.webp$/);
+    await expect(clip.getByRole("button", { name: messages.landing.playClip })).toBeVisible();
+  }
+});
+
+test("L-7: scrolling the whole page breaks no rule of the security policy, and the page stays isolated", async ({ page }) => {
+  await installFakeApi(page);
+  await page.addInitScript(() => {
+    window.cspViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+      window.cspViolations?.push(`${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+  await page.goto("/");
+  await capabilityChecked(page);
+  await scrollThrough(page);
+  await page.waitForTimeout(500);
+
+  expect(await page.evaluate(() => window.cspViolations)).toEqual([]);
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+});
+
+test("L-8: the editor's route downloads no GSAP, and the landing page does", async ({ page }) => {
+  await installFakeApi(page);
+  const scripts: Promise<string>[] = [];
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname.endsWith(".js")) {
+      scripts.push(response.text().catch(() => ""));
+    }
+  });
+  await page.goto("/app");
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1000);
+  const onApp = await Promise.all(scripts);
+  expect(onApp.length).toBeGreaterThan(0);
+  expect(onApp.filter((body) => body.includes("ScrollTrigger"))).toEqual([]);
+
+  scripts.length = 0;
+  await page.goto("/");
+  await scrollThrough(page, 5);
+  await expect.poll(async () => (await Promise.all(scripts)).some((body) => body.includes("ScrollTrigger"))).toBe(true);
+});
+
+test("L-9: leaving for /app inside the app leaves nothing of the landing page behind", async ({ page }) => {
+  await installFakeApi(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await scrollThrough(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
+
+  await startFree(page.getByRole("banner")).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(dropZone(page).or(page.getByTestId("unsupported-reason"))).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".pin-spacer")).toHaveCount(0);
+  await expect(page.locator("[data-landing]")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("L-6: every clip loads from the asset host under the isolation headers, and plays", async ({ page }) => {
+  await installFakeApi(page);
+  const response = await page.goto("/");
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  // The policy names the asset host in more than one directive: one host.
+  const assetHosts = [...new Set((csp.match(/https?:\/\/[^\s;]+/g) ?? []).map((host) => new URL(host).origin))];
+  expect(assetHosts).toHaveLength(1);
+
+  const videos = page.locator("[data-clip] video");
+  await expect(videos).toHaveCount(CLIP_SLOTS);
+  for (const video of await videos.all()) {
+    await video.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => video.evaluate((element) => (element as HTMLVideoElement).readyState), { timeout: 20_000 })
+      .toBeGreaterThanOrEqual(2);
+    const state = await video.evaluate((element) => {
+      const clip = element as HTMLVideoElement;
+      return { error: clip.error === null ? null : clip.error.code, paused: clip.paused, origin: new URL(clip.currentSrc).origin };
+    });
+    expect(state).toEqual({ error: null, paused: false, origin: assetHosts[0] });
+  }
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+});
+
+/** An accessibility violation, as the reviews quote one: its rule and how many elements break it. */
+const violations = async (page: Page) => (await axe(page)).map((v) => `${v.id}: ${String(v.nodes.length)} node(s)`);
+
+test("L-12: the settings and a legal page, on the dark system, have no serious or critical accessibility violation", async ({ page }) => {
+  await installFakeApi(page);
+  for (const path of ["/settings", "/legal/terms"]) {
+    await page.goto(path);
+    await expect(page.locator("main[data-theme='dark']")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(await violations(page), `axe on ${path}`).toEqual([]);
+  }
+});
+
+test("L-11: the landing page has no serious or critical accessibility violation, at the top or at the end", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await installFakeApi(page);
+  await page.goto("/");
+  await capabilityChecked(page);
+  expect(await violations(page), "axe at the top").toEqual([]);
+  await scrollThrough(page);
+  await page.waitForTimeout(500);
+  expect(await violations(page), "axe at the end").toEqual([]);
 });
