@@ -27,7 +27,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 390.8086,
-          "y": 1346.3828,
+          "y": 1301.4121,
           "w": 238.38281,
           "h": 95.11719
         },
@@ -90,7 +90,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             402.8086,
-            1420.1328
+            1375.1621
           ]
         },
         "text": "Third,"

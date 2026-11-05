@@ -17,7 +17,7 @@ use crate::display_list::DrawCmd;
 use crate::display_list::{FontKey, Rect};
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
-use crate::placement::line_align;
+use crate::placement::line_drop;
 use crate::readability::{Limits, Unit, chunk_break_cost, chunk_cost, text_of};
 use crate::styles::{Case, StyleSpec};
 use crate::theme::Theme;
@@ -324,8 +324,8 @@ pub fn chunk(
 }
 
 /// The lines of one chunk, one under the other: centred across the caption
-/// block, and down it aligned by the block's place in the band (DC-13): at
-/// the middle centred as before, at Bottom low in the block, at the top high,
+/// block, and down it centred, then lowered by the block's place in the band
+/// (DC-13): as before at and above the middle, a little lower towards Bottom,
 /// always with the style's decoration inside the block.
 fn lines(
     group: &[Placed<'_>],
@@ -369,12 +369,12 @@ fn lines(
 
     let height = ascent + descent;
     let text = height * lines.len() as f32;
-    // Centred, then moved by the alignment's distance from the middle: at 0.5
-    // the second term is exactly zero, so a centred block is drawn as before.
-    let inset = style.decoration_height();
-    let top = block.y
-        + (block.h - text) / 2.0
-        + (line_align(block) - 0.5) * (block.h - 2.0 * inset - text);
+    // Centred, then moved down a share of the room under the lines (DC-13):
+    // at or above the band's middle the share is exactly zero, so the lines
+    // are drawn as before; the style's decoration stays inside the block.
+    let centred = (block.h - text) / 2.0;
+    let below = (centred - style.decoration_height()).max(0.0);
+    let top = block.y + centred + line_drop(block) * below;
     // What is drawn around the outermost glyphs stays in the block as well.
     let room = block.w - style.decoration_width();
     for (index, line) in lines.iter_mut().enumerate() {
@@ -396,6 +396,7 @@ mod tests {
     use offcut_types::{CaptionPlacement, DurMs};
 
     use super::*;
+    use crate::placement::{BOTTOM_LINE_DROP, SNAP_MIDDLE, SNAP_TOP};
     use crate::readability::hold_for_reading;
     use crate::safe_area::{ZoneId, zone};
     use crate::styles::spec;
@@ -678,42 +679,61 @@ mod tests {
         ("users", 1_400, 1_800),
     ];
 
+    /// How far below centred lines the first line of each chunk starts, the
+    /// room under centred lines (to the block's bottom less the decoration),
+    /// and the block's bottom less where the last line's decoration ends.
+    fn lowered(style: StyleId, p: f32, timed: &[(&str, u32, u32)]) -> Vec<(f32, f32, f32)> {
+        let inset = spec(style).decoration_height();
+        let (chunks, block) = placed(style, p, timed);
+        chunks
+            .iter()
+            .map(|chunk| {
+                let (first, last, height) = text_extent(chunk);
+                let centred = (block.h - height * chunk.lines.len() as f32) / 2.0;
+                (
+                    first - (block.y + centred),
+                    centred - inset,
+                    block.y + block.h - (last + inset),
+                )
+            })
+            .collect()
+    }
+
     #[test]
-    fn at_the_middle_of_the_band_lines_are_centred_in_the_block_as_before() {
-        // DC-13: placement 0.5 is drawn bit for bit as before the change.
+    fn at_and_above_the_middle_of_the_band_lines_are_centred_as_before() {
+        // DC-13: every placement from the top to the middle is drawn bit for
+        // bit as before the change.
         for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
-            for timed in [&ONE_LINE[..], &TWO_LINES[..]] {
-                let (chunks, block) = placed(style, 0.5, timed);
-                for chunk in &chunks {
-                    let (first, _, height) = text_extent(chunk);
-                    let lines = chunk.lines.len() as f32;
-                    let centred = block.y + (block.h - height * lines) / 2.0;
-                    assert_eq!(first.to_bits(), centred.to_bits(), "{style:?}");
+            for p in [0.0, SNAP_TOP, 0.3, 0.5] {
+                for timed in [&ONE_LINE[..], &TWO_LINES[..]] {
+                    let (chunks, block) = placed(style, p, timed);
+                    for chunk in &chunks {
+                        let (first, _, height) = text_extent(chunk);
+                        let lines = chunk.lines.len() as f32;
+                        let centred = block.y + (block.h - height * lines) / 2.0;
+                        assert_eq!(first.to_bits(), centred.to_bits(), "{style:?} at {p}");
+                    }
                 }
             }
         }
     }
 
     #[test]
-    fn at_bottom_the_last_line_and_its_decoration_end_at_the_block_bottom() {
-        // DC-13: at 1.0 the lines are low in the block, and what is drawn
-        // around them (shadow, stroke, pill, Mono's panel) stays inside it.
+    fn at_bottom_the_lines_move_down_a_share_of_the_room_under_them_and_stay_in_the_block() {
+        // DC-13: at 1.0 the lines move down `BOTTOM_LINE_DROP` of the room
+        // under centred lines, and what is drawn around them (shadow, stroke,
+        // pill, Mono's panel) stays inside the block with room to spare.
         for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
-            let inset = spec(style).decoration_height();
             for timed in [&ONE_LINE[..], &TWO_LINES[..]] {
-                let (chunks, block) = placed(style, 1.0, timed);
-                let bottom = block.y + block.h;
-                for chunk in &chunks {
-                    let (_, last, _) = text_extent(chunk);
+                for (drop, room, left) in lowered(style, 1.0, timed) {
+                    assert!(room > 0.0, "{style:?}: {room}");
                     assert!(
-                        last + inset <= bottom + 0.01,
-                        "{style:?}: {} over {bottom}",
-                        last + inset
+                        (drop - BOTTOM_LINE_DROP * room).abs() < 0.01,
+                        "{style:?}: {drop} of {room}"
                     );
                     assert!(
-                        last + inset >= bottom - 2.0,
-                        "{style:?}: {} above {bottom}",
-                        last + inset
+                        left >= (1.0 - BOTTOM_LINE_DROP) * room - 0.01,
+                        "{style:?}: {left} left"
                     );
                 }
             }
@@ -721,17 +741,28 @@ mod tests {
     }
 
     #[test]
-    fn at_the_top_the_first_line_starts_its_decoration_below_the_block_top() {
+    fn a_one_line_clean_caption_at_bottom_is_a_little_lower_not_on_the_block_bottom() {
+        // The founder's "a little bit low" (2026-11-05): about 45 lp lower than
+        // before, with as much room again left under it in the block.
+        let rows = lowered(StyleId::Clean, 1.0, &ONE_LINE);
+        assert_eq!(rows.len(), 1);
+        let (drop, _, left) = rows[0];
+        assert!((40.0..=50.0).contains(&drop), "{drop}");
+        assert!(left >= 40.0, "{left}");
+    }
+
+    #[test]
+    fn between_the_middle_and_bottom_the_drop_rises_evenly() {
         for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
-            let inset = spec(style).decoration_height();
-            let (chunks, block) = placed(style, 0.0, &TWO_LINES);
-            for chunk in &chunks {
-                let (first, _, _) = text_extent(chunk);
-                assert!(
-                    (first - (block.y + inset)).abs() < 0.01,
-                    "{style:?}: {first}"
-                );
-            }
+            let bottom = lowered(style, 1.0, &ONE_LINE)[0].0;
+            let three_quarters = lowered(style, 0.75, &ONE_LINE)[0].0;
+            assert!(
+                (three_quarters - bottom / 2.0).abs() < 0.01,
+                "{style:?}: {three_quarters} of {bottom}"
+            );
+            // The Middle snap, just under the band's middle, moves a few lp.
+            let middle = lowered(style, SNAP_MIDDLE, &ONE_LINE)[0].0;
+            assert!(middle > 0.0 && middle < bottom / 8.0, "{style:?}: {middle}");
         }
     }
 

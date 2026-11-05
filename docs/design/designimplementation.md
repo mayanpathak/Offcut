@@ -747,6 +747,8 @@ The founder chooses from rendered stills: the reference clip at Bottom, one-line
 
 **What is unchanged in the editor.** The preview, drag and Framing tab do not change. The drag still writes the same 0..1 placement, and only where the lines sit in the block moves.
 
+**As built (designchangelog Entry 16).** The founder, 2026-11-05: lower, but "a little bit low", as the apps draw their own UI at the bottom. A's mechanism is kept at a half, below the band's middle only: at Bottom the lines move half the room under centred lines (`BOTTOM_LINE_DROP` = 0.5), so a one-line Clean caption moves 45 lp (to about 70% down), not A's 90; placements 0 to 0.5 are drawn as before. The positioning review, today, 0.33, 0.5 and A against the safe area and the apps' bottom regions, is in `~/design-review/captions-v2/`.
+
 ---
 
 ## 15. Part C: the other pages on the dark system **(founder: yes/no; recommended yes)**

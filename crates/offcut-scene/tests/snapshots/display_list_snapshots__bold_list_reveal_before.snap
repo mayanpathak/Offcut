@@ -77,7 +77,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             266.9619,
-            1418.7383
+            1378.6475
           ]
         },
         "text": "HERE"
@@ -126,7 +126,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             505.75488,
-            1418.7383
+            1378.6475
           ]
         },
         "text": "ARE"
@@ -165,7 +165,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             696.8467,
-            1418.7383
+            1378.6475
           ]
         },
         "text": "3"
@@ -220,7 +220,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             266.9619,
-            1414.7383
+            1374.6475
           ]
         },
         "text": "HERE"
@@ -269,7 +269,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             505.75488,
-            1414.7383
+            1374.6475
           ]
         },
         "text": "ARE"
@@ -308,7 +308,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             696.8467,
-            1414.7383
+            1374.6475
           ]
         },
         "text": "3"

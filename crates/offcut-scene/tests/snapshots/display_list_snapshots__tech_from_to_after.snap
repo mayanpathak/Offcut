@@ -27,7 +27,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 74.79999,
-          "y": 1306.0801,
+          "y": 1270.56,
           "w": 870.39996,
           "h": 137.92004
         },
@@ -75,7 +75,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             140.4,
-            1395.2001
+            1359.68
           ]
         },
         "text": "and"
@@ -116,7 +116,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             274.8,
-            1395.2001
+            1359.68
           ]
         },
         "text": "see"
@@ -157,7 +157,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             409.2,
-            1395.2001
+            1359.68
           ]
         },
         "text": "you"
@@ -203,7 +203,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             543.60004,
-            1395.2001
+            1359.68
           ]
         },
         "text": "next"
@@ -254,7 +254,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             711.6,
-            1395.2001
+            1359.68
           ]
         },
         "text": "week."
@@ -264,7 +264,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 241.2,
-          "y": 1338.0801,
+          "y": 1302.56,
           "w": 33.600002,
           "h": 73.920006
         },

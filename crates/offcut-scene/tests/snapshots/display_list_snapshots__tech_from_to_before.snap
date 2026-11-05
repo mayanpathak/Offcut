@@ -27,7 +27,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 192.39996,
-          "y": 1232.1599,
+          "y": 1215.12,
           "w": 635.2,
           "h": 211.84009
         },
@@ -75,7 +75,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             274.8,
-            1321.2799
+            1304.24
           ]
         },
         "text": "Our"
@@ -126,7 +126,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             409.2,
-            1321.2799
+            1304.24
           ]
         },
         "text": "build"
@@ -172,7 +172,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             610.80005,
-            1321.2799
+            1304.24
           ]
         },
         "text": "went"
@@ -218,7 +218,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             257.99997,
-            1395.2
+            1378.16
           ]
         },
         "text": "from"
@@ -294,7 +294,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             426.0,
-            1395.2
+            1378.16
           ]
         },
         "text": "90 minutes"
@@ -304,7 +304,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 392.39996,
-          "y": 1338.08,
+          "y": 1321.04,
           "w": 33.600002,
           "h": 73.920006
         },

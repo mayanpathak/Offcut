@@ -1064,14 +1064,16 @@ function blockCentre(placement: number): number {
  * Drags the caption block on the paused preview to `to` (a snap's name, or a
  * placement from 0 to 1), as a person does (D-183); resolves when the one
  * change of the drag is applied. The block is taken at its centre, from the
- * player's mirror of where it is; a caption must be shown at this time.
+ * player's mirror of where it is; a caption must be shown at this time. The
+ * centre is on the block (`data-hit` "captions") or on a word, as the lines
+ * need not be centred in the block (DC-13).
  */
 export async function dragCaptions(page: Page, to: keyof typeof CAPTION_SNAP_AT | number): Promise<void> {
   const from = blockCentre((await captionMirror(page)).position);
   const target = blockCentre(typeof to === "number" ? to : CAPTION_SNAP_AT[to]);
   let x: number | undefined;
   for (const candidate of [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74]) {
-    if (await hoverPreview(page, candidate, from, ["block", "word"])) {
+    if (await hoverPreview(page, candidate, from, ["captions", "word"])) {
       x = candidate;
       break;
     }

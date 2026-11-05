@@ -78,7 +78,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             296.5664,
-            1424.1328
+            1379.1621
           ]
         },
         "text": "and"
@@ -127,7 +127,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             446.33203,
-            1424.1328
+            1379.1621
           ]
         },
         "text": "see"
@@ -176,7 +176,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             589.83984,
-            1424.1328
+            1379.1621
           ]
         },
         "text": "you"
@@ -226,7 +226,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             296.5664,
-            1420.1328
+            1375.1621
           ]
         },
         "text": "and"
@@ -236,7 +236,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 286.36957,
-          "y": 1347.4683,
+          "y": 1302.4976,
           "w": 154.40933,
           "h": 92.94639
         },
@@ -254,7 +254,7 @@ expression: "scene.frame_at(OutMs::new(t))"
         "opacity": 1.0,
         "clip": {
           "x": 286.36957,
-          "y": 1347.4683,
+          "y": 1302.4976,
           "w": 154.40933,
           "h": 92.94639
         }
@@ -295,7 +295,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             296.5664,
-            1420.1328
+            1375.1621
           ]
         },
         "text": "and"
@@ -345,7 +345,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             446.33203,
-            1420.1328
+            1375.1621
           ]
         },
         "text": "see"
@@ -394,7 +394,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             589.83984,
-            1420.1328
+            1375.1621
           ]
         },
         "text": "you"

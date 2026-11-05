@@ -27,7 +27,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 141.99997,
-          "y": 1306.0801,
+          "y": 1270.56,
           "w": 736.0,
           "h": 137.92004
         },
@@ -80,7 +80,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             207.59998,
-            1395.2001
+            1359.68
           ]
         },
         "text": "Here"
@@ -121,7 +121,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             375.59998,
-            1395.2001
+            1359.68
           ]
         },
         "text": "are"
@@ -152,7 +152,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             510.0,
-            1395.2001
+            1359.68
           ]
         },
         "text": "3"
@@ -213,7 +213,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             577.2,
-            1395.2001
+            1359.68
           ]
         },
         "text": "reasons"
@@ -223,7 +223,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 476.39996,
-          "y": 1338.0801,
+          "y": 1302.56,
           "w": 33.600002,
           "h": 73.920006
         },

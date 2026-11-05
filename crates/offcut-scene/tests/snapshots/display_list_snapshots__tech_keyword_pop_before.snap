@@ -27,7 +27,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 209.19998,
-          "y": 1232.1599,
+          "y": 1215.12,
           "w": 601.6001,
           "h": 211.84009
         },
@@ -75,7 +75,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             274.8,
-            1321.2799
+            1304.24
           ]
         },
         "text": "The"
@@ -126,7 +126,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             409.2,
-            1321.2799
+            1304.24
           ]
         },
         "text": "first"
@@ -172,7 +172,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             610.80005,
-            1321.2799
+            1304.24
           ]
         },
         "text": "week"
@@ -218,7 +218,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             325.19998,
-            1395.2
+            1378.16
           ]
         },
         "text": "felt"
@@ -274,7 +274,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             493.2,
-            1395.2
+            1378.16
           ]
         },
         "text": "brutal"
@@ -284,7 +284,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 459.59998,
-          "y": 1338.08,
+          "y": 1321.04,
           "w": 33.600002,
           "h": 73.920006
         },

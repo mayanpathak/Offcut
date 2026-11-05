@@ -77,7 +77,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             335.6953,
-            1337.0156
+            1313.8242
           ]
         },
         "text": "felt"
@@ -141,7 +141,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             471.8203,
-            1337.0156
+            1313.8242
           ]
         },
         "text": "brutal"
@@ -220,7 +220,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             388.4297,
-            1424.1328
+            1400.9414
           ]
         },
         "text": "everyone."
@@ -231,7 +231,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 257.67188,
-          "y": 1346.3828,
+          "y": 1323.1914,
           "w": 127.00781,
           "h": 95.11719
         },
@@ -292,7 +292,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             335.6953,
-            1333.0156
+            1309.8242
           ]
         },
         "text": "felt"
@@ -356,7 +356,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             471.8203,
-            1333.0156
+            1309.8242
           ]
         },
         "text": "brutal"
@@ -397,7 +397,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             269.67188,
-            1420.1328
+            1396.9414
           ]
         },
         "text": "for"
@@ -476,7 +476,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             388.4297,
-            1420.1328
+            1396.9414
           ]
         },
         "text": "everyone."

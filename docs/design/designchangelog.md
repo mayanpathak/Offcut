@@ -11,7 +11,7 @@ This file covers the design release between V6 and the cloud-transcription relea
 | 3 | Design review 3 (P158): done as a self-review under `overnight-run.md` §5, rubric passed in round 2. The founder reads `~/design-review/` and `copy/landing.ts` in the morning | Founder | Entry 11 |
 | 4 | The Dodo resubmission (V6 CL open item 10). The tag `design` is done (Entry 13) | Founder | guide Phase 10 |
 | 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
-| 6 | Part B (DC-13) is built on `design-captions`, draft pull request, not merged: protected `review-edit` case 13 fails because its drag helper grabs the block's centre. Choose (a) declare the helper change, (b) a larger hit region, or (c) keep the captions as they are | Founder | Entry 14 |
+| 6 | ~~Part B (DC-13)~~: **closed** 2026-11-05. The founder chose (a) with the captions "a little bit low"; the positioning review chose half of A's movement, below the middle only; the helper's declared change; `review-edit` 16 of 16 | Founder, agent | Entry 16 |
 
 ## Entry 1 - 2026-11-04: the plan
 
@@ -801,3 +801,67 @@ On CI, `landing_view` took 5.1 s and `capability_check` 4.8 s (Entry 8's watch),
 - D1's `pnpm e2e` is load-sensitive. "Two tabs" and three checkout cases fail under parallel load and pass alone (Entry 3). At the end of the night, after hours of builds, D1 ran the suite at less than half its speed.
 - Under `page.clock`, ScrollTrigger's keep-alive frame loop makes `landing_view` and `capability_check` slower to replay: 8-13 s on D1, 5 s on CI. A real browser is not affected (Entry 8).
 - On CI, the golden test process crashed once with SIGSEGV after all its goldens had passed (lavapipe). A re-run passed.
+
+## Entry 16 - 2026-11-05: Part B finished: "a little bit low", the positioning review, the helper (DC-13)
+
+**The founder's answer to Entry 14.** Choice (a), with two conditions: "by lower I don't mean very low, little bit low from where they are today, because on real platforms have icons also at the bottom", and "do the review of the positioning first".
+
+**The positioning review** (`~/design-review/captions-v2/`).
+
+- **The method.** The 16 goldens at four settings: today (`6ea40bf`), 0.33 and 0.5 of A's movement, and A (Entry 14), in `today/`, `third/`, `half/` and `A/`. Six `compare-*.png` sheets put the four side by side, each with these marked:
+  - the safe area's bottom (1500) and right edge (960);
+  - the watermark's band (1444-1500);
+  - three approximate regions where the apps a short is posted to draw their own interface: the right-hand button column (about x 940-1060, y 880-1600), the name and one-line description (about y 1540-1800), and a longer description growing up to about y 1450. These are boxes drawn by eye from common 1080 × 1920 layouts, not measurements of any one app.
+- **The numbers** (glyph rows in lp, from the layout code itself):
+
+  | At Bottom | Today | 0.5 | A |
+  |---|---|---|---|
+  | Clean, one line | 1260-1348 | 1305-1393 (+45) | 1350-1437 (+90) |
+  | Bold, one line | 1253-1355 | 1293-1395 (+40) | +80 |
+  | Mono, one line (panel to) | 1267-1341 (1373) | 1303-1377 (1409, +36) | +71 |
+  | Clean, two lines | 1217-1391 | 1240-1414 (+23) | +46 |
+  | Bold, two lines | 1202-1406 | 1217-1420 (+15) | +29 |
+
+- **What it shows.**
+  - Under A a one-line Clean caption rests on the watermark's band, and Mono's panel reaches the region where a longer description sits.
+  - At 0.5, every style's last line ends in one narrow row, 1377-1420, 30-70 lp above where a longer description starts and 80-120 lp above the safe area's bottom. A one-line caption is centred at about 70% of the height (today 68%, A 73%).
+  - 0.33 is hard to tell from today on a phone.
+  - Nothing at any setting moves sideways, so the button column is as clear as today (the safe area's 120 lp right inset).
+- **Chosen: 0.5.** It is "a little bit low" and keeps clear of the apps' bottom regions.
+
+**What changed from Entry 14's code.**
+
+- **`placement.rs`.** `line_align` is replaced by `line_drop(block)` and the constant `BOTTOM_LINE_DROP = 0.5`. The share of the room under centred lines that they move down is 0 at or above the band's middle, rising evenly to 0.5 at Bottom.
+- **Only placements below the middle move.** A also moved Top captions up, nearer the apps' top bar, which nobody asked for. Every frame at placements 0 to 0.5 is now drawn as before, bit for bit. The Middle snap (0.55) moves about 4 lp.
+- **`captions.rs`.** `top = block.y + centred + line_drop(block) · max(centred − decoration_height, 0)`, where `centred = (block.h − text)/2`. The `max` keeps a block too full to have room from moving up.
+- **`styles.rs`.** `decoration_height()` is unchanged from Entry 14.
+- **The four unit tests.** They are rewritten for the rule, and the decoration-height test is kept:
+  - placements 0, 0.15, 0.3 and 0.5 are drawn bit for bit as centred, for all three styles, one and two lines;
+  - at Bottom the lines move exactly 0.5 of their room and leave at least as much under them in the block;
+  - a one-line Clean caption at Bottom moves 40-50 lp and keeps 40 lp or more under it;
+  - between the middle and Bottom the drop rises evenly: at 0.75 it is half of Bottom's, and the Middle snap moves less than an eighth of it.
+- **Snapshots.** `INSTA_UPDATE=always` rewrote the same 40 files as A. A script compared each with today's (`6ea40bf`), value by value:
+  - 206 glyph-run translations `transform.m[5]`;
+  - 40 rect `y` values (pills and panels);
+  - 2 layer clips' `y`.
+
+  There was no structural difference, and every change is between +14.7 and +45.0 lp.
+- **Goldens.** `OFFCUT_GOLDEN_UPDATE=1` rewrote 14 of the 16 (as with A). A second run without it passed 19 of 19, with `crop_landscape_050`, `punch_in_110` and the parity case unchanged.
+
+**DECLARED CHANGE (DC-13, second line): the protected e2e helper `dragCaptions`** (`web/tests-e2e/helpers/fixtures.ts`). It hovers at the block's centre and waited for `data-hit` to be `"block"` or `"word"`. The page never reports `"block"`: `PreviewGestures.tsx` writes the hit's kind, which is `"captions"` for the block (`HitValue::Captions`, since V4 P113). So the helper only ever matched a word near the block's centre, and that stopped being true once the lines were not centred. It now waits for `"captions"` or `"word"`, which is its own premise ("the block is taken at its centre"). A press on `"captions"` starts the same drag as a press on a word (`PreviewGestures.tsx`, `onPointerMove`). No other line of the helper or of any spec changed.
+
+**TS.** The DC-13 row of §41.2 is rewritten for the half drop, the below-the-middle rule and the helper line, and adds `pipeline-preview.spec.ts` to its proofs. §19.1's caption-track paragraph gains one sentence. `designimplementation.md` §14 gains "As built".
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass (fmt, clippy, deny, eslint, both `tsc`, file tree, gen clean, copy codes) |
+| `pnpm test` | Rust **817 / 0 / 4** (Setup's 812 and 5 new unit tests: 4 placement tests and the decoration-height test); Vitest **522** |
+| `pnpm build:e2e`, then `review-edit.spec.ts` (all) and `preview-sync.spec.ts` | **16 of 16** and **4 of 4**. Case 13 (drag to Top) passed in 8.4 s, case 10 (click a caption word on the preview) in 6.2 s |
+| `pipeline-preview.spec.ts`, "long tasks" (its caption drag) | passed; the drag had 0 tasks of 50 ms or more |
+| `export-free.spec.ts`, `export-creator.spec.ts` | **32 of 32**, every file passing `verify_mp4.py`'s 11 checks: Free at 720 × 1280 with the watermark, and Creator. A first run failed 3 cases with `E_ENTITLEMENT_INVALID` because I had built without `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` (my mistake, not the change); after a keyed `pnpm build:e2e`, all passed |
+
+No full media run. The founder's choice (a) is `review-edit` alone; the other DC-13 proofs were added because the frames changed from those of last night's full run. What DC-13 cannot reach (the other media specs) passed under A in Entry 14's full run, and CI's `e2e-media` runs the `@no-gpu` cases.
+
+**Open.** Item 6 is closed by this entry and the merge.
