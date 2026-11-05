@@ -72,7 +72,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             272.0625,
-            1377.75
+            1424.1328
           ]
         },
         "text": "for"
@@ -151,7 +151,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             390.8203,
-            1377.75
+            1424.1328
           ]
         },
         "text": "watching,"
@@ -162,7 +162,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 364.74023,
-          "y": 1212.8828,
+          "y": 1259.2656,
           "w": 290.51953,
           "h": 95.11719
         },
@@ -225,7 +225,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             376.74023,
-            1286.6328
+            1333.0156
           ]
         },
         "text": "Thanks"
@@ -274,7 +274,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             272.0625,
-            1373.75
+            1420.1328
           ]
         },
         "text": "for"
@@ -353,7 +353,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             390.8203,
-            1373.75
+            1420.1328
           ]
         },
         "text": "watching,"

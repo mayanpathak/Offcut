@@ -77,7 +77,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             273.60645,
-            1338.5566
+            1418.7383
           ]
         },
         "text": "WEEK"
@@ -131,7 +131,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             547.95996,
-            1338.5566
+            1418.7383
           ]
         },
         "text": "FELT"
@@ -186,7 +186,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             273.60645,
-            1334.5566
+            1414.7383
           ]
         },
         "text": "WEEK"
@@ -240,7 +240,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             547.95996,
-            1334.5566
+            1414.7383
           ]
         },
         "text": "FELT"

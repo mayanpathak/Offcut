@@ -49,6 +49,15 @@ pub(crate) fn block_at(p: CaptionPlacement) -> Rect {
     }
 }
 
+/// Where the lines sit in a caption block (DC-13, designimplementation §14):
+/// 0 aligns them with its top, 1 with its bottom, 0.5 centres them. It is the
+/// block's place in the band, `CAPTION_TOP` to `CAPTION_BOTTOM`, so a block
+/// at Bottom holds its lines low and one at the top holds them high.
+pub(crate) fn line_align(block: Rect) -> f32 {
+    let centre = block.y + block.h / 2.0;
+    ((centre - CAPTION_TOP) / (CAPTION_BOTTOM - CAPTION_TOP)).clamp(0.0, 1.0)
+}
+
 /// Where the visuals of plan items go: the free side of the captions. When
 /// the block's centre is at or below the canvas middle, the zone ends
 /// `EVENT_ZONE_GAP` above the block; above the middle, it starts that far

@@ -67,7 +67,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             300.48633,
-            1290.6328
+            1337.0156
           ]
         },
         "text": "We"
@@ -136,7 +136,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             432.14648,
-            1290.6328
+            1337.0156
           ]
         },
         "text": "crossed"
@@ -147,7 +147,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 280.01367,
-          "y": 1300.0,
+          "y": 1346.3828,
           "w": 459.97266,
           "h": 95.11719
         },
@@ -198,7 +198,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             300.48633,
-            1286.6328
+            1333.0156
           ]
         },
         "text": "We"
@@ -267,7 +267,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             432.14648,
-            1286.6328
+            1333.0156
           ]
         },
         "text": "crossed"
@@ -348,7 +348,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             292.01367,
-            1373.75
+            1420.1328
           ]
         },
         "text": "3,000 users"

@@ -17,6 +17,7 @@ use crate::display_list::DrawCmd;
 use crate::display_list::{FontKey, Rect};
 use crate::fonts::FontSet;
 use crate::layout::{ShapedRun, shape};
+use crate::placement::line_align;
 use crate::readability::{Limits, Unit, chunk_break_cost, chunk_cost, text_of};
 use crate::styles::{Case, StyleSpec};
 use crate::theme::Theme;
@@ -322,7 +323,10 @@ pub fn chunk(
     Ok(chunks)
 }
 
-/// The lines of one chunk: centred in the caption block, one under the other.
+/// The lines of one chunk, one under the other: centred across the caption
+/// block, and down it aligned by the block's place in the band (DC-13): at
+/// the middle centred as before, at Bottom low in the block, at the top high,
+/// always with the style's decoration inside the block.
 fn lines(
     group: &[Placed<'_>],
     space: f32,
@@ -364,7 +368,13 @@ fn lines(
     }
 
     let height = ascent + descent;
-    let top = block.y + (block.h - height * lines.len() as f32) / 2.0;
+    let text = height * lines.len() as f32;
+    // Centred, then moved by the alignment's distance from the middle: at 0.5
+    // the second term is exactly zero, so a centred block is drawn as before.
+    let inset = style.decoration_height();
+    let top = block.y
+        + (block.h - text) / 2.0
+        + (line_align(block) - 0.5) * (block.h - 2.0 * inset - text);
     // What is drawn around the outermost glyphs stays in the block as well.
     let room = block.w - style.decoration_width();
     for (index, line) in lines.iter_mut().enumerate() {
@@ -621,5 +631,116 @@ mod tests {
         let edits = BTreeMap::from([(WordIdx::new(2), "five,".to_owned())]);
         assert_eq!(shown(&edits)[2], ("five,".to_owned(), false));
         assert!(shows_a_number("40%") && shows_a_number("3,000.") && !shows_a_number("x3"));
+    }
+
+    /// The chunks of `timed` in `style` at placement `p`, and the caption block they are in (DC-13).
+    fn placed(style: StyleId, p: f32, timed: &[(&str, u32, u32)]) -> (Vec<Chunk>, Rect) {
+        let spoken: Vec<_> = timed.iter().map(|w| word(w.0, w.1, w.2)).collect();
+        let transcript = transcript(&spoken);
+        let map = TimeMap::identity(DurMs::new(10_000));
+        let words = words(&transcript, &BTreeMap::new(), &map);
+        let (theme, fonts) = (Theme::default_for(style), FontSet::embedded());
+        let block = zone(ZoneId::Caption, CaptionPlacement::new(p).unwrap());
+        let chunks = chunk(
+            &words,
+            &transcript.sentences,
+            &spec(style),
+            &theme,
+            &fonts,
+            block,
+        )
+        .unwrap();
+        (chunks, block)
+    }
+
+    /// The top of a chunk's first line and the bottom of its last, by its tallest glyphs.
+    fn text_extent(chunk: &Chunk) -> (f32, f32, f32) {
+        let runs = || {
+            chunk
+                .lines
+                .iter()
+                .flat_map(|line| &line.words)
+                .flat_map(|word| &word.runs)
+        };
+        let ascent = runs().map(|run| run.ascent).fold(0.0f32, f32::max);
+        let descent = runs().map(|run| run.descent).fold(0.0f32, f32::max);
+        let first = chunk.lines.first().unwrap().baseline - ascent;
+        let last = chunk.lines.last().unwrap().baseline + descent;
+        (first, last, ascent + descent)
+    }
+
+    const ONE_LINE: [(&str, u32, u32); 2] = [("We", 0, 300), ("crossed", 300, 700)];
+    const TWO_LINES: [(&str, u32, u32); 5] = [
+        ("We", 0, 300),
+        ("crossed", 300, 700),
+        ("three", 700, 1_000),
+        ("thousand", 1_000, 1_400),
+        ("users", 1_400, 1_800),
+    ];
+
+    #[test]
+    fn at_the_middle_of_the_band_lines_are_centred_in_the_block_as_before() {
+        // DC-13: placement 0.5 is drawn bit for bit as before the change.
+        for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
+            for timed in [&ONE_LINE[..], &TWO_LINES[..]] {
+                let (chunks, block) = placed(style, 0.5, timed);
+                for chunk in &chunks {
+                    let (first, _, height) = text_extent(chunk);
+                    let lines = chunk.lines.len() as f32;
+                    let centred = block.y + (block.h - height * lines) / 2.0;
+                    assert_eq!(first.to_bits(), centred.to_bits(), "{style:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn at_bottom_the_last_line_and_its_decoration_end_at_the_block_bottom() {
+        // DC-13: at 1.0 the lines are low in the block, and what is drawn
+        // around them (shadow, stroke, pill, Mono's panel) stays inside it.
+        for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
+            let inset = spec(style).decoration_height();
+            for timed in [&ONE_LINE[..], &TWO_LINES[..]] {
+                let (chunks, block) = placed(style, 1.0, timed);
+                let bottom = block.y + block.h;
+                for chunk in &chunks {
+                    let (_, last, _) = text_extent(chunk);
+                    assert!(
+                        last + inset <= bottom + 0.01,
+                        "{style:?}: {} over {bottom}",
+                        last + inset
+                    );
+                    assert!(
+                        last + inset >= bottom - 2.0,
+                        "{style:?}: {} above {bottom}",
+                        last + inset
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn at_the_top_the_first_line_starts_its_decoration_below_the_block_top() {
+        for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
+            let inset = spec(style).decoration_height();
+            let (chunks, block) = placed(style, 0.0, &TWO_LINES);
+            for chunk in &chunks {
+                let (first, _, _) = text_extent(chunk);
+                assert!(
+                    (first - (block.y + inset)).abs() < 0.01,
+                    "{style:?}: {first}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_height_of_each_style_s_decoration_comes_from_its_spec() {
+        // Clean: half its 5 lp stroke and the 4 lp drop; Bold: half of 10 and
+        // the drop; Mono (Tech): its panel's padding.
+        assert_eq!(spec(StyleId::Clean).decoration_height(), 6.5);
+        assert_eq!(spec(StyleId::Bold).decoration_height(), 9.0);
+        assert_eq!(spec(StyleId::Tech).decoration_height(), 32.0);
     }
 }
