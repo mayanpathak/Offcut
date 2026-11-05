@@ -9,8 +9,9 @@ This file covers the design release between V6 and the cloud-transcription relea
 | 1 | F-3: hide the in-app offers until live mode, as a small change of its own after this release (V6 CL open item 17) | Founder | §18 |
 | 2 | ~~The upload of the seven re-encoded clips~~: **closed** 2026-11-05, uploaded under `overnight-run.md` §3.2 | Agent | Entry 9 |
 | 3 | Design review 3 (P158): done as a self-review under `overnight-run.md` §5, rubric passed in round 2. The founder reads `~/design-review/` and `copy/landing.ts` in the morning | Founder | Entry 11 |
-| 4 | The Dodo resubmission and the tag `design` (P160) | Founder | guide Phase 10 |
+| 4 | The Dodo resubmission (V6 CL open item 10). The tag `design` is done (Entry 13) | Founder | guide Phase 10 |
 | 5 | GSAP's `@license` banners are not kept in the minified bundle. The notice is in `web/LICENSES.md` and the package. Keeping it in the bundle needs a `vite.config.ts` option (outside this release's files). Decide whether that is needed | Founder | Entry 8 |
+| 6 | ~~Part B (DC-13)~~: **closed** 2026-11-05. The founder chose (a) with the captions "a little bit low"; the positioning review chose half of A's movement, below the middle only; the helper's declared change; `review-edit` 16 of 16 | Founder, agent | Entry 16 |
 
 ## Entry 1 - 2026-11-04: the plan
 
@@ -636,3 +637,231 @@ They were made from the development build (`vite build --mode development`, as `
 **Open.** Nothing new.
 
 **Found, not fixed.** None.
+
+## Entry 13 - 2026-11-05: Parts A and C merged, deployed, checked and tagged
+
+**The last gate.** CI on the pull request's head `d8618b6` (run 41913861090) passed in every job:
+
+- `changes`;
+- `ci` on its one re-run, 13 min 12 s;
+- `e2e-media`, 14 min 57 s.
+
+The first attempt of `ci` stopped in "Golden frames, with their readings". Every golden had passed, then the test process died with SIGSEGV. `git diff 8d94a06 -- crates fixtures` is empty, so the crash was the runner's software GPU (lavapipe), not this code. One re-run is allowed (`overnight-run.md` §6), and it passed.
+
+On CI, `landing_view` took 5.1 s and `capability_check` 4.8 s (Entry 8's watch), and `pnpm e2e` passed 57 of 57 with no flake.
+
+**The merge.** `gh pr ready 13`, then `gh pr merge 13 --merge`: merge commit **`80d611e`**. The `main` run 41920213592 passed in every job:
+
+- `ci`, 13 min 42 s;
+- `e2e-media`, 14 min 50 s;
+- `deploy-api`, 2 min 18 s;
+- `deploy-web`, 1 min 18 s: the build for Vercel, the test-key guard, the deploy, the API through the rewrite, the headers, and the smoke case against the deployment, every step green.
+
+**The live checks of `overnight-run.md` §7.3** (2026-11-05, about 04:00 IST, from D1):
+
+- `E2E_BASE_URL=https://offcut-one.vercel.app pnpm --filter web exec playwright test --project=non-media --grep @smoke`: 1 passed.
+- `node scripts/check-headers.mjs https://offcut-one.vercel.app`: "sends the 7 headers of web/vercel.json, value for value". The policy and both isolation headers are present.
+- `https://offcut-api.onrender.com/api/v1/healthz`: `{"ok":true,"version":"80d611e…"}`.
+- `/` in Chrome, 1280 × 800, analytics answered locally so that no row is added:
+  - the H1 reads "Say it once. Post it finished.";
+  - all 7 clips reach `readyState` 4 with no error;
+  - `crossOriginIsolated` is true;
+  - no security-policy violation;
+  - the top bar's "Start free" leads to `/app` inside the app, which shows the drop zone with "Try a sample" enabled;
+  - no `.pin-spacer` and no `[data-landing]` are left behind.
+- One console line was seen, a `401` on `POST /api/v1/auth/refresh`. That is the session check of a visitor who is not signed in, which V6 treats as normal ("a refusal is not an error"). It is not from this release.
+- The screenshots are `~/design-review/live/live-top.png`, `live-end.png` and `live-app.png`, none staged.
+- The editor is unharmed: on the live `/app` the drop zone shows and "Try a sample" is enabled. Nothing was exported, and nobody signed in.
+
+**The tag.** `git tag -a design -m "Design release: landing page, clips" 80d611e`, pushed. So open item 4's tag part is done; the Dodo resubmission stays the founder's.
+
+**Next.** Part B, lower captions (P159), on its own branch `design-captions` from `origin/main`. This entry is that branch's first commit.
+
+## Entry 14 - 2026-11-05: P159, lower Bottom captions (Part B, DC-13): built, not shipped
+
+**Branch** `design-captions`, from `origin/main` at the merge `80d611e`. The pull request is left a **draft**, under `overnight-run.md` §6 and §7.4.4.
+
+**What was built.**
+
+- **The stills first** (guide Step 9.1). With option A in the working copy, `golden_frames` was run without updating. Each changed golden wrote its new picture to `target/golden-out/`, beside today's in `fixtures/golden/`.
+  - The 14 caption goldens (Clean, Bold and Mono, each kind, at Bottom, the default placement) and the Free frame with its watermark were read side by side. They are in `~/design-review/captions/`: one `<golden>-today-vs-A.png` each, and three contact sheets.
+  - A moves a one-line caption about 90 lp lower and a two-line one about 45 lp lower. The Mono panel stays inside the block.
+  - On the Free frame the pill stays above the "Made with Offcut" watermark, with nothing on it. Nothing leaves the safe area, and nothing reads worse than today. **A held.**
+- **`captions.rs`.** The lines' top is now `block.y + (block.h − H)/2 + (align − 0.5)·(block.h − 2·inset − H)`. At 0.5 the second term is exactly `+0.0`, so a centred block is drawn bit for bit as before.
+- **`placement.rs`.** `line_align(block)`, the block's place in the band (0 at `CAPTION_TOP`, 1 at `CAPTION_BOTTOM`), `pub(crate)`. `lines()` keeps its signature.
+- **`styles.rs`** (outside P159's named exceptions, recorded here). `StyleSpec::decoration_height()`, purely additive: half the stroke with the drop shadow's 4 lp, the pill's padding down (4 lp), the panel's padding. That gives Clean 6.5, Bold 9, Mono 32.
+  - It counts the shadow and the pill whether the style draws them or not. My first version read them from the style, and the existing unit test `captions_draw::the_shadow_and_the_pill_change_no_layout_box` failed: it holds V4's rule that the shadow and the pill change no layout box.
+  - The test was not touched. The code now keeps the rule.
+- **Four new unit tests** in `captions.rs`:
+  - placement 0.5 is unchanged bit for bit, for Clean, Bold and Mono, one and two lines;
+  - at 1.0 the last line with its decoration ends within 2 lp of the block's bottom, never below it;
+  - at 0.0 the first line starts its decoration at the block's top;
+  - each style's decoration height.
+- **Snapshots.** `INSTA_UPDATE=always cargo test -p offcut-scene` rewrote 40 `.snap` files. A script compared every old file with its new one, field by field:
+  - 206 glyph-run translations `transform.m[5]`;
+  - 40 rect `y` values (pills and panels);
+  - 2 layer bounds' `y`.
+  
+  Nothing else differs: no command was added, removed or reordered, and no horizontal value changed.
+- **Goldens.** `OFFCUT_GOLDEN_UPDATE=1` rewrote 14 of the 16, and a second run without the variable passed 19 of 19. `crop_landscape_050`, `punch_in_110` and the parity case are unchanged.
+- **TS §41.2.** The DC-13 row, with "founder's choice: option A, 2026-11-05".
+
+**Tier 4, once, detached.**
+
+| Check | Result |
+|---|---|
+| `cargo test --workspace` | **816 / 0 / 4**: Setup's 812 and the 4 new tests. `layout_safe_area.rs`, `hit.rs`, `parity.rs` and `placement.rs` pass unchanged |
+| `pnpm check`, Vitest, `pnpm build` | pass; 522; shell 444.3 kB |
+| `pnpm e2e --workers=4` | 52 of 57 in 3.8 min (1.6 min before): two checkout cases, L-11, L-12 and "two tabs" hit 30 s test timeouts or their 5 s waits. Run again alone on a fresh production build: **5 of 5 passed**. The web app has not changed since the deploy, which passed 57 of 57. D1 was under heavy load, after hours of builds |
+| `pnpm build:e2e`, then the full `pnpm e2e:media` (55.6 min) | **98 passed, 2 failed, 1 skipped (`rej_h264_444`, as before), 6 did not run** |
+
+**The two media failures.**
+
+1. **`review-edit.spec.ts` 13, "drag the captions to the top: they snap at Top, and the move is one change": caused by DC-13.**
+   - The protected helper `dragCaptions` (`tests-e2e/helpers/fixtures.ts`) takes the block "at its centre": it hovers at `blockCentre(position)`, y 1304 of 1920 at Bottom, and expects the hit test to answer `block` or `word`.
+   - Under option A a one-line caption at Bottom sits about 90 lp below that point, so nothing is under the pointer: "no caption block under the pointer".
+   - The 6 cases that did not run are the rest of that serial group.
+   - Passing it would need either a change to the protected helper, or a larger hit region (the whole block), which is logic beyond §14's files. Neither is allowed tonight. So, under §6, **Part B is not shipped**.
+2. **`timeline-preserved.spec.ts`, "Preview's length": not caused by DC-13.** It read 19,500 ms where it wants more than 19,500. Run again alone, the whole file passed, 11 of 11.
+
+**For the founder: the choice for DC-13.**
+
+- **(a) Recommended.** Declare a second line under DC-13: `dragCaptions` takes the captions where the player's mirror says the lines are, not at the block's centre. That is the helper's own premise ("the block is taken at its centre") meeting the change DC-13 makes. Then run `review-edit.spec.ts` (all of it) and merge.
+- **(b)** Make the caption hit region the whole block. This is a behaviour change: a press 90 lp above the words would grab them.
+- **(c)** Keep the captions as they are: close the pull request.
+
+**Open.** Item 6 (new): Part B on the draft pull request, the choice above.
+
+**Found, not fixed.** None in the code. The test helper's premise is above.
+
+## Entry 15 - Morning report, 2026-11-05
+
+**1. Live or not: live.**
+
+- The new landing page and the dark pages are live on https://offcut-one.vercel.app from the merge **`80d611e`** (pull request 13). The tag is **`design`**.
+- §7.3's checks all passed (Entry 13):
+  - `@smoke` against the deployment;
+  - the 7 headers equal to `web/vercel.json`;
+  - the API at `80d611e`;
+  - the H1 "Say it once. Post it finished.";
+  - 7 of 7 clips at `readyState` 4;
+  - isolated, with no security-policy violation;
+  - "Start free" leads to `/app`, whose drop zone and "Try a sample" are as before.
+- The live screenshots are `~/design-review/live/live-top.png`, `live-end.png` and `live-app.png`.
+
+**2. What shipped and what did not.**
+
+- **Part A shipped:** the landing page, Motion and GSAP, every working feature named, 12 "Coming soon", "Start free" four times, no waitlist sentence.
+- **Part C shipped:** settings, legal, account, callback and unsupported on the dark system.
+- **The seven clips shipped,** all uploaded and playing: hero, before-after, caption-styles, visuals, how-it-works, privacy, coming-soon.
+- **Part B did not ship.** It is built, and its unit, snapshot and golden checks pass. But the protected `review-edit` case 13 fails under it, because its drag helper grabs the captions at the block's centre, where the lowered lines no longer are. It is on the draft pull request from `design-captions` (Entry 14, with the three choices).
+
+**3. Every decision taken tonight** (`overnight-run.md` §3.1 and §6).
+
+- GSAP's licence read as allowed: its one restriction on use is the Webflow-competitor one (Entry 4). The bundle drops GSAP's banner comments: open item 5.
+- `MotionScope` lives in `parts.tsx`, because D-319's rule refuses Motion in `ui/pages/` (Entry 5).
+- `LANDING_CLIPS` and its types came in P152, empty, and were filled in P156.
+- `landing-cards.module.css` was split off to stay under 700 lines (Entry 6).
+- Creator shows the chip "On sale soon". The sentence is the section's lead.
+- `gsap-runtime.ts`: one chunk for GSAP and ScrollTrigger, so `/app`'s scripts never hold "ScrollTrigger" (L-8).
+- No GSAP download under reduced motion. The marquee loops only while on screen.
+- `check-hosts.mjs` tolerates two literals, each with its reason: GSAP's warning address in its chunk, and the site's own address in `index.html`'s open-graph tags.
+- The hero and caption-styles clips are shown in rounded boxes, not CSS phones, because they draw their own phone and chips. M5's chips remain only for a missing clip.
+- `og.png` is made from a middle frame of the hero clip.
+- The upload: once, seven files, nothing else touched on the asset host.
+- The pinned steps keep full contrast (axe), and the wordmark's "O" is violet (rubric item 5).
+- `LoopVideo`: only `NotAllowedError` counts as a refused play.
+- One CI re-run: the lavapipe SIGSEGV in "Golden frames", with no Rust changed.
+- The merge, the deploy checks and the tag.
+- Part B is left a draft under §6.
+
+**4. Counts.**
+
+| | Setup | Live (Parts A, C) | Part B branch |
+|---|---|---|---|
+| Rust | 812 / 0 / 4 | 812 / 0 / 4 | 816 / 0 / 4 |
+| Vitest | 522 | 522 | 522 |
+| `pnpm e2e` | 45 | 57 (CI 57, no flake) | 57 (5 load timeouts, each passed alone) |
+| Media | 106 passed, 1 skipped (V6) | CI `e2e-media` green on the pull request and on `main` | 98 passed, 2 failed, 1 skipped, 6 did not run |
+| App shell, gzip | 351.6 kB | 444.3 kB (GSAP chunk 44.1 kB; budget 500) | 444.3 kB |
+
+**5. For the founder.**
+
+- **The Dodo resubmission** (V6 CL open item 10). The live page no longer reads as a waitlist: "Start free" leads into the app, and pricing shows both plans with "Creator goes on sale soon".
+- **Open item 17 (F-3):** hide the in-app offers until live mode, as its own change.
+- **The clips** show a drawn silhouette, and the how-it-works clip shows a face in the editor's screenshots, taken here to be yours (Entry 9). Re-render with real footage if wanted: a new upload is a new path in `LANDING_CLIPS`, and the poster shows meanwhile.
+- **Design review 3** was a self-review with the rubric (Entry 11). Read `~/design-review/` and `web/src/copy/landing.ts`. Any change is an ordinary pull request.
+- **Part B:** choose (a), (b) or (c) of Entry 14. (a) is recommended.
+- **Open item 5:** keep GSAP's banners in the bundle, or not.
+- **`target/` grows large** (84 GB before tonight). After this release, `cargo clean` is safe; the next build starts slow.
+- **The repository is public** (memory: for free CI). Nothing secret was committed tonight; `gitleaks` ran on every push and passed.
+
+**6. Found, not fixed.**
+
+- D1's `pnpm e2e` is load-sensitive. "Two tabs" and three checkout cases fail under parallel load and pass alone (Entry 3). At the end of the night, after hours of builds, D1 ran the suite at less than half its speed.
+- Under `page.clock`, ScrollTrigger's keep-alive frame loop makes `landing_view` and `capability_check` slower to replay: 8-13 s on D1, 5 s on CI. A real browser is not affected (Entry 8).
+- On CI, the golden test process crashed once with SIGSEGV after all its goldens had passed (lavapipe). A re-run passed.
+
+## Entry 16 - 2026-11-05: Part B finished: "a little bit low", the positioning review, the helper (DC-13)
+
+**The founder's answer to Entry 14.** Choice (a), with two conditions: "by lower I don't mean very low, little bit low from where they are today, because on real platforms have icons also at the bottom", and "do the review of the positioning first".
+
+**The positioning review** (`~/design-review/captions-v2/`).
+
+- **The method.** The 16 goldens at four settings: today (`6ea40bf`), 0.33 and 0.5 of A's movement, and A (Entry 14), in `today/`, `third/`, `half/` and `A/`. Six `compare-*.png` sheets put the four side by side, each with these marked:
+  - the safe area's bottom (1500) and right edge (960);
+  - the watermark's band (1444-1500);
+  - three approximate regions where the apps a short is posted to draw their own interface: the right-hand button column (about x 940-1060, y 880-1600), the name and one-line description (about y 1540-1800), and a longer description growing up to about y 1450. These are boxes drawn by eye from common 1080 × 1920 layouts, not measurements of any one app.
+- **The numbers** (glyph rows in lp, from the layout code itself):
+
+  | At Bottom | Today | 0.5 | A |
+  |---|---|---|---|
+  | Clean, one line | 1260-1348 | 1305-1393 (+45) | 1350-1437 (+90) |
+  | Bold, one line | 1253-1355 | 1293-1395 (+40) | +80 |
+  | Mono, one line (panel to) | 1267-1341 (1373) | 1303-1377 (1409, +36) | +71 |
+  | Clean, two lines | 1217-1391 | 1240-1414 (+23) | +46 |
+  | Bold, two lines | 1202-1406 | 1217-1420 (+15) | +29 |
+
+- **What it shows.**
+  - Under A a one-line Clean caption rests on the watermark's band, and Mono's panel reaches the region where a longer description sits.
+  - At 0.5, every style's last line ends in one narrow row, 1377-1420, 30-70 lp above where a longer description starts and 80-120 lp above the safe area's bottom. A one-line caption is centred at about 70% of the height (today 68%, A 73%).
+  - 0.33 is hard to tell from today on a phone.
+  - Nothing at any setting moves sideways, so the button column is as clear as today (the safe area's 120 lp right inset).
+- **Chosen: 0.5.** It is "a little bit low" and keeps clear of the apps' bottom regions.
+
+**What changed from Entry 14's code.**
+
+- **`placement.rs`.** `line_align` is replaced by `line_drop(block)` and the constant `BOTTOM_LINE_DROP = 0.5`. The share of the room under centred lines that they move down is 0 at or above the band's middle, rising evenly to 0.5 at Bottom.
+- **Only placements below the middle move.** A also moved Top captions up, nearer the apps' top bar, which nobody asked for. Every frame at placements 0 to 0.5 is now drawn as before, bit for bit. The Middle snap (0.55) moves about 4 lp.
+- **`captions.rs`.** `top = block.y + centred + line_drop(block) · max(centred − decoration_height, 0)`, where `centred = (block.h − text)/2`. The `max` keeps a block too full to have room from moving up.
+- **`styles.rs`.** `decoration_height()` is unchanged from Entry 14.
+- **The four unit tests.** They are rewritten for the rule, and the decoration-height test is kept:
+  - placements 0, 0.15, 0.3 and 0.5 are drawn bit for bit as centred, for all three styles, one and two lines;
+  - at Bottom the lines move exactly 0.5 of their room and leave at least as much under them in the block;
+  - a one-line Clean caption at Bottom moves 40-50 lp and keeps 40 lp or more under it;
+  - between the middle and Bottom the drop rises evenly: at 0.75 it is half of Bottom's, and the Middle snap moves less than an eighth of it.
+- **Snapshots.** `INSTA_UPDATE=always` rewrote the same 40 files as A. A script compared each with today's (`6ea40bf`), value by value:
+  - 206 glyph-run translations `transform.m[5]`;
+  - 40 rect `y` values (pills and panels);
+  - 2 layer clips' `y`.
+
+  There was no structural difference, and every change is between +14.7 and +45.0 lp.
+- **Goldens.** `OFFCUT_GOLDEN_UPDATE=1` rewrote 14 of the 16 (as with A). A second run without it passed 19 of 19, with `crop_landscape_050`, `punch_in_110` and the parity case unchanged.
+
+**DECLARED CHANGE (DC-13, second line): the protected e2e helper `dragCaptions`** (`web/tests-e2e/helpers/fixtures.ts`). It hovers at the block's centre and waited for `data-hit` to be `"block"` or `"word"`. The page never reports `"block"`: `PreviewGestures.tsx` writes the hit's kind, which is `"captions"` for the block (`HitValue::Captions`, since V4 P113). So the helper only ever matched a word near the block's centre, and that stopped being true once the lines were not centred. It now waits for `"captions"` or `"word"`, which is its own premise ("the block is taken at its centre"). A press on `"captions"` starts the same drag as a press on a word (`PreviewGestures.tsx`, `onPointerMove`). No other line of the helper or of any spec changed.
+
+**TS.** The DC-13 row of §41.2 is rewritten for the half drop, the below-the-middle rule and the helper line, and adds `pipeline-preview.spec.ts` to its proofs. §19.1's caption-track paragraph gains one sentence. `designimplementation.md` §14 gains "As built".
+
+**Checks.**
+
+| Check | Result |
+|---|---|
+| `pnpm check` | pass (fmt, clippy, deny, eslint, both `tsc`, file tree, gen clean, copy codes) |
+| `pnpm test` | Rust **817 / 0 / 4** (Setup's 812 and 5 new unit tests: 4 placement tests and the decoration-height test); Vitest **522** |
+| `pnpm build:e2e`, then `review-edit.spec.ts` (all) and `preview-sync.spec.ts` | **16 of 16** and **4 of 4**. Case 13 (drag to Top) passed in 8.4 s, case 10 (click a caption word on the preview) in 6.2 s |
+| `pipeline-preview.spec.ts`, "long tasks" (its caption drag) | passed; the drag had 0 tasks of 50 ms or more |
+| `export-free.spec.ts`, `export-creator.spec.ts` | **32 of 32**, every file passing `verify_mp4.py`'s 11 checks: Free at 720 × 1280 with the watermark, and Creator. A first run failed 3 cases with `E_ENTITLEMENT_INVALID` because I had built without `VITE_ENTITLEMENT_TEST_PUBLIC_KEY` (my mistake, not the change); after a keyed `pnpm build:e2e`, all passed |
+
+No full media run. The founder's choice (a) is `review-edit` alone; the other DC-13 proofs were added because the frames changed from those of last night's full run. What DC-13 cannot reach (the other media specs) passed under A in Entry 14's full run, and CI's `e2e-media` runs the `@no-gpu` cases.
+
+**Open.** Item 6 is closed by this entry and the merge.

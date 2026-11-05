@@ -67,7 +67,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             226.39746,
-            1287.7383
+            1302.4199
           ]
         },
         "text": "WE"
@@ -136,7 +136,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             385.49707,
-            1287.7383
+            1302.4199
           ]
         },
         "text": "CROSSED"
@@ -225,7 +225,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             230.41699,
-            1389.375
+            1404.0566
           ]
         },
         "text": "3,000 USERS"
@@ -270,7 +270,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             226.39746,
-            1283.7383
+            1298.4199
           ]
         },
         "text": "WE"
@@ -339,7 +339,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             385.49707,
-            1283.7383
+            1298.4199
           ]
         },
         "text": "CROSSED"
@@ -428,7 +428,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             230.41699,
-            1385.375
+            1400.0566
           ]
         },
         "text": "3,000 USERS"

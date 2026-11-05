@@ -67,7 +67,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             450.01465,
-            1287.7383
+            1302.4199
           ]
         },
         "text": "TO"
@@ -151,7 +151,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             255.23145,
-            1389.375
+            1404.0566
           ]
         },
         "text": "10 MINUTES"
@@ -196,7 +196,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             450.01465,
-            1283.7383
+            1298.4199
           ]
         },
         "text": "TO"
@@ -280,7 +280,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             255.23145,
-            1385.375
+            1400.0566
           ]
         },
         "text": "10 MINUTES"

@@ -49,6 +49,25 @@ pub(crate) fn block_at(p: CaptionPlacement) -> Rect {
     }
 }
 
+/// How low Bottom captions sit in their block (DC-13, designimplementation
+/// §14): the share of the room under centred lines, down to the block's
+/// bottom less the style's decoration, that the lines move at Bottom. 1 would
+/// rest them on the block's bottom (option A); a half lowers a one-line
+/// Clean caption 45 lp, and keeps them clear of where the apps a short is
+/// posted to draw its description and buttons (founder, 2026-11-05: "a
+/// little bit low", designchangelog Entry 16).
+pub const BOTTOM_LINE_DROP: f32 = 0.5;
+
+/// The share of the room under centred lines that the lines of `block` move
+/// down (DC-13): 0 for a block at or above the middle of the band, so every
+/// such frame is drawn as before, rising evenly to `BOTTOM_LINE_DROP` at
+/// Bottom.
+pub(crate) fn line_drop(block: Rect) -> f32 {
+    let centre = block.y + block.h / 2.0;
+    let along = (centre - CAPTION_TOP) / (CAPTION_BOTTOM - CAPTION_TOP);
+    (2.0 * along - 1.0).clamp(0.0, 1.0) * BOTTOM_LINE_DROP
+}
+
 /// Where the visuals of plan items go: the free side of the captions. When
 /// the block's centre is at or below the canvas middle, the zone ends
 /// `EVENT_ZONE_GAP` above the block; above the middle, it starts that far

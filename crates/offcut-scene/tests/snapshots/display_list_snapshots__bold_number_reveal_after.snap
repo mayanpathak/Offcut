@@ -87,7 +87,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             230.99121,
-            1287.7383
+            1302.4199
           ]
         },
         "text": "THANKS"
@@ -136,7 +136,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             618.7119,
-            1287.7383
+            1302.4199
           ]
         },
         "text": "FOR"
@@ -215,7 +215,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             256.4004,
-            1389.375
+            1404.0566
           ]
         },
         "text": "WATCHING,"
@@ -280,7 +280,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             230.99121,
-            1283.7383
+            1298.4199
           ]
         },
         "text": "THANKS"
@@ -329,7 +329,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             618.7119,
-            1283.7383
+            1298.4199
           ]
         },
         "text": "FOR"
@@ -408,7 +408,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             256.4004,
-            1385.375
+            1400.0566
           ]
         },
         "text": "WATCHING,"

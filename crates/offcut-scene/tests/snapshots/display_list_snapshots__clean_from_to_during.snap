@@ -77,7 +77,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             216.02344,
-            1290.6328
+            1313.8242
           ]
         },
         "text": "from"
@@ -161,7 +161,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             400.83984,
-            1290.6328
+            1313.8242
           ]
         },
         "text": "90 minutes"
@@ -205,7 +205,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             272.80078,
-            1377.75
+            1400.9414
           ]
         },
         "text": "to"
@@ -216,7 +216,7 @@ expression: "scene.frame_at(OutMs::new(t))"
       "FillRect": {
         "rect": {
           "x": 347.91797,
-          "y": 1300.0,
+          "y": 1323.1914,
           "w": 411.28125,
           "h": 95.11719
         },
@@ -277,7 +277,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             216.02344,
-            1286.6328
+            1309.8242
           ]
         },
         "text": "from"
@@ -361,7 +361,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             400.83984,
-            1286.6328
+            1309.8242
           ]
         },
         "text": "90 minutes"
@@ -405,7 +405,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             272.80078,
-            1373.75
+            1396.9414
           ]
         },
         "text": "to"
@@ -481,7 +481,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             359.91797,
-            1373.75
+            1396.9414
           ]
         },
         "text": "10 minutes"

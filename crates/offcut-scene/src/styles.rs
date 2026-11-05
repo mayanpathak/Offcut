@@ -81,6 +81,18 @@ impl StyleSpec {
         let panel = self.panel.map_or(0.0, |panel| panel.padding);
         2.0 * stroke.max(pill).max(panel + cursor)
     }
+
+    /// The height above and below a line's glyphs that what is drawn around
+    /// them may take, on one side: half the stroke with the drop shadow's
+    /// 4 lp, the pill's padding down, and the panel's padding (DC-13). Lines
+    /// aligned to the caption block's top or bottom keep this inside it. The
+    /// shadow and the pill count whether the style draws them or not: they
+    /// change no layout box (V4), so a line sits where it would without them.
+    pub fn decoration_height(&self) -> f32 {
+        let stroke = self.stroke_width.max(0.0) / 2.0 + DROP_SHADOW.offset.1.abs();
+        let panel = self.panel.map_or(0.0, |panel| panel.padding);
+        stroke.max(PILL_PADDING.1).max(panel)
+    }
 }
 
 /// The premium default (D-170): Inter 800, a drop shadow, the spoken word on

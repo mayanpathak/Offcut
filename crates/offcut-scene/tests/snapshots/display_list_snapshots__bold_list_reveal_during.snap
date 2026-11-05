@@ -87,7 +87,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             315.79102,
-            1338.5566
+            1378.6475
           ]
         },
         "text": "THIRD,"
@@ -131,7 +131,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             622.0957,
-            1338.5566
+            1378.6475
           ]
         },
         "text": "IT"
@@ -196,7 +196,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             315.79102,
-            1334.5566
+            1374.6475
           ]
         },
         "text": "THIRD,"
@@ -240,7 +240,7 @@ expression: "scene.frame_at(OutMs::new(t))"
             0.0,
             1.0,
             622.0957,
-            1334.5566
+            1374.6475
           ]
         },
         "text": "IT"
