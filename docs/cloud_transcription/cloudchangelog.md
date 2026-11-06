@@ -634,3 +634,7 @@ All fourteen captures are in `~/cloud-review/` (1-14).
 | `pnpm e2e` | 57 (floor 57) |
 
 **Push 3**, CI waited on: see below.
+
+- CI for push 3 (run 42223029927): `ci` and `e2e-media` green, no re-run needed.
+
+**Open for the founder** (G 10.2 onwards): the wording approval (G 6.6), Zero Data Retention seen on (F-2), the Render variables with the switch off, the merge, the switch on, the live journey, the tag.
