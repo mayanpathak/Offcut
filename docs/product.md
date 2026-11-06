@@ -1,6 +1,6 @@
 # Offcut - Speech-driven short-form video maker that runs in your browser (Product Spec v1.3)
 
-> **Positioning (launch pitch, v1.3).** Two paths, equal on the landing page. **Drop a long video** (up to 20 minutes) and get 5-10 finished vertical shorts, each built from the best moments, even from different parts of the video, with face-tracked framing, kinetic captions and visuals that follow what you said. **Drop a short clip** (up to 90 seconds) and get one finished short. All of it renders on your computer: your video and voice are not uploaded. An AI edit plan reads your transcript and decides what goes where; only text and timings are sent to make the plan (§12.8). You edit by clicking or by asking in words; there is no timeline. Flat price, no per-minute credits, because the heavy work runs on your machine (§11). **Not a launch promise:** stock footage, avatars, phones, languages other than English.
+> **Positioning (launch pitch, v1.3).** Two paths, equal on the landing page. **Drop a long video** (up to 20 minutes) and get 5-10 finished vertical shorts, each built from the best moments, even from different parts of the video, with face-tracked framing, kinetic captions and visuals that follow what you said. **Drop a short clip** (up to 90 seconds) and get one finished short. All of it renders on your computer: your video is not uploaded. To write captions fast, a clip's sound is sent for transcription when you choose Cloud in the drop zone, which is the default for an account (cloud transcription release, §12.6). An AI edit plan reads your transcript and decides what goes where; only text and timings are sent to make the plan (§12.8). You edit by clicking or by asking in words; there is no timeline. Flat price, no per-minute credits, because the heavy work runs on your machine (§11). **Not a launch promise:** stock footage, avatars, phones, languages other than English.
 
 > *Earlier pitch, for reference (v1.2):* a raw talking-head clip up to 90 seconds becomes a finished vertical 1080p short, with an AI edit plan, kinetic captions, cards and a brand kit.
 
@@ -261,7 +261,7 @@ Both paths share everything after the short exists. There is no timeline, no pro
 | Semantic "story" timeline editor and general timeline | (d) it is an editor, a different product; (f) high cognitive and maintenance cost |
 | Bundled music library | (c) licensing: in only for tracks whose licence TE-16 confirms allows redistribution inside an app. User-supplied music with ducking is **in** (V6.7) |
 | Local LLM for deeper semantic understanding | (f) download size, device variance; the v1.2 plan uses a cloud LLM over the transcript instead (§12.8). A local model stays P2 as the offline producer of the same plan |
-| Cloud transcription (audio upload) | (c) conflicts with "your voice is not uploaded"; P1, §12.6. The cloud **LLM over transcript text** is in from V6.2 (§12.8) |
+| Cloud transcription (audio upload) | **Built in the cloud transcription release** for signed-in people, chosen in the drop zone's card (§12.6); the video is never sent. The cloud **LLM over transcript text** is in from V6.2 (§12.8) |
 | Languages other than English (including Hindi/Hinglish) | (f) separate accuracy testing, font shaping and caption rules per language; (e) not needed by the primary ICP |
 | Phones and tablets (browser) | (f) memory limits, WebCodecs/WebGPU variance; *reach is a known risk*, measured by E-8 |
 | Safari, Firefox | (f) test matrix and encoder/GPU differences; P1 gated on E-8 |
@@ -360,7 +360,7 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 | Mobile browsers | P1 | Same trigger as above plus a viable WebGPU/WebCodecs path |
 | Pro plan ($29) | P1 | Promoted when two P1 features exist that are worth a higher tier (§21) |
 | Pause-subscription option | P1 | Promoted when churn reasons cite "stopped posting" > 30% |
-| Cloud transcription fallback (consented) | P1 | Promoted when E-3 shows > 25% of users miss the time budget |
+| Cloud transcription (signed-in default, the card's choice) | **Built** (cloud transcription release) | The founder brought it forward on 2026-11-06: about 13× faster than the device on a minute of speech (TE-C4) |
 | Three versions per recording, remix | P2 | After retention evidence (§21); a second plan request with a different "energy" setting is the cheap path |
 | Style DNA | P2 | After retention evidence |
 | Local LLM producer of the edit plan | P2 | When provider cost or terms (TE-15) or the privacy messaging (E-6) argue for it |
@@ -420,7 +420,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | Chat: ops, route, panel | Medium | Prompt upkeep; refusals | No timeline, ever | P0 (V6.9) |
 | Creator memory, queue | Medium | Long-running jobs, storage | Retention | P0 (V6.10) |
 | Person mask | High | Model, flicker, licence | Demos that spread; gated (TE-25) | P0 (V6.11), gated |
-| Cloud transcription fallback | High | Consent, security, cost, privacy-claim integrity | Weak devices | P1 |
+| Cloud transcription | High | Consent, security, cost, privacy-claim integrity | Everyone signed in | **Built** (cloud transcription release): the card before every drop, P-1 revised, Zero Data Retention, a global budget under the free tier |
 | Local LLM producer of the plan | Very high | Download size, device variance | Offline plan, no provider dependency | P2 |
 | Native desktop build | High | Second platform to ship and support | Power users | P2 |
 | Style DNA | High | Analysis models, UX | Retention/stickiness | P2 |
@@ -488,7 +488,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | **J1** Land | Hero (design release, 2026-11-05): "Say it once. Post it finished.", with the hero clip, "Start free" into the app and "See how it works". Below: "Your video stays on your computer." and a link to "What leaves your device." Then short product clips (made with Remotion, in place of the hand-made demo), every feature that works today, everything after V6 marked "Coming soon", the drop zone, pricing and the update form | Supported-browser line: "Works in Chrome or Edge on Windows and Mac." Shown before any upload |
 | **J2** Drop | Large drop zone: "Drop a clip or a full video (up to 20 minutes, English)." Optional "Try with a sample clip". (With `long_video` off: "Drop a clip (up to 90 seconds, English).") | No account needed for a clip; a long video goes to L1 |
 | **J3** Capability check | 1-3 second check, green tick or a clear unsupported page (§9.3) | Tone: plain, specific. "Your browser can do this." |
-| **J4** First-run model download | "One-time setup: downloading the speech model (about 250 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
+| **J4** First-run model download | "One-time setup: downloading the speech model (about 250 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining. **Only on the device path:** a cloud clip needs no model (cloud transcription release) | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
 | **J5** Validate | Probe the file; reject with specific guidance if constraints fail (§9.4) | Counted as `reject_reason` only |
 | **J6** Processing | Live "what we found" feed: "Transcribing…", "Planning your edit…", "Found: 3-item list", "Found: $2k to $20k", "Trimmed 6.4 s of pauses", "Cleaning voice" | Shows real plan items and cuts only; no fake steps. If the plan falls back to rules, the feed says so once ("Edit plan unavailable: using local rules") |
 | **J7** Preview (AHA) | Preview plays with animated captions and visual events; two buttons: "Looks good → Export" and "Fix something" | If no events were confident enough: "No numbers or lists found in this clip. Captions and cleanup applied." (honest, no padding) |
@@ -583,7 +583,11 @@ At MVP (V4-V6): style choice (3), visual on/off per visual, crop offset (by drag
 - Rendering is deterministic: the same (source, transcript, events, style, renderer version) yields the same frames, which makes golden-frame testing possible.
 - Two timelines from V4 (v1.2): **recording time** (when a word was spoken in the source) and **program time** (when it plays in the export). A time map built from the plan's cuts converts one to the other; transcript and plan keep recording time, the scene, preview and export run on program time. Until a plan contains cuts (V6.3) the map is the identity, so program time equals recording time and the export is as long as the source clip, pauses included.
 
-### 12.6 Opt-in later cloud transcription fallback and consent rules (P1, not in MVP)
+### 12.6 Cloud transcription and its consent rules (built in the cloud transcription release)
+
+**As built (founder, 2026-11-06; `docs/cloud_transcription/`).** Cloud transcription is the default for a signed-in person and is chosen in a card inside the drop zone, before any clip is dropped: "Cloud · fast" or "On device · private", with one line saying what each means ("Only your clip's sound is sent to write them, and it is not kept. Your video stays on your computer."). The choice is remembered on the device. Signed out, everything runs on the device and the card offers sign-in. The provider is Groq (`whisper-large-v3-turbo`), with Zero Data Retention on; the sound is compressed to Opus and passes through our server in memory only. Any failure finishes the clip on the device with one notice. This replaces the per-clip prompt below, and the per-export mode display: the card is shown before every drop, and the processing card says where the captions are written. The settings table and the Privacy Policy name the provider. Video frames are never uploaded in any mode. The founder approved the wording; a lawyer's review is on the launch checklist (§17).
+
+**As first written (superseded):**
 
 This section is about uploading **audio** for transcription. The v1.2 edit plan sends transcript text only and has its own rules (§12.8). If E-3 shows too many users miss the time budget, offer **"Faster processing (uses our servers)"**, off by default. Consent rules: a per-clip explicit prompt (not a persistent toggle) saying what is sent (audio only, for transcription), where it goes, that it is deleted after processing (retention period to be set by the tech spec), and that the "never uploaded" claim does not apply to that clip. The settings page shows the mode used for each export. Video frames are never uploaded in any mode. Legal review (§17) is required before launch of this feature.
 
@@ -593,7 +597,8 @@ A "What leaves your device" table, always visible:
 
 | Data | Leaves your device? |
 |---|---|
-| Video, audio, frames, music files, assets, brand logo and fonts, captions as edited, project edits | **No** |
+| Video, frames, music files, assets, brand logo and fonts, captions as edited, project edits | **No** |
+| A clip's sound, compressed (cloud transcription release) | **Yes, while "Cloud" is chosen in the drop zone and you are signed in:** to our server, which sends it to the transcription provider named here and returns the words. Neither keeps the sound or the words after the request. Choose "On device" and nothing of the clip leaves |
 | Transcript text, word timings and per-word loudness/pitch scores (v1.2, from V6.2) | **Yes, while "AI edit plan" is on:** once per plan request, to our server, which forwards it to the AI provider named here and returns the plan. Neither we nor the provider keep it after the request (provider terms recorded by TE-15). Switch it off and nothing of the clip leaves |
 | Sentence text and timings of a long video, and shot categories like "talking head, face left" (v1.3, V6.4) | **Yes, while "AI edit plan" is on:** once per long video, to choose shorts. Same rules as above |
 | What you type in chat, with that short's words (v1.3, V6.9) | **Yes, while "AI edit plan" is on:** per message. Same rules. Never used in analytics |
@@ -915,7 +920,7 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | **Analytics rules** | Allowed: anonymous event names and numeric/enum properties from an explicit list (capability pass/fail, reject_reason, stage timings, error codes, export success, plan outcome and item/cut counts). **Never allowed:** file names, transcript text, caption text, event or plan params, audio/video content, free-text user input. Enforced by an automated browser test that processes a fixture clip while capturing all network traffic: it fails if any request goes to a non-allowlisted host, if any payload other than the one plan request contains a transcript word, if any payload contains media bytes, or if a request is sent during processing other than analytics beacons, the API warm-up and the plan request |
 | **Edit-plan request (v1.2)** | Only from the plan use-case; body = transcript text, timings, prosody scores, catalog version; no media, no file name, no user edits. The server holds it in memory for the request only, never writes it to the database or logs, and forwards it only to the configured AI provider over HTTPS. The provider's retention and training terms are recorded by TE-15 and shown on the settings page; a provider that trains on the data or keeps it is not chosen unless the founder accepts that in writing and the settings page says so |
 | **AI requests of the long path and chat (v1.3)** | One use-case per route; bodies carry sentence text and timings, shot categories, the typed message and short history, the words of the short, asset labels and memory counts. **Never a frame, an audio sample, a file name.** Held in memory for the request only, never written to a database or log. Chat text is never in analytics |
-| **Legal-review gate** | Before any public claim of GDPR, India DPDP Act, CCPA, SOC 2 or similar compliance, or any absolute wording such as "never leaves your device", a lawyer reviews the claim (*general-market knowledge, re-verify before launch*). The MVP's factual claim is "your video is not uploaded to our servers," backed by the network test; from V6.2 the copy also says that the transcript is sent to make the edit plan, with the provider named. The consented cloud fallback (§12.6) needs its own review |
+| **Legal-review gate** | Before any public claim of GDPR, India DPDP Act, CCPA, SOC 2 or similar compliance, or any absolute wording such as "never leaves your device", a lawyer reviews the claim (*general-market knowledge, re-verify before launch*). The MVP's factual claim is "your video is not uploaded to our servers," backed by the network test; from V6.2 the copy also says that the transcript is sent to make the edit plan, with the provider named. Cloud transcription (§12.6, built in the cloud transcription release) needs its own review before launch; until then the founder approved its wording (2026-11-06) |
 | **Deletion/export** | "Delete account" first cancels any active subscription, then immediately removes the user, sessions, subscription link, usage receipts and waitlist entries from our servers (well inside a 30-day bound); analytics hold no account link, so there is nothing to remove there and they expire at 90 days; billing records may be retained by the merchant of record for tax reasons and are out of our control. "Clear local data" removes OPFS/IndexedDB content in that browser but cannot remove files the user already downloaded. "Export my account data" returns a JSON of server-side records only (there is nothing else) |
 
 ---
@@ -1124,7 +1129,7 @@ All thresholds are TARGETS. Measure from public launch (planned as Mon 21 Dec 20
 | 6 | ~~Face-tracking reframe~~ | Moved into launch scope (V6.5, v1.3) | |
 | 7 | Pro plan ($29) with three versions per recording and brand presets (P1) | At least two Pro-worthy features exist and ≥ 20 paid users | Active paid ≥ 20; retention ≥ 35% |
 | 8 | Mobile browser support (P1) | E-8 shows mobile is the largest blocked group and a viable path exists | Memory and encode budgets proven on mid-range phones |
-| 9 | Consented cloud transcription fallback (P1) | > 25% of users miss the time budget | Legal review of consent text; data retention design |
+| 9 | Cloud transcription | **Built** (cloud transcription release) | A lawyer's review of its wording before launch (§17) |
 | 10 | Style DNA (P2); brand kit moved into launch scope (V6.10, v1.2) | Retention evidence that style consistency drives usage | Pro plan live |
 | 11 | Local LLM producer of the edit plan (P2) | Provider cost or terms (TE-15), or privacy-led messaging wins E-6 | Device capability data shows adequate hardware share |
 | 12 | Native desktop app (P2) | Web product validated and requests for offline/GPU speed | M4 continue decision |

@@ -596,3 +596,41 @@ All fourteen captures are in `~/cloud-review/` (1-14).
 - **F-2:** Zero Data Retention seen on in the console.
 
 **Found, not fixed.** None.
+
+## Entry 11 - 2026-11-06 - P170 (agent's part): copy-back and the one full media run
+
+**Copy-back** (plan §18):
+
+- **TS:**
+  - §5 rows (done with each prompt);
+  - §7: the lint edge;
+  - §16: the model paragraph and "Cloud transcription is built";
+  - §22.1: `/healthz`'s field, the `POST /transcribe` row, and DC-14's exception under the table;
+  - §22.8: the three variables;
+  - §24.1: the provider's host from the server;
+  - §24.5: the two buckets and the budget;
+  - §25.1: P-1 and P-5 revised, P-16 new;
+  - §25.3: the inventory row and "Built";
+  - INV-3 and INV-4;
+  - the two rejected-alternative lines;
+  - §41.2 DC-14, §41.3's flag list, and §41.5's row;
+  - §37: TE-C1 to TE-C5.
+- **PS:**
+  - the positioning line;
+  - the four P1 tables' rows;
+  - J4: the device path only;
+  - §12.6, "as built" above the superseded text;
+  - §12.7: the sound row;
+  - §17: the legal gate.
+- **BP §0:** the release's paragraph.
+
+**Tier 4** (keyed build of P169's last commit, D1, Chrome 156):
+
+| Suite | Result |
+|---|---|
+| `pnpm e2e:media`, the full run, once (D-338) | **112 passed, 1 skipped** (the existing skip), 0 failed, in 40.5 min |
+| `cargo test --workspace` | **863 / 0 / 4** (floor 817) |
+| Vitest | 568 (floor 522) |
+| `pnpm e2e` | 57 (floor 57) |
+
+**Push 3**, CI waited on: see below.

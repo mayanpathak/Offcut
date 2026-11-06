@@ -1129,6 +1129,7 @@ everything ─► gen (types only)
 - `usecases` never import each other except `cancel-job.ts` and `restore-clip.ts`, which other use-cases may call, and the two pairs of §2 "Edges added in V2" (`import-clip.ts` to `run-pipeline.ts`, `start-export.ts` to `control-preview.ts`); checked by a `boundaries` rule.
 - Stores never import use-cases; use-cases write stores through exported action functions only.
 - **Edges added in V6.** `start-app.ts` to `restore-session.ts`: `connectAccount()` runs first in `start-app.ts` and hands `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links, so `net` and `persistence` import no store (v6implementation D-306). `blockers.ts` to `entitlement.ts`, as §12.5 asks `effective()` (D-309). `offcut-api` uses `getrandom` directly, as a wrapper in `deny.toml`, for the 32 random bytes of a link and a refresh token (D-257).
+- **Edges added in the cloud transcription release.** `run-pipeline.ts` to `transcribe-cloud.ts` (cloudimplementation D-372): the pipeline hands the clip's sound to the one use-case that sends it.
 
 ---
 
@@ -2267,7 +2268,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
 
 ## 16. Model Manager and Local ASR
 
-**Model: a quantized English Whisper-family model run by ONNX Runtime Web inside `asr.worker` (WebGPU first, WASM-SIMD + threads fallback); model files are downloaded by the app from the asset CDN into OPFS, hash-verified, and served to the runtime only from OPFS. Rejected: the runtime's default hub/CDN loading (third-party hosts break the closed network list), a CPU-only WASM build (misses PS §20.2 on R1), cloud ASR (PS §9.8).**
+**Model: a quantized English Whisper-family model run by ONNX Runtime Web inside `asr.worker` (WebGPU first, WASM-SIMD + threads fallback); model files are downloaded by the app from the asset CDN into OPFS, hash-verified, and served to the runtime only from OPFS. Rejected: the runtime's default hub/CDN loading (third-party hosts break the closed network list), a CPU-only WASM build (misses PS §20.2 on R1), cloud ASR as the only path (PS §9.8). Since the cloud transcription release this model is the device path and every fallback, and a signed-in person's clips go to the cloud by default (Seams below).**
 
 ### 16.1 Model manifest
 
@@ -2353,7 +2354,7 @@ transcribe(pcm16):
 
 **Contingency (PS §20.4).** ASR median above 145 s for a 60 s clip on R1 (D-67; the line was 40 s) → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
-**Seams (not built now).** Consented cloud transcription (P1, PS §12.6): an alternative implementation of `AsrWorkerApi.transcribe` selected per clip, a new host in `allowlist-hosts.ts`, a consent dialog and a `CloudJobConsent` record. Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker. v1.3: the manifest becomes one file per model under `config/models/`, the ASR file unchanged (DC-4); the face and person models run in `asr.worker` through their own `*-runtime.ts` (DC-10).
+**Cloud transcription is built** (cloud transcription release, cloudimplementation §8). `asr.worker` gains `encodeForCloud` (`pcm16` to Ogg Opus, 32 kbps, through WebCodecs and `workers/asr/ogg-opus.ts`) and `fromCloud` (the provider's words through D-382's silence guard, then the same `postProcess` and `normalizeTranscript` as device words) beside an unchanged `transcribe`. `usecases/transcribe-cloud.ts` sends the file to our API, so no browser host is added. `run-pipeline.ts` chooses cloud once per run: the flag `cloud_transcribe` on, `/healthz` not saying no, the drop zone's card on Cloud, and a person signed in; any failure finishes the clip on the device. **Seams (not built now).** Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker. v1.3: the manifest becomes one file per model under `config/models/`, the ASR file unchanged (DC-4); the face and person models run in `asr.worker` through their own `*-runtime.ts` (DC-10).
 
 ---
 
@@ -2938,7 +2939,7 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 
 | Route | Auth | Purpose | Body limit | Rate limit | Idempotency |
 |---|---|---|---|---|---|
-| `GET /healthz` | none | Liveness; touches no DB | none | 60/min per IP | n/a |
+| `GET /healthz` | none | Liveness; touches no DB; says `cloud_transcribe` (cloud transcription release, D-355) | none | 60/min per IP | n/a |
 | `POST /auth/magic-link` | none | Create link, send email; 202 for any address (no account enumeration); 503 `email_unavailable` when the mail relay fails, sent inside the request with an 8 s timeout (V6, D-254) | 1 kB | 3 per 15 min per email; 10/h per IP | New request invalidates earlier unused links for that email |
 | `POST /auth/verify` | none | Consume link; create user if new; set refresh cookie; return `SessionResponse` | 1 kB | 10/min per IP | Token is single-use |
 | `POST /auth/refresh` | refresh cookie + CSRF header | Rotate refresh token; return `SessionResponse` | 0 | 30/min per IP | Previous token accepted for 30 s (multi-tab), then reuse revokes the session |
@@ -2951,13 +2952,14 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | `POST /billing/webhook` | provider signature over raw body | Apply subscription events | 64 kB | 120/min per IP | `provider_event_id` primary key; replays return 200 and change nothing |
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
 | `POST /notify-me` | none | Waitlist / unsupported-platform email | 1 kB | 5/h per IP | Primary key (email, wanted) |
+| `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`) | None; each success counts against the budget |
 | `POST /plan` (v1.2, V6.2) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
 | `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | 64 kB | 6/min per user | A repeat for the same prefix in a month uses no new grant |
 | `POST /chat-edit` (v1.3, V6.9) | bearer | Chat: message and context → `ChatReply` (§49.3); body never stored or logged | 64 kB | 30/min per user | none |
 | `POST /account/delete` | bearer | Delete account (§22.7) | 0 | 3/h per user | Idempotent |
 | `GET /account/export` | bearer | `AccountExport` JSON | none | 6/h per user | n/a |
 
-`server/tests/no_media_routes.rs` walks the router and asserts: no route has a body limit above 64 kB; `multipart/*`, `application/octet-stream`, `video/*` and `audio/*` requests receive 415 on every route.
+`server/tests/no_media_routes.rs` walks the router and asserts: no route has a body limit above 64 kB; `multipart/*`, `application/octet-stream`, `video/*` and `audio/*` requests receive 415 on every route. **The one exception (DC-14):** `POST /transcribe` takes `audio/ogg` with a 1 MiB limit; its other media types still get 415.
 
 ### 22.2 Sessions and CSRF
 
@@ -3087,7 +3089,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 
 ### 22.8 Configuration (`config.rs`, the only place that reads the environment)
 
-`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
+`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRANSCRIBE_ENABLED` (the server's kill switch), `TRANSCRIBE_API_KEY`, `TRANSCRIBE_API_BASE_URL` (cloud transcription release, D-356), `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
 
 ### 22.9 Free-tier behaviour (external facts: verified 2026-10, re-verified by TE-11)
 
@@ -3249,7 +3251,7 @@ CREATE TABLE platform_waitlist (
 
 Nothing else: no font CDN, no analytics vendor, no error tracker, no tag manager, no third-party script (PS §17). `config/allowlist-hosts.ts` lists hosts 1 and 2 and is the only such list; `scripts/check-hosts.mjs` fails the build when the bundle contains any other `http(s)://` host literal.
 
-**From the server:** Postgres host; the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
+**From the server:** Postgres host; the transcription provider's API (`api.groq.com/openai/v1`, `POST /transcribe` only, cloud transcription release); the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
 
 ### 24.2 Secrets
 
@@ -3283,7 +3285,7 @@ Logged per request: request id, method, route template, status, latency, and for
 
 ### 24.5 Rate limiting
 
-In-memory token buckets keyed by (route group, key), at most 50,000 keys with least-recently-used eviction. Loss at restart is accepted. `client_ip.rs` takes the address `TRUSTED_PROXY_HOPS` positions from the right of `X-Forwarded-For`, or the socket peer when the header is absent; TE-5 establishes the hop count behind the Vercel rewrite. Limit exceeded → 429 with `retry_after_secs`.
+In-memory token buckets keyed by (route group, key), at most 50,000 keys with least-recently-used eviction. Loss at restart is accepted. `client_ip.rs` takes the address `TRUSTED_PROXY_HOPS` positions from the right of `X-Forwarded-For`, or the socket peer when the header is absent; TE-5 establishes the hop count behind the Vercel rewrite. Limit exceeded → 429 with `retry_after_secs`. Cloud transcription (cloud transcription release) adds `TranscribeUser` (20 per 24 h) and `TranscribeIp` (60 per hour), and a global audio budget in `transcribe/budget.rs`, the only place it is set: 7,000 s per UTC hour and 27,000 s per UTC day, under the provider's free tier, charged before the provider is called and lost at a restart.
 
 ### 24.6 Integrity and supply chain
 
@@ -3310,13 +3312,14 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 
 | # | Promise (PS reference) | Structural | Automatic | In the product |
 |---|---|---|---|---|
-| P-1 | Video, audio, music, brand assets, captions as edited and project edits are not uploaded; the transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media (§22.1); DTOs carry no free-text field except `email` and `PlanRequest.words[].text`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `events.types.test.ts`; `log_redaction.rs` (plan flow) | Settings → "What leaves your device" with the switch and the provider; "Verify it yourself" note; J4 and J10 copy |
+| P-1 | Video, video frames, music, brand assets, captions as edited and project edits are not uploaded. **A clip's sound leaves only as one compressed Opus file in the body of `POST /transcribe`, only for a signed-in person with Cloud chosen in the drop zone's card, and is forwarded only to the transcription provider; the words come back in its response** (cloud transcription release). Transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media but `POST /transcribe`'s `audio/ogg` (§22.1, DC-14); only `usecases/transcribe-cloud.ts` sends audio; DTOs carry no free-text field except `email`, `PlanRequest.words[].text` and the words of `TranscribeResponse`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `transcribe_route.rs`; `cloud-transcribe.spec.ts` (identity, On device sends nothing); `events.types.test.ts`; `log_redaction.rs` (plan and transcribe flows) | Settings → "What leaves your device" with the sound row and the provider; the drop zone's card; "Verify it yourself" note; J4 and J10 copy |
 | P-2 | Only allowlisted hosts are contacted (PS §17) | `allowlist-hosts.ts`; CSP; `check-hosts.mjs` | `privacy-network.spec.ts` assertion 1 | Settings lists the two hosts |
 | P-3 | Analytics carry only allowlisted names with numeric/enum properties; never file names, transcript or caption text, event parameters or free text (PS §17) | `AnalyticsEvent` has no `String` field; `deny_unknown_fields`; client `track()` accepts only the generated union | `events.types.test.ts` (type-level); `analytics_allowlist.rs` (server rejects extras and strings); `privacy-network.spec.ts` assertions 3 and 5 | Event list rendered on the settings page |
 | P-4 | The "What leaves your device" page matches the allowlist exactly (PS §20.1) | Page renders `ANALYTICS_EVENT_DOCS`, generated from `analytics.rs` | `settings-what-leaves.spec.ts` compares rendered rows with `gen/api.ts` | The page itself |
-| P-5 | No request during processing other than allowlisted beacons, the `GET /healthz` warm-up and (plan on) the one `POST /plan` (PS §17, v1.2) | Use-cases between import and `ready` import no `net` module except `request-plan.ts` (one boundaries exception) | `privacy-network.spec.ts` assertion 4 | Processing feed copy "Everything is rendering on your computer" |
+| P-5 | No request during processing other than allowlisted beacons, the `GET /healthz` warm-up, in cloud mode the one `POST /transcribe` (cloud transcription release), and (plan on) the one `POST /plan` (PS §17, v1.2) | Use-cases between import and `ready` import no `net` module except `transcribe-cloud.ts` and `request-plan.ts` (one boundaries edge each) | `privacy-network.spec.ts` assertion 4; `cloud-transcribe.spec.ts` (On device: only `/events`) | Processing card: "Everything runs on your computer" on the device, the cloud line in cloud mode |
 | P-15 | (v1.3) No pixel or audio sample of a source or an asset leaves the browser; vision reaches the AI only as enums and indexes (INV-28); chat text, sentence text and asset labels leave only in the AI request bodies, only with the AI switch on, and the server neither stores nor logs them | Types of `ShotLine`, `AssetLine`, `ChatEditRequest`; one use-case per route | `privacy-network.spec.ts` (long path, chat, assets); `log_redaction.rs` | The settings table lists each |
 | P-14 | The server never stores or logs a plan request's transcript, and forwards it only to the configured AI provider (v1.2) | `/plan` handler holds the body in memory only; no DB write of `PlanRequest`; `log.rs` logs no body; one provider adapter selected by config | `log_redaction.rs` (marker words in a plan request); a grep test that no `sqlx` query in `server/src/plan/` writes text | Settings names the provider and its data-use terms (TE-15) |
+| P-16 | (cloud transcription release) The server never stores or logs a clip's sound or the words returned for it, and forwards the sound only to the configured transcription provider, whose retention is switched off (Zero Data Retention) | `transcribe/` names no database; `route.rs` logs a kind, a length bucket and the status; `groq.rs` never reads an error body | `log_redaction.rs` (marker word and marker bytes); `transcribe_route.rs` (no `sqlx` under `transcribe/`) | The Privacy Policy's "Cloud captions"; the settings table |
 | P-6 | The model stays in the browser and is verified (PS §10 J4, §17) | Bundled manifest hashes; OPFS-only cache adapter | `download.test.ts`; `model-download.spec.ts` | Settings shows model version, cache size |
 | P-7 | "Clear local data" removes clips, transcripts and render cache (PS §20.1) | §23.3 | `clear-local-data.spec.ts` | Settings button |
 | P-8 | Account deletion removes server records within 30 days (PS §17) | §22.7 (immediate) | `account_delete.rs` | Account page |
@@ -3361,8 +3364,9 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | Anonymous allowlisted events | `analytics_events` | 90 days |
 | AI request counts per user per month (v1.3) | `ai_usage`, `ai_shorts_grants` | Until account deletion |
 | Plan-request bodies (transcript text and timings) (v1.2) | none: memory only, for the duration of the request | Not stored |
+| A clip's compressed sound and the words returned for it (cloud transcription release) | none: memory only, for the duration of `POST /transcribe` | Not stored |
 
-**Seams (not built now).** Consented cloud transcription fallback (P1, PS §12.6): per-clip consent prompt, per-export mode display on the settings page, legal review. It would send audio, changes P-1 for consenting clips only and requires a revision of this section before any code. (The v1.2 plan request sends text only and is specified in §40.7 and P-1, P-14.)
+**Built: cloud transcription** (cloud transcription release). A signed-in person's choice in the drop zone's card, Cloud by default, replaces PS §12.6's per-clip prompt; P-1 is revised for it and P-16 added; the provider's Zero Data Retention is on; the founder approved the wording, and a lawyer's review of it is on the launch checklist (PS §17). (The v1.2 plan request sends text only and is specified in §40.7 and P-1, P-14.)
 
 ---
 
@@ -3805,8 +3809,8 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 |---|---|---|
 | INV-1 | The browser contacts no host outside `config/allowlist-hosts.ts` | `privacy-network.spec.ts` (1); `check-hosts.mjs`; CSP |
 | INV-2 | No request URL, header or body contains media bytes, caption text as edited, event or plan parameters, or a file name; transcript text appears only in the body of `POST /api/v1/plan`, and never while "AI edit plan" is off (v1.2) | `privacy-network.spec.ts` (3, 4b) |
-| INV-3 | Import, processing, preview and review complete with the API unreachable | `api-cold-start.spec.ts` |
-| INV-4 | The server has no route that accepts more than 64 kB or a media content type | `no_media_routes.rs` |
+| INV-3 | Import, processing, preview and review complete with the API unreachable. Processing waits on the API only in cloud mode, at most 45 s for a waking API and one 30 s request, and completes on the device when it cannot (cloud transcription release, D-375) | `api-cold-start.spec.ts`; `transcribe-cloud.test.ts`; `cloud-transcribe.spec.ts` (fallbacks) |
+| INV-4 | The server has no route that accepts more than 64 kB or a media content type, except `POST /transcribe`: `audio/ogg` only, at most 1 MiB, bearer only (DC-14) | `no_media_routes.rs` |
 | INV-5 | `TIMELINE_INTEGRITY` (v1.2). Every removed span is a validated, unrestored `Cut` of the stored plan; no cut starts or ends inside a word; nothing is reordered or retimed; the export has `ceil(time_map.out_duration x 30 / 1000)` frames. With the identity map (V4-V6, and whenever the plan has no applied cuts) source time equals output time and the export has `ceil(source duration x 30 / 1000)` frames | `timeline-preserved.spec.ts` (identity); `timemap_build.rs`, `cuts_applied.spec.ts` (V6.3); `verify_mp4.py` (3, 5, 8) |
 | INV-6 | No `DetectedEvent` exists with confidence below its kind's threshold | `rules_table.rs`; assertion in `precision_recall.rs` |
 | INV-7 | Equal scene inputs and renderer version give byte-identical display lists for every frame | `offcut-scene/tests/determinism.rs` |
@@ -3836,7 +3840,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 |---|---|
 | FFmpeg compiled to WASM | Rejected by PS §0 item 4 and §9.8: size, licensing review (c)(f). `ffmpeg` appears only as a development CLI in `fixtures/` and `verify/` |
 | Local LLM for semantics | PS §9.2 (f); P2: a third producer of `EditPlan` (§40) |
-| Cloud transcription (audio upload), even "temporarily" | Breaks P-1; P1 with consent and a spec revision (PS §12.6). The cloud LLM over transcript **text** is built from V6.2 (§40.7) |
+| Cloud transcription for a signed-out person, or of the video | Built for signed-in people only, with the card's On device choice (cloud transcription release; P-1 as revised). Video and frames never leave |
 | The browser calling an AI provider; a provider key in the client; streaming model output to the browser | §40.7: the server is the only caller; the browser's allowlist stays two hosts |
 | Cuts decided by rules (silence thresholds, pause-length rules) without a plan; cuts inside a word; reordering inside a `TimeMap`; speed changes | PS §9.2, §9.2.1: cuts come only from a validated plan and are shortened pauses, lead/trail silence and (opt-in) fillers and false starts. With the plan off, nothing is cut. v1.3: choosing and ordering whole sentences is the `Assembly`'s job (§44, DC-6); a user-asked cut is a chat op (§49.2) |
 | Any `TimeMap` constructor other than `TimeMap::identity` and `offcut-plan::timemap::build`; any time conversion outside `TimeMap` | §40.1 (replaces the v1.1 ban on a mapping layer; the map is built in V4 on purpose, TDR-7) |
@@ -4463,10 +4467,11 @@ A protected behaviour changes only here. Each row names what changes, when, what
 | DC-11 | V6 | Comment-only cleanup of the old V6.x numbers (§42), including regenerated `web/src/gen/domain.ts` comments | No token changes outside comments | `check-gen-clean.sh`; an empty diff with comments stripped |
 | DC-12 | V6 | `export-creator.spec.ts`, the case "no token" only: what the person is told changes from "accounts are not open yet" to the sign-in dialog with the limits. Founder's yes of 2026-11-02, "carefully": its title and one assertion change, and one line closes the dialog | Every other assertion of that case, and every other case of the file, unchanged: no download, no `export_started`, nothing in `exports`, the button still enabled. No exported file changes | The spec's diff read in P147; the file's other cases passing unchanged; `verify_mp4.py`'s 11 checks |
 | DC-13 | Design release | Caption lines below the middle of the band are lowered in the caption block instead of centred: by a share of the room under centred lines (to the block's bottom less the style's vertical decoration, `StyleSpec::decoration_height`: Clean 6.5 lp, Bold 9, Mono 32) that rises evenly from 0 at the band's middle to `BOTTOM_LINE_DROP` = 0.5 at Bottom (`placement::line_drop`). At Bottom a one-line caption moves 36-45 lp lower (Clean 45, Bold 40, Mono 36), a two-line one 15-23 lp, and the Middle snap (0.55) about 4 lp. Clips saved at Bottom render their captions lower on reopening. Goldens and display-list snapshots of placements below the middle are regenerated; their diffs are only glyph runs', pills' and panels' `y`. The e2e helper `dragCaptions` takes the block at its centre on `data-hit` "captions" or "word" (it named "block", a kind the page never reports, so it matched only a word). Founder's choice, 2026-11-05: option A's mechanism, but "a little bit low", as the apps draw their own UI at the bottom (designchangelog Entry 16) | The block, event zone, safe area, watermark, hit regions, `CaptionPlacement` values and their storage; every frame at placements 0 to 0.5, bit for bit; the export's 11 checks | `layout_safe_area.rs`, `display_list_snapshots.rs` (40 files, every diff a `y`), `golden_frames.rs` (14 of 16 regenerated), `export-*.spec.ts`, `preview-sync.spec.ts`, `review-edit.spec.ts`, `pipeline-preview.spec.ts` |
+| DC-14 | Cloud transcription | `media_guard` admits exactly `POST /api/v1/transcribe` with `audio/ogg`; that route's body limit is 1 MiB. `no_media_routes.rs` names it as the one exception (`AUDIO_BODY`): its other media types get 415, `audio/ogg` passes the guard (401 without a bearer, 413 over 1 MiB with one). `/healthz`'s body gains `cloud_transcribe` (`notify_me.rs`'s exact-body assertion gains the field). Founder's decision of 2026-11-06 | Every other route: 415 for every media type, no body over 64 kB, the same assertions. The device path, its frames, samples, transcripts and exports: with the fake's `/healthz` (no field) every protected suite runs on the device | `no_media_routes.rs`, `router.rs`'s unit tests, `transcribe_route.rs`, `cloud-transcribe.spec.ts` (identity); every §41.1 proof unchanged |
 
 ### 41.3 How each release is made safe
 
-1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
+1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
 2. **Baseline read first.** Before a release's first code commit, read the protected proofs and record them in its changelog.
 3. **Additive data.** A new field on a stored or sent type has `#[serde(default)]` and a default that means "the V5 behaviour". A new IndexedDB store comes through a numbered migration. A server migration stays compatible with the previously deployed binary (§23.3). The plan's wire format stays `PLAN_FORMAT = 1`; new kinds take new codes (§40.2).
 4. **Old callers keep their function.** `transcribe`, `decodeAudio`, `importClip`, `run-pipeline.ts` and `validate_probe` keep their signatures. New paths call new functions, which call shared stages.
@@ -4493,6 +4498,7 @@ The implementer stops, writes the question into the changelog's "Open items" and
 | Release | Leaves ready | Used by |
 |---|---|---|
 | V6 | Accounts, entitlement token, `ai_usage`-ready account lists (S-10) | V6.2 quotas, V6.4 long-video grant, V6.10 brand gating |
+| Cloud transcription | `Transcriber`, `POST /transcribe`, `encodeForCloud`, `fromCloud`, `ogg-opus.ts`, `transcribe-cloud.ts`, the availability gate, `features.ts` | V6.1 windows of long sources, at most 90 s each |
 | V6.1 | `route_probe`, `SourceInfo`, `sources/` storage, windowed ASR with checkpoints, the source machine, `features.ts`, multi-manifest model manager | V6.4, V6.5, V6.10 queue, V6.11 |
 | V6.2 | `/plan`, provider trait, spend cap, plan store, catalog growth rule, `DrawCmd::Image` | Every release that adds a kind; V6.4 and V6.9 routes share the provider |
 | V6.3 | Non-identity `TimeMap`, `Assembly`, `SourcePos`, region audio, rebased transcripts, join handling | V6.4 shorts, V6.8 transitions at joins |
@@ -4533,7 +4539,7 @@ On 2026-11-02 the founder set the order: **V6 first, then V6.1-V6.11, then V7-V1
 
 ## 43. The Long Path: Source, Route, Storage, Transcription (V6.1)
 
-**Model: a file longer than 90 seconds is a source, not a clip. A source is copied once into OPFS, its audio is decoded in windows onto disk, its transcript is built in checkpointed windows, and nothing else in the product reads it directly: shorts read it through an `Assembly`. Rejected: reading the original file in place with a `FileSystemFileHandle` (the handle's name is a file name stored in the browser, against P-11; permission prompts on every return; `render.worker` and `media.worker` both open OPFS sync handles today), YouTube-link import (a server that downloads video breaks INV-4 and the platform's terms), cloud transcription (P-1).**
+**Model: a file longer than 90 seconds is a source, not a clip. A source is copied once into OPFS, its audio is decoded in windows onto disk, its transcript is built in checkpointed windows, and nothing else in the product reads it directly: shorts read it through an `Assembly`. Rejected: reading the original file in place with a `FileSystemFileHandle` (the handle's name is a file name stored in the browser, against P-11; permission prompts on every return; `render.worker` and `media.worker` both open OPFS sync handles today), YouTube-link import (a server that downloads video breaks INV-4 and the platform's terms), cloud transcription of a whole source in one request (the route takes at most 92 s; V6.1 sends windows of at most 90 s through the cloud transcription release's `encodeForCloud` and `POST /transcribe`).**
 
 ### 43.1 Routing
 
@@ -5309,6 +5315,11 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | TE-23 | Which face detector: speed, accuracy, licence | Three candidates on 20 corpus shorts | Under 15 ms a frame on D1; at least 95% of faces found on frontal shots; a licence that allows bundling in a paid product | V6.5 | Next candidate; a coarser `FACE_FPS` |
 | TE-24 | Which person-matte model: speed, size, licence | MODNet-class, RVM-class and others | At most 2× duration on D1; at most 30 MB; licence recorded and acceptable (a GPL model is not) | V6.11 | Next; then ask |
 | TE-25 | Matte quality | §51.4 | §51.4 | V6.11 | §51.4 |
+| TE-C1 | Does the browser's Opus encoder take 16 kHz mono? (cloud transcription) | `docs/cloud_transcription/experiments.md` | Supported in Chrome and Edge 156; 60 s in 0.25-0.34 s; `OpusHead` pre-skip 104 | Cloud transcription | 48 kHz input |
+| TE-C2 | Groq's answer, its accuracy per bitrate, its timing | the same | 32 kbps WER 6.2% (FLAC 5.5%); word starts 33 ms from measured onsets (the device's 264 ms late); an invented closing "Thank you." led to D-382's silence guard | Cloud transcription | A higher bitrate |
+| TE-C3 | The same visual events, cloud and device | the same | Every event on six clips, plus the 3-item list the device misses | Cloud transcription | Stop and ask |
+| TE-C4 | Drop to ready, cloud and device | the same | 13-14× faster on a minute of speech, model cached | Cloud transcription | Recorded |
+| TE-C5 | Vercel's rewrite carries the body; a live request's time | the same, at the merge | (P170) | Cloud transcription | Lower the limit or the bitrate |
 
 TE-15 now also covers the paid provider: price, the `/shorts` and `/chat-edit` latency, data terms. Its "free tier" pass line becomes "free tier for development; the cost model of §52 fits the cap".
 
