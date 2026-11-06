@@ -66,6 +66,26 @@
   background: rgb(255 255 255 / 0.09);
 }
 
+/* The transcription card's two choices (cloudimplementation §9.1): the pill
+   rule above is for buttons, so the choices take their own, and the chosen one shows. */
+.tryFrame [role="radio"] {
+  height: 38px;
+  padding: 0 18px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.tryFrame [role="radio"]:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+}
+
+.tryFrame [role="radio"][aria-checked="true"] {
+  background: rgb(167 139 250 / 0.2);
+  color: var(--text);
+}
+
 .tryFrame [role="status"] {
   min-height: 1.5em;
   font-size: 14px;

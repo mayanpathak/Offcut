@@ -383,7 +383,7 @@ export const messages = {
             heading: "Cloud captions",
             body: [
               "When you are signed in and \"Cloud\" captions are on, which is the default for an account, the sound of each clip you drop is compressed in your browser and sent through our server to Groq, which writes the words and their timings and sends them back. Neither we nor Groq keep the sound or the words after the request. Your video and its frames are never sent.",
-              "Choose \"On this device\" before you drop a clip, and nothing of that clip leaves your computer. Without an account, everything runs on your computer.",
+              "Choose \"On device\" before you drop a clip, and nothing of that clip leaves your computer. Without an account, everything runs on your computer.",
             ],
           },
           {
@@ -438,7 +438,7 @@ export const messages = {
       { data: "Video, video frames, captions as edited, project edits", leaves: "No" },
       {
         data: "The sound of a clip, compressed, when \"Cloud\" captions are on (signed in only)",
-        leaves: "Yes: to our server, which sends it to Groq to write the captions and returns the words. Neither keeps the sound or the words after the request. Choose \"On this device\" and nothing of the clip leaves",
+        leaves: "Yes: to our server, which sends it to Groq to write the captions and returns the words. Neither keeps the sound or the words after the request. Choose \"On device\" and nothing of the clip leaves",
       },
       { data: "Your email and plan status", leaves: "Yes, to our servers" },
       { data: "Count of exports (no content)", leaves: "Yes" },

@@ -6,8 +6,8 @@ The rows are defined in `cloudimplementation.md` §13. Each result is written he
 |---|---|---|---|
 | TE-C1 | Does the browser's WebCodecs encoder take Opus at 16 kHz mono, and what does it return (description, pre-skip, chunk durations, speed)? | P161 | **Passed** 2026-11-06 |
 | TE-C2 | What does Groq return for our audio, how good is it at each bitrate, and how far are its times from the device recognizer's? | P161 | **Passed** 2026-11-06, with D-382 (silence guard) added |
-| TE-C3 | Does the cloud transcript give the same visual events as the device transcript on the reference clip and its derived clips? | P169 | Not run |
-| TE-C4 | How much faster is drop-to-ready with cloud than on the device, with and without the model cached? | P169 | Not run |
+| TE-C3 | Does the cloud transcript give the same visual events as the device transcript on the reference clip and its derived clips? | P169 | **Passed** 2026-11-06: every event, plus the 3-item list the device misses |
+| TE-C4 | How much faster is drop-to-ready with cloud than on the device, with and without the model cached? | P169 | **Passed** 2026-11-06: 13-14× on a minute of speech, model cached |
 | TE-C5 | Does Vercel's rewrite carry a 900 kB body to our API, and how long does a live cloud request take? | P170 (G 10.7) | Not run |
 
 ## TE-C1
@@ -104,11 +104,54 @@ This agrees with D-346's hourly budget of 7,000 s. The daily audio limit is not 
 
 ## TE-C3
 
-Not run.
+**Read on 2026-11-06 (P169), D1, Chrome 156.**
+
+**The set-up.**
+
+- **Build and server:** the keyed test build and the real local API (`cargo run -p offcut-api`, `.env` then `.env.deploy` sourced in a subshell, `TRANSCRIBE_ENABLED=true`, the real Groq key).
+- **Sign-in:** the founder was not available to sign in, so a temporary Playwright spec (deleted) faked the session in the page only, and sent `/healthz` and `/transcribe` to the real API with an access token signed by the **local** `.env` key (never a production key).
+- **What was real:** the app, the encoder, the upload, the route's checks, the budget, Groq, the silence guard and the transcript.
+- **What was compared:** each clip was processed twice in fresh contexts: "On device" (model cached) and "Cloud". The events come from the Visuals tab.
+
+| Clip | Mode | Words | Sentences | Events (time, kind, figure) |
+|---|---|---|---|---|
+| reference (74.7 s) | device | 157 | 17 | 0:11 3,000 hours; 0:26 90 → 10 minutes; 0:36 list, 3 reasons; 1:02 $12k |
+| reference (74.7 s) | cloud | 155 | 18 | 0:11 3,000 hours; 0:25 90 → 10 minutes; 0:35 list, 3 reasons; 1:02 $12k |
+| speech_60s_portrait | device | 127 | 10 | 0:10 3,000 hours; 0:25 90 → 10 minutes |
+| speech_60s_portrait | cloud | 127 | 16 | 0:10 3,000 hours; 0:24 90 → 10 minutes; **0:34 list, 3 reasons** |
+| speech_60s_landscape | device | 127 | 10 | as portrait |
+| speech_60s_landscape | cloud | 127 | 16 | as portrait, **with the list** |
+| speech_20s_noevents | device | 32 | 3 | none |
+| speech_20s_noevents | cloud | 32 | 3 | none |
+| speech_20s_long_pause | device | 38 | 3 | 0:02 3,000 hours; 0:17 90 → 10 minutes |
+| speech_20s_long_pause | cloud | 35 | 3 | the same two |
+| speech_30s_sparse | device | 16 | 5 | none |
+| speech_30s_sparse | cloud | 17 | 5 | none |
+
+**Passed.**
+
+- **Cloud finds every number, list and from-to the device finds, on every clip.**
+- **On both 60 s clips it also finds the three-item list,** which the device has never found. `fixtures/speech/README.md` explains why: the device writes the three items as one sentence, and a list marker counts only at a sentence's start. Groq writes "First, …", "Second, …", "Third, …" as three sentences.
+- Cloud events sit about 1 s earlier on the longer clips: the device recognizer runs late (TE-C2).
+- **The silence guard on generated room tone** (long pause, sparse) lost no event. The word counts differ by up to 3, as two different recognizers do.
+- The local API logged six `kind=ok` lines, no warning, no error, and no dropped words.
+
+**Real audio:** six clips, about 300 s, all `200`. Total for the build so far: about 725 s.
 
 ## TE-C4
 
-Not run.
+**Read on 2026-11-06 (P169), the same runs as TE-C3.** Time from the drop to the preview being ready, on D1, with the model **already cached** for the device runs. A first device run would also download it, about 250 MB (PS J4).
+
+| Clip | Device | Cloud | × |
+|---|---|---|---|
+| reference (74.7 s) | 66.1 s | 5.0 s | 13 |
+| speech_60s_portrait | 57.8 s | 4.2 s | 14 |
+| speech_60s_landscape | 57.4 s | 4.0 s | 14 |
+| speech_20s_noevents | 17.1 s | 1.5 s | 11 |
+| speech_20s_long_pause | 17.1 s | 2.0 s | 9 |
+| speech_30s_sparse | 13.5 s | 2.6 s | 5 |
+
+**Passed:** cloud is at least 2× faster on every clip (assumption: 2×), and **13-14× on a minute of speech**. The cloud time includes the encode, the upload to a local server, Groq and the transcript. On the live site the request also crosses Vercel and Render (TE-C5).
 
 ## TE-C5
 

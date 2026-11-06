@@ -12,7 +12,7 @@ import { DropZone } from "../components/DropZone";
 import { ErrorPanel, readyContext } from "../components/ErrorPanel";
 import { ModelDownloadPanel } from "../components/ModelDownloadPanel";
 import { PreviewPlayer, PreviewTransport } from "../components/PreviewPlayer";
-import { ProcessingCard } from "../components/ProcessingCard";
+import { ProcessingCard, useCloudFallbackToast } from "../components/ProcessingCard";
 import { RejectionPanel } from "../components/RejectionPanel";
 import styles from "../styles/editor.module.css";
 
@@ -96,6 +96,7 @@ function FrameContent({ view }: { view: StageView }) {
 }
 
 export function Stage({ view }: { view: StageView }) {
+  useCloudFallbackToast();
   return (
     <main className={styles.stage}>
       <div className={styles.column}>

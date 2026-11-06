@@ -533,3 +533,66 @@ They are taken from the keyed build against an API answered in the capture scrip
   - The old file is untouched on the host.
 - **Wiring:** `LANDING_CLIPS.privacy.path` is the new path; `ui/assets/landing/privacy.webp` is the new poster (8,936 bytes).
 - **Capture 7** shows the new clip on the landing page.
+
+## Entry 10 - 2026-11-06 - P169: experiments and the review, by the agent
+
+**The founder's word** (2026-11-06): "I am very busy today, please start the app yourself, review it thoroughly, check the logic part and see if everything works correctly end to end and see if anything breaks… properly check everything like the CSS, how it looks." So G 9.1 and G 9.2 were done by the agent.
+
+**Differs from the guide (G 9.1): no real sign-in.** The founder's mailbox was not available. Instead:
+
+- A temporary Playwright spec (deleted with its config) ran the real keyed build against the real local API on `:8080`.
+- The local API was started with `.env` then `.env.deploy` sourced in a subshell and `TRANSCRIBE_ENABLED=true`.
+- The session was faked in the page only.
+- `/healthz` and `/transcribe` were sent to the real API with an access token signed by the **local** `.env` key (never a production key).
+- Everything about transcription was real: the encoder, the upload, the route's checks and budget, Groq, the silence guard, the transcript, the events and the export path.
+- The API was stopped when the run ended.
+
+**TE-C3 and TE-C4: passed** (`experiments.md`).
+
+- Over six clips, the cloud finds **every event the device finds**, and the three-item list on both 60 s clips, which the device never found.
+- Cloud is **13-14× faster** on a minute of speech (4-5 s against 57-66 s, with the model cached).
+- The local API logged six `kind=ok` lines and no warning.
+- About 300 s more real audio; about 725 s for the build.
+
+**The review, and what it found and fixed.**
+
+1. **The fallback toast could be told twice.** The hook was in `ProcessingCard`, which the stage replaces with `ModelDownloadPanel` while a fallback downloads the model, then shows again. The hook is now called by `Stage`, which stays mounted, so a fallback is told once per run.
+2. **On the landing page the chosen option did not show.** `landing-sections.module.css` styles every `button` in the try-it frame as a pill, which covered the control's checked state. Three rules for the frame's `[role="radio"]` give the choices their own look, with the chosen one in the page's violet tint. The shared primitive is unchanged.
+3. **The settings table and the Privacy Policy said "On this device";** the card says "On device". The two now match.
+
+**Checked and found right.**
+
+- The card in all three states.
+- The server-says-no drop zone, identical to today's.
+- The processing line in cloud mode.
+- The limit toast over the download panel during a fallback.
+- The settings table with the new row and the `asr_cloud` event.
+- The Privacy Policy's "Cloud captions" section, and Groq in "Who handles it".
+- The landing page's try-it card at 1280 and at 390 px (phone).
+- The stage at 1024 and 768 px.
+- The arrow keys moving the choice.
+- The landing privacy section with the new clip.
+
+All fourteen captures are in `~/cloud-review/` (1-14).
+
+**Logic read again, with no change needed:**
+
+- the mode chosen once per run, "Process again" choosing again;
+- a run cancelled while the cloud answers;
+- a server that has not said yes never meets an analytics value it does not know;
+- the user's bucket checked before the body is read;
+- the budget charged before the provider;
+- the cloud words passing the same `postProcess` and `normalizeTranscript` as device words;
+- the device path byte for byte (Entry 6).
+
+**Checks:** see below.
+
+- Vitest 568; ESLint and both `tsc` pass.
+- On the final keyed build: `cloud-transcribe.spec.ts` with the protected `review-edit.spec.ts`, **24 passed** (13.7 min), the editor unchanged; `pnpm e2e` **57 passed**.
+
+**Open for the founder.**
+
+- **G 6.6:** the wording approval (the captures and the copy files).
+- **F-2:** Zero Data Retention seen on in the console.
+
+**Found, not fixed.** None.

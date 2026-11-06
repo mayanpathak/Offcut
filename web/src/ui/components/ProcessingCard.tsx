@@ -102,8 +102,12 @@ export function CancelButton({ scope }: { scope: "import" | "pipeline" | "model"
   );
 }
 
-/** One toast when a run's cloud transcription falls back to the device (cloudimplementation D-348). */
-function useCloudFallbackToast(): void {
+/**
+ * One toast when a run's cloud transcription falls back to the device
+ * (cloudimplementation D-348). Called by `Stage`, which stays mounted while the
+ * download panel and this card take turns, so a fallback is told once.
+ */
+export function useCloudFallbackToast(): void {
   const fallback = useClipStore((state) => state.asrFallback);
   useEffect(() => {
     if (fallback !== undefined) {
@@ -121,7 +125,6 @@ export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
   const feed = useClipStore((state) => state.feed);
   const importing = useClipStore((state) => state.status === "importing");
   const inCloud = useClipStore((state) => state.asrMode === "cloud");
-  useCloudFallbackToast();
   if (cancelled) {
     return <Cancelled />;
   }
