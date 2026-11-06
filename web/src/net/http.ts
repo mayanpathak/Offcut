@@ -95,6 +95,7 @@ const API_ERROR_CODES: Record<ApiErrorCode, true> = {
   session_expired: true,
   email_unavailable: true,
   billing_unavailable: true,
+  transcribe_unavailable: true,
   internal: true,
 };
 

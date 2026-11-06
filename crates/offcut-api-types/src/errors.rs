@@ -27,6 +27,9 @@ pub enum ApiErrorCode {
     SessionExpired,
     EmailUnavailable,
     BillingUnavailable,
+    /// The cloud transcription release: the route is switched off, its budget
+    /// is spent, or the provider failed (cloudimplementation D-354).
+    TranscribeUnavailable,
     Internal,
 }
 
@@ -35,7 +38,7 @@ mod tests {
     use super::*;
 
     /// v1implementation §7.6, in its order.
-    const CODES: [&str; 13] = [
+    const CODES: [&str; 14] = [
         "bad_request",
         "unauthorized",
         "forbidden",
@@ -48,6 +51,7 @@ mod tests {
         "session_expired",
         "email_unavailable",
         "billing_unavailable",
+        "transcribe_unavailable",
         "internal",
     ];
 
@@ -67,12 +71,13 @@ mod tests {
             ApiErrorCode::SessionExpired => 9,
             ApiErrorCode::EmailUnavailable => 10,
             ApiErrorCode::BillingUnavailable => 11,
-            ApiErrorCode::Internal => 12,
+            ApiErrorCode::TranscribeUnavailable => 12,
+            ApiErrorCode::Internal => 13,
         }
     }
 
     #[test]
-    fn api_error_code_has_13_snake_case_members() {
+    fn api_error_code_has_14_snake_case_members() {
         for (i, code) in CODES.iter().enumerate() {
             let json = format!("\"{code}\"");
             let parsed: ApiErrorCode = serde_json::from_str(&json).unwrap();

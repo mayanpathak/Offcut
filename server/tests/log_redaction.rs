@@ -257,6 +257,30 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
         StatusCode::UNAUTHORIZED
     );
 
+    // Cloud transcription (P-16): the words returned and the audio sent.
+    let spoken = "markerspokenword";
+    markers.push(("a word of a transcript", spoken.to_owned()));
+    *app.transcriber.answer.lock().unwrap() = Ok(vec![offcut_api_types::CloudWord {
+        text: spoken.to_owned(),
+        start_ms: 0,
+        end_ms: 300,
+    }]);
+    let mut audio = include_bytes!("fixtures/ogg/ffmpeg_tone_3s.ogg").to_vec();
+    // A marker inside the last page's data: the file still reads, and its bytes must not be logged.
+    let marker_bytes = "markeraudiobytes";
+    markers.push(("the audio's bytes", marker_bytes.to_owned()));
+    let at = audio.len() - marker_bytes.len();
+    audio[at..].copy_from_slice(marker_bytes.as_bytes());
+    let request = app.client.post(url("/transcribe")).bearer_auth(&access);
+    let response = request
+        .header("content-type", "audio/ogg")
+        .body(audio)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response.text().await.unwrap().contains(spoken));
+
     // Deleting the account.
     app.billing.fail.store(false, Ordering::SeqCst);
     let request = app.client.post(url("/account/delete")).bearer_auth(&access);
@@ -276,4 +300,8 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
     assert!(text.contains("/api/v1/me"), "{text}");
     assert!(text.contains(&user_tag(claims.sub)), "{text}");
     assert!(text.contains("billing_event_ignored"), "{text}");
+    assert!(
+        text.contains("/api/v1/transcribe") && text.contains("\"kind\":\"ok\""),
+        "{text}"
+    );
 }

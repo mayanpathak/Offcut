@@ -51,7 +51,11 @@ async fn healthz_answers_with_the_version_and_the_api_headers() {
     assert!(cors.is_empty(), "{cors:?}");
 
     let body: Value = serde_json::from_str(&response.text().await.unwrap()).unwrap();
-    assert_eq!(body, json!({"ok": true, "version": "test-sha"}));
+    // DC-14: the body also says whether cloud transcription will try (TestApp: yes).
+    assert_eq!(
+        body,
+        json!({"ok": true, "version": "test-sha", "cloud_transcribe": true})
+    );
 }
 
 #[tokio::test]

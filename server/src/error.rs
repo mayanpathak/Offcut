@@ -14,7 +14,9 @@ pub enum AppError {
     NotFound,
     UnsupportedMediaType,
     PayloadTooLarge,
-    RateLimited { retry_after_secs: u32 },
+    RateLimited {
+        retry_after_secs: u32,
+    },
     Unauthorized,
     Forbidden,
     LinkInvalid,
@@ -22,6 +24,8 @@ pub enum AppError {
     SessionExpired,
     EmailUnavailable,
     BillingUnavailable,
+    /// Cloud transcription is off, its budget is spent, or its provider failed.
+    TranscribeUnavailable,
     Db(sqlx::Error),
     Internal,
 }
@@ -65,6 +69,11 @@ impl IntoResponse for AppError {
             Self::BillingUnavailable => (
                 StatusCode::BAD_GATEWAY,
                 ApiErrorCode::BillingUnavailable,
+                None,
+            ),
+            Self::TranscribeUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                ApiErrorCode::TranscribeUnavailable,
                 None,
             ),
             Self::Db(error) => {
@@ -170,6 +179,11 @@ mod tests {
             (AppError::SessionExpired, 401, "session_expired"),
             (AppError::EmailUnavailable, 503, "email_unavailable"),
             (AppError::BillingUnavailable, 502, "billing_unavailable"),
+            (
+                AppError::TranscribeUnavailable,
+                503,
+                "transcribe_unavailable",
+            ),
             (AppError::Db(sqlx::Error::PoolTimedOut), 500, "internal"),
             (AppError::Internal, 500, "internal"),
         ];

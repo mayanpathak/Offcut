@@ -141,3 +141,98 @@ Total: 303 s of audio.
 **Stop-and-ask triggers:** none met. No `words`, no times, an onset offset over 60 ms, unsupported Opus and limits below the budget were all checked, and none happened.
 
 **Found, not fixed.** Groq heard "wiki" for "week". It is one word, and a person corrects it in review as with any caption.
+
+## Entry 3 - 2026-11-06 - P162: the transcribe route, its limits and DC-14, without a provider
+
+**What changed.**
+
+- **Types** (`offcut-api-types`):
+  - `transcribe.rs`: `CloudWord`, `TranscribeResponse` and `HealthResponse`. `cloud_transcribe` is `#[serde(default)]`, so an older server's body reads as `false`.
+  - `ApiErrorCode::TranscribeUnavailable` is the 14th code.
+  - `AsrBackend::Cloud` and the prop enum `CloudOutcome` (7 values).
+  - `AnalyticsEvent::AsrCloud {outcome, duration_ms}`, appended **last**, so no existing sample moves; it has its doc line.
+  - `web/src/gen/api.ts` is regenerated.
+- **Config:**
+  - `TRANSCRIBE_ENABLED`, `TRANSCRIBE_API_KEY` (redacted) and `TRANSCRIBE_API_BASE_URL`. The URL is checked by a new `is_base_url`: `is_origin` plus a path of plain segments, no trailing slash.
+  - `.env` gains the three names, with `false`, `unused` and Groq's URL; it now has 22.
+  - `render.yaml` gains three `sync: false` entries.
+- **`server/src/transcribe/`:**
+  - `provider.rs`: the trait and `UnconfiguredTranscriber`.
+  - `ogg.rs`: the BOS page's `OpusHead` and the EOS page that ends the file exactly. A packet holding "OggS" is not taken for a page.
+  - `budget.rs`: per UTC hour and day, refused charges take nothing, compile-time check that it stays under the free tier.
+  - `route.rs`: D-352's order, with the body read by `to_bytes(…, 1 MiB)` only after auth, the user's bucket and the switch.
+  - Nothing there names the database.
+- **Router:**
+  - the route, after `/notify-me`, with `body(1 MiB)` and `TranscribeIp`;
+  - `/healthz` returns `HealthResponse`;
+  - `media_type()` is factored out of `is_media`;
+  - `is_transcribe_upload` is DC-14's exception.
+- **The rest:**
+  - `rate_limit.rs`: `TranscribeUser` (20 per 24 h) and `TranscribeIp` (60 per hour).
+  - `error.rs`: 503 `transcribe_unavailable`.
+  - `main.rs`: `UnconfiguredTranscriber` and the production budget (P163 adds Groq).
+  - `analytics/mod.rs`: `AsrCloud`'s `duration_ms` is capped like the other durations.
+- **Web, the two lines the new types force:**
+  - `http.ts`'s `API_ERROR_CODES` gains `transcribe_unavailable`;
+  - `messages.settings.events` gains `asr_cloud: "Cloud transcription result"`.
+  - The rest of D-373 is P165's.
+- **TS §5:** rows for `transcribe.rs`, `server/src/transcribe/` (all seven files, two of them P163's), `transcribe_route.rs`, `groq_adapter.rs`, `fixtures/groq/` and `fixtures/ogg/`.
+
+**DECLARED CHANGE DC-14,** `server/tests/no_media_routes.rs`, read line by line:
+
+- **Unchanged:** every existing assertion, `MEDIA_TYPES`, `READ_BODY`, `IGNORE_BODY`, and the route walk read from `router.rs`.
+- **Added:**
+  - `AUDIO_BODY` (`/transcribe`, `audio/ogg`, 1 MiB) and `audio_route()`;
+  - `the_table_is_read` asserts the route is in the table;
+  - the media loop skips **only** the pair (`/transcribe`, its own type) and then asserts it gets 401 there, not 415, and 415 on `/events`;
+  - the body-limit walk sends `/transcribe` 1 MiB + 1 of `audio/ogg` with a bearer and expects 413, and asserts the limit is at most 1 MiB.
+- **A new POST route still fails** until it is named in one of the three lists.
+- **The 413 request runs on a client of its own.** The server answers it without reading the whole body and closes that connection, and the next route of the walk (`/account/delete`) was sometimes sent on it. Seen once in three runs; three runs green after.
+
+**REOPENED CONTRACT: `/healthz`'s body.** `notify_me.rs`'s exact-body assertion gains `"cloud_transcribe": true`, the value `TestApp` sets.
+
+**Count assertions that had to rise** (each lists members, so a new one fails until placed; none is weakened):
+
+| Test | Before | After |
+|---|---|---|
+| `api_error_code_has_*_snake_case_members` | 13 | 14 |
+| `typescript_declares_every_type_once` | 39 names, 19 doc lines | 43, 20 |
+| `SAMPLES` | 19 | 20 |
+| `prop_enums_have_exactly_the_values_of_the_spec` | 16 | 17 |
+| `rate_limit.rs`'s group table | 16 | 18 |
+| `config.rs`'s required variables | 19 | 22 |
+| `<redacted>` fields | 7 | 8 |
+| `analytics_allowlist.rs` stored rows | 19 | 20 |
+| `analytics_allowlist.rs` free-text bodies | 21 | 22 |
+
+**New tests.**
+
+- `transcribe_route.rs`, 12 cases:
+  - success, with the exact bytes received;
+  - no bearer, where a 2 MiB body is never read: the 401, or a reset while the client was still sending, and the provider saw nothing;
+  - the switch off: 503, and `/healthz` reads `false`;
+  - six other types: 415;
+  - 1 MiB + 1: 413;
+  - five bad files: 400, and exactly 92 s passes;
+  - the provider's two failures;
+  - a spent budget, where the provider is not called;
+  - the 21st clip of a user is 429 while another user passes;
+  - 60 per hour per address;
+  - the switch is read on every request;
+  - P-16: no `sqlx` or `state.db` under `transcribe/`.
+- Unit tests:
+  - `ogg.rs` (3), including P161's `ffmpeg` tone at 3,000 ms ± 20;
+  - `budget.rs` (4);
+  - `router.rs` (3, including `audio/ogg` refused on any other path);
+  - `config.rs` (1).
+- `log_redaction.rs`: the transcribe flow with a marker word in the answer and a marker run of bytes in the audio; neither is in the log, and the `kind=ok` line is.
+- `analytics_allowlist.rs`: `asr_backend: "cloud"` and `asr_cloud` accepted; text, an over-cap duration or an extra prop refused.
+
+**Checks.**
+
+- `pnpm check`: fmt, clippy, deny (the duplicate-crate warnings are the existing ones), ESLint, both `tsc`, file tree and copy codes all pass. `check-gen-clean.sh` passes once `web/src/gen/api.ts` is committed with this.
+- `cargo test -p offcut-api -p offcut-api-types`: 232 / 0 / 0.
+- `cargo test --workspace`: **844 / 0 / 4** (floor 817).
+- Vitest 522.
+
+**Found, not fixed.** None.

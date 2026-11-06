@@ -41,7 +41,7 @@ Total about 25 hours of agent time over 3-4 working days, plus the founder's ste
 ## Read this first: 18 things that will bite you
 
 1. **Never send `testclips/v3testclip.mp4` (it carries a location tag), any `v3testclip*` file, any `WIN_*` recording or any corpus clip to Groq** (D-379, P-13, V3 D-112). Real calls use the reference clip's audio (`fixtures/.gen/speech/speech_60s_portrait.mp4` and friends, or `testclips/speech_scriptA_landscape_720p.mp4`) and synthetic tones only, and only after F-1.
-2. **Never print, log, commit or paste the Groq key.** A script that needs it sources `.env.deploy` in a subshell and prints names, status codes and times only. `git grep -n "gsk_"` before every push: no output.
+2. **Never print, log, commit or paste the Groq key.** A script that needs it sources `.env.deploy` in a subshell and prints names, status codes and times only. `git grep -nE "gsk_[A-Za-z0-9]{20}"` before every push: no output.
 3. **The fake API's `/healthz` must keep answering without `cloud_transcribe` by default.** That absence is what keeps every protected suite on the device (D-366). New specs turn it on through the new option.
 4. **The device branch of `run-pipeline.ts` is moved, not edited** (§8.5). Diff it with `git diff -w`: today's step 7-8 lines appear once, inside `hearOnDevice`, unchanged. `run-pipeline.test.ts`'s existing cases must pass without a change.
 5. **`media_guard`'s exception is method + exact path + exact media type** (§7.2). `audio/ogg` on any other path is still 415, and so is any other type on `/transcribe`.
@@ -431,5 +431,5 @@ pnpm --filter web exec vitest run                      # Vitest
 pnpm build:e2e                                         # keyed build for media suites (item 11)
 pnpm e2e --workers=4                                   # non-media
 pnpm e2e:media <spec> --grep "<case>" --max-failures=1
-git grep -n "gsk_"                                     # before every push: no output
+git grep -nE "gsk_[A-Za-z0-9]{20}"                                     # before every push: no output
 ```

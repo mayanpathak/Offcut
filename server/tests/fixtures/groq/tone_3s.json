@@ -1,0 +1,17 @@
+{
+ "task": "transcribe",
+ "language": "English",
+ "duration": 3,
+ "text": " .",
+ "words": [
+  {
+   "word": ".",
+   "start": 0,
+   "end": 0.54
+  }
+ ],
+ "segments": null,
+ "x_groq": {
+  "id": "req_fixture"
+ }
+}

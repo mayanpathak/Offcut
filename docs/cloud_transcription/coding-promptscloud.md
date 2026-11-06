@@ -37,7 +37,7 @@ Server tests need Postgres on port 9000, a Windows service on D1, not Docker (V6
 3. **Reopened contracts and declared changes are exactly:** DC-14 (`media_guard`, `no_media_routes.rs`, `/healthz`'s body and `notify_me.rs`'s one assertion); D-373 (`http.ts`); D-375 (INV-3's text); the additive members of `protocol.ts`; the landing counts of §9.6. Say **REOPENED CONTRACT** or **DECLARED CHANGE** in the entry for each.
 4. No source file over 700 lines above its test module. Rust non-test code: no `unwrap`, `expect`, `panic!`, slice indexing. TypeScript: no `any`, `!`, `@ts-ignore`, empty `catch`, or inline style. No disabled lint, no weakened or deleted test. Dependencies only as §3.1 lists.
 5. User-facing text only in `copy/` (new strings in `copy/transcription.ts`, D-380). `fetch` only in the allowed files. A temporary file is `zz-…` or `zz_…` and is deleted before the gate.
-6. **Secrets.** Never print, log, commit or paste a value from `.env`, `.env.deploy`, a token, a cookie or a link. A script that uses `.env.deploy` sources it in a subshell and prints names, status codes and times only. `git grep -n "gsk_"` before every commit: no output. **Never query the production database.** A server log line names a `kind`, never provider text or a word of a transcript.
+6. **Secrets.** Never print, log, commit or paste a value from `.env`, `.env.deploy`, a token, a cookie or a link. A script that uses `.env.deploy` sources it in a subshell and prints names, status codes and times only. `git grep -nE "gsk_[A-Za-z0-9]{20}"` before every commit: no output. **Never query the production database.** A server log line names a `kind`, never provider text or a word of a transcript.
 7. **Privacy of recordings (D-379).** Real Groq calls only after F-1, only with the reference clip's audio or its derived fixtures or a synthetic tone, and each one listed in the entry (file, seconds of audio, status). **Never** `testclips/v3testclip*.mp4`, `testclips/WIN_*`, or a corpus clip. Never stage `testclips/**`, `fixtures/.gen/**`, `corpus/**`, `web/test-results/**` or `.env*`. A transcript's words appear in a commit only inside the two fixture files of §4, whose words are Script A's, already public in `fixtures/speech/README.md`.
 8. Long runs start detached and are read from a log tail. Append to the changelog with the Edit tool, never a heredoc holding backticks.
 9. **Branch.** Commit on `cloud-build` only. Push only where the prompt says. Never push to `main`, merge, tag, mark the pull request ready, change Render, Groq or Vercel settings, or press Vercel's Redeploy button.
@@ -49,7 +49,7 @@ Server tests need Postgres on port 9000, a Windows service on D1, not Docker (V6
 ```bash
 git branch --show-current
 git status --porcelain | grep -c "zz[-_]"        # 0
-git grep -n "gsk_" | wc -l                        # 0
+git grep -nE "gsk_[A-Za-z0-9]{20}" | wc -l                        # 0
 env | grep -c VITE_ENTITLEMENT_TEST_PUBLIC_KEY   # 0 before the commit
 # G 0.4's two commands: no output
 git ls-files --cached | grep -E '(^|/)\.env'     # no output
@@ -121,7 +121,7 @@ Counts never fall below the previous entry's; the floor is D-339's. Add a short 
 
 - [ ] TE-C1 and TE-C2 recorded with numbers; the bitrate chosen with its reason.
 - [ ] Every real call listed in the entry (file, 60 s, status, time); total under 300 s of audio.
-- [ ] No `zz` file; no key in any file (`git grep -n "gsk_"`).
+- [ ] No `zz` file; no key in any file (`git grep -nE "gsk_[A-Za-z0-9]{20}"`).
 - [ ] Commit `CT P161: the probes`.
 
 ---

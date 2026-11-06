@@ -126,6 +126,9 @@ mod tests {
             billing_price_creator_annual: placeholder(),
             billing_price_creator_annual_founding: placeholder(),
             founding_offer_enabled: false,
+            transcribe_enabled: false,
+            transcribe_api_key: placeholder(),
+            transcribe_api_base_url: placeholder(),
             trusted_proxy_hops: 1,
             git_sha: "test-sha".to_owned(),
         }

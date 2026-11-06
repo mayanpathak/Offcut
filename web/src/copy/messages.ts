@@ -454,6 +454,7 @@ export const messages = {
       checkout_step: "Checkout step",
       client_error: "Error in the app",
       local_data_cleared: "Local data cleared",
+      asr_cloud: "Cloud transcription result",
     } satisfies Record<EventName, string>,
   },
 

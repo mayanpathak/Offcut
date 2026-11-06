@@ -11,6 +11,7 @@ use offcut_api::mail::MailError;
 use offcut_api::mail::smtp_mailer::SmtpMailer;
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
+use offcut_api::transcribe::provider::UnconfiguredTranscriber;
 use offcut_api::{analytics, db, log, router};
 use tokio::net::TcpListener;
 
@@ -77,6 +78,9 @@ async fn serve(config: Config) -> Result<(), ServeError> {
         mailer,
         billing,
         fair_use: Arc::default(),
+        // P163 builds the provider when TRANSCRIBE_ENABLED=true.
+        transcriber: Arc::new(UnconfiguredTranscriber),
+        transcribe_budget: Arc::default(),
     };
     // The rate limiter needs the peer address of each connection.
     let app = router::build(state).into_make_service_with_connect_info::<SocketAddr>();

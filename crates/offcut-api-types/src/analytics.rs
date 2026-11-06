@@ -37,7 +37,7 @@ prop_enums! {
     DurationBucket: Lt30, Lt60, Lte90;
     ClipSource: User, Sample;
     DownloadOutcome: Ok, Failed, HashMismatch;
-    AsrBackend: Webgpu, Wasm;
+    AsrBackend: Webgpu, Wasm, Cloud;
     ReviewActionKind: WordEdit, EventToggle, Style, CropOffset, CaptionPosition, HighlightNumbers, ReplaceAll, Undo, Redo;
     ExportedAs: Free, Creator;
     PostExportAnswer: Yes, SmallEdits, No;
@@ -45,6 +45,7 @@ prop_enums! {
     PromptAction: Shown, Clicked, Dismissed;
     SigninStep: LinkRequested, Completed;
     CheckoutStep: Started, ReturnedSuccess, ReturnedCancel;
+    CloudOutcome: Ok, Unavailable, Limited, Timeout, Offline, Unsupported, Failed;
 }
 
 /// One variant per row of TS §22.6. A variant without props serializes as
@@ -136,6 +137,12 @@ pub enum AnalyticsEvent {
         stage: FailureStage,
     },
     LocalDataCleared,
+    /// The cloud transcription release (cloudimplementation D-377): how one
+    /// attempt at cloud transcription ended, and how long it took.
+    AsrCloud {
+        outcome: CloudOutcome,
+        duration_ms: u32,
+    },
 }
 
 impl AnalyticsEvent {
@@ -161,6 +168,7 @@ impl AnalyticsEvent {
             Self::CheckoutStep { .. } => "checkout_step",
             Self::ClientError { .. } => "client_error",
             Self::LocalDataCleared => "local_data_cleared",
+            Self::AsrCloud { .. } => "asr_cloud",
         }
     }
 }
@@ -206,6 +214,7 @@ pub const ANALYTICS_EVENT_DOCS: &[EventDoc] = &[
     doc("checkout_step", "That checkout was started, completed or cancelled."),
     doc("client_error", "That something went wrong, with the error code and the stage it happened in."),
     doc("local_data_cleared", "That you cleared the data Offcut keeps in this browser."),
+    doc("asr_cloud", "Whether cloud transcription of a clip worked or why it fell back to this device, and how long it took, never the words."),
 ];
 
 #[cfg(test)]
@@ -213,7 +222,7 @@ mod tests {
     use super::*;
 
     /// One sample per variant, in enum order, exactly as the client sends it.
-    const SAMPLES: [&str; 19] = [
+    const SAMPLES: [&str; 20] = [
         r#"{"name":"landing_view","props":{"hero_variant":"outcome"}}"#,
         r#"{"name":"capability_check","props":{"result":"fail","unsupported_reason":"UNSUPPORTED_WEBGPU","gpu_vendor":"intel","memory_bucket":"gb8plus","platform":"windows"}}"#,
         r#"{"name":"clip_accepted","props":{"duration_bucket":"lt60","orientation":"portrait","source":"user"}}"#,
@@ -233,6 +242,7 @@ mod tests {
         r#"{"name":"checkout_step","props":{"step":"returned_success"}}"#,
         r#"{"name":"client_error","props":{"error_code":"E_WORKER_CRASH","stage":"import"}}"#,
         r#"{"name":"local_data_cleared"}"#,
+        r#"{"name":"asr_cloud","props":{"outcome":"limited","duration_ms":1200}}"#,
     ];
 
     fn parse(json: &str) -> serde_json::Result<AnalyticsEvent> {
@@ -354,7 +364,7 @@ mod tests {
             (DurationBucket::inline(&cfg), "lt30, lt60, lte90"),
             (ClipSource::inline(&cfg), "user, sample"),
             (DownloadOutcome::inline(&cfg), "ok, failed, hash_mismatch"),
-            (AsrBackend::inline(&cfg), "webgpu, wasm"),
+            (AsrBackend::inline(&cfg), "webgpu, wasm, cloud"),
             (ReviewActionKind::inline(&cfg), "word_edit, event_toggle, style, crop_offset, caption_position, highlight_numbers, replace_all, undo, redo"),
             (ExportedAs::inline(&cfg), "free, creator"),
             (PostExportAnswer::inline(&cfg), "yes, small_edits, no"),
@@ -362,8 +372,9 @@ mod tests {
             (PromptAction::inline(&cfg), "shown, clicked, dismissed"),
             (SigninStep::inline(&cfg), "link_requested, completed"),
             (CheckoutStep::inline(&cfg), "started, returned_success, returned_cancel"),
+            (CloudOutcome::inline(&cfg), "ok, unavailable, limited, timeout, offline, unsupported, failed"),
         ];
-        assert_eq!(table.len(), 16);
+        assert_eq!(table.len(), 17);
         for (union, values) in table {
             assert_eq!(union.replace('"', "").replace(" | ", ", "), values);
         }

@@ -3,8 +3,8 @@
 use std::any::Any;
 
 use axum::extract::{DefaultBodyLimit, Request, State};
-use axum::http::HeaderValue;
 use axum::http::header::{CONTENT_TYPE, HeaderName};
+use axum::http::{HeaderValue, Method};
 use axum::middleware::{Next, from_fn, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -17,7 +17,9 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::rate_limit::{RouteGroup, by_ip};
 use crate::state::AppState;
-use crate::{account, analytics, auth, billing, entitlement, headers, log, usage};
+use crate::transcribe::route::{AUDIO_TYPE, MAX_AUDIO_BYTES};
+use crate::{account, analytics, auth, billing, entitlement, headers, log, transcribe, usage};
+use offcut_api_types::HealthResponse;
 
 const KB: usize = 1024;
 /// Every route, unless its row in the table says otherwise (TS §22.1).
@@ -76,6 +78,13 @@ pub fn build(state: AppState) -> Router {
             "/notify-me",
             post(account::notify::notify_me).layer((body(KB), ip(RouteGroup::NotifyMe))),
         )
+        // The one route that takes media (DC-14): `audio/ogg`, at most 1 MiB.
+        // `TranscribeUser`, its other limit, is checked in its handler.
+        .route(
+            "/transcribe",
+            post(transcribe::route::transcribe)
+                .layer((body(MAX_AUDIO_BYTES), ip(RouteGroup::TranscribeIp))),
+        )
         // These two are limited per user in their handlers.
         .route(
             "/account/delete",
@@ -109,8 +118,14 @@ fn with_layers<S: Clone + Send + Sync + 'static>(router: Router<S>) -> Router<S>
 }
 
 /// Liveness. Touches no database, so it answers while the database is down.
-async fn healthz(State(state): State<AppState>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "ok": true, "version": state.config.git_sha }))
+/// It also says whether cloud transcription will try (cloudimplementation
+/// D-355): the client offers it only after a server that says so.
+async fn healthz(State(state): State<AppState>) -> Json<HealthResponse> {
+    Json(HealthResponse {
+        ok: true,
+        version: state.config.git_sha.clone(),
+        cloud_transcribe: state.transcriber.enabled(),
+    })
 }
 
 async fn not_found() -> AppError {
@@ -139,20 +154,33 @@ fn panic_response(_: Box<dyn Any + Send + 'static>) -> Response {
     AppError::Internal.into_response()
 }
 
-/// Layer 5. The API takes no media and no file upload on any route (INV-4):
-/// such a request gets 415 before a handler sees it.
+/// Layer 5. The API takes no media and no file upload on any route (INV-4),
+/// with one exception (DC-14): such a request gets 415 before a handler sees it.
 async fn media_guard(req: Request, next: Next) -> Result<Response, AppError> {
     let content_type = req.headers().get(CONTENT_TYPE);
     let content_type = content_type.and_then(|value| value.to_str().ok());
-    if content_type.is_some_and(is_media) {
+    if content_type.is_some_and(is_media) && !is_transcribe_upload(&req, content_type) {
         return Err(AppError::UnsupportedMediaType);
     }
     Ok(next.run(req).await)
 }
 
-fn is_media(content_type: &str) -> bool {
+/// The one exception to INV-4 (DC-14): exactly `POST /api/v1/transcribe`
+/// with `audio/ogg`.
+fn is_transcribe_upload(req: &Request, content_type: Option<&str>) -> bool {
+    req.method() == Method::POST
+        && req.uri().path() == "/api/v1/transcribe"
+        && content_type.is_some_and(|value| media_type(value) == AUDIO_TYPE)
+}
+
+/// A content type's media type: lower case, without its parameters.
+pub(crate) fn media_type(content_type: &str) -> String {
     let media_type = content_type.split(';').next().unwrap_or(content_type);
-    let media_type = media_type.trim().to_ascii_lowercase();
+    media_type.trim().to_ascii_lowercase()
+}
+
+fn is_media(content_type: &str) -> bool {
+    let media_type = media_type(content_type);
     ["multipart/", "video/", "audio/"]
         .iter()
         .any(|prefix| media_type.starts_with(prefix))
@@ -235,6 +263,71 @@ mod tests {
             let error = api_error(response).await;
             assert_eq!(error.code, ApiErrorCode::UnsupportedMediaType);
         }
+    }
+
+    #[test]
+    fn the_media_type_is_lower_case_without_parameters() {
+        assert_eq!(media_type("AUDIO/OGG; codecs=opus"), "audio/ogg");
+        assert_eq!(media_type(" audio/ogg "), "audio/ogg");
+        assert_eq!(
+            media_type("application/json; charset=utf-8"),
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn only_post_audio_ogg_on_the_transcribe_path_is_the_exception() {
+        let req = |method: Method, path: &str| {
+            Request::builder()
+                .method(method)
+                .uri(path)
+                .body(Body::empty())
+                .unwrap()
+        };
+        let path = "/api/v1/transcribe";
+        assert!(is_transcribe_upload(
+            &req(Method::POST, path),
+            Some("audio/ogg")
+        ));
+        assert!(is_transcribe_upload(
+            &req(Method::POST, path),
+            Some("AUDIO/OGG; codecs=opus")
+        ));
+        for other in [
+            "audio/wav",
+            "audio/webm",
+            "video/mp4",
+            "multipart/form-data; boundary=x",
+            "application/octet-stream",
+        ] {
+            assert!(
+                !is_transcribe_upload(&req(Method::POST, path), Some(other)),
+                "{other}"
+            );
+        }
+        assert!(!is_transcribe_upload(&req(Method::POST, path), None));
+        assert!(!is_transcribe_upload(
+            &req(Method::GET, path),
+            Some("audio/ogg")
+        ));
+        for other_path in [
+            "/api/v1/events",
+            "/api/v1/transcribe/",
+            "/api/v1/transcribex",
+            "/transcribe",
+        ] {
+            assert!(
+                !is_transcribe_upload(&req(Method::POST, other_path), Some("audio/ogg")),
+                "{other_path}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn audio_ogg_is_refused_on_any_other_path() {
+        let request = request(Method::POST, "/ok").header(CONTENT_TYPE, "audio/ogg");
+        let response = send(request.body(Body::from("x")).unwrap()).await;
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]

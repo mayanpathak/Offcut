@@ -505,6 +505,7 @@ offcut/
 │   │       ├── account.rs
 │   │       ├── billing.rs
 │   │       ├── usage.rs
+│   │       ├── transcribe.rs          (cloud transcription) TranscribeResponse, CloudWord, HealthResponse
 │   │       ├── analytics.rs           [ONLY] analytics allowlist: event names and prop types
 │   │       └── errors.rs              ApiError, ApiErrorCode
 │   ├── offcut-wasm-core/
@@ -571,6 +572,14 @@ offcut/
 │   │   │   ├── mod.rs                 Mailer trait
 │   │   │   ├── smtp_mailer.rs         SMTP over STARTTLS through the chosen provider (TE-8)
 │   │   │   └── templates.rs           magic-link email
+│   │   ├── transcribe/                (cloud transcription) POST /transcribe; stores nothing (P-16)
+│   │   │   ├── mod.rs
+│   │   │   ├── provider.rs            Transcriber trait, UnconfiguredTranscriber
+│   │   │   ├── groq.rs                the only file that names the transcription provider
+│   │   │   ├── align.rs               written forms onto the provider's words (cloudimplementation D-360)
+│   │   │   ├── ogg.rs                 OpusHead and the last granule of an Ogg file; no decoding
+│   │   │   ├── budget.rs              [ONLY] the audio budget per hour and per day
+│   │   │   └── route.rs               the handler: auth, limits, type, body, Ogg, budget, provider
 │   │   ├── plan/                      (V6.2, V6.4, V6.9) the only code that calls the AI provider
 │   │   │   ├── mod.rs
 │   │   │   ├── provider.rs            PlanProvider trait and the TE-15 adapter
@@ -609,7 +618,11 @@ offcut/
 │       ├── ai_cap.rs
 │       ├── account_export.rs
 │       ├── log_redaction.rs
-│       ├── no_media_routes.rs
+│       ├── no_media_routes.rs         INV-4, with DC-14's one exception
+│       ├── transcribe_route.rs        (cloud transcription) POST /transcribe on a fake provider
+│       ├── groq_adapter.rs            (cloud transcription) the adapter, from fixtures/groq/, against a local mock
+│       ├── fixtures/groq/             real Groq responses for the reference clip's audio, request ids replaced
+│       ├── fixtures/ogg/              small Ogg Opus files: a tone from ffmpeg and one from the browser's encoder
 │       └── notify_me.rs               /healthz and /notify-me against a real Postgres
 ├── web/
 │   ├── package.json

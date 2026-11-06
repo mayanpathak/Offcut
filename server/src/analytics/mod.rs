@@ -47,7 +47,8 @@ fn within_bounds(event: &AnalyticsEvent) -> bool {
     let count = |n: &u32| *n <= MAX_COUNT;
     match event {
         AnalyticsEvent::ModelDownload { duration_ms, .. }
-        | AnalyticsEvent::StageTiming { duration_ms, .. } => ms(duration_ms),
+        | AnalyticsEvent::StageTiming { duration_ms, .. }
+        | AnalyticsEvent::AsrCloud { duration_ms, .. } => ms(duration_ms),
         AnalyticsEvent::PipelineDone {
             total_ms,
             n_number,
