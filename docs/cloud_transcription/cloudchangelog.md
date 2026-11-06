@@ -428,3 +428,108 @@ Total: 303 s of audio.
 **Push 1** (D-338), CI not waited on.
 
 **Found, not fixed.** None.
+
+## Entry 7 - 2026-11-06 - P166: the card, the copy, the legal text, the landing wording
+
+**What changed.**
+
+- **`ui/components/TranscriptionChoice.tsx`** (§9.1), inside `DropZone`'s two variants, under "Try a sample":
+  - **When it shows:** only with the flag on and a server that has not said no; otherwise it renders nothing, and the drop zone is today's.
+  - **What it uses:** V4's `SegmentedControl` (a radiogroup with arrow keys), the line under it, and, signed out, the device option shown with the control disabled (its reason is the signed-out line) plus a "Sign in to use cloud transcription" button that opens the existing `SignInDialog`.
+  - **Where it sits:** outside the drop target, so a click on the card never opens the file chooser.
+  - **The label wrap:** one rule scoped to the card keeps each choice on one line (`white-space: nowrap`); the primitive is unchanged.
+- **`copy/transcription.ts`** (D-380), imported by `messages.ts` as `messages.transcription`; `messages.ts` is at 668 of 700 lines.
+  - **Differs from §9.2's drafts:**
+    - the legend is "How captions are written";
+    - the labels are "Cloud · fast" and "On device · private" (the founder's words, 2026-11-06); "On this device · private" wrapped in the control.
+  - Every other line is §9.2's.
+- **`ProcessingCard`:**
+  - in cloud mode it says `processingCloud`, otherwise today's "Everything runs on your computer" line;
+  - a hook pushes one toast when `asrFallback` is set: the limit toast for `limited`, the "did not answer" toast otherwise.
+- **The settings table, Privacy Policy and Terms:**
+  - **Settings table:** five rows; the first is split, and the new row says what is sent, to whom, and that neither keeps it.
+  - **Privacy Policy:** "Your video" now names "its sound" among what is kept in the browser; a new section, "Cloud captions"; "Who handles it" names Groq.
+  - **Terms, "Your videos":** one clause about cloud captions.
+  - **`legal.updated`:** 6 November 2026.
+- **Landing** (`copy/landing.ts`, §9.6, F-3 (a)):
+  - the privacy heading is "Your video is never uploaded.";
+  - the first privacy fact is "It is edited, rendered and exported in your browser, on your computer.";
+  - the step is "Transcribed in seconds";
+  - the features lead is "Every card below works today.";
+  - the captions card names the cloud;
+  - the privacy clip's label is "The video stays inside the browser.";
+  - "Faster transcription, your choice" leaves "Coming soon" (12 items become 11).
+  - No landing string mentions audio or sound beyond today's preview and music lines.
+- **TS §5:** rows for `copy/transcription.ts` and `TranscriptionChoice.tsx`.
+
+**DECLARED CHANGE** to a design-release case, not a TS §41.1 proof: `landing.spec.ts`, "the settings link leads to the table of what leaves the device", pins the fixed rows at 4. It now pins 5, with a comment. L-2 reads the "Coming soon" items from the copy, so it follows by itself.
+
+**Captures** for the founder (G 6.4), in `~/cloud-review/`:
+
+1. signed in, Cloud;
+2. signed in, On device;
+3. signed out;
+4. a server that says no: today's drop zone;
+5. processing in cloud mode;
+6. the landing page's try-it section;
+7. the landing page's privacy section with the new clip.
+
+They are taken from the keyed build against an API answered in the capture script (no server, no Groq).
+
+**Checks.** ESLint, both `tsc`, the copy codes and the file tree pass. The landing and settings cases pass (Entry 8).
+
+**Open.**
+
+- **G 6.6:** the founder's approval of the card, the processing line, the toasts, the settings table, the Privacy Policy and Terms sections, and the landing wording (F-4).
+- **F-2:** the console check that Zero Data Retention is on; the Privacy Policy's "Neither we nor Groq keep…" depends on it.
+
+## Entry 8 - 2026-11-06 - P167: cloud-transcribe.spec.ts
+
+**What changed.**
+
+- **`tests-e2e/helpers/fake-api.ts`.** Defaults are unchanged, so every existing spec meets the same fake. Three additions:
+  - `healthz.cloudTranscribe` adds `"cloud_transcribe":true`;
+  - `transcribe: {response, delayMs}` answers `/transcribe`, with 401 when there is no bearer; without the option the route is a 404, as before;
+  - `transcribeBodies` records the raw bytes of every upload, whose JSON body is not parsed.
+- **`tests-e2e/cloud-transcribe.spec.ts`**, media project, `speech_60s_portrait.mp4`, 8 cases:
+  1. **Identity.** One clip processed twice in two fresh contexts: with no `cloud_transcribe` (no card), then with the server's switch on and nobody signed in. The card's signed-out state is shown, axe reports 0, no `/transcribe` request is made and no bytes are sent, and **the stored transcript and prosody are equal as JSON** to the first run's.
+  2. **Cloud** (serial with case 3), in a context with **no model**:
+     - the card on Cloud, with axe at 0;
+     - one request, `content-type: audio/ogg`, under 1 MiB, starting `OggS`;
+     - `ffprobe` on the saved body reads Opus, mono, with its duration within 40 ms of the clip's;
+     - the processing line is the cloud one;
+     - the stored transcript's `model_version` is Groq's, with **129 − 2 words: the silence guard dropped "Thank you." in a real browser**, the last word "month.";
+     - no model panel;
+     - `asr_cloud` `ok` and `stage_timing` `asr_backend: "cloud"`.
+  3. **The export** from that cloud transcript passes `verify_mp4.py`'s 11 checks. It compares 3 flashes in this fixture's exports, the two white frames and one more it reads as a flash, so `FLASHES` is 3.
+  4. **The choice is remembered.** "On device" chosen, then a reload: still chosen, axe 0, and while processing only `/events`, never `/transcribe` (P-5).
+  5. **A fallback on a 429:** the limit toast, the device transcript, and `asr_cloud` `limited`.
+  6. **A fallback on no answer in 30 s:** the "did not answer" toast, the device transcript, and `asr_cloud` `timeout`.
+  - **Differs from the plan (§11.4 case 4):** two fallback runs, not three. The 503 mapping is covered by `transcribe-cloud.test.ts`, and each device run costs about a minute on D1.
+  - The toasts are looked for right after the drop: a toast lasts 5 s and the clip is ready about a minute later. The first run looked at the end and missed both.
+- **`playwright.config.ts`:** the spec is in `MEDIA_SUITES`.
+
+**Runs.**
+
+- First run: 5 passed and 3 failed. The export expected 2 flashes and the verifier compared 3; both toasts were looked for too late.
+- After the two fixes: **8 passed in 6.4 min**; again on the final build (with P168's clip), **8 passed in 6.7 min**. Green twice in a row.
+- Tier 3's `pnpm e2e` on that build: **57 passed** (1.6 min).
+- CI for push 1 (run 42190565424): `ci` and `e2e-media` green.
+- `pnpm e2e`: 56 passed and 1 failed before the declared change of Entry 7, then the case alone passed.
+
+## Entry 9 - 2026-11-06 - P168: the privacy clip without the cloud
+
+**What changed.**
+
+- **The composition** `../offcut-remotion/src/clips/Privacy.tsx`, outside this repository; the original is kept in the scratchpad.
+  - The cloud outline and the three dotted paths are removed.
+  - A violet padlock sits on the file's lower right corner, in a layer above the icon, breathing with the glow.
+  - The laptop, the glow and the sentence "Your video stays on your computer." are unchanged. The clip is still 6 s, 180 frames, a seamless loop (both animations are periodic over the loop).
+- **The render and re-encode:** `npm run render:all -- privacy`, then the design release's re-encode (designbuildguide Step 6.1) from the master into `~/cloud-upload/`.
+  - Read with `ffprobe`: H.264 High, `yuv420p`, limited range, BT.709, 30 fps, 180 frames, 6.000 s, 41,900 bytes (cap 1.5 MB), video only, `moov` first.
+  - A middle frame was read by eye.
+- **The upload, once** (founder's choice 3a): `sh scripts/upload-assets.sh media` printed `media/offcut-privacy-1280x720.f6af0adb3438b1da.mp4`.
+  - The public URL answers 200 with `Cache-Control: public, max-age=31536000, immutable`.
+  - The old file is untouched on the host.
+- **Wiring:** `LANDING_CLIPS.privacy.path` is the new path; `ui/assets/landing/privacy.webp` is the new poster (8,936 bytes).
+- **Capture 7** shows the new clip on the landing page.
