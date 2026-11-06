@@ -289,3 +289,74 @@ Total: 303 s of audio.
 - `cargo fmt` applied.
 
 **Found, not fixed.** None.
+
+## Entry 5 - 2026-11-06 - P164: features.ts, the Ogg Opus encoder in asr.worker
+
+**What changed.**
+
+- **`web/src/config/features.ts`** (D-365, TS §41.3.1), the file V6.1 was to bring, built now with one flag, `cloud_transcribe`.
+  - `vite.config.ts` defines `__OFFCUT_FEATURES__` from `OFFCUT_FEATURES_OFF`, a comma list. Every flag is on by default, and an unknown name stops the build.
+  - Where no bundler ran (Vitest, Node), every flag is on, as `render-cache-repo.ts` treats `__RENDERER_VERSION__`.
+- **`workers/asr/ogg-opus.ts`:**
+  - the Ogg CRC, from a table (polynomial `0x04C11DB7`, initial 0, not reflected);
+  - pages with lacing, at most 50 packets or 255 lacing values per page;
+  - `OpusHead` (version 1, one channel, the encoder's pre-skip, 16,000) and `OpusTags` (vendor "offcut");
+  - the last page is EOS with granule pre-skip + `pcm16.length × 3`, which trims the padded last packet;
+  - nothing decodes or changes the audio.
+- **`workers/asr/cloud-audio.ts`:**
+  - `encodeOpus`:
+    - the WebCodecs encoder, handed in as `EncoderDeps` so the test can fake it;
+    - TE-C1's config: Opus at 16 kHz, mono, 32 kbps, 20 ms frames;
+    - one-second `AudioData`;
+    - the pre-skip from the `OpusHead` description, else 312;
+    - `{unsupported: true}` when the browser says so.
+  - `dropSilentWords`: D-382's guard.
+    - Measures each word's RMS against the clip's 95th-percentile sample level.
+    - Drops a word more than 30 dB under it, or one starting at or after the end.
+    - Measures a word under 40 ms over 40 ms.
+    - In digital silence, drops every word.
+- **`protocol.ts`** gains two `AsrWorkerApi` members, `encodeForCloud` and `fromCloud`. **`asr.worker.ts`** gains their handlers. `load`, `transcribe` and `unload` are unchanged; `git diff` shows additions only, apart from three import lines.
+  - `encodeForCloud`: an encoder that throws is answered `unsupported`, so the device path takes the clip.
+  - `fromCloud`: guard, then `postProcess`, then `normalizeTranscript`, then `MIN_WORDS`, as `transcribe` does. Confidence is 1.
+  - Neither touches the model session.
+- **The result's `Uint8Array` is copied, not transferred:** `rpc-worker.ts`'s `transferablesOf` moves only `Float32Array` buffers, and the file stays frozen. A 90 s file is about 0.32 MB.
+- **TS §5:** the four rows came with P163's commit (Entry 4).
+
+**Tests.**
+
+- `ogg-opus.test.ts`, 9 cases:
+  - the CRC against a bit-by-bit reference;
+  - a reader written in the test reads every page back, with a good CRC, sequence, serial, `OpusHead`, `OpusTags`, and the packets byte for byte;
+  - BOS and EOS on the first and last pages only;
+  - 50, 50, 20 packets per page, with rising granules and the clip's end on the last;
+  - lacing of 600 bytes (255, 255, 90) and of 510 (255, 255, 0);
+  - a new page when lacing would pass 255;
+  - no packets;
+  - a count mismatch throws.
+- `cloud-audio.test.ts`, 7 cases:
+  - one-second frames, TE-C1's config and the trimmed end;
+  - the pre-skip from the description and the default without one;
+  - `unsupported`, and an encoder error throws;
+  - the guard at the reference clip's levels keeps a −37 dBFS word and drops one over silence;
+  - a word starting at or after the end is dropped, and one straddling it is judged on the part inside;
+  - the 40 ms window;
+  - digital silence and a steady clip.
+
+**The file is real (G 4.3).**
+
+- **The probe:** a throwaway Node script, outside the repository, transpiled the real `cloud-audio.ts` and `ogg-opus.ts` (types stripped) and loaded them in Chrome 156.
+- **The input:** the reference clip's 16 kHz audio (`speech_60s_portrait.mp4.pcm48.f32`, each three samples averaged).
+- **The encode:** 60 s became 210,960 bytes in 0.63 s.
+- **Three readers agree:**
+  - `ffprobe`: Opus, mono, 60.002 s (the exact length 59.9998 s);
+  - Groq (one real call, 60 s): 200 in 1.65 s, 129 words, the same WER as `ffmpeg`'s 32 kbps file (8 of 128), the first word at the same 0.38 s, so the pre-skip is right;
+  - `ogg.rs`: a 3 s tone from the same code, committed as `server/tests/fixtures/ogg/client_tone_3s.ogg`, reads 3,000 ms ± 20 with pre-skip 104 (new unit test).
+- **Total real audio so far:** 423 s.
+
+**Counts.**
+
+- Vitest 538 (522 + 16).
+- `offcut-api` lib 109.
+- ESLint, both `tsc`, and the file tree pass.
+
+**Found, not fixed.** None.

@@ -3,9 +3,12 @@
 // The model and the render session never exist at the same time (INV-12):
 // `unload` answers only when the model's memory has been given back.
 
-import { LIMITS, type Transcript } from "../gen/domain";
+import type { CloudWord } from "../gen/api";
+import { type Confidence, type DurMs, LIMITS, type TimeMs, type Transcript } from "../gen/domain";
 import { loadCore } from "../wasm/load-core";
-import { loadModel, transcribe as hear, unloadModel } from "./asr/whisper-runtime";
+import { dropSilentWords, encodeOpus } from "./asr/cloud-audio";
+import { loadModel, type RawWord, transcribe as hear, unloadModel } from "./asr/whisper-runtime";
+import { postProcess } from "./asr/word-timestamps";
 import type { AsrWorkerApi } from "./protocol";
 import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
@@ -70,6 +73,39 @@ async function unload(): Promise<void> {
   }
 }
 
-const handlers: Handlers<AsrWorkerApi> = { load, transcribe, unload };
+// --- Cloud transcription (cloudimplementation §8.3) -----------------------------
+// Neither handler touches the model session: INV-12 holds as before.
+
+async function encodeForCloud(p: { pcm16: Float32Array }): Promise<{ ogg: Uint8Array; durationMs: number } | { unsupported: true }> {
+  try {
+    return await encodeOpus(p.pcm16);
+  } catch {
+    // An encoder that fails is one this clip cannot use: the device path takes it.
+    return { unsupported: true };
+  }
+}
+
+/** The 16 kHz samples in one millisecond. */
+const SAMPLES_PER_MS = 16;
+
+async function fromCloud(p: {
+  words: CloudWord[];
+  pcm16: Float32Array;
+  modelVersion: string;
+}): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }> {
+  const spoken = dropSilentWords(p.words, p.pcm16);
+  // As the device path does: confidence 1, the words placed by `postProcess` (D-371).
+  const raw: RawWord[] = spoken.map((w) => ({
+    text: w.text,
+    startMs: w.start_ms as TimeMs,
+    endMs: w.end_ms as TimeMs,
+    confidence: 1 as Confidence,
+  }));
+  const duration = Math.round(p.pcm16.length / SAMPLES_PER_MS) as DurMs;
+  const transcript = (await loadCore()).normalizeTranscript(postProcess(raw, duration), p.modelVersion);
+  return transcript.words.length < LIMITS.MIN_WORDS ? { rejected: "NoSpeech" } : { ok: transcript };
+}
+
+const handlers: Handlers<AsrWorkerApi> = { load, transcribe, unload, encodeForCloud, fromCloud };
 
 serveWorker(handlers, { stage: "asr", oneWay: [], duringPreview: [] });

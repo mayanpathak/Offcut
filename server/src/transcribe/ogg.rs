@@ -226,6 +226,15 @@ mod tests {
     }
 
     #[test]
+    fn the_browsers_tone_reads_three_seconds_with_its_pre_skip() {
+        // Written by the client's own encoder in Chrome 156 (cloud CL Entry 5).
+        let bytes = include_bytes!("../../tests/fixtures/ogg/client_tone_3s.ogg");
+        let info = read(bytes).unwrap();
+        assert_eq!(info.pre_skip, 104);
+        assert!(info.duration_ms.abs_diff(3_000) <= 20, "{info:?}");
+    }
+
+    #[test]
     fn the_ffmpeg_tone_reads_three_seconds() {
         let bytes = include_bytes!("../../tests/fixtures/ogg/ffmpeg_tone_3s.ogg");
         let info = read(bytes).unwrap();
