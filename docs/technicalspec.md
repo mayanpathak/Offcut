@@ -1007,6 +1007,11 @@ offcut/
     ├── v6/coding-promptsv6.md         the V6 coding prompts (Setup, 137 to 150), run in order
     ├── v6/v6changelog.md              record of every change while building V6 and V6.1-V6.11; Entry 0 is the v1.3 revision
     ├── v6/experiments.md              outcome of TE-8 and TE-9 (v6implementation section 17), from Prompt 149
+    ├── cloud_transcription/cloudimplementation.md  plan for the cloud transcription release (D-336 to D-381, DC-14)
+    ├── cloud_transcription/cloudbuildguide.md      step-by-step build guide for the cloud transcription release
+    ├── cloud_transcription/coding-promptscloud.md  its coding prompts (Setup, 161 to 170), run in order
+    ├── cloud_transcription/cloudchangelog.md       record of every change while building it
+    ├── cloud_transcription/experiments.md          outcome of TE-C1 to TE-C5 (cloudimplementation section 13)
     ├── v5/experiments.md              outcome of every reading V5 takes (v5implementation section 20), from Prompt 136
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
