@@ -7,7 +7,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | # | Item | Owner | Where |
 |---|---|---|---|
 | 1 | ~~F-1~~: **answered yes** 2026-11-06 (Entry 1) | Founder | plan §15 |
-| 2 | F-2: answered yes 2026-11-06. **To confirm at G 10.3** that Zero Data Retention shows as on in Groq's console, before the merge; the Privacy Policy's sentence depends on it. The founder merged and switched cloud on (Entry 12); the console read itself was not reported to the agent, so it stays listed until the founder confirms it | Founder | plan §15 |
+| 2 | ~~F-2~~: answered yes 2026-11-06; **confirmed by the founder**: Zero Data Retention is on in Groq's console (Entry 12), so the Privacy Policy's sentence holds | Founder | plan §15 |
 | 3 | ~~F-3~~: **answered (a)**, "Your video is never uploaded." | Founder | plan §15 |
 | 4 | F-4: answered yes. The approval itself is G 6.6 (P166); a lawyer's review stays on the launch checklist | Founder | plan §15 |
 | 5 | ~~F-5~~: **answered yes** (switch off at the merge) | Founder | plan §12.2 |
@@ -658,7 +658,7 @@ All fourteen captures are in `~/cloud-review/` (1-14).
 **The live journey (G 10.6).** Done by the founder on the deployed site: signed in, dropped a clip, and the captions arrived from the cloud. The founder reported that it works; no timings or files were passed to the agent, so none are recorded here.
 
 **Open after the release.**
-- Open item 2: the founder's read of Zero Data Retention in Groq's console, which the Privacy Policy's sentence depends on.
+- None from the founder: open item 2 (Zero Data Retention on in Groq's console) was confirmed by the founder on 2026-11-07.
 - Known issues 1 to 3, carried to V6.1.
 - From V6, still open: `web/vercel.json`'s `no-cache` over the API's `no-store`.
 - Groq's free tier daily cap: when it bites, the server answers 503 and the clip finishes on the device (D-348, D-359); move to the Dev tier then (D-342).
