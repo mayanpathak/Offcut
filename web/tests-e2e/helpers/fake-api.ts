@@ -19,6 +19,8 @@ export type FakeApi = {
   eventsOf(name: string): unknown[];
   /** Forgets everything recorded so far: `eventsOf` counts from here (v5implementation §6.3). */
   forget(): void;
+  /** The raw bytes of every `POST /transcribe`, in order (cloud transcription). */
+  transcribeBodies: Buffer[];
 };
 
 /** The account the fake holds. `null`: nobody is signed in, and `/auth/refresh` answers 401. */
@@ -38,7 +40,17 @@ export type FakeFailure = { status: number; code: string; retryAfterSecs?: numbe
 export type FakeApiOptions = {
   /** How `POST /notify-me` answers. The default is 204 at once. */
   notifyMe?: { status: number; delayMs?: number };
-  healthz?: { delayMs?: number };
+  /**
+   * `cloudTranscribe`: `/healthz` says cloud transcription will try. Absent by
+   * default, as an older server's body: every existing spec runs on the device
+   * (cloudimplementation D-366).
+   */
+  healthz?: { delayMs?: number; cloudTranscribe?: boolean };
+  /**
+   * How `POST /transcribe` answers when it is not in `failures`: `response`
+   * after `delayMs`. Without this option it answers 404, which no existing spec meets.
+   */
+  transcribe?: { response: unknown; delayMs?: number };
   /** Signed in from the start. The default is nobody: `/auth/refresh` answers 401 (v6implementation §15.4). */
   session?: FakeSession;
   /** Another page's `api.account`, in place of a new one. */
@@ -200,13 +212,18 @@ function accountAnswer(
  */
 export async function installFakeApi(page: Page, options: FakeApiOptions = {}): Promise<FakeApi> {
   const requests: RecordedRequest[] = [];
+  const transcribeBodies: Buffer[] = [];
   const notifyMe = options.notifyMe ?? { status: 204 };
   const account: FakeAccount = options.account ?? { session: options.session === undefined ? null : { ...options.session }, receipts: new Set<string>() };
 
   await page.route(`**${API_PREFIX}/**`, async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.slice(API_PREFIX.length);
-    const body = parse(request.postData());
+    const audio = path === "/transcribe";
+    if (audio) {
+      transcribeBodies.push(request.postDataBuffer() ?? Buffer.alloc(0));
+    }
+    const body = audio ? undefined : parse(request.postData());
     requests.push({ method: request.method(), path, body });
 
     const failing = options.failures?.[path];
@@ -218,7 +235,15 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
       );
     } else if (path === "/healthz") {
       await wait(options.healthz?.delayMs ?? 0);
-      await route.fulfill({ status: 200, contentType: JSON_TYPE, body: '{"ok":true,"version":"fake"}' });
+      const cloud = options.healthz?.cloudTranscribe === true ? ',"cloud_transcribe":true' : "";
+      await route.fulfill({ status: 200, contentType: JSON_TYPE, body: `{"ok":true,"version":"fake"${cloud}}` });
+    } else if (audio && options.transcribe !== undefined) {
+      if (request.headers().authorization === undefined) {
+        await route.fulfill({ status: 401, contentType: JSON_TYPE, body: JSON.stringify({ code: "unauthorized", retry_after_secs: null }) });
+      } else {
+        await wait(options.transcribe.delayMs ?? 0);
+        await route.fulfill({ status: 200, contentType: JSON_TYPE, body: JSON.stringify(options.transcribe.response) }).catch(() => undefined);
+      }
     } else if (path === "/events") {
       await route.fulfill({ status: 204 });
     } else if (path === "/notify-me") {
@@ -250,7 +275,9 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
         .filter((event) => typeof event === "object" && event !== null && "name" in event && event.name === name),
     forget: () => {
       requests.length = 0;
+      transcribeBodies.length = 0;
     },
+    transcribeBodies,
   };
 }
 

@@ -78,15 +78,15 @@ export const landingCopy = {
   beforeAfter: {
     heading: "Raw take in. Finished short out.",
     lead: "The same take, the same length: only better to watch.",
-    steps: ["Transcribed on your computer", "Voice cleaned", "Captions and visuals added"],
+    steps: ["Transcribed in seconds", "Voice cleaned", "Captions and visuals added"],
   },
   features: {
     heading: "Everything a talking-head short needs. Nothing it doesn't.",
-    lead: "Every card below works today, in your browser.",
+    lead: "Every card below works today.",
     cards: {
       captions: {
         title: "Captions that follow your voice",
-        body: "Word by word, timed to your speech. Three styles: Clean, Bold and Mono. Numbers can take the accent colour.",
+        body: "Word by word, timed to your speech, written in seconds in the cloud or on your computer if you prefer. Three styles: Clean, Bold and Mono. Numbers can take the accent colour.",
         chips: ["Clean", "Bold", "Mono"],
       },
       visuals: {
@@ -146,9 +146,9 @@ export const landingCopy = {
       `Up to ${String(limits.MAX_CLIP_DURATION / MS_PER_SECOND)} seconds, in English, one speaker. MP4 or MOV.`,
   },
   privacy: {
-    heading: "Not uploaded. Made in your browser.",
+    heading: "Your video is never uploaded.",
     facts: [
-      "The video, its sound and its words stay in this browser.",
+      "It is edited, rendered and exported in your browser, on your computer.",
       "No third-party trackers.",
       "Every anonymous event we count is listed.",
     ],
@@ -161,10 +161,6 @@ export const landingCopy = {
     next: {
       title: "Next",
       items: [
-        {
-          title: "Faster transcription, your choice",
-          line: "Much faster captions for long recordings, in the cloud if you choose it. On-device stays available.",
-        },
         {
           title: "Long videos",
           line: `Up to ${String(LONG_VIDEO_MINUTES)} minutes and 4K, with transcription that carries on after a closed tab.`,
@@ -213,7 +209,7 @@ export const landingCopy = {
     captionStyles: "The same caption in the three styles: Clean, Bold and Mono.",
     visuals: "A spoken number, a list and a before-and-after, each animated on screen.",
     howItWorks: "The Offcut editor: a clip dropped in, a word fixed, an MP4 downloaded.",
-    privacy: "The video stays inside the browser; nothing is uploaded.",
+    privacy: "The video stays inside the browser.",
     comingSoon: "The features that are coming, each marked Coming soon.",
   },
 };

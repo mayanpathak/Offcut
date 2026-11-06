@@ -30,6 +30,12 @@ pub struct Config {
     pub billing_price_creator_annual: String,
     pub billing_price_creator_annual_founding: String,
     pub founding_offer_enabled: bool,
+    /// Cloud transcription is offered (cloudimplementation D-356). `false`
+    /// is the server's kill switch: `/healthz` says so and the route refuses.
+    pub transcribe_enabled: bool,
+    pub transcribe_api_key: String,
+    /// The provider's API, with its path and no trailing slash.
+    pub transcribe_api_base_url: String,
     pub trusted_proxy_hops: u8,
     /// The commit the image was built from (D-14); "dev" when unset.
     pub git_sha: String,
@@ -75,6 +81,14 @@ impl Config {
             "FOUNDING_OFFER_ENABLED",
             required("FOUNDING_OFFER_ENABLED")?.parse().ok(),
         )?;
+        let transcribe_enabled = parsed(
+            "TRANSCRIBE_ENABLED",
+            required("TRANSCRIBE_ENABLED")?.parse().ok(),
+        )?;
+        let transcribe_api_base_url = required("TRANSCRIBE_API_BASE_URL")?;
+        if !is_base_url(&transcribe_api_base_url) {
+            return Err(ConfigError::Malformed("TRANSCRIBE_API_BASE_URL"));
+        }
 
         Ok(Config {
             database_url: required("DATABASE_URL")?,
@@ -103,6 +117,9 @@ impl Config {
                 "BILLING_PRICE_CREATOR_ANNUAL_FOUNDING",
             )?,
             founding_offer_enabled,
+            transcribe_enabled,
+            transcribe_api_key: required("TRANSCRIBE_API_KEY")?,
+            transcribe_api_base_url,
             trusted_proxy_hops: parsed(
                 "TRUSTED_PROXY_HOPS",
                 required("TRUSTED_PROXY_HOPS")?.parse().ok(),
@@ -144,6 +161,32 @@ fn is_origin(origin: &str) -> bool {
     host_ok && port.is_none_or(is_port)
 }
 
+/// An origin as `is_origin` reads it, then an optional path of plain
+/// segments, with no trailing slash, query or fragment:
+/// `https://api.example.com/openai/v1`.
+fn is_base_url(url: &str) -> bool {
+    let after_scheme = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"));
+    let Some(rest) = after_scheme else {
+        return false;
+    };
+    let (authority, path) = match rest.find('/') {
+        Some(at) => rest.split_at(at),
+        None => (rest, ""),
+    };
+    let origin_len = url.len() - rest.len() + authority.len();
+    let origin = url.get(..origin_len).unwrap_or_default();
+    let segment_ok = |segment: &str| {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    };
+    let path_ok = path.is_empty() || path.split('/').skip(1).all(segment_ok);
+    is_origin(origin) && path_ok
+}
+
 /// Written by hand so that no key and no secret can reach a log.
 impl fmt::Debug for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -176,6 +219,9 @@ impl fmt::Debug for Config {
                 &self.billing_price_creator_annual_founding,
             )
             .field("founding_offer_enabled", &self.founding_offer_enabled)
+            .field("transcribe_enabled", &self.transcribe_enabled)
+            .field("transcribe_api_key", &REDACTED)
+            .field("transcribe_api_base_url", &self.transcribe_api_base_url)
             .field("trusted_proxy_hops", &self.trusted_proxy_hops)
             .field("git_sha", &self.git_sha)
             .finish()
@@ -215,6 +261,12 @@ mod tests {
             ("BILLING_PRICE_CREATOR_ANNUAL", "price_annual"),
             ("BILLING_PRICE_CREATOR_ANNUAL_FOUNDING", "price_founding"),
             ("FOUNDING_OFFER_ENABLED", "false"),
+            ("TRANSCRIBE_ENABLED", "true"),
+            ("TRANSCRIBE_API_KEY", "transcribe-secret"),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "https://api.transcribe.example.com/openai/v1",
+            ),
             ("TRUSTED_PROXY_HOPS", "1"),
         ])
     }
@@ -269,7 +321,7 @@ mod tests {
     #[test]
     fn each_missing_or_empty_variable_names_itself() {
         let names: Vec<&'static str> = complete().into_keys().collect();
-        assert_eq!(names.len(), 19);
+        assert_eq!(names.len(), 22);
         for name in names {
             let mut env = complete();
             env.remove(name);
@@ -354,6 +406,27 @@ mod tests {
             ("BILLING_API_BASE_URL", "http://localhost:8080"),
             ("BILLING_API_BASE_URL", "https://test.billing.example.com/"),
             ("BILLING_API_BASE_URL", "test.billing.example.com"),
+            ("TRANSCRIBE_ENABLED", "1"),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "https://api.transcribe.example.com/openai/v1/",
+            ),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "https://api.transcribe.example.com/v1?x=1",
+            ),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "http://api.transcribe.example.com/v1",
+            ),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "ftp://api.transcribe.example.com",
+            ),
+            (
+                "TRANSCRIBE_API_BASE_URL",
+                "https://api.transcribe.example.com//v1",
+            ),
         ];
         for (name, value) in cases {
             assert_eq!(
@@ -371,6 +444,34 @@ mod tests {
             with("LOG_LEVEL", "DEBUG").unwrap().log_level,
             tracing::Level::DEBUG
         );
+    }
+
+    #[test]
+    fn the_transcription_variables_parse() {
+        let config = load(&complete()).unwrap();
+        assert!(config.transcribe_enabled);
+        assert_eq!(config.transcribe_api_key, "transcribe-secret");
+        assert_eq!(
+            config.transcribe_api_base_url,
+            "https://api.transcribe.example.com/openai/v1"
+        );
+        assert!(
+            !with("TRANSCRIBE_ENABLED", "false")
+                .unwrap()
+                .transcribe_enabled
+        );
+        for url in [
+            "https://api.groq.com/openai/v1",
+            "https://api.groq.com",
+            "http://localhost:8099/openai/v1",
+        ] {
+            assert_eq!(
+                with("TRANSCRIBE_API_BASE_URL", url)
+                    .unwrap()
+                    .transcribe_api_base_url,
+                url
+            );
+        }
     }
 
     #[test]
@@ -396,13 +497,14 @@ mod tests {
             "smtp-password-secret",
             "billing-secret",
             "webhook-secret",
+            "transcribe-secret",
         ];
         for secret in secrets {
             assert!(!debug.contains(secret), "{secret} is in {debug}");
         }
         // The seed bytes must not appear either, in any common rendering.
         assert!(!debug.contains("[0, 1, 2, 3") && !debug.to_lowercase().contains("00010203"));
-        assert_eq!(debug.matches("<redacted>").count(), 7);
+        assert_eq!(debug.matches("<redacted>").count(), 8);
         assert!(debug.contains("https://offcut.example.com") && debug.contains("8080"));
     }
 }

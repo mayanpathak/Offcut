@@ -36,6 +36,10 @@ pub enum RouteGroup {
     NotifyMe,
     AccountDelete,
     AccountExport,
+    /// `POST /transcribe`, per user, checked in its handler (cloudimplementation D-363).
+    TranscribeUser,
+    /// `POST /transcribe`, per IP, as a layer.
+    TranscribeIp,
 }
 
 /// `capacity` requests per `window`.
@@ -47,6 +51,7 @@ pub struct Limit {
 
 const MINUTE: u64 = 60;
 const HOUR: u64 = 60 * MINUTE;
+const DAY: u64 = 24 * HOUR;
 
 const fn per(capacity: u32, window_secs: u64) -> Limit {
     Limit {
@@ -68,6 +73,8 @@ impl RouteGroup {
             Self::NotifyMe => per(5, HOUR),
             Self::AccountDelete => per(3, HOUR),
             Self::AccountExport => per(6, HOUR),
+            Self::TranscribeUser => per(20, DAY),
+            Self::TranscribeIp => per(60, HOUR),
         }
     }
 }
@@ -206,7 +213,7 @@ mod tests {
 
     use super::*;
 
-    const GROUPS: [RouteGroup; 16] = [
+    const GROUPS: [RouteGroup; 18] = [
         RouteGroup::Healthz,
         RouteGroup::MagicLinkEmail,
         RouteGroup::MagicLinkIp,
@@ -223,6 +230,8 @@ mod tests {
         RouteGroup::NotifyMe,
         RouteGroup::AccountDelete,
         RouteGroup::AccountExport,
+        RouteGroup::TranscribeUser,
+        RouteGroup::TranscribeIp,
     ];
 
     fn ip(last: u8) -> RateKey {
@@ -239,23 +248,25 @@ mod tests {
     #[test]
     fn every_group_has_the_limit_of_the_spec_table() {
         // (capacity, window in seconds), in the order of the enum; TS §22.1.
-        let expected: [(u32, u64); 16] = [
-            (60, 60),   // Healthz
-            (3, 900),   // MagicLinkEmail
-            (10, 3600), // MagicLinkIp
-            (10, 60),   // Verify
-            (30, 60),   // Refresh
-            (30, 60),   // Logout
-            (60, 60),   // Me
-            (60, 60),   // Entitlement
-            (30, 60),   // UsageReceipts
-            (10, 60),   // Checkout
-            (10, 60),   // Portal
-            (120, 60),  // Webhook
-            (60, 60),   // Events
-            (5, 3600),  // NotifyMe
-            (3, 3600),  // AccountDelete
-            (6, 3600),  // AccountExport
+        let expected: [(u32, u64); 18] = [
+            (60, 60),     // Healthz
+            (3, 900),     // MagicLinkEmail
+            (10, 3600),   // MagicLinkIp
+            (10, 60),     // Verify
+            (30, 60),     // Refresh
+            (30, 60),     // Logout
+            (60, 60),     // Me
+            (60, 60),     // Entitlement
+            (30, 60),     // UsageReceipts
+            (10, 60),     // Checkout
+            (10, 60),     // Portal
+            (120, 60),    // Webhook
+            (60, 60),     // Events
+            (5, 3600),    // NotifyMe
+            (3, 3600),    // AccountDelete
+            (6, 3600),    // AccountExport
+            (20, 86_400), // TranscribeUser
+            (60, 3600),   // TranscribeIp
         ];
         for (group, (capacity, window_secs)) in GROUPS.into_iter().zip(expected) {
             assert_eq!(group.limit(), per(capacity, window_secs), "{group:?}");

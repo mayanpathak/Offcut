@@ -1,6 +1,7 @@
 // The message types of all four workers (TS §14.1, §14.2). Types only: this
 // file has no function and no constant. It imports from gen/ and nothing else.
 
+import type { CloudWord } from "../gen/api";
 import type {
   ChangeSummary,
   ClipId,
@@ -81,6 +82,10 @@ export interface AsrWorkerApi {
   load(p: { modelId: string; backend: "webgpu" | "wasm" }): Promise<{ backend: "webgpu" | "wasm" }>;
   transcribe(p: { pcm16: Float32Array }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
   unload(): Promise<void>;
+  /** Cloud transcription (cloudimplementation §8.3): `pcm16` as an Ogg Opus file. No model is involved. */
+  encodeForCloud(p: { pcm16: Float32Array }): Promise<{ ogg: Uint8Array; durationMs: number } | { unsupported: true }>;
+  /** The provider's words as a transcript, as `transcribe` builds one, after the silence guard (D-382). */
+  fromCloud(p: { words: CloudWord[]; pcm16: Float32Array; modelVersion: string }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
 }
 
 // The audio worker has no method that detects silence or plans a cut. Only

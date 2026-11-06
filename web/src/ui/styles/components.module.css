@@ -233,6 +233,29 @@
   font-size: var(--fs-12);
 }
 
+/* --- The transcription card (cloudimplementation §9.1), under the drop target --- */
+
+.transcriptionChoice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 34rem;
+  margin-top: var(--sp-2);
+}
+
+/* The two choices stay on one line each: the card is wider than the control needs. */
+.transcriptionChoice [role="radio"] {
+  white-space: nowrap;
+}
+
+.transcriptionLine {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+}
+
 /* --- The cards in the stage's frame ------------------------------------------ */
 
 .card {

@@ -51,6 +51,7 @@ fn one_of_each() -> Vec<Value> {
         json!({"name": "client_error", "props": {
             "error_code": "E_WORKER_CRASH", "stage": "import"}}),
         json!({"name": "local_data_cleared"}),
+        json!({"name": "asr_cloud", "props": {"outcome": "ok", "duration_ms": 1200}}),
     ]
 }
 
@@ -95,6 +96,30 @@ async fn assert_all_rejected(app: &TestApp, bodies: &[Value]) {
 }
 
 #[tokio::test]
+async fn the_cloud_transcription_values_are_accepted_and_text_is_not() {
+    let app = TestApp::spawn().await;
+    let good = [
+        json!({"name": "stage_timing", "props": {"stage": "asr", "duration_ms": 900, "asr_backend": "cloud"}}),
+        json!({"name": "asr_cloud", "props": {"outcome": "limited", "duration_ms": 0}}),
+        json!({"name": "asr_cloud", "props": {"outcome": "unsupported", "duration_ms": 3_600_000}}),
+    ];
+    let response = post(&app, &batch(&good)).await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(rows(&app).await.len(), 3);
+
+    let app = TestApp::spawn().await;
+    assert_all_rejected(
+        &app,
+        &[
+            batch(&[json!({"name": "asr_cloud", "props": {"outcome": "the words were hello", "duration_ms": 1}})]),
+            batch(&[json!({"name": "asr_cloud", "props": {"outcome": "ok", "duration_ms": 3_600_001}})]),
+            batch(&[json!({"name": "asr_cloud", "props": {"outcome": "ok", "duration_ms": 1, "text": "hi"}})]),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn one_valid_event_of_each_kind_is_stored_as_sent() {
     let app = TestApp::spawn().await;
     let events = one_of_each();
@@ -105,7 +130,7 @@ async fn one_valid_event_of_each_kind_is_stored_as_sent() {
     assert_eq!(response.text().await.unwrap(), "");
 
     let stored = rows(&app).await;
-    assert_eq!(stored.len(), 19);
+    assert_eq!(stored.len(), 20);
     let docs = offcut_api_types::ANALYTICS_EVENT_DOCS;
     for ((sent, (name, props)), doc) in events.iter().zip(&stored).zip(docs) {
         assert_eq!(
@@ -181,7 +206,7 @@ async fn a_free_text_prop_is_rejected_on_any_event() {
         "outcome": "ok", "duration_ms": text, "resumed": false}})]));
     bodies.push(batch(&[json!({"name": "model_download", "props": {
         "outcome": "ok", "duration_ms": 1, "resumed": text}})]));
-    assert_eq!(bodies.len(), 21);
+    assert_eq!(bodies.len(), 22);
     assert_all_rejected(&app, &bodies).await;
 }
 

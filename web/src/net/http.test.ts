@@ -447,3 +447,21 @@ describe("toAppFailure", () => {
     expect(code("status", 413)).toEqual(["E_INTERNAL", false]);
   });
 });
+
+describe("a raw body and a longer attempt (cloudimplementation D-373)", () => {
+  it("sends the bytes as they are, with their content type and no JSON", async () => {
+    const { request, calls } = setup([{ status: 200, body: { ok: true } }]);
+    const bytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53, 0, 1, 2]);
+    await request({ method: "POST", path: "/transcribe", rawBody: { bytes, contentType: "audio/ogg" } });
+    expect(calls[0]?.init.body).toBe(bytes);
+    expect(calls[0]?.init.headers).toEqual({ "Content-Type": "audio/ogg" });
+  });
+
+  it("an attempt waits for its own timeout instead of the default", async () => {
+    const { request, elapsed } = setup([{ hang: true }]);
+    const result = failed(await request({ method: "POST", path: "/transcribe", attemptTimeoutMs: 30 * SECONDS }));
+    expect(result.failure.code).toBe("E_NET_TIMEOUT");
+    expect(elapsed()).toBe(30 * SECONDS);
+    expect(API_TIMEOUT_MS).toBeLessThan(30 * SECONDS);
+  });
+});

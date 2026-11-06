@@ -53,5 +53,13 @@ services:
         sync: false
       - key: FOUNDING_OFFER_ENABLED
         sync: false
+      # Cloud transcription (cloudimplementation D-356): false until the
+      # founder switches it on after the merge's checks (D-381).
+      - key: TRANSCRIBE_ENABLED
+        sync: false
+      - key: TRANSCRIBE_API_KEY
+        sync: false
+      - key: TRANSCRIBE_API_BASE_URL
+        sync: false
       - key: TRUSTED_PROXY_HOPS
         sync: false

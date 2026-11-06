@@ -56,6 +56,9 @@ fn config(secret: &str) -> Arc<Config> {
         billing_price_creator_annual: "prod_annual".to_owned(),
         billing_price_creator_annual_founding: "prod_founding".to_owned(),
         founding_offer_enabled: false,
+        transcribe_enabled: false,
+        transcribe_api_key: "unset-in-tests".to_owned(),
+        transcribe_api_base_url: "unset-in-tests".to_owned(),
         trusted_proxy_hops: 1,
         git_sha: "test-sha".to_owned(),
     })

@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use axum::body::Bytes;
 use axum::http::HeaderMap;
 use ed25519_dalek::SigningKey;
 use offcut_api::billing::provider::{
@@ -16,8 +17,10 @@ use offcut_api::config::Config;
 use offcut_api::mail::{MailError, Mailer};
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
+use offcut_api::transcribe::budget::Budget;
+use offcut_api::transcribe::provider::{CloudTranscript, TranscribeError, Transcriber};
 use offcut_api::{db, router};
-use offcut_api_types::{BillingInterval, Offer};
+use offcut_api_types::{BillingInterval, CloudWord, Offer};
 use offcut_types::{UnixSecs, UserId};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{AssertSqlSafe, ConnectOptions, Connection, PgPool};
@@ -135,6 +138,67 @@ impl BillingProvider for FakeBilling {
     }
 }
 
+/// A transcription provider that records the audio it is given and answers
+/// what the test sets: by default the two words "Hello there." over the
+/// audio's length. With `enabled` false it is the server's switch turned off.
+pub struct FakeTranscriber {
+    pub enabled: AtomicBool,
+    pub received: Mutex<Vec<Vec<u8>>>,
+    pub answer: Mutex<Result<Vec<CloudWord>, TranscribeError>>,
+}
+
+impl Default for FakeTranscriber {
+    fn default() -> FakeTranscriber {
+        let word = |text: &str, start_ms, end_ms| CloudWord {
+            text: text.to_owned(),
+            start_ms,
+            end_ms,
+        };
+        FakeTranscriber {
+            enabled: AtomicBool::new(true),
+            received: Mutex::default(),
+            answer: Mutex::new(Ok(vec![word("Hello", 100, 400), word("there.", 400, 800)])),
+        }
+    }
+}
+
+#[async_trait]
+impl Transcriber for FakeTranscriber {
+    fn enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+
+    async fn transcribe(
+        &self,
+        audio: Bytes,
+        duration_ms: u32,
+    ) -> Result<CloudTranscript, TranscribeError> {
+        self.received.lock().unwrap().push(audio.to_vec());
+        let words = self.answer.lock().unwrap().clone()?;
+        Ok(CloudTranscript {
+            words,
+            duration_ms,
+            model: "fake:whisper".to_owned(),
+        })
+    }
+}
+
+/// What a test may change about the app before it starts.
+pub struct TestOptions {
+    pub transcribe_enabled: bool,
+    /// The audio budget in seconds: (hour, day).
+    pub transcribe_budget: (u32, u32),
+}
+
+impl Default for TestOptions {
+    fn default() -> TestOptions {
+        TestOptions {
+            transcribe_enabled: true,
+            transcribe_budget: (7_000, 27_000),
+        }
+    }
+}
+
 /// The header the fake's webhook is signed with.
 pub const FAKE_SIGNATURE: &str = "x-fake-signature";
 
@@ -187,6 +251,7 @@ pub struct TestApp {
     pub client: reqwest::Client,
     pub mailer: Arc<FakeMailer>,
     pub billing: Arc<FakeBilling>,
+    pub transcriber: Arc<FakeTranscriber>,
     database: String,
 }
 
@@ -195,6 +260,11 @@ impl TestApp {
     /// `DATABASE_URL` names, migrates it, and serves the router over it. The
     /// role in `DATABASE_URL` needs `CREATEDB`.
     pub async fn spawn() -> TestApp {
+        TestApp::spawn_with(TestOptions::default()).await
+    }
+
+    /// As `spawn`, with `options`.
+    pub async fn spawn_with(options: TestOptions) -> TestApp {
         // As `main.rs` does. Only the first call in a process installs it.
         let _ = rustls::crypto::ring::default_provider().install_default();
         let server = server_options();
@@ -215,6 +285,11 @@ impl TestApp {
 
         let mailer = Arc::new(FakeMailer::default());
         let billing = Arc::new(FakeBilling::default());
+        let transcriber = Arc::new(FakeTranscriber::default());
+        transcriber
+            .enabled
+            .store(options.transcribe_enabled, Ordering::SeqCst);
+        let (hour, day) = options.transcribe_budget;
         let state = AppState {
             db: pool.clone(),
             config: Arc::new(test_config()),
@@ -222,6 +297,8 @@ impl TestApp {
             mailer: mailer.clone(),
             billing: billing.clone(),
             fair_use: Arc::default(),
+            transcriber: transcriber.clone(),
+            transcribe_budget: Arc::new(Budget::new(hour, day)),
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
@@ -235,6 +312,7 @@ impl TestApp {
             client: reqwest::Client::builder().no_proxy().build().unwrap(),
             mailer,
             billing,
+            transcriber,
             database,
         }
     }
@@ -246,7 +324,8 @@ impl Drop for TestApp {
     fn drop(&mut self) {
         // Each test binary reads what it needs of these. These reads keep the
         // ones a binary does not use from being called dead.
-        let _ = (&self.pool, &self.mailer, &self.billing);
+        let _ = (&self.pool, &self.mailer, &self.billing, &self.transcriber);
+        let _: fn(TestOptions) -> _ = TestApp::spawn_with;
         let _: fn(&'static TestApp, &'static serde_json::Value) -> _ = webhook;
         let drop_database = format!(
             r#"DROP DATABASE IF EXISTS "{}" WITH (FORCE)"#,
@@ -299,6 +378,9 @@ fn test_config() -> Config {
         billing_price_creator_annual: placeholder(),
         billing_price_creator_annual_founding: placeholder(),
         founding_offer_enabled: false,
+        transcribe_enabled: true,
+        transcribe_api_key: placeholder(),
+        transcribe_api_base_url: "https://api.transcribe.example.com/openai/v1".to_owned(),
         // One proxy in front, as in production behind the Vercel rewrite: the
         // rate limiter reads `X-Forwarded-For` when a request carries it.
         trusted_proxy_hops: 1,

@@ -5,6 +5,7 @@ pub mod analytics;
 pub mod auth;
 pub mod billing;
 pub mod errors;
+pub mod transcribe;
 pub mod usage;
 
 pub use account::*;
@@ -12,6 +13,7 @@ pub use analytics::*;
 pub use auth::*;
 pub use billing::*;
 pub use errors::*;
+pub use transcribe::*;
 pub use usage::*;
 
 /// Generates `web/src/gen/api.ts` (v1implementation §9). The output is one
@@ -51,6 +53,9 @@ mod typescript {
         v.visit::<UrlResponse>();
         v.visit::<UsageReceiptRequest>();
         v.visit::<EntitlementResponse>();
+        v.visit::<CloudWord>();
+        v.visit::<TranscribeResponse>();
+        v.visit::<HealthResponse>();
         v.visit::<HeroVariant>();
         v.visit::<CheckResult>();
         v.visit::<GpuVendor>();
@@ -67,6 +72,7 @@ mod typescript {
         v.visit::<PromptAction>();
         v.visit::<SigninStep>();
         v.visit::<CheckoutStep>();
+        v.visit::<CloudOutcome>();
         v.visit::<AnalyticsEvent>();
         v.visit::<EventsBatch>();
         v.visit::<ApiError>();
@@ -177,12 +183,14 @@ mod typescript {
             include_str!("account.rs"),
             include_str!("billing.rs"),
             include_str!("usage.rs"),
+            include_str!("transcribe.rs"),
             include_str!("analytics.rs"),
             include_str!("errors.rs"),
         ];
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
-        // 38 types cross the API. `EventDoc` does not: its table is written as a constant.
-        assert_eq!(names.len(), 39);
+        // 42 types cross the API (the cloud transcription release adds four). `EventDoc`
+        // does not: its table is written as a constant.
+        assert_eq!(names.len(), 43);
         for name in names.into_iter().filter(|name| *name != "EventDoc") {
             let declarations = ts.matches(&format!("\nexport type {name} = ")).count();
             assert_eq!(declarations, 1, "{name} is declared {declarations} times");
@@ -210,7 +218,7 @@ mod typescript {
             .nth(1)
             .unwrap();
         let docs = docs.split("] as const;").next().unwrap();
-        assert_eq!(docs.lines().count(), 19);
+        assert_eq!(docs.lines().count(), 20);
         assert!(ts.ends_with("\nexport const MAX_EVENTS_PER_BATCH = 50;\n"));
     }
 }

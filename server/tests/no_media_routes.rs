@@ -4,7 +4,8 @@
     clippy::panic,
     clippy::indexing_slicing
 )]
-//! The API takes no media and no upload on any route (INV-4, TS §22.1). The
+//! The API takes no media and no upload on any route (INV-4, TS §22.1), with
+//! one exception named below (DC-14, the cloud transcription release). The
 //! routes are read from `router.rs` itself, so a new one is walked without
 //! anyone remembering to add it here.
 
@@ -39,6 +40,16 @@ const READ_BODY: [&str; 7] = [
 ];
 /// The POST routes that read no body at all.
 const IGNORE_BODY: [&str; 3] = ["/auth/refresh", "/auth/logout", "/account/delete"];
+/// DC-14: the one route that takes media, the one type it takes, and its own
+/// body limit. Every other media type still gets 415 there.
+const AUDIO_BODY: [(&str, &str, usize); 1] = [("/transcribe", "audio/ogg", 1024 * 1024)];
+
+fn audio_route(path: &str) -> Option<(&'static str, usize)> {
+    AUDIO_BODY
+        .iter()
+        .find(|(route, _, _)| *route == path)
+        .map(|(_, media, limit)| (*media, *limit))
+}
 
 /// (path, method) of each `.route(...)` of the table, read from the source.
 fn routes() -> Vec<(String, Method)> {
@@ -70,6 +81,7 @@ fn the_table_is_read() {
     assert!(routes.contains(&("/healthz".to_owned(), Method::GET)));
     assert!(routes.contains(&("/auth/verify".to_owned(), Method::POST)));
     assert!(routes.contains(&("/me".to_owned(), Method::GET)));
+    assert!(routes.contains(&("/transcribe".to_owned(), Method::POST)));
 }
 
 #[tokio::test]
@@ -77,6 +89,11 @@ async fn every_route_refuses_media_and_uploads() {
     let app = TestApp::spawn().await;
     for (path, method) in routes() {
         for media in MEDIA_TYPES {
+            // DC-14's one pair (its route, its type) is checked below, not here.
+            let own_type = media.split(';').next().unwrap().trim().to_ascii_lowercase();
+            if audio_route(&path).is_some_and(|(allowed, _)| own_type == allowed) {
+                continue;
+            }
             let url = format!("{}{path}", app.base_url);
             let request = app.client.request(method.clone(), url);
             let response = request
@@ -95,6 +112,38 @@ async fn every_route_refuses_media_and_uploads() {
             assert_eq!(body.code, ApiErrorCode::UnsupportedMediaType, "{context}");
         }
     }
+    // DC-14: the exception's own type passes the guard and meets the route's
+    // other checks (here, no bearer), and only on its path.
+    for (path, media, _) in AUDIO_BODY {
+        let url = format!("{}{path}", app.base_url);
+        let response = app
+            .client
+            .post(url)
+            .header("content-type", media)
+            .body("x")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{path} with {media}"
+        );
+        let elsewhere = format!("{}/events", app.base_url);
+        let response = app
+            .client
+            .post(elsewhere)
+            .header("content-type", media)
+            .body("x")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "/events with {media}"
+        );
+    }
     // The refused requests reached no handler.
     assert!(app.mailer.sent.lock().unwrap().is_empty());
 }
@@ -111,7 +160,29 @@ async fn every_post_route_refuses_a_body_over_the_limit() {
             continue;
         }
         let url = format!("{}{path}", app.base_url);
-        if READ_BODY.contains(&path.as_str()) {
+        if let Some((media, limit)) = audio_route(&path) {
+            // DC-14: its own limit, read only from a signed-in person. The server
+            // answers before reading the whole body and closes that connection,
+            // so the request has a client of its own: the next route must not
+            // be sent on a connection that is closing.
+            let own = reqwest::Client::builder()
+                .no_proxy()
+                .pool_max_idle_per_host(0)
+                .build()
+                .unwrap();
+            let response = own
+                .post(url)
+                .bearer_auth(&access)
+                .header("content-type", media)
+                .body(vec![0u8; limit + 1])
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+            let body: ApiError = response.json().await.unwrap();
+            assert_eq!(body.code, ApiErrorCode::PayloadTooLarge, "{path}");
+            assert!(limit <= 1024 * 1024, "{path}: DC-14 allows at most 1 MiB");
+        } else if READ_BODY.contains(&path.as_str()) {
             let response = app
                 .client
                 .post(url)

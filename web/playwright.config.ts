@@ -25,6 +25,7 @@ const MEDIA_SUITES = [
   "preview-sync.spec.ts",
   "review-edit.spec.ts",
   "cancel.spec.ts",
+  "cloud-transcribe.spec.ts",
 ];
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).

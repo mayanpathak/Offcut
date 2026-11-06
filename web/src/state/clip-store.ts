@@ -4,7 +4,7 @@
 
 import { create } from "zustand";
 
-import type { ClipSource } from "../gen/api";
+import type { ClipSource, CloudOutcome } from "../gen/api";
 import type {
   ClipId,
   ClipInfo,
@@ -31,6 +31,13 @@ export type ClipState = {
   stage?: PipelineStage;
   /** The pipeline is held up by the download of the speech model. */
   waitingModel: boolean;
+  /**
+   * How this run transcribes (cloudimplementation D-378): set at its start,
+   * and turned to `device` by a fallback. The processing card reads it.
+   */
+  asrMode?: "cloud" | "device";
+  /** Why this run's cloud transcription fell back, once; the interface says so (D-348). */
+  asrFallback?: Exclude<CloudOutcome, "ok">;
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
@@ -186,6 +193,20 @@ export function cancelledImport(): void {
   const failure: AppFailure = { code: "E_INTERNAL", stage: "import", retryable: false, detail: "Cancelled" };
   apply("fail", (current) => ({ ...settled(current), failure }));
   reset();
+}
+
+/** How the processing run transcribes. Only a processing clip has a mode. */
+export function setAsrMode(asrMode: "cloud" | "device"): void {
+  if (useClipStore.getState().status === "processing") {
+    useClipStore.setState({ asrMode });
+  }
+}
+
+/** The run's cloud transcription fell back to the device, for `reason`. */
+export function cloudFellBack(reason: Exclude<CloudOutcome, "ok">): void {
+  if (useClipStore.getState().status === "processing") {
+    useClipStore.setState({ asrMode: "device", asrFallback: reason });
+  }
 }
 
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */

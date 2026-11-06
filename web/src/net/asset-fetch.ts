@@ -32,7 +32,7 @@ export const LANDING_CLIPS: Partial<Record<LandingSlot, LandingClip>> = {
   captionStyles: { path: "media/offcut-caption-styles-720x1280.d2b8c6103512e7d2.mp4", width: 720, height: 1280 },
   visuals: { path: "media/offcut-visuals-960x960.7d7b21acf8b32466.mp4", width: 960, height: 960 },
   howItWorks: { path: "media/offcut-how-it-works-1280x720.bf1c3a7343abb4b6.mp4", width: 1280, height: 720 },
-  privacy: { path: "media/offcut-privacy-1280x720.642f1e2cda617aaa.mp4", width: 1280, height: 720 },
+  privacy: { path: "media/offcut-privacy-1280x720.f6af0adb3438b1da.mp4", width: 1280, height: 720 },
   comingSoon: { path: "media/offcut-coming-soon-1280x720.5fff4a66a864300e.mp4", width: 1280, height: 720 },
 };
 

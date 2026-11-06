@@ -8,6 +8,7 @@
 import type { AnalyticsEvent, BillingInterval, Wanted } from "../gen/api";
 import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
 import { landingCopy, pricingCopy } from "./landing";
+import { transcriptionCopy } from "./transcription";
 
 type EventName = AnalyticsEvent["name"];
 
@@ -86,6 +87,9 @@ const FAILED_ON_DEVICE = "Something went wrong on this device.";
 export const messages = {
   // The landing page and its prices: copy/landing.ts (designimplementation D-321).
   landing: landingCopy,
+
+  // Cloud transcription's card, line and toasts: copy/transcription.ts (cloudimplementation D-380).
+  transcription: transcriptionCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
@@ -328,7 +332,7 @@ export const messages = {
   // each change (buildplan.md §10.3). Not reviewed by a lawyer. The wording rules
   // at the top of this file apply.
   legal: {
-    updated: "Last updated 3 November 2026.",
+    updated: "Last updated 6 November 2026.",
     contactLead: "Questions? Write to",
     contactEmail: "ranupathak1986@gmail.com",
     footerContact: "Contact",
@@ -343,7 +347,7 @@ export const messages = {
           },
           {
             heading: "Your videos",
-            body: ["Your videos and the shorts you make stay yours. Offcut processes them on your computer. You are responsible for having the right to use what you put in and what you publish."],
+            body: ["Your videos and the shorts you make stay yours. Offcut processes them on your computer; when cloud captions are on, the sound of a clip is transcribed by our provider. You are responsible for having the right to use what you put in and what you publish."],
           },
           {
             heading: "Plans and payment",
@@ -373,7 +377,14 @@ export const messages = {
         sections: [
           {
             heading: "Your video",
-            body: ["Your video is not uploaded to our servers. Offcut processes it in your browser, on your computer, and keeps the video, audio, transcript, captions and edits in that browser's storage. You can remove them by clearing this site's data in your browser."],
+            body: ["Your video is not uploaded to our servers. Offcut processes it in your browser, on your computer, and keeps the video, its sound, the transcript, captions and edits in that browser's storage. You can remove them by clearing this site's data in your browser."],
+          },
+          {
+            heading: "Cloud captions",
+            body: [
+              "When you are signed in and \"Cloud\" captions are on, which is the default for an account, the sound of each clip you drop is compressed in your browser and sent through our server to Groq, which writes the words and their timings and sends them back. Neither we nor Groq keep the sound or the words after the request. Your video and its frames are never sent.",
+              "Choose \"On device\" before you drop a clip, and nothing of that clip leaves your computer. Without an account, everything runs on your computer.",
+            ],
           },
           {
             heading: "What we collect today",
@@ -389,7 +400,7 @@ export const messages = {
           },
           {
             heading: "Who handles it",
-            body: ["We use Vercel to serve the site, Render to run the server, Neon for the database and Cloudflare to serve the files the app downloads. Brevo sends the sign-in emails, so it receives your email address, and Dodo Payments will handle payment. We do not sell your data, show ads or use third-party trackers."],
+            body: ["We use Vercel to serve the site, Render to run the server, Neon for the database and Cloudflare to serve the files the app downloads. Brevo sends the sign-in emails, so it receives your email address. Groq writes the captions of clips sent for cloud transcription. Dodo Payments will handle payment. We do not sell your data, show ads or use third-party trackers."],
           },
           {
             heading: "Changes",
@@ -424,7 +435,11 @@ export const messages = {
     whatLeavesHeading: "What leaves your device",
     columns: { data: "Data", leaves: "Leaves your device?" },
     rows: [
-      { data: "Video, audio, transcript, captions, project edits", leaves: "No" },
+      { data: "Video, video frames, captions as edited, project edits", leaves: "No" },
+      {
+        data: "The sound of a clip, compressed, when \"Cloud\" captions are on (signed in only)",
+        leaves: "Yes: to our server, which sends it to Groq to write the captions and returns the words. Neither keeps the sound or the words after the request. Choose \"On device\" and nothing of the clip leaves",
+      },
       { data: "Your email and plan status", leaves: "Yes, to our servers" },
       { data: "Count of exports (no content)", leaves: "Yes" },
       {
@@ -454,6 +469,7 @@ export const messages = {
       checkout_step: "Checkout step",
       client_error: "Error in the app",
       local_data_cleared: "Local data cleared",
+      asr_cloud: "Cloud transcription result",
     } satisfies Record<EventName, string>,
   },
 

@@ -75,7 +75,8 @@ test("the settings link leads to the table of what leaves the device", async ({ 
 
   const fixed = page.getByTestId("what-leaves").locator("tbody tr");
   await expect(fixed).toHaveCount(messages.settings.rows.length);
-  await expect(fixed).toHaveCount(4);
+  // DECLARED CHANGE (cloud transcription, cloudimplementation §9.3): the audio row makes five.
+  await expect(fixed).toHaveCount(5);
 
   // One row per event of the generated allowlist, each with its wire name.
   const events = page.getByTestId("analytics-events").locator("tbody tr");

@@ -31,7 +31,7 @@ export const STORES = {
   meta: "meta",
 } as const;
 
-export const META_KEYS = { anonId: "anonId", persistRequested: "persistRequested" } as const;
+export const META_KEYS = { anonId: "anonId", persistRequested: "persistRequested", transcription: "transcription" } as const;
 
 /**
  * Every stored value is wrapped this way. A value whose `schemaVersion` is

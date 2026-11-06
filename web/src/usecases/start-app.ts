@@ -5,11 +5,13 @@ import { initAnalytics, track } from "../analytics/client";
 import { env } from "../config/env";
 import type { AnonId } from "../gen/domain";
 import * as modelManager from "../models/model-manager";
-import { wake } from "../net/api-client";
+import { checkHealth } from "../net/api-client";
 import { metaGet, metaSet } from "../persistence/db";
+import { getTranscriptionChoice } from "../persistence/prefs-repo";
 import { META_KEYS } from "../persistence/schema";
 import { runCapabilityCheck } from "../platform/capability";
 import { beginCheck, setSupported, setUnsupported } from "../state/capability-store";
+import { setAvailability, setChoice } from "../state/cloud-store";
 import { setIllegalTransitionReporter } from "../state/machines/transition";
 import { preload } from "../workers/pool";
 import { connectAccount, restoreSession } from "./restore-session";
@@ -77,8 +79,13 @@ async function run(options: StartOptions): Promise<void> {
   }
   track({ name: "capability_check", props: report });
 
-  // 6. Start waking a sleeping API now. Nothing waits for the answer.
-  wake();
+  // 6. Start waking a sleeping API now. Nothing waits for the answer, which
+  //    also says whether cloud transcription will try (cloudimplementation
+  //    D-366); the choice this device made is read beside it (D-367).
+  void checkHealth().then((health) => {
+    setAvailability(health.ok && health.data.cloud_transcribe === true ? "available" : "unavailable");
+  });
+  void getTranscriptionChoice().then(setChoice);
 
   // The session this browser may hold. Nothing waits for it (INV-3, D-289).
   if (options.restoreSession) {
