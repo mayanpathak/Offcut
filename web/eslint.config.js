@@ -155,6 +155,12 @@ const layerPolicies = [
     from: fromFile("usecases", "start-export.ts"),
     allow: { to: to("usecases", "control-preview.ts") },
   },
+  // The cloud transcription release (cloudimplementation D-372): the pipeline
+  // hands the clip's sound to the one use-case that sends it.
+  {
+    from: fromFile("usecases", "run-pipeline.ts"),
+    allow: { to: to("usecases", "transcribe-cloud.ts") },
+  },
 
   // The review's edges V4 adds (v4implementation §4, D-147): every review
   // change goes through the one update rule, which holds the queue of one,

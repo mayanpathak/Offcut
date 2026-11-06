@@ -9,10 +9,12 @@ import type {
   CheckoutRequest,
   EntitlementResponse,
   EventsBatch,
+  HealthResponse,
   MagicLinkRequest,
   MeResponse,
   NotifyMeRequest,
   SessionResponse,
+  TranscribeResponse,
   UrlResponse,
   UsageReceiptRequest,
   VerifyRequest,
@@ -66,12 +68,12 @@ function waking(onWaking: (() => void) | undefined): { onWaking?: () => void } {
 }
 
 /**
- * `GET /healthz`, to start waking a sleeping API as early as possible. The
- * answer is not used and a failure is not reported: the first real request
- * will show it.
+ * `GET /healthz`, to start waking a sleeping API as early as possible. Its
+ * answer also says whether cloud transcription will try (cloudimplementation
+ * D-366); a failure is not reported: the first real request will show it.
  */
-export function wake(): void {
-  void http.request({ method: "GET", path: "/healthz", retry: "cold-start" });
+export function checkHealth(): Promise<HttpResult<HealthResponse>> {
+  return http.request<HealthResponse>({ method: "GET", path: "/healthz", retry: "cold-start" });
 }
 
 /** `GET /healthz`, awaited: the API is up, or the reason it is not. */
@@ -171,6 +173,24 @@ async function authed<T>(req: HttpRequest): Promise<HttpResult<T>> {
     }
   }
   return mapped(second);
+}
+
+/** One attempt of `POST /transcribe` may take this long: the upload and the provider (D-374). */
+export const TRANSCRIBE_TIMEOUT_MS = 30_000;
+
+/**
+ * `POST /transcribe`: one clip's compressed sound, its words back (D-372).
+ * One attempt; a failure is the caller's to fall back from, never a retry.
+ */
+export function transcribeAudio(ogg: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<HttpResult<TranscribeResponse>> {
+  return authed<TranscribeResponse>({
+    method: "POST",
+    path: "/transcribe",
+    rawBody: { bytes: ogg, contentType: "audio/ogg" },
+    retry: "none",
+    attemptTimeoutMs: TRANSCRIBE_TIMEOUT_MS,
+    signal,
+  });
 }
 
 /** `POST /auth/logout`. It answers 204 for any cookie. */

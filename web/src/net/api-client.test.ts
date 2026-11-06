@@ -369,3 +369,47 @@ describe("the routes (§11.1, §11.2)", () => {
     expect(pathsOf("/me")).toHaveLength(2);
   });
 });
+
+describe("cloud transcription (cloudimplementation D-366, D-372, D-373)", () => {
+  it("checkHealth reads cloud_transcribe, and an older server's body has none", async () => {
+    answers.set("/healthz", [{ status: 200, body: { ok: true, version: "v", cloud_transcribe: true } }]);
+    const yes = await settled(api.checkHealth());
+    expect(yes.ok && yes.data.cloud_transcribe).toBe(true);
+    answers.set("/healthz", [{ status: 200, body: { ok: true, version: "old" } }]);
+    const old = await settled(api.checkHealth());
+    expect(old.ok && old.data.cloud_transcribe).toBeUndefined();
+  });
+
+  it("transcribeAudio sends the bytes once, as audio/ogg, with the token, and a 401 refreshes once", async () => {
+    const words = { words: [], duration_ms: 1_000, model: "groq:whisper-large-v3-turbo" };
+    answers.set("/transcribe", [UNAUTHORIZED, { status: 200, body: words }]);
+    answers.set("/auth/refresh", [{ status: 200, body: SESSION }]);
+    const ogg = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
+    const result = await settled(api.transcribeAudio(ogg, new AbortController().signal));
+
+    expect(result.ok && result.data).toEqual(words);
+    expect(pathsOf("/transcribe").map((call) => call.headers)).toEqual([
+      { "Content-Type": "audio/ogg", Authorization: "Bearer old-access" },
+      { "Content-Type": "audio/ogg", Authorization: "Bearer new-access" },
+    ]);
+    expect(pathsOf("/auth/refresh")).toHaveLength(1);
+  });
+
+  it("transcribeAudio's 503 transcribe_unavailable is one answer, read by its code, not a waking API", async () => {
+    answers.set("/transcribe", [{ status: 503, body: { code: "transcribe_unavailable", retry_after_secs: null } }, JSON_OK]);
+    const result = await settled(api.transcribeAudio(new Uint8Array([1]), new AbortController().signal));
+    expect(!result.ok && result.apiError?.code).toBe("transcribe_unavailable");
+    expect(pathsOf("/transcribe")).toHaveLength(1);
+  });
+
+  it("transcribeAudio waits 30 s for its one attempt, not 10", async () => {
+    answers.set("/transcribe", [{ hang: true }]);
+    const pending = api.transcribeAudio(new Uint8Array([1]), new AbortController().signal);
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(pathsOf("/transcribe")).toHaveLength(1);
+    const result = await settled(pending);
+    expect(!result.ok && result.failure.code).toBe("E_NET_TIMEOUT");
+    expect(Date.now()).toBeGreaterThanOrEqual(api.TRANSCRIBE_TIMEOUT_MS);
+    expect(pathsOf("/transcribe")).toHaveLength(1);
+  });
+});

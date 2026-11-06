@@ -656,6 +656,7 @@ offcut/
 │   │   ├── copy/
 │   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
 │   │   │   ├── landing.ts             the landing page's and the prices' copy, imported by messages.ts (designimplementation D-321)
+│   │   │   ├── transcription.ts       (cloud transcription) the card, the processing line and the two toasts (cloudimplementation D-380)
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
@@ -679,6 +680,7 @@ offcut/
 │   │   │   ├── preview-store.ts
 │   │   │   ├── export-store.ts
 │   │   │   ├── auth-store.ts
+│   │   │   ├── cloud-store.ts         (cloud transcription) what /healthz said, and this device's choice
 │   │   │   ├── entitlement-store.ts
 │   │   │   ├── entitlement-store.test.ts
 │   │   │   ├── ui-store.ts            selected tab, follow switch, editing word, toasts, save state (v4implementation §17)
@@ -703,6 +705,9 @@ offcut/
 │   │   │   ├── import-clip.ts
 │   │   │   ├── run-pipeline.ts
 │   │   │   ├── run-pipeline.test.ts
+│   │   │   ├── transcribe-cloud.ts    (cloud transcription) the only use-case that sends audio (D-372)
+│   │   │   ├── transcribe-cloud.test.ts
+│   │   │   ├── set-transcription.ts   (cloud transcription) the card's choice, for the page and the next visit
 │   │   │   ├── edit-word.ts
 │   │   │   ├── toggle-event.ts
 │   │   │   ├── set-style.ts
@@ -775,6 +780,7 @@ offcut/
 │   │   │   ├── creator-memory-repo.ts (V6.10)
 │   │   │   ├── render-cache-repo.ts
 │   │   │   ├── entitlement-repo.ts
+│   │   │   ├── prefs-repo.ts          (cloud transcription) the card's choice in the meta store (D-367)
 │   │   │   ├── receipt-outbox.ts
 │   │   │   └── receipt-outbox.test.ts
 │   │   ├── wasm/
@@ -871,6 +877,7 @@ offcut/
 │   │       ├── components/
 │   │       │   ├── CapabilityGate.tsx
 │   │       │   ├── DropZone.tsx
+│   │       │   ├── TranscriptionChoice.tsx  (cloud transcription) the drop zone's Cloud / On this device card
 │   │       │   ├── ModelDownloadPanel.tsx
 │   │       │   ├── ProcessingFeed.tsx
 │   │       │   ├── ProcessingCard.tsx     the processing state's card (v4implementation D-188)

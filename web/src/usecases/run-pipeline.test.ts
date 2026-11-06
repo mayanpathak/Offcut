@@ -4,7 +4,7 @@
 // held as a worker that sees its flag would. No real worker, timer or
 // network.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ClipInfo, EditPlan, EditState, Prosody, TimeMap, Transcript } from "../gen/domain";
 import * as clipStore from "../state/clip-store";
@@ -432,5 +432,117 @@ describe("review-update (D-147)", () => {
       await undo();
       expect(clip().edit.word_edits).toEqual({ 0: "John" });
     });
+  });
+});
+
+// --- Cloud transcription (cloudimplementation §8.5, §11.2) ---------------------
+// The existing cases above run with nobody signed in, so they never meet the
+// cloud path: this block turns it on, and checks the device path is today's
+// whenever any condition of D-368 is missing.
+
+const cloud = vi.hoisted((): { result: unknown; pending: Promise<unknown> | undefined; flags: { cloud_transcribe: boolean } } => ({
+  result: undefined,
+  pending: undefined,
+  flags: { cloud_transcribe: true },
+}));
+vi.mock("./transcribe-cloud", () => ({
+  transcribeInCloud: () => {
+    m.calls.push("cloud.transcribe");
+    return cloud.pending ?? Promise.resolve(cloud.result);
+  },
+}));
+vi.mock("../config/features", () => ({ FEATURES: cloud.flags }));
+
+const { useAuthStore } = await import("../state/auth-store");
+const { useCloudStore } = await import("../state/cloud-store");
+
+/** Today's calls, from the voice chain to the records: what a device run makes. */
+const DEVICE_CALLS = [
+  "media.extractAudio",
+  "audio.runChain",
+  "asr.load",
+  "asr.transcribe",
+  "asr.unload",
+  "audio.measureProsody",
+  "render.openSession",
+  "render.detect",
+  "render.rulesPlan",
+  "render.setScene",
+  "opfs.writeAudio",
+  "audio.assemble",
+  "opfs.writeProgram",
+  "transcriptRepo.put",
+  "editsRepo.put",
+];
+
+describe("runPipeline, cloud transcription", () => {
+  beforeEach(() => {
+    cloud.flags.cloud_transcribe = true;
+    cloud.result = { ok: TRANSCRIPT };
+    cloud.pending = undefined;
+    useAuthStore.setState({ status: "signed_in", email: "a@example.com", accessToken: "token" });
+    useCloudStore.setState({ availability: "available", choice: "cloud" });
+  });
+
+  afterEach(() => {
+    useAuthStore.setState({ status: "unknown", email: null, accessToken: null });
+    useCloudStore.setState({ availability: "unknown", choice: "cloud" });
+  });
+
+  it("a cloud transcript: no model is loaded, the rest of the run is today's", async () => {
+    await runPipeline(CLIP);
+    expect(m.calls).toEqual(DEVICE_CALLS.flatMap((call) => (call === "asr.load" ? ["cloud.transcribe"] : call.startsWith("asr.") ? [] : [call])));
+    expect(clip()).toMatchObject({ status: "ready", transcript: TRANSCRIPT, asrMode: "cloud" });
+    expect(clip().asrFallback).toBeUndefined();
+    const asr = named("stage_timing").filter((e) => (e.props as { stage: string }).stage === "asr");
+    expect(asr).toHaveLength(1);
+    expect(asr[0]?.props).toMatchObject({ asr_backend: "cloud" });
+  });
+
+  it("a fallback finishes on the device, in today's order, and says why", async () => {
+    cloud.result = { fallback: "limited" };
+    await runPipeline(CLIP);
+    const device = m.calls.filter((call) => call !== "cloud.transcribe");
+    expect(device).toEqual(DEVICE_CALLS);
+    expect(m.calls.indexOf("cloud.transcribe")).toBeLessThan(m.calls.indexOf("asr.load"));
+    expect(clip()).toMatchObject({ status: "ready", asrMode: "device", asrFallback: "limited" });
+    const asr = named("stage_timing").filter((e) => (e.props as { stage: string }).stage === "asr");
+    expect(asr.map((e) => (e.props as { asr_backend: string }).asr_backend)).toEqual(["webgpu"]);
+  });
+
+  it("no speech in the cloud's words refuses the clip as the device path does", async () => {
+    cloud.result = { rejected: "NoSpeech" };
+    await runPipeline(CLIP);
+    expect(clip()).toMatchObject({ status: "rejected", reject: "REJECT_NO_SPEECH" });
+    expect(m.calls).not.toContain("asr.load");
+  });
+
+  it.each([
+    ["signed out", () => useAuthStore.setState({ status: "anonymous", accessToken: null })],
+    ["a session still being restored", () => useAuthStore.setState({ status: "unknown", accessToken: null })],
+    ["the server said no", () => useCloudStore.setState({ availability: "unavailable" })],
+    ["the card on this device", () => useCloudStore.setState({ choice: "device" })],
+    ["the flag off", () => {
+      cloud.flags.cloud_transcribe = false;
+    }],
+  ])("%s: today's run exactly", async (_, condition) => {
+    condition();
+    await runPipeline(CLIP);
+    expect(m.calls).toEqual(DEVICE_CALLS);
+    expect(clip()).toMatchObject({ status: "ready", asrMode: "device" });
+  });
+
+  it("a cancel while the cloud answers ends accepted, with no device call", async () => {
+    const answered = deferred("cloud");
+    cloud.pending = answered.promise;
+    const run = runPipeline(CLIP);
+    await vi.waitFor(() => expect(m.calls).toContain("cloud.transcribe"));
+    const cancelled = cancelJob("pipeline");
+    // The use-case's request is aborted by the signal; it answers as a fallback.
+    answered.resolve({ fallback: "failed" });
+    await cancelled;
+    await run;
+    expect(clip()).toMatchObject({ status: "accepted", cancelled: true });
+    expect(m.calls).not.toContain("asr.load");
   });
 });

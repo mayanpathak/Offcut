@@ -360,3 +360,71 @@ Total: 303 s of audio.
 - ESLint, both `tsc`, and the file tree pass.
 
 **Found, not fixed.** None.
+
+## Entry 6 - 2026-11-06 - P165: cloud mode and fallback in the pipeline
+
+**What changed.**
+
+- **`net/http.ts` (REOPENED CONTRACT, D-373):** `HttpRequest` gains `rawBody` (bytes plus `audio/ogg`, sent as they are) and `attemptTimeoutMs`.
+  - **Differs from the plan:** `PROVIDER_FAILURES` is not changed. It maps to an `ErrorCode`, and a new one would touch the frozen `offcut-types`. With `retry: "none"` a 503 is already one answer, read by its `apiError.code`. `API_ERROR_CODES` gained the code in P162.
+- **`net/api-client.ts`:**
+  - `wake()` becomes `checkHealth()`: the same `GET /healthz` with `retry: "cold-start"`, its `HealthResponse` returned.
+  - `transcribeAudio(ogg, signal)`: through `authed()`, the raw Ogg body, one attempt of 30 s (`TRANSCRIBE_TIMEOUT_MS`), the pipeline's signal.
+- **State and storage:**
+  - `state/cloud-store.ts` holds `availability` (`unknown`, `available`, `unavailable`) and `choice` (`cloud`, `device`). `settledAvailability(ms)` waits for `/healthz` at most `ms`.
+  - `persistence/prefs-repo.ts` keeps the choice in the `meta` store under `META_KEYS.transcription`; absent or unreadable means `cloud`.
+  - `usecases/set-transcription.ts` writes the choice to both.
+  - `start-app.ts` step 6 sets `availability` from `checkHealth()` and loads the choice, awaiting neither.
+- **`usecases/transcribe-cloud.ts`** (D-372), the one use-case that sends audio:
+  1. waits up to 45 s for a waking API;
+  2. has `asr.worker` encode a copy of `pcm16`;
+  3. sends it once;
+  4. has the worker build the transcript from the words and another copy of `pcm16`, passing through D-382's guard;
+  5. reports `asr_cloud`, only once the server has said yes (D-377).
+  - Every failure is a fallback reason: `unavailable`, `limited`, `timeout`, `offline`, `unsupported` or `failed`. A cancel is answered without a report.
+- **`state/clip-store.ts`:** `asrMode` (D-378), and **also `asrFallback`**, set by `cloudFellBack()`. Use-cases may not import copy, so the interface shows the toast from it (P166). Both are set only while processing.
+- **`usecases/run-pipeline.ts`** (§8.5):
+  - `chooseMode()` picks cloud only with the flag on, a server that has not said no, the card on Cloud, and a person `signed_in` **now**.
+  - **Differs from the plan (D-368): no 3 s wait** for a session being restored. Every existing pipeline test runs with the session unknown, and a session still restoring means a cold API, when availability is unknown anyway.
+  - In cloud mode the model is not asked for (D-369).
+  - On a fallback, `cloudFellBack()` is called, then the model is asked for (with `ModelDownloadPanel` while it downloads), then today's path runs.
+  - `stage_timing` for `asr` says `cloud` on a cloud success.
+- **The device path moved, it did not change.** Today's step 6 is now `modelOrEnd()` and steps 7-8 are `hearOnDevice()`. A script compared the old file's blocks with the new file's: steps 3-5, step 6, steps 7-8 (`try`…`catch`) and steps 9-14 are present byte for byte. Step 6's `return;` became `return false;`, the helper's way to say the run ended.
+- **`eslint.config.js`:** one edge, `run-pipeline.ts` to `transcribe-cloud.ts`.
+- **TS §5:** rows for `cloud-store.ts`, `prefs-repo.ts`, `transcribe-cloud.ts` and its test, and `set-transcription.ts`.
+
+**Tests.**
+
+- **`run-pipeline.test.ts`:**
+  - **Its 20 existing cases pass unchanged.** The file's import line gains `afterEach`; no case was edited.
+  - 9 new cases in their own block:
+    - a cloud success: no `asr.*` call, the rest of the run is today's, `asr_backend: "cloud"`;
+    - a fallback: today's calls in today's order after the cloud call, with `asrFallback: "limited"`;
+    - no speech in the cloud's words;
+    - five conditions that each give today's run exactly: signed out, a session being restored, the server said no, the card on device, the flag off;
+    - a cancel while the cloud answers ends `accepted`, with no device call.
+- **`transcribe-cloud.test.ts`, 15 cases:**
+  - encoding a copy, sending once, building from the words, `ok`;
+  - six answers to their outcomes;
+  - unsupported;
+  - a worker failure;
+  - no speech;
+  - a server that said no: nothing is sent and no analytics value either;
+  - a waking API: going on when it says yes, and giving up at 45 s, both on a fake clock;
+  - a cancel;
+  - a cancelled worker call.
+- **`api-client.test.ts`, 4 cases:**
+  - `checkHealth` with and without the field;
+  - `transcribeAudio`'s headers, and one refresh on 401;
+  - a 503 `transcribe_unavailable` is one answer;
+  - a 30 s attempt.
+- **`http.test.ts`, 2 cases:** a raw body, and its own attempt timeout.
+- **Vitest 568** (538 + 30). ESLint and both `tsc` pass.
+
+**Tier 2** (keyed `pnpm build:e2e`; the protected specs that run the pipeline, unchanged): see below.
+
+**Tier 2 result.** Keyed `pnpm build:e2e`, then `pnpm e2e:media pipeline-preview.spec.ts model-download.spec.ts cancel.spec.ts` (the media project runs one worker): **30 passed in 11.9 min**, no case edited. The fake's `/healthz` has no `cloud_transcribe`, so every run took the device path.
+
+**Push 1** (D-338), CI not waited on.
+
+**Found, not fixed.** None.

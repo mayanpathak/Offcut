@@ -23,6 +23,13 @@ export type HttpRequest = {
   /** Relative to `/api/v1`; never an absolute URL. */
   path: `/${string}`;
   body?: unknown;
+  /**
+   * Bytes sent as they are, in place of a JSON `body`: the one compressed
+   * audio file of `POST /transcribe` (cloudimplementation D-373).
+   */
+  rawBody?: { bytes: Uint8Array<ArrayBuffer>; contentType: "audio/ogg" };
+  /** How long one attempt may take. The default is `API_TIMEOUT_MS`. */
+  attemptTimeoutMs?: number;
   /** `"cold-start"` keeps trying while the API may be waking; `"none"` makes one attempt. */
   retry: "cold-start" | "none";
   /** How long `"cold-start"` keeps trying. The default is `API_COLD_START_BUDGET_MS`. */
@@ -180,7 +187,10 @@ export function createHttp(deps: HttpDeps): { request<T>(req: HttpRequest): Prom
       signal: req.signal === undefined ? timeout.signal : AbortSignal.any([timeout.signal, req.signal]),
     };
     const headers: Record<string, string> = {};
-    if (req.body !== undefined) {
+    if (req.rawBody !== undefined) {
+      headers["Content-Type"] = req.rawBody.contentType;
+      init.body = req.rawBody.bytes;
+    } else if (req.body !== undefined) {
       headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(req.body);
     }
@@ -241,7 +251,7 @@ export function createHttp(deps: HttpDeps): { request<T>(req: HttpRequest): Prom
 
     try {
       for (let made = 0; ; made += 1) {
-        const timeoutMs = Math.min(API_TIMEOUT_MS, deadline - deps.now());
+        const timeoutMs = Math.min(req.attemptTimeoutMs ?? API_TIMEOUT_MS, deadline - deps.now());
         const { again, result } = await attempt<T>(req, timeoutMs);
         const waitMs = RETRY_WAITS_MS[made] ?? MAX_RETRY_WAIT_MS;
         // Try again only while the next attempt would start inside the budget.

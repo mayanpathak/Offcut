@@ -6,9 +6,12 @@
 // stages around the calls (v2implementation D-35). A run can be cancelled
 // (v4implementation D-152): it stops at its next step and ends with the clip
 // `accepted`. Nothing here calls the API (INV-3), and nothing of what was
-// said leaves in an analytics event.
+// said leaves in an analytics event. The one exception is cloud mode
+// (cloudimplementation §8.5, D-375): `transcribe-cloud.ts` sends the clip's
+// sound, and any failure there finishes the clip on the device.
 
 import { track } from "../analytics/client";
+import { FEATURES } from "../config/features";
 import type { DownloadOutcome } from "../gen/api";
 import type {
   ClipId,
@@ -25,10 +28,13 @@ import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
 import * as transcriptRepo from "../persistence/transcript-repo";
 import * as clipStore from "../state/clip-store";
+import { useAuthStore } from "../state/auth-store";
+import { useCloudStore } from "../state/cloud-store";
 import { useModelStore } from "../state/model-store";
 import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { failureShown, signalFor } from "./cancel-job";
+import { transcribeInCloud } from "./transcribe-cloud";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -222,44 +228,32 @@ function releaseAudio(run: Run): void {
 }
 
 /**
- * Steps 2 to 14 of v3implementation §15.2. A failure is thrown; `runPipeline`
- * stores it. A cancel is thrown as `RunCancelled`, after the chain has
- * settled, as a failure is.
+ * Cloud or device for this run (D-368): cloud only with the flag on, a
+ * server that has not said no, the card on "Cloud", and a person signed in
+ * now. Nothing waits here: a session still being restored is not signed in.
  */
-async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortSignal): Promise<void> {
-  const { clipInfo, edit } = clipStore.useClipStore.getState();
-  if (clipInfo === undefined) {
-    throw new Error("runPipeline: the clip has no ClipInfo");
+function chooseMode(): "cloud" | "device" {
+  if (!FEATURES.cloud_transcribe) {
+    return "device";
   }
-
-  // 2. The model, beside the audio (C-3). The clip waits for it at step 6.
-  const model = modelReady();
-  if (useModelStore.getState().status !== "ready") {
-    clipStore.processing("probe_audio", true);
+  const { availability, choice } = useCloudStore.getState();
+  if (availability === "unavailable" || choice !== "cloud") {
+    return "device";
   }
+  return useAuthStore.getState().status === "signed_in" ? "cloud" : "device";
+}
 
-  // 3. (A) The audio, at both rates. The stage began with the import (D-35).
-  const audio = answered(await pool.media.extractAudio({ clipId }), run.stage, signal);
-  track({ name: "stage_timing", props: { stage: "probe_audio", duration_ms: capMs(performance.now() - startedAt) } });
-  const pcm16 = owned(audio.pcm16);
-  const pcm48 = owned(audio.pcm48);
-
-  // 4, 5. (B2) The voice chain runs beside the model wait and ASR, and owns
-  //    `pcm48` from here (D-90). Every path below waits for it.
-  clipStore.pushFeed({ kind: "cleaning_voice" });
-  const chainAt = performance.now();
-  run.audioStarted = true;
-  const chain = settle(
-    pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain", signal)),
-  ).then((c) => {
-    if ("ok" in c) {
-      track({ name: "stage_timing", props: { stage: "audio_chain", duration_ms: capMs(c.at - chainAt) } });
-    }
-    return c;
-  });
-
-  // 6. A model that cannot be had ends the clip, once the chain has settled.
-  //    A download that was cancelled ends the run as cancelled (D-152).
+/**
+ * 6. A model that cannot be had ends the clip, once the chain has settled.
+ * A download that was cancelled ends the run as cancelled (D-152). `false`:
+ * the run ended here.
+ */
+async function modelOrEnd(
+  model: Promise<AppFailure | null>,
+  chain: Promise<Settled<unknown>>,
+  run: Run,
+  signal: AbortSignal,
+): Promise<boolean> {
   const modelFailure = await model;
   if (signal.aborted) {
     await chain;
@@ -270,11 +264,21 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     releaseAudio(run);
     clipStore.failed(modelFailure);
     failureShown(modelFailure);
-    return;
+    return false;
   }
+  return true;
+}
 
-  // 7, 8. (B1, C) The model is loaded for this clip, hears it, and gives its
-  //    memory back before the render session opens (INV-12).
+/**
+ * 7, 8. (B1, C) The model is loaded for this clip, hears it, and gives its
+ * memory back before the render session opens (INV-12).
+ */
+async function hearOnDevice(
+  pcm16: Float32Array<ArrayBuffer>,
+  chain: Promise<Settled<unknown>>,
+  run: Run,
+  signal: AbortSignal,
+): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }> {
   run.stage = "asr";
   clipStore.processing("asr", false);
   let heard: { ok: Transcript } | { rejected: "NoSpeech" };
@@ -310,6 +314,86 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     const c = await chain;
     await pool.asr.unload().catch(() => undefined);
     throw "failure" in c && c.at < failedAt && failureOf(error) !== null ? c.failure : error;
+  }
+  return heard;
+}
+
+/**
+ * Steps 2 to 14 of v3implementation §15.2. A failure is thrown; `runPipeline`
+ * stores it. A cancel is thrown as `RunCancelled`, after the chain has
+ * settled, as a failure is.
+ */
+async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortSignal): Promise<void> {
+  const { clipInfo, edit } = clipStore.useClipStore.getState();
+  if (clipInfo === undefined) {
+    throw new Error("runPipeline: the clip has no ClipInfo");
+  }
+
+  // 1b. Cloud or device, once for this run (D-368).
+  const mode = chooseMode();
+  clipStore.setAsrMode(mode);
+
+  // 2. The model, beside the audio (C-3). The clip waits for it at step 6.
+  //    In cloud mode it is not wanted, and not downloaded (D-369).
+  let model = mode === "device" ? modelReady() : undefined;
+  if (model !== undefined && useModelStore.getState().status !== "ready") {
+    clipStore.processing("probe_audio", true);
+  }
+
+  // 3. (A) The audio, at both rates. The stage began with the import (D-35).
+  const audio = answered(await pool.media.extractAudio({ clipId }), run.stage, signal);
+  track({ name: "stage_timing", props: { stage: "probe_audio", duration_ms: capMs(performance.now() - startedAt) } });
+  const pcm16 = owned(audio.pcm16);
+  const pcm48 = owned(audio.pcm48);
+
+  // 4, 5. (B2) The voice chain runs beside the model wait and ASR, and owns
+  //    `pcm48` from here (D-90). Every path below waits for it.
+  clipStore.pushFeed({ kind: "cleaning_voice" });
+  const chainAt = performance.now();
+  run.audioStarted = true;
+  const chain = settle(
+    pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain", signal)),
+  ).then((c) => {
+    if ("ok" in c) {
+      track({ name: "stage_timing", props: { stage: "audio_chain", duration_ms: capMs(c.at - chainAt) } });
+    }
+    return c;
+  });
+
+  // 7c. (cloud) The clip's sound is sent, its words come back (D-372). Any
+  //     failure falls back, once, to the device path below (D-348, D-369).
+  let heard: { ok: Transcript } | { rejected: "NoSpeech" } | undefined;
+  if (mode === "cloud") {
+    run.stage = "asr";
+    clipStore.processing("asr", false);
+    const asrStartedAt = performance.now();
+    const cloud = await transcribeInCloud(pcm16, signal);
+    if (signal.aborted) {
+      await chain;
+      throw new RunCancelled();
+    }
+    if ("fallback" in cloud) {
+      clipStore.cloudFellBack(cloud.fallback);
+      model = modelReady();
+      if (useModelStore.getState().status !== "ready") {
+        clipStore.processing("asr", true);
+      }
+    } else {
+      heard = cloud;
+      track({
+        name: "stage_timing",
+        props: { stage: "asr", duration_ms: capMs(performance.now() - asrStartedAt), asr_backend: "cloud" },
+      });
+    }
+  }
+
+  if (heard === undefined) {
+    // 6. The device path, as before cloud transcription.
+    if (!(await modelOrEnd(model ?? modelReady(), chain, run, signal))) {
+      return;
+    }
+    // 7, 8.
+    heard = await hearOnDevice(pcm16, chain, run, signal);
   }
 
   // 9. Too few words to caption: once the chain has settled, the clip cannot
