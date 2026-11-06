@@ -11,7 +11,8 @@ use offcut_api::mail::MailError;
 use offcut_api::mail::smtp_mailer::SmtpMailer;
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
-use offcut_api::transcribe::provider::UnconfiguredTranscriber;
+use offcut_api::transcribe::groq::GroqTranscriber;
+use offcut_api::transcribe::provider::{TranscribeError, Transcriber, UnconfiguredTranscriber};
 use offcut_api::{analytics, db, log, router};
 use tokio::net::TcpListener;
 
@@ -56,6 +57,8 @@ enum ServeError {
     Mail(#[from] MailError),
     #[error("cannot set up billing: {0}")]
     Billing(#[from] BillingError),
+    #[error("cannot set up transcription: {0}")]
+    Transcribe(#[from] TranscribeError),
     #[error("cannot listen or serve: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -71,6 +74,13 @@ async fn serve(config: Config) -> Result<(), ServeError> {
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
     let config = Arc::new(config);
     let billing = Arc::new(DodoBilling::new(config.clone())?);
+    // The provider only when the switch is on; off, the route refuses and
+    // nothing is ever sent (cloudimplementation D-357, D-381).
+    let transcriber: Arc<dyn Transcriber> = if config.transcribe_enabled {
+        Arc::new(GroqTranscriber::new(&config)?)
+    } else {
+        Arc::new(UnconfiguredTranscriber)
+    };
     let state = AppState {
         db: pool,
         config,
@@ -78,8 +88,7 @@ async fn serve(config: Config) -> Result<(), ServeError> {
         mailer,
         billing,
         fair_use: Arc::default(),
-        // P163 builds the provider when TRANSCRIBE_ENABLED=true.
-        transcriber: Arc::new(UnconfiguredTranscriber),
+        transcriber,
         transcribe_budget: Arc::default(),
     };
     // The rate limiter needs the peer address of each connection.

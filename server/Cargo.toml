@@ -19,7 +19,7 @@ offcut-api-types = { workspace = true }
 offcut-entitlement = { workspace = true, features = ["sign"] }
 offcut-types = { workspace = true }
 # TLS through `rustls` on `ring`, the one provider of this tree (v6implementation D-281).
-reqwest = { workspace = true, features = ["json", "query", "rustls-no-provider"] }
+reqwest = { workspace = true, features = ["json", "query", "multipart", "rustls-no-provider"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

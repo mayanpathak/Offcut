@@ -236,3 +236,56 @@ Total: 303 s of audio.
 - Vitest 522.
 
 **Found, not fixed.** None.
+
+## Entry 4 - 2026-11-06 - P163: the Groq adapter, punctuation, one real call
+
+**What changed.**
+
+- **`server/Cargo.toml`: `reqwest` gains `multipart`** (D-358). `cargo deny check` stays clean (advisories, bans, licences, sources). It brings `mime_guess` 2.0.5 and `unicase` 2.10.0, both MIT/Apache-2.0. `cargo tree` shows no `native-tls`, `openssl` or `aws-lc`, so the hand-written fallback was not needed. `Cargo.lock` +18 lines.
+- **`transcribe/align.rs`** (D-360).
+  - Word keys are lower-cased letters and digits.
+  - Five rules, in order:
+    1. a word with no key is kept as given;
+    2. an equal token gives the word its written form;
+    3. a token spread over 2-4 words: each word keeps its text and the last gets the token's trailing mark;
+    4. the word's own token within the next 3 is taken, and the tokens before it are passed over;
+    5. otherwise the word is kept as given.
+  - Never adds, drops or reorders a word, and never touches a time. Nine unit tests ("$12,000.", "40%", "don't", "e-mail.", "U.S.", repeated words, missing words and tokens, a number written as words, empty inputs).
+  - It is an identity on Groq's real words (asserted on the fixture).
+- **`transcribe/groq.rs`** (§7.4, D-359).
+  - The request: multipart with `file` (`audio.ogg`, `audio/ogg`, streamed with its length), `model`, `response_format=verbose_json`, `timestamp_granularities[]=word`, `language=en`, `temperature=0`, and a bearer. The timeout is 25 s.
+  - Statuses 400, 413, 415 and 422 map to `BadAudio`. Any other non-2xx, a timeout, a network failure or an unreadable body maps to `Unavailable`.
+  - **An error body is never read.** The log line names a kind and the status only, so no provider text can reach a log by construction. The plan's extra `log_redaction.rs` case through the mock was replaced by this rule (differs from the plan).
+  - `parse` is pure:
+    - seconds become rounded milliseconds;
+    - a non-finite or negative time drops the word, counted and logged as a number;
+    - `duration` falls back to the audio's own length;
+    - `model` is `groq:whisper-large-v3-turbo`.
+- **`main.rs`:** `GroqTranscriber::new` when `TRANSCRIBE_ENABLED=true`, else `UnconfiguredTranscriber`. A client that cannot be built stops the boot (`ServeError::Transcribe`), as billing does.
+- **`groq_adapter.rs`**, 5 cases, with no network:
+  - the reference clip's answer: 129 words, the first seven with their punctuation, the first times 380-600 ms, times rising, the last end 60,480 ms (the invented "Thank you.", which the client's guard drops);
+  - every recorded answer parses (Opus with segments, FLAC, tone);
+  - against a local axum mock: the exact form fields and the file's bytes unchanged; 429, 500, 503 and 401 give `Unavailable`; 400 and 413 give `BadAudio`; a body that is not JSON and a 2 s stall against a 0.5 s timeout give `Unavailable`;
+  - a port with nothing listening gives `Unavailable`.
+
+**The one real call through the real code** (F-1; G 3.3):
+
+- **The call:** a temporary `server/tests/zz_groq_live.rs`, run once with `.env` and `.env.deploy` sourced in a subshell and `TRANSCRIBE_ENABLED=true`. It posted `ref32.ogg` (60 s of the reference clip's audio) through `GroqTranscriber::transcribe`.
+- **The answer:** 129 words, 60,000 ms, the test finished in 2.6 s.
+- **The fixture:** it wrote `web/tests-e2e/fixtures/cloud/speech_60s_portrait.json` (10,672 bytes, a `TranscribeResponse`; Script A's words only).
+- **Cleanup:** the file was deleted, and no word was printed.
+- **Total real audio so far:** 363 s.
+
+**TS §5:**
+
+- `tests-e2e/cloud-transcribe.spec.ts` and `tests-e2e/fixtures/cloud/`;
+- P164's four `workers/asr/` rows: `check-file-tree.mjs` reads untracked files too, and they were already in the tree;
+- `features.ts` loses "(V6.1)".
+
+**Checks.**
+
+- `cargo test -p offcut-api --lib --test groq_adapter --test transcribe_route --test log_redaction`: 108 + 5 + 12 + 1, all pass.
+- `cargo clippy --workspace --all-targets -- -D warnings` clean.
+- `cargo fmt` applied.
+
+**Found, not fixed.** None.

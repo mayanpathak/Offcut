@@ -651,7 +651,7 @@ offcut/
 │   │   │   ├── pricing.ts             [ONLY] display prices (PS §11)
 │   │   │   ├── model-manifest.json    model files: path, size, sha256
 │   │   │   ├── models/                (V6.5, V6.11) one manifest per extra model: face, person; the ASR manifest stays above (DC-4)
-│   │   │   ├── features.ts            [ONLY] (V6.1) FeatureFlags from a Vite define (§41.3)
+│   │   │   ├── features.ts            [ONLY] FeatureFlags from a Vite define (§41.3); built by the cloud transcription release with `cloud_transcribe`, V6.1 adds its own
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
 │   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
@@ -794,6 +794,10 @@ offcut/
 │   │   │   ├── asr/whisper-runtime.ts
 │   │   │   ├── asr/model-cache-adapter.ts   serves model files from OPFS; blocks remote loads
 │   │   │   ├── asr/word-timestamps.ts
+│   │   │   ├── asr/ogg-opus.ts            (cloud transcription) Opus packets into an Ogg file; the end trimmed to the clip
+│   │   │   ├── asr/ogg-opus.test.ts
+│   │   │   ├── asr/cloud-audio.ts         (cloud transcription) pcm16 to Ogg Opus with WebCodecs; the silence guard (D-382)
+│   │   │   ├── asr/cloud-audio.test.ts
 │   │   │   ├── asr/vision-runtime.ts      (V6.5) the face detector session (DC-10)
 │   │   │   ├── asr/person-runtime.ts      (V6.11) the person-matte session (DC-10)
 │   │   │   ├── audio.worker.ts
@@ -930,6 +934,8 @@ offcut/
 │       ├── timeline-preserved.spec.ts
 │       ├── checkout.spec.ts
 │       ├── cancel.spec.ts
+│       ├── cloud-transcribe.spec.ts   (cloud transcription) the cloud path, fallbacks, the card, identity with the switch on
+│       ├── fixtures/cloud/            the TranscribeResponse the real adapter gave for speech_60s_portrait's audio (P163)
 │       ├── screens.spec.ts            D1-only screen capture for the design reviews; never in CI (v4implementation D-191)
 │       ├── restore.spec.ts
 │       ├── failure-recovery.spec.ts

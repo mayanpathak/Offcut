@@ -1,0 +1,651 @@
+{
+  "words": [
+    {
+      "text": "Last",
+      "start_ms": 380,
+      "end_ms": 600
+    },
+    {
+      "text": "year,",
+      "start_ms": 600,
+      "end_ms": 1160
+    },
+    {
+      "text": "I",
+      "start_ms": 1160,
+      "end_ms": 1260
+    },
+    {
+      "text": "almost",
+      "start_ms": 1260,
+      "end_ms": 1600
+    },
+    {
+      "text": "quit",
+      "start_ms": 1600,
+      "end_ms": 2000
+    },
+    {
+      "text": "making",
+      "start_ms": 2000,
+      "end_ms": 2460
+    },
+    {
+      "text": "videos.",
+      "start_ms": 2460,
+      "end_ms": 3060
+    },
+    {
+      "text": "Editing",
+      "start_ms": 3320,
+      "end_ms": 3720
+    },
+    {
+      "text": "ate",
+      "start_ms": 3720,
+      "end_ms": 3980
+    },
+    {
+      "text": "every",
+      "start_ms": 3980,
+      "end_ms": 5120
+    },
+    {
+      "text": "evening",
+      "start_ms": 5120,
+      "end_ms": 5760
+    },
+    {
+      "text": "and",
+      "start_ms": 5760,
+      "end_ms": 5980
+    },
+    {
+      "text": "almost",
+      "start_ms": 5980,
+      "end_ms": 6360
+    },
+    {
+      "text": "nobody",
+      "start_ms": 6360,
+      "end_ms": 6780
+    },
+    {
+      "text": "watched.",
+      "start_ms": 6780,
+      "end_ms": 7380
+    },
+    {
+      "text": "So",
+      "start_ms": 8000,
+      "end_ms": 8160
+    },
+    {
+      "text": "I",
+      "start_ms": 8160,
+      "end_ms": 8320
+    },
+    {
+      "text": "added",
+      "start_ms": 8320,
+      "end_ms": 8540
+    },
+    {
+      "text": "it",
+      "start_ms": 8540,
+      "end_ms": 8700
+    },
+    {
+      "text": "up.",
+      "start_ms": 8700,
+      "end_ms": 8980
+    },
+    {
+      "text": "I",
+      "start_ms": 9460,
+      "end_ms": 9600
+    },
+    {
+      "text": "had",
+      "start_ms": 9600,
+      "end_ms": 9860
+    },
+    {
+      "text": "spent",
+      "start_ms": 9860,
+      "end_ms": 10300
+    },
+    {
+      "text": "3000",
+      "start_ms": 10300,
+      "end_ms": 10760
+    },
+    {
+      "text": "hours",
+      "start_ms": 10760,
+      "end_ms": 11580
+    },
+    {
+      "text": "editing",
+      "start_ms": 11580,
+      "end_ms": 12020
+    },
+    {
+      "text": "by",
+      "start_ms": 12020,
+      "end_ms": 12240
+    },
+    {
+      "text": "hand.",
+      "start_ms": 12240,
+      "end_ms": 12580
+    },
+    {
+      "text": "This",
+      "start_ms": 13100,
+      "end_ms": 13320
+    },
+    {
+      "text": "is",
+      "start_ms": 13320,
+      "end_ms": 13460
+    },
+    {
+      "text": "literally",
+      "start_ms": 13460,
+      "end_ms": 14020
+    },
+    {
+      "text": "brutal",
+      "start_ms": 14020,
+      "end_ms": 15120
+    },
+    {
+      "text": "way",
+      "start_ms": 15120,
+      "end_ms": 15420
+    },
+    {
+      "text": "to",
+      "start_ms": 15420,
+      "end_ms": 15620
+    },
+    {
+      "text": "make",
+      "start_ms": 15620,
+      "end_ms": 15940
+    },
+    {
+      "text": "anything.",
+      "start_ms": 15940,
+      "end_ms": 16360
+    },
+    {
+      "text": "The",
+      "start_ms": 16960,
+      "end_ms": 17140
+    },
+    {
+      "text": "slow",
+      "start_ms": 17140,
+      "end_ms": 17480
+    },
+    {
+      "text": "part",
+      "start_ms": 17480,
+      "end_ms": 17760
+    },
+    {
+      "text": "was",
+      "start_ms": 17760,
+      "end_ms": 17960
+    },
+    {
+      "text": "always",
+      "start_ms": 17960,
+      "end_ms": 18380
+    },
+    {
+      "text": "a",
+      "start_ms": 18380,
+      "end_ms": 18600
+    },
+    {
+      "text": "rough",
+      "start_ms": 18600,
+      "end_ms": 18780
+    },
+    {
+      "text": "cut.",
+      "start_ms": 18780,
+      "end_ms": 19160
+    },
+    {
+      "text": "Then",
+      "start_ms": 20860,
+      "end_ms": 21100
+    },
+    {
+      "text": "I",
+      "start_ms": 21100,
+      "end_ms": 21480
+    },
+    {
+      "text": "checked",
+      "start_ms": 21480,
+      "end_ms": 21780
+    },
+    {
+      "text": "my",
+      "start_ms": 21780,
+      "end_ms": 21960
+    },
+    {
+      "text": "workflow",
+      "start_ms": 21960,
+      "end_ms": 22340
+    },
+    {
+      "text": "and",
+      "start_ms": 22340,
+      "end_ms": 22800
+    },
+    {
+      "text": "the",
+      "start_ms": 22800,
+      "end_ms": 22980
+    },
+    {
+      "text": "rough",
+      "start_ms": 22980,
+      "end_ms": 23300
+    },
+    {
+      "text": "cut",
+      "start_ms": 23300,
+      "end_ms": 23660
+    },
+    {
+      "text": "went",
+      "start_ms": 23660,
+      "end_ms": 24100
+    },
+    {
+      "text": "from",
+      "start_ms": 24100,
+      "end_ms": 24400
+    },
+    {
+      "text": "90",
+      "start_ms": 24400,
+      "end_ms": 25040
+    },
+    {
+      "text": "minutes",
+      "start_ms": 25040,
+      "end_ms": 25300
+    },
+    {
+      "text": "to",
+      "start_ms": 25300,
+      "end_ms": 25640
+    },
+    {
+      "text": "10",
+      "start_ms": 25640,
+      "end_ms": 25820
+    },
+    {
+      "text": "minutes.",
+      "start_ms": 25820,
+      "end_ms": 26240
+    },
+    {
+      "text": "That",
+      "start_ms": 27760,
+      "end_ms": 28060
+    },
+    {
+      "text": "change",
+      "start_ms": 28060,
+      "end_ms": 28360
+    },
+    {
+      "text": "gave",
+      "start_ms": 28360,
+      "end_ms": 28620
+    },
+    {
+      "text": "me",
+      "start_ms": 28620,
+      "end_ms": 28820
+    },
+    {
+      "text": "my",
+      "start_ms": 28820,
+      "end_ms": 29040
+    },
+    {
+      "text": "evenings",
+      "start_ms": 29040,
+      "end_ms": 29440
+    },
+    {
+      "text": "back.",
+      "start_ms": 29440,
+      "end_ms": 29980
+    },
+    {
+      "text": "And",
+      "start_ms": 30460,
+      "end_ms": 30600
+    },
+    {
+      "text": "honestly,",
+      "start_ms": 30600,
+      "end_ms": 31340
+    },
+    {
+      "text": "it",
+      "start_ms": 31340,
+      "end_ms": 31780
+    },
+    {
+      "text": "was",
+      "start_ms": 31780,
+      "end_ms": 32020
+    },
+    {
+      "text": "not",
+      "start_ms": 32020,
+      "end_ms": 32580
+    },
+    {
+      "text": "luck.",
+      "start_ms": 32580,
+      "end_ms": 33180
+    },
+    {
+      "text": "There",
+      "start_ms": 33700,
+      "end_ms": 33940
+    },
+    {
+      "text": "are",
+      "start_ms": 33940,
+      "end_ms": 34520
+    },
+    {
+      "text": "three",
+      "start_ms": 34520,
+      "end_ms": 35060
+    },
+    {
+      "text": "reasons",
+      "start_ms": 35060,
+      "end_ms": 35420
+    },
+    {
+      "text": "it",
+      "start_ms": 35420,
+      "end_ms": 35940
+    },
+    {
+      "text": "worked.",
+      "start_ms": 35940,
+      "end_ms": 36560
+    },
+    {
+      "text": "First,",
+      "start_ms": 36780,
+      "end_ms": 37300
+    },
+    {
+      "text": "the",
+      "start_ms": 37300,
+      "end_ms": 37660
+    },
+    {
+      "text": "captions",
+      "start_ms": 37660,
+      "end_ms": 38060
+    },
+    {
+      "text": "write",
+      "start_ms": 38060,
+      "end_ms": 38620
+    },
+    {
+      "text": "themselves.",
+      "start_ms": 38620,
+      "end_ms": 39400
+    },
+    {
+      "text": "Second,",
+      "start_ms": 39700,
+      "end_ms": 40240
+    },
+    {
+      "text": "the",
+      "start_ms": 40240,
+      "end_ms": 40580
+    },
+    {
+      "text": "numbers",
+      "start_ms": 40580,
+      "end_ms": 40980
+    },
+    {
+      "text": "animate",
+      "start_ms": 40980,
+      "end_ms": 41700
+    },
+    {
+      "text": "automatically.",
+      "start_ms": 41700,
+      "end_ms": 42700
+    },
+    {
+      "text": "Third,",
+      "start_ms": 42940,
+      "end_ms": 43360
+    },
+    {
+      "text": "everything",
+      "start_ms": 43360,
+      "end_ms": 43820
+    },
+    {
+      "text": "runs",
+      "start_ms": 43820,
+      "end_ms": 44160
+    },
+    {
+      "text": "on",
+      "start_ms": 44160,
+      "end_ms": 44520
+    },
+    {
+      "text": "my",
+      "start_ms": 44520,
+      "end_ms": 44840
+    },
+    {
+      "text": "laptop.",
+      "start_ms": 44840,
+      "end_ms": 45180
+    },
+    {
+      "text": "I",
+      "start_ms": 45740,
+      "end_ms": 45840
+    },
+    {
+      "text": "record",
+      "start_ms": 45840,
+      "end_ms": 46140
+    },
+    {
+      "text": "a",
+      "start_ms": 46140,
+      "end_ms": 46300
+    },
+    {
+      "text": "clip,",
+      "start_ms": 46300,
+      "end_ms": 46680
+    },
+    {
+      "text": "drop",
+      "start_ms": 46680,
+      "end_ms": 47000
+    },
+    {
+      "text": "it",
+      "start_ms": 47000,
+      "end_ms": 47200
+    },
+    {
+      "text": "in,",
+      "start_ms": 47200,
+      "end_ms": 47540
+    },
+    {
+      "text": "and",
+      "start_ms": 47540,
+      "end_ms": 48120
+    },
+    {
+      "text": "read",
+      "start_ms": 48120,
+      "end_ms": 48580
+    },
+    {
+      "text": "the",
+      "start_ms": 48580,
+      "end_ms": 48840
+    },
+    {
+      "text": "result.",
+      "start_ms": 48840,
+      "end_ms": 49500
+    },
+    {
+      "text": "If",
+      "start_ms": 49300,
+      "end_ms": 49560
+    },
+    {
+      "text": "a",
+      "start_ms": 49560,
+      "end_ms": 49960
+    },
+    {
+      "text": "caption",
+      "start_ms": 49960,
+      "end_ms": 50360
+    },
+    {
+      "text": "is",
+      "start_ms": 50360,
+      "end_ms": 50620
+    },
+    {
+      "text": "wrong,",
+      "start_ms": 50620,
+      "end_ms": 50920
+    },
+    {
+      "text": "I",
+      "start_ms": 50920,
+      "end_ms": 51780
+    },
+    {
+      "text": "fix",
+      "start_ms": 51780,
+      "end_ms": 52120
+    },
+    {
+      "text": "the",
+      "start_ms": 52120,
+      "end_ms": 52340
+    },
+    {
+      "text": "word",
+      "start_ms": 52340,
+      "end_ms": 52520
+    },
+    {
+      "text": "and",
+      "start_ms": 52520,
+      "end_ms": 52720
+    },
+    {
+      "text": "move",
+      "start_ms": 52720,
+      "end_ms": 52900
+    },
+    {
+      "text": "on.",
+      "start_ms": 52900,
+      "end_ms": 53160
+    },
+    {
+      "text": "Now,",
+      "start_ms": 54140,
+      "end_ms": 54520
+    },
+    {
+      "text": "I",
+      "start_ms": 54520,
+      "end_ms": 54840
+    },
+    {
+      "text": "publish",
+      "start_ms": 54840,
+      "end_ms": 55300
+    },
+    {
+      "text": "every",
+      "start_ms": 55300,
+      "end_ms": 55720
+    },
+    {
+      "text": "wiki",
+      "start_ms": 55720,
+      "end_ms": 56000
+    },
+    {
+      "text": "instead",
+      "start_ms": 56000,
+      "end_ms": 57440
+    },
+    {
+      "text": "of",
+      "start_ms": 57440,
+      "end_ms": 57780
+    },
+    {
+      "text": "every",
+      "start_ms": 57780,
+      "end_ms": 58240
+    },
+    {
+      "text": "month.",
+      "start_ms": 58240,
+      "end_ms": 58560
+    },
+    {
+      "text": "Thank",
+      "start_ms": 59920,
+      "end_ms": 60280
+    },
+    {
+      "text": "you.",
+      "start_ms": 60280,
+      "end_ms": 60480
+    }
+  ],
+  "duration_ms": 60000,
+  "model": "groq:whisper-large-v3-turbo"
+}
