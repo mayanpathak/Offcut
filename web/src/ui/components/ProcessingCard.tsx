@@ -5,11 +5,12 @@
 // so two steps can run at once. Cancel stops the import or the run (D-152);
 // the cancelled card offers "Process again" and "Start over".
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { messages } from "../../copy/messages";
 import type { PipelineStage } from "../../gen/domain";
 import { type ClipState, useClipStore } from "../../state/clip-store";
+import { useUiStore } from "../../state/ui-store";
 import { cancelJob } from "../../usecases/cancel-job";
 import { dismissClip } from "../../usecases/import-clip";
 import { runPipeline } from "../../usecases/run-pipeline";
@@ -101,10 +102,26 @@ export function CancelButton({ scope }: { scope: "import" | "pipeline" | "model"
   );
 }
 
+/** One toast when a run's cloud transcription falls back to the device (cloudimplementation D-348). */
+function useCloudFallbackToast(): void {
+  const fallback = useClipStore((state) => state.asrFallback);
+  useEffect(() => {
+    if (fallback !== undefined) {
+      const copy = messages.transcription;
+      useUiStore.getState().pushToast({
+        id: "cloud-fallback",
+        message: fallback === "limited" ? copy.limitToast : copy.fallbackToast,
+      });
+    }
+  }, [fallback]);
+}
+
 export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
   const stage = useClipStore((state) => state.stage);
   const feed = useClipStore((state) => state.feed);
   const importing = useClipStore((state) => state.status === "importing");
+  const inCloud = useClipStore((state) => state.asrMode === "cloud");
+  useCloudFallbackToast();
   if (cancelled) {
     return <Cancelled />;
   }
@@ -121,7 +138,7 @@ export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
         ))}
       </ol>
       <ProcessingFeed />
-      <p className={styles.cardHint}>{messages.processing.reassure}</p>
+      <p className={styles.cardHint}>{inCloud ? messages.transcription.processingCloud : messages.processing.reassure}</p>
       <div className={styles.cardActions}>
         <CancelButton scope={importing ? "import" : "pipeline"} />
       </div>

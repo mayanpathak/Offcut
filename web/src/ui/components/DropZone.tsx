@@ -17,6 +17,7 @@ import { useExportStore } from "../../state/export-store";
 import { importClip, importSampleClip } from "../../usecases/import-clip";
 import { ArrowUp } from "../icons";
 import { Button } from "../primitives/Button";
+import { TranscriptionChoice } from "./TranscriptionChoice";
 import styles from "../styles/components.module.css";
 
 // What the file chooser offers first. It is a hint to the browser: whether a
@@ -147,6 +148,7 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
         <Button variant="secondary" busy={fetchingSample} onClick={sample}>
           {messages.dropZone.sampleButton}
         </Button>
+        <TranscriptionChoice />
         <p className={styles.dropBrowsers}>{messages.landing.supportedBrowsers}</p>
         <p className={styles.dropLine} role="status">
           {line}
@@ -167,6 +169,7 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
       >
         {messages.dropZone.sampleButton}
       </button>
+      <TranscriptionChoice />
       <p className={styles.notice} role="status">
         {line}
       </p>
