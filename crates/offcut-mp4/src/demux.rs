@@ -203,6 +203,77 @@ impl<R: RandomAccess> Demuxer<R> {
     }
 }
 
+/// The boxes of the chosen video track's sample entry that V6.1 reads and V5
+/// did not: `hvcC` (D-396) and `colr` (D-397), as raw bodies.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct VideoEntryBoxes {
+    pub fourcc: Option<[u8; 4]>,
+    pub hvcc: Option<Vec<u8>>,
+    pub colr: Option<Vec<u8>>,
+}
+
+/// The most bytes of an `hvcC` or `colr` body. A real `hvcC` is a few kB.
+const MAX_ENTRY_BOX: u64 = 1 << 20;
+
+impl<R: RandomAccess> Demuxer<R> {
+    /// V6.1 (additive): walks `moov` again to the video track `open` chose
+    /// (the first enabled one, or the first), and reads its sample entry's
+    /// `hvcC` and `colr`. `open` and everything it read are untouched.
+    pub fn video_entry_boxes(&mut self) -> Result<VideoEntryBoxes, ContainerError> {
+        let r = &mut self.reader;
+        let len = r.len();
+        let (_, moov) = find_moov(r, len)?;
+        let mut chosen: Option<(BoxHeader, bool)> = None;
+        for trak in boxes::children(r, &moov)?
+            .iter()
+            .filter(|h| &h.kind == b"trak")
+        {
+            let Some(hdlr) = boxes::descend(r, trak, &[*b"mdia", *b"hdlr"])? else {
+                continue;
+            };
+            if &boxes::read_hdlr(r, &hdlr)? != b"vide" {
+                continue;
+            }
+            let enabled = read_tkhd(r, trak)?.flags & 1 == 1;
+            if chosen.is_none_or(|(_, was_enabled)| enabled && !was_enabled) {
+                chosen = Some((*trak, enabled));
+            }
+        }
+        let Some((trak, _)) = chosen else {
+            return Ok(VideoEntryBoxes::default());
+        };
+        let Some(stsd) = boxes::descend(r, &trak, &[*b"mdia", *b"minf", *b"stbl", *b"stsd"])?
+        else {
+            return Ok(VideoEntryBoxes::default());
+        };
+        // Version, flags and the entry count come before the first entry; a
+        // visual sample entry's own fields take 78 bytes before its boxes.
+        let entry = boxes::read_header(r, Bytes::new(stsd.body.get().saturating_add(8)), stsd.end)?;
+        let inner = BoxHeader {
+            body: Bytes::new(entry.body.get().saturating_add(78).min(entry.end.get())),
+            ..entry
+        };
+        let mut out = VideoEntryBoxes {
+            fourcc: Some(entry.kind),
+            ..VideoEntryBoxes::default()
+        };
+        for child in boxes::children(r, &inner)? {
+            let slot = match &child.kind {
+                b"hvcC" => &mut out.hvcc,
+                b"colr" => &mut out.colr,
+                _ => continue,
+            };
+            if slot.is_none() {
+                if child.body_len() > MAX_ENTRY_BOX {
+                    return Err(ContainerError::Malformed("sample entry"));
+                }
+                *slot = Some(boxes::load(r, &child, MAX_ENTRY_BOX)?);
+            }
+        }
+        Ok(out)
+    }
+}
+
 fn find(headers: &[BoxHeader], kind: &[u8; 4]) -> Option<BoxHeader> {
     headers.iter().find(|h| &h.kind == kind).copied()
 }

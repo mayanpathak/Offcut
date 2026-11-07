@@ -414,3 +414,27 @@ fn no_derived_clip_carries_the_reference_clips_metadata() {
         assert!(found.is_empty(), "{name}: {found:?}");
     }
 }
+
+/// V6.1 (D-396, D-397): the HEVC fixture's `hvcC` gives the codec string D1's
+/// Chrome was asked about in P171, and no `colr` means SDR; an H.264 clip has no
+/// `hvcC`. The HDR fixture's `colr` case joins when P173 generates it.
+#[test]
+fn rej_hevc_gives_its_hvcc_codec_string_and_h264_clips_give_none() {
+    let mut d = open("rej_hevc.mov");
+    let boxes = d.video_entry_boxes().unwrap();
+    assert_eq!(boxes.fourcc, Some(*b"hvc1"));
+    let hvcc = boxes.hvcc.expect("rej_hevc.mov has an hvcC");
+    assert!(hvcc.len() > offcut_mp4::hevc::HVCC_HEADER_LEN);
+    let detail = offcut_mp4::probe::video_detail(&mut d);
+    assert_eq!(detail.hevc_codec_string.as_deref(), Some("hvc1.1.6.L93.90"));
+    assert!(!detail.is_hdr);
+
+    for name in ["ok_60fps.mp4", "speech/speech_60s_portrait.mp4"] {
+        let mut d = open(name);
+        let boxes = d.video_entry_boxes().unwrap();
+        assert_eq!(boxes.fourcc, Some(*b"avc1"), "{name}");
+        assert!(boxes.hvcc.is_none(), "{name}");
+        let detail = offcut_mp4::probe::video_detail(&mut d);
+        assert_eq!(detail, offcut_types::VideoDetail::default(), "{name}");
+    }
+}

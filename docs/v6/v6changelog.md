@@ -831,3 +831,23 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts:** unchanged from Entry 25 (no code): Rust 863 / 0 / 4, Vitest 568, `pnpm e2e` 57.
 
 **Open:** item 24 (new). **Found, not fixed:** the per-minute limit above (a founder decision, not a code fix).
+
+## Entry 27 - 2026-11-08 - P172: types, HEVC, colr and `route_probe`
+
+**Built.**
+
+- `offcut-types/src/source.rs` (new): `Entry`, `RouteFlags`, `VideoDetail`, `SourceInfo` (with `is_hdr`, `avg_fps`, `video_codec`, `audio_track` 0, `audio_tracks`), `Route`, `SourceReject` (`REJECT_HDR`), `RouteReject` (untagged: a V5 `RejectReason` or a `SourceReject`), `SourceErrorCode` (`E_SOURCE_READ`, `E_SOURCE_AUDIO`), the constants `MAX_SOURCE_DURATION` (45 min), `MAX_INPUT_LONG_SIDE` (3840), `MAX_FILE_SIZE_HIGH_RES` (16 GB, DC-3), `CLOUD_WINDOW_S` 90, `CLOUD_OVERLAP_S` **10** (P171), `MAX_SOURCE_WINDOWS` 35, and `window_count()`. `lib.rs` adds the module and, in its generator, the eight types after every V5 type, `SOURCE_LIMITS`, `SOURCE_REJECT_REASONS` and `SOURCE_ERROR_CODES`.
+- `offcut-mp4`: `hevc.rs` (`parse_hvcc`, `codec_string` per Annex E), `colr.rs` (`parse_colr`, `is_hdr`), `route.rs` (`route_probe`, §6.2's 17 rules; rule 1 returns `validate_probe`'s answer as it is; a private `clip_info` builds the `ClipInfo` as `validate_probe` does), `demux.rs` gains `VideoEntryBoxes` and `Demuxer::video_entry_boxes()` (a second walk to the track `open` chose, for `hvcC` and `colr`), `probe.rs` gains `video_detail()`, `validate.rs` gains the one line `pub use crate::route::route_probe;`.
+- `pnpm gen:types`: `web/src/gen/domain.ts` gains 83 lines, removes none.
+
+**DECLARED CHANGE / REOPENED CONTRACT.** Additions only in `offcut-types` and `offcut-mp4` (D-387): G 0.4's additive check prints nothing for `validate.rs`, `media.rs`, `error.rs`, `limits.rs`, `demux.rs`, `probe.rs`, both `lib.rs` and `demux_fixtures.rs`. No existing function body changed; `validate_probe`, `probe`, `read_stsd` and `video_decoder_description` are as they were.
+
+**What differs from the plan (As read under D-395 and D-397).** V5's tests pin `RejectReason` and `ErrorCode` (exhaustive matches and the TypeScript unions' exact counts), `limits.rs` (21 constants) and every `VideoTrackInfo` literal; adding a member, a constant or a field would have meant editing those cases, which ON §3 forbids. So the codes and the rules are the plan's, but `REJECT_HDR` and the two `E_SOURCE_*` codes live in their own enums, the constants in `source.rs`, and `is_hdr` with the HEVC string in a `VideoDetail` passed beside the `ProbeInfo`. `colr.rs` reads `nclc` as well as `nclx` (ffmpeg writes `nclc` in a `.mov`). `SourceId` is left to TypeScript (P176). The copy check learns the two new code arrays in P179, with their copy.
+
+**Tests (all new; no existing case touched).** `source.rs` 6 (window counts for a 10 s overlap, the limits' order, the codes' serialization); `lib.rs` 1 (the generated long-path types and arrays); `hevc.rs` 4 (three real `hvcC` headers give `hvc1.1.6.L93.90`, `hvc1.1.6.L150.90`, `hvc1.2.4.L120.90`; Annex E's space, tier and inner zero bytes; malformed); `colr.rs` 5; `demux_fixtures.rs` 1 (`rej_hevc.mov`'s `hvcC` and codec string, H.264 clips have none); `route_probe.rs` 10: with both flags off `route_probe` equals `validate_probe` on all 24 fixtures the demuxer opens, with decode yes and no, from both pages; with `high_res` on every fixture V5 accepts is the same `ClipInfo` (and opens as that clip from the long page); `rej_4k.mp4` and `rej_hevc.mov` accepted with `high_res`; every rule alone from the long page; resolution, rotation and HEVC with `high_res`; the clip page keeps V5's duration and track rules; the earlier of two failing rules wins; the long page with its flag off is the clip page; a two-track source reads track 0; 45:00 is long, 45:00.001 is refused.
+
+**Counts.** Rust 890 / 0 / 4 (863 + 27; `cargo test -p offcut-types -p offcut-mp4`, the workspace is P182's), Vitest 568, `pnpm e2e` 57 (no web code changed). `pnpm check`: fmt, clippy, deny, eslint, both `tsc`, file tree (556 files: rows for `colr.rs`, `route.rs`, `route_probe.rs`), gen clean, copy codes: ok. Frozen check empty.
+
+**Carried to P173.** The fixtures' manifest entries must name the code V5 gives (`rej_hdr_hlg.mov` is HEVC, so `REJECT_HEVC` for `validate_probe`), since `probe_rejections.rs` and `demux_fixtures.rs` read the manifest with `deny_unknown_fields` and expect `validate_probe`'s reason; `REJECT_HDR` is asserted in `route_probe.rs`. The HLG fixture's `colr` case joins `demux_fixtures.rs` then.
+
+**Open:** nothing new. **Found, not fixed:** none.

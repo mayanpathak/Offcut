@@ -3,12 +3,15 @@
 //! sample, and no file is read or held whole.
 
 pub mod boxes;
+pub mod colr;
 pub mod demux;
 mod edit_list;
+pub mod hevc;
 pub mod mux;
 mod mux_boxes;
 pub mod probe;
 pub mod reader;
+pub mod route;
 pub mod sample_table;
 pub mod sps;
 pub mod validate;

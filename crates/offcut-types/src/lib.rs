@@ -9,6 +9,7 @@ pub mod media;
 pub mod plan;
 pub mod profile;
 pub mod prosody;
+pub mod source;
 pub mod stage;
 pub mod summary;
 pub mod timemap;
@@ -24,6 +25,7 @@ pub use media::*;
 pub use plan::*;
 pub use profile::*;
 pub use prosody::*;
+pub use source::*;
 pub use stage::*;
 pub use summary::*;
 pub use timemap::*;
@@ -190,6 +192,15 @@ mod typescript {
         v.visit::<ErrorCode>();
         v.visit::<UnsupportedReason>();
         v.visit::<FailureStage>();
+        // V6.1: the long path (source.rs), after every V5 type so their order is unchanged.
+        v.visit::<Entry>();
+        v.visit::<RouteFlags>();
+        v.visit::<VideoDetail>();
+        v.visit::<SourceInfo>();
+        v.visit::<Route>();
+        v.visit::<SourceReject>();
+        v.visit::<RouteReject>();
+        v.visit::<SourceErrorCode>();
     }
 
     struct Brands<'a>(&'a mut String, &'a Config);
@@ -287,7 +298,61 @@ mod typescript {
         code_array::<ErrorCode>(&mut out, &cfg, "ERROR_CODES");
         code_array::<RejectReason>(&mut out, &cfg, "REJECT_REASONS");
         code_array::<UnsupportedReason>(&mut out, &cfg, "UNSUPPORTED_REASONS");
+        source_ts(&mut out, &cfg);
         without_trailing_spaces(&out)
+    }
+
+    /// V6.1's limits and codes (source.rs), apart from `LIMITS` and the V5
+    /// code lists so those stay exactly as they were.
+    fn source_ts(out: &mut String, cfg: &Config) {
+        out.push_str("\nexport const SOURCE_LIMITS = {\n");
+        let lines = [
+            ("MAX_SOURCE_DURATION", MAX_SOURCE_DURATION.ts(cfg)),
+            ("MAX_INPUT_LONG_SIDE", MAX_INPUT_LONG_SIDE.ts(cfg)),
+            ("MAX_FILE_SIZE_HIGH_RES", MAX_FILE_SIZE_HIGH_RES.ts(cfg)),
+            ("CLOUD_WINDOW_S", CLOUD_WINDOW_S.ts(cfg)),
+            ("CLOUD_OVERLAP_S", CLOUD_OVERLAP_S.ts(cfg)),
+            ("MAX_SOURCE_WINDOWS", MAX_SOURCE_WINDOWS.ts(cfg)),
+        ];
+        for (name, value) in lines {
+            let _ = writeln!(out, "  {name}: {value},");
+        }
+        out.push_str("} as const;\n");
+        code_array::<SourceReject>(out, cfg, "SOURCE_REJECT_REASONS");
+        code_array::<SourceErrorCode>(out, cfg, "SOURCE_ERROR_CODES");
+    }
+
+    #[test]
+    fn typescript_declares_the_long_path_after_v5() {
+        let ts = domain_ts();
+        for name in [
+            "Entry",
+            "RouteFlags",
+            "VideoDetail",
+            "SourceInfo",
+            "Route",
+            "SourceReject",
+            "RouteReject",
+            "SourceErrorCode",
+        ] {
+            assert_eq!(
+                ts.matches(&format!("\nexport type {name} = ")).count(),
+                1,
+                "{name}"
+            );
+        }
+        let v5_end = ts.find("\nexport type FailureStage = ").unwrap();
+        assert!(ts.find("\nexport type Entry = ").unwrap() > v5_end);
+        assert!(ts.contains("\n  MAX_SOURCE_DURATION: 2700000 as DurMs,\n"));
+        assert!(ts.contains("\n  CLOUD_OVERLAP_S: 10,\n"));
+        assert!(ts.contains("\n  MAX_SOURCE_WINDOWS: 35,\n"));
+        assert!(
+            ts.contains("export const SOURCE_REJECT_REASONS = [\n  \"REJECT_HDR\",\n] as const;")
+        );
+        assert!(ts.contains(
+            "export const SOURCE_ERROR_CODES = [\n  \"E_SOURCE_READ\",\n  \"E_SOURCE_AUDIO\",\n] as const;"
+        ));
+        assert!(ts.contains("export type RouteReject = RejectReason | SourceReject;"));
     }
 
     /// `CATALOG_VERSION` of `offcut-plan`, read from its one home,

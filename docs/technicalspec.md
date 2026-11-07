@@ -329,7 +329,9 @@ offcut/
 │   │   │   ├── demux.rs               Demuxer
 │   │   │   ├── probe.rs               probe() -> ProbeInfo
 │   │   │   ├── sps.rs                 full_range(): the brightness range an H.264 stream states (v2implementation D-70)
-│   │   │   ├── hevc.rs                (V6.1) hvcC, the HEVC codec string, HDR flags
+│   │   │   ├── hevc.rs                (V6.1) hvcC and the HEVC codec string (v6.1implementation D-396)
+│   │   │   ├── colr.rs                (V6.1) the colour box; is_hdr from nclx or nclc (D-397)
+│   │   │   ├── route.rs               (V6.1) route_probe(): which path a file takes (§43.1, D-395); re-exported by validate.rs
 │   │   │   ├── validate.rs            [ONLY] validate_probe(): PS §9.4 limits -> RejectReason
 │   │   │   ├── mux.rs                 Mp4Muxer (faststart)
 │   │   │   └── mux_boxes.rs           box writers for the muxer (v2implementation D-55)
@@ -337,6 +339,7 @@ offcut/
 │   │       ├── demux_fixtures.rs
 │   │       ├── probe_rejections.rs
 │   │       ├── mux_roundtrip.rs
+│   │       ├── route_probe.rs         (V6.1) every rule of route_probe from both pages; flags off equals validate_probe
 │   │       └── mux_reorder.rs         real B-frames through the muxer, read by ffprobe and ffmpeg (v5implementation D-212)
 │   ├── offcut-text/
 │   │   ├── Cargo.toml

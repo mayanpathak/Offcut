@@ -1,6 +1,7 @@
 //! The limits a clip must meet (PS §9.4), in the order of TS §15.2. This is
 //! the only place a `ClipInfo` is made.
 
+pub use crate::route::route_probe;
 use offcut_types::limits::{INPUT_FPS_TOLERANCE, MAX_CLIP_DURATION, MAX_INPUT_FPS, MAX_LONG_SIDE};
 use offcut_types::{
     AudioCodec, ClipInfo, ContainerKind, Orientation, ProbeInfo, RejectReason, Rotation, VideoCodec,

@@ -29,6 +29,31 @@ pub fn probe<R: RandomAccess>(d: &Demuxer<R>, file_size: Bytes) -> ProbeInfo {
     }
 }
 
+/// V6.1 (additive): what the video's sample entry says beyond `ProbeInfo`:
+/// HDR from `colr`, and the HEVC codec string from `hvcC` (D-396, D-397).
+/// Like `probe`, it never fails: a box that cannot be read gives no codec
+/// string (so the browser is asked about bare `hvc1` and says no) and SDR.
+pub fn video_detail<R: RandomAccess>(d: &mut Demuxer<R>) -> offcut_types::VideoDetail {
+    let Ok(found) = d.video_entry_boxes() else {
+        return offcut_types::VideoDetail::default();
+    };
+    let is_hevc = matches!(found.fourcc.as_ref(), Some(b"hvc1" | b"hev1"));
+    let hevc_codec_string = match (is_hevc, found.hvcc.as_deref(), found.fourcc) {
+        (true, Some(payload), Some(fourcc)) => crate::hevc::parse_hvcc(payload)
+            .ok()
+            .map(|h| crate::hevc::codec_string(&h, fourcc)),
+        _ => None,
+    };
+    let colr = found
+        .colr
+        .as_deref()
+        .and_then(|body| crate::colr::parse_colr(body).ok());
+    offcut_types::VideoDetail {
+        is_hdr: crate::colr::is_hdr(colr.as_ref()),
+        hevc_codec_string,
+    }
+}
+
 /// `presented` in milliseconds, to the nearest (v2implementation D-34).
 fn duration_ms(track: &Track) -> u32 {
     let timescale = u128::from(track.table.timescale.max(1));
