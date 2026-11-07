@@ -1,6 +1,6 @@
-# technicalspec.md - Offcut Technical Specification (v1.3)
+# technicalspec.md - Offcut Technical Specification (v1.4)
 
-**Status:** v1.3. Implements `product.md` "Offcut Product Spec v1.3". Changes since v1 are listed in Section 0. **v1.2 added §40 (Edit Plan Architecture). v1.3 adds §41-§53 (the compatibility contract, the version map, long videos, shorts, vision, layers, chat, brand and memory, person mask, AI cost). Later sections win over any older section they contradict**; older sections describe the clip path with every flag off unless they were rewritten. **§41 is binding on every release: read it first.**
+**Status:** v1.4. Implements `product.md` "Offcut Product Spec v1.4". Changes since v1 are listed in Section 0. **v1.2 added §40 (Edit Plan Architecture). v1.3 adds §41-§53 (the compatibility contract, the version map, long videos, shorts, vision, layers, chat, brand and memory, person mask, AI cost). v1.4 revises them in place, each change marked "v1.4" (two entry pages, 45-minute sources read in place and transcribed in the cloud, part copies, stock B-roll, B-roll placed by hand, auto zoom). Later sections win over any older section they contradict**; older sections describe the clip path with every flag off unless they were rewritten. **§41 is binding on every release: read it first.**
 
 **Precedence.** The product spec (PS) wins on scope, priority, pricing and success numbers. This document only adds technical precision. It adds no feature, changes no priority and restates no product number differently. Labels P0/P1/P2, M0-M4, E-1 to E-10, H1-H4, A-1 to A-12 and reason codes (a)-(f) keep their PS meaning.
 
@@ -34,9 +34,16 @@
 
 ## 0. Changes From v1
 
+**v1.4 (founder decisions of 2026-11-08, `docs/v6/v6changelog.md` Entries 21 and 22) reshapes the long path before any of it is built.**
+
+- **Changed.** Two entry pages: the person chooses "Make shorts from a long video" (`/app/long`) or "Edit a clip" (`/app`); duration no longer routes (§43.1, DC-1). Long sources up to **45 minutes**, with no file-size limit (§43.2). **The dropped file is read in place, never copied whole;** only the parts the Director picks are copied, as small MP4s (§43.3, §44.8). **A long video is transcribed in the cloud only,** in checkpointed windows of at most 90 s, and pauses with Continue instead of falling back to the device (§43.6). `/shorts` takes up to 160 kB (DC-15). Clip-page file size moves to the `high_res` flag (DC-3). INV-3, INV-4, INV-28, P-1, P-5, P-15, TE-17, TE-18, TE-20, §52's cost model, §53.3's budgets.
+- **Added.** `PunchIn`'s `motion` (auto zoom, §47.2) and the quality bar against the founder's Submagic benchmark; Pixabay stock B-roll (§48.6, P-17, INV-32, TE-26, flag `stock_broll`, browser host 4); B-roll placed by hand on a word with a part picker, through `plan_ops` built in V6.8 (§48.5, §49.2); `remux_range` and `SourceMedia` (§44.8).
+- **Removed.** The whole-source copy, `MAX_SOURCE_FILE_SIZE`, device transcription of a source and its two-pass seam.
+- **Unchanged.** The clip path and the compatibility contract (§41). Tooscut stays a study source only (§53.4).
+
 **v1.3 (founder decisions of 2026-11-02) adds the long path: a long video becomes 5-10 finished shorts.**
 
-- **Added.** §41 the compatibility contract, the rule every release obeys; §42 the version map; §43 long sources (20 minutes, 16 GB, 4K, HEVC), windowed audio, resumable transcription; §44 the `Assembly`, a short as a virtual clip; §45 the Director (`/shorts`, whole-sentence selection, stitching); §46 local vision and face-tracked framing; §47 the launch catalog; §48 layers, B-roll, asset box, join transitions; §49 chat editing through typed `PlanOp`s; §50 creator memory and the back-catalogue queue; §51 person mask; §52 paid AI with a spend cap; §53 experiments TE-17 to TE-25, INV-25 to INV-31, long-path budgets, and what was learned from studying Tooscut.
+- **Added.** §41 the compatibility contract, the rule every release obeys; §42 the version map; §43 long sources (20 minutes, 16 GB, 4K, HEVC; v1.4: 45 minutes, read in place), windowed audio, resumable transcription; §44 the `Assembly`, a short as a virtual clip; §45 the Director (`/shorts`, whole-sentence selection, stitching); §46 local vision and face-tracked framing; §47 the launch catalog; §48 layers, B-roll, asset box, join transitions; §49 chat editing through typed `PlanOp`s; §50 creator memory and the back-catalogue queue; §51 person mask; §52 paid AI with a spend cap; §53 experiments TE-17 to TE-25, INV-25 to INV-31, long-path budgets, and what was learned from studying Tooscut.
 - **Changed.** V6.x renumbered (§42). INV-2, INV-5, INV-12, P-1, P-5, P-11, §36, §23, §31, A-3. Every change to a protected behaviour is a numbered row of §41.2.
 - **Moved to post-launch.** Chapter markers and the lower third.
 - **Unchanged.** The clip path. A clip of at most 90 seconds with flags off is V5, byte for byte (INV-26).
@@ -1038,6 +1045,11 @@ offcut/
     ├── cloud_transcription/coding-promptscloud.md  its coding prompts (Setup, 161 to 170), run in order
     ├── cloud_transcription/cloudchangelog.md       record of every change while building it
     ├── cloud_transcription/experiments.md          outcome of TE-C1 to TE-C5 (cloudimplementation section 13)
+    ├── v6.1/v6.1implementation.md      plan for V6.1, long source (D-383 to D-432; DC-1 to DC-4); its changelog is v6/v6changelog.md
+    ├── v6.1/v6.1buildguide.md          step-by-step build guide for V6.1: phases, commands, tiers, checks
+    ├── v6.1/coding-promptsv6.1.md      the V6.1 coding prompts (Setup, 171 to 182), run in order
+    ├── v6.1/overnight-run.md           the unattended session's master prompt for V6.1: authorisations, safe paths, merge gates
+    ├── v6.1/experiments.md             outcome of TE-17, TE-18, TE-20, TE-21 and the TE-12 re-read (v6.1implementation section 13)
     ├── v5/experiments.md              outcome of every reading V5 takes (v5implementation section 20), from Prompt 136
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```
@@ -1115,7 +1127,7 @@ everything ─► gen (types only)
 | A crate imports a crate above it in the diagram | Cargo rejects cycles; `scripts/check-file-tree.mjs` checks declared dependencies against this section |
 | `ui` imports `workers`, `net`, `persistence`, `wasm`, `models`, `analytics` | `eslint-plugin-boundaries` element rules in `web/eslint.config.js` |
 | `state` imports anything except `gen` | same |
-| `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, `RTCPeerConnection` outside `net/http.ts`, `net/asset-fetch.ts`, `wasm/load-core.ts`, `wasm/load-render.ts` | ESLint `no-restricted-globals` / `no-restricted-properties` with per-file overrides; runtime backstop: CSP `connect-src` (§24.3); proof: `privacy-network.spec.ts` |
+| `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, `RTCPeerConnection` outside `net/http.ts`, `net/asset-fetch.ts`, `wasm/load-core.ts`, `wasm/load-render.ts`, and from V6.8 `net/stock-fetch.ts` (v1.4, §24.1 row 4) | ESLint `no-restricted-globals` / `no-restricted-properties` with per-file overrides; runtime backstop: CSP `connect-src` (§24.3); proof: `privacy-network.spec.ts` |
 | `import.meta.env` outside `config/env.ts` | ESLint `no-restricted-syntax` |
 | String literals of user-facing sentences outside `copy/messages.ts` | ESLint `react/jsx-no-literals` (allowing punctuation) in `ui/` |
 | Editing `web/src/gen/*` by hand | `scripts/check-gen-clean.sh` regenerates and fails on diff |
@@ -2354,7 +2366,7 @@ transcribe(pcm16):
 
 **Contingency (PS §20.4).** ASR median above 145 s for a 60 s clip on R1 (D-67; the line was 40 s) → ship a smaller model (base-size first, then tiny-size) and keep the cloud fallback as a P1 trigger. TE-1 fails (runtime cannot be confined to OPFS, or no word timestamps) → second candidate runtime (Rust inference compiled to WASM/WebGPU) behind the same `whisper-runtime.ts` interface; if that also fails, word timestamps are approximated by forced alignment of segment text to energy onsets and E-7 decides whether events remain viable.
 
-**Cloud transcription is built** (cloud transcription release, cloudimplementation §8). `asr.worker` gains `encodeForCloud` (`pcm16` to Ogg Opus, 32 kbps, through WebCodecs and `workers/asr/ogg-opus.ts`) and `fromCloud` (the provider's words through D-382's silence guard, then the same `postProcess` and `normalizeTranscript` as device words) beside an unchanged `transcribe`. `usecases/transcribe-cloud.ts` sends the file to our API, so no browser host is added. `run-pipeline.ts` chooses cloud once per run: the flag `cloud_transcribe` on, `/healthz` not saying no, the drop zone's card on Cloud, and a person signed in; any failure finishes the clip on the device. **Seams (not built now).** Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker. v1.3: the manifest becomes one file per model under `config/models/`, the ASR file unchanged (DC-4); the face and person models run in `asr.worker` through their own `*-runtime.ts` (DC-10).
+**Cloud transcription is built** (cloud transcription release, cloudimplementation §8). `asr.worker` gains `encodeForCloud` (`pcm16` to Ogg Opus, 32 kbps, through WebCodecs and `workers/asr/ogg-opus.ts`) and `fromCloud` (the provider's words through D-382's silence guard, then the same `postProcess` and `normalizeTranscript` as device words) beside an unchanged `transcribe`. `usecases/transcribe-cloud.ts` sends the file to our API, so no browser host is added. `run-pipeline.ts` chooses cloud once per run: the flag `cloud_transcribe` on, `/healthz` not saying no, the drop zone's card on Cloud, and a person signed in; any failure finishes the clip on the device. **v1.4:** a long source is always transcribed in the cloud, in checkpointed windows, and pauses instead of falling back to the device (§43.6). **Seams (not built now).** Other languages (P2): one manifest per language. Local LLM (P2): a separate manifest entry and worker. v1.3: the manifest becomes one file per model under `config/models/`, the ASR file unchanged (DC-4); the face and person models run in `asr.worker` through their own `*-runtime.ts` (DC-10).
 
 ---
 
@@ -2952,14 +2964,15 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | `POST /billing/webhook` | provider signature over raw body | Apply subscription events | 64 kB | 120/min per IP | `provider_event_id` primary key; replays return 200 and change nothing |
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
 | `POST /notify-me` | none | Waitlist / unsupported-platform email | 1 kB | 5/h per IP | Primary key (email, wanted) |
-| `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`) | None; each success counts against the budget |
+| `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`). **v1.4, windows of a long source** (header `X-Offcut-Window: <index>/<total>`, §43.6): instead of the 20, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per 24 h, and 200/h per IP (assumptions; the founder sets them). A client that marks clips as windows gains at most that budget. The global budget's values come from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S`, defaulting to the values above, so the Dev tier raises them without a code change (§52) | None; each success counts against the budget |
 | `POST /plan` (v1.2, V6.2) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
-| `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | 64 kB | 6/min per user | A repeat for the same prefix in a month uses no new grant |
+| `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | **160 kB** (DC-15, v1.4) | 6/min per user | A repeat for the same prefix in a month uses no new grant |
+| `POST /broll/search` (v1.4, V6.8) | bearer | Stock B-roll search: one query → at most 12 Pixabay results (§48.6); the query is never stored or logged; the cache is keyed by its hash | 1 kB | 20/min per user; 90 per 60 s for the whole server | Cached 24 h by query hash |
 | `POST /chat-edit` (v1.3, V6.9) | bearer | Chat: message and context → `ChatReply` (§49.3); body never stored or logged | 64 kB | 30/min per user | none |
 | `POST /account/delete` | bearer | Delete account (§22.7) | 0 | 3/h per user | Idempotent |
 | `GET /account/export` | bearer | `AccountExport` JSON | none | 6/h per user | n/a |
 
-`server/tests/no_media_routes.rs` walks the router and asserts: no route has a body limit above 64 kB; `multipart/*`, `application/octet-stream`, `video/*` and `audio/*` requests receive 415 on every route. **The one exception (DC-14):** `POST /transcribe` takes `audio/ogg` with a 1 MiB limit; its other media types still get 415.
+`server/tests/no_media_routes.rs` walks the router and asserts: no route has a body limit above 64 kB; `multipart/*`, `application/octet-stream`, `video/*` and `audio/*` requests receive 415 on every route. **The two exceptions:** `POST /transcribe` takes `audio/ogg` with a 1 MiB limit (DC-14), its other media types still getting 415; and `POST /shorts` takes JSON up to 160 kB (DC-15, v1.4), with every media type still getting 415.
 
 ### 22.2 Sessions and CSRF
 
@@ -3089,7 +3102,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 
 ### 22.8 Configuration (`config.rs`, the only place that reads the environment)
 
-`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRANSCRIBE_ENABLED` (the server's kill switch), `TRANSCRIBE_API_KEY`, `TRANSCRIBE_API_BASE_URL` (cloud transcription release, D-356), `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
+`DATABASE_URL`, `APP_ORIGIN`, `PORT`, `LOG_LEVEL`, `ENTITLEMENT_SIGNING_KEY`, `ACCESS_TOKEN_SIGNING_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` (V6, D-251: `MAIL_API_KEY` is gone), `BILLING_API_BASE_URL` (V6, D-273), `BILLING_API_KEY`, `BILLING_WEBHOOK_SECRET`, `BILLING_PRICE_CREATOR_MONTHLY`, `BILLING_PRICE_CREATOR_ANNUAL`, `BILLING_PRICE_CREATOR_ANNUAL_FOUNDING`, `FOUNDING_OFFER_ENABLED`, `TRANSCRIBE_ENABLED` (the server's kill switch), `TRANSCRIBE_API_KEY`, `TRANSCRIBE_API_BASE_URL` (cloud transcription release, D-356), `TRUSTED_PROXY_HOPS`; `GIT_SHA` is optional. **v1.4:** `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` (V6.1, optional, defaulting to 7,000 and 27,000, §22.1); `PIXABAY_API_KEY` (V6.8, required once `stock_broll` ships; set in Render before the deploy that reads it). A missing or malformed variable aborts startup with the variable's name (never its value). `BILLING_WEBHOOK_SECRET` must be a `whsec_` value. Production runs Dodo's test-mode keys from V6's merge until the founding release after V6.6 (D-285, D-303).
 
 ### 22.9 Free-tier behaviour (external facts: verified 2026-10, re-verified by TE-11)
 
@@ -3248,10 +3261,11 @@ CREATE TABLE platform_waitlist (
 | 1 | App origin (`APP_ORIGIN`, Vercel) | `GET` static files; `/api/v1/*` | Only via `net/http.ts` and the two WASM loaders |
 | 2 | Asset origin (host of `VITE_ASSET_BASE_URL`) | `GET`/`HEAD` model files, demo video, sample clip | No credentials, no query string, no request body; only via `net/asset-fetch.ts` and the demo `<video>` element |
 | 3 | Merchant hosted checkout / portal | Top-level navigation to a URL returned by the API | Never fetched, framed or scripted |
+| 4 | `cdn.pixabay.com` (v1.4, V6.8, flag `stock_broll`) | `GET` of one stock video file the person or the plan chose, and of search thumbnails | Only via `net/stock-fetch.ts` (the fifth file allowed to fetch, §7), called by `usecases/resolve-stock.ts` and the search panel; no credentials, no body; only while the stock switch is on (§48.6) |
 
-Nothing else: no font CDN, no analytics vendor, no error tracker, no tag manager, no third-party script (PS §17). `config/allowlist-hosts.ts` lists hosts 1 and 2 and is the only such list; `scripts/check-hosts.mjs` fails the build when the bundle contains any other `http(s)://` host literal.
+Nothing else: no font CDN, no analytics vendor, no error tracker, no tag manager, no third-party script (PS §17). `config/allowlist-hosts.ts` lists hosts 1 and 2, and from V6.8 host 4 (v1.4), and is the only such list; `scripts/check-hosts.mjs` fails the build when the bundle contains any other `http(s)://` host literal.
 
-**From the server:** Postgres host; the transcription provider's API (`api.groq.com/openai/v1`, `POST /transcribe` only, cloud transcription release); the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
+**From the server:** Postgres host; the transcription provider's API (`api.groq.com/openai/v1`, `POST /transcribe` only, cloud transcription release); Pixabay's API (`pixabay.com/api/videos/`, `POST /broll/search` only, v1.4, V6.8); the SMTP relay (`smtp-relay.brevo.com:2525`, V6); the merchant API host (`test.dodopayments.com` until the founding release, then `live.dodopayments.com`); AI provider API host (v1.2, V6.2, TE-15; `POST /plan` only). **Into the Render host directly:** merchant webhooks; uptime monitor; the Vercel proxy.
 
 ### 24.2 Secrets
 
@@ -3268,6 +3282,8 @@ Content-Security-Policy:      default-src 'none'; script-src 'self' 'wasm-unsafe
                               style-src 'self'; font-src 'self'; img-src 'self' data: blob:;
                               media-src 'self' blob: <ASSET_ORIGIN>; connect-src 'self' <ASSET_ORIGIN>;
                               base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+                              (v1.4, V6.8: connect-src gains https://cdn.pixabay.com, §24.1 row 4; thumbnails
+                              are fetched and shown as blob: URLs, so img-src does not change)
 Referrer-Policy:              no-referrer
 X-Content-Type-Options:       nosniff
 Permissions-Policy:           camera=(), microphone=(), geolocation=()
@@ -3312,14 +3328,15 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 
 | # | Promise (PS reference) | Structural | Automatic | In the product |
 |---|---|---|---|---|
-| P-1 | Video, video frames, music, brand assets, captions as edited and project edits are not uploaded. **A clip's sound leaves only as one compressed Opus file in the body of `POST /transcribe`, only for a signed-in person with Cloud chosen in the drop zone's card, and is forwarded only to the transcription provider; the words come back in its response** (cloud transcription release). Transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media but `POST /transcribe`'s `audio/ogg` (§22.1, DC-14); only `usecases/transcribe-cloud.ts` sends audio; DTOs carry no free-text field except `email`, `PlanRequest.words[].text` and the words of `TranscribeResponse`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `transcribe_route.rs`; `cloud-transcribe.spec.ts` (identity, On device sends nothing); `events.types.test.ts`; `log_redaction.rs` (plan and transcribe flows) | Settings → "What leaves your device" with the sound row and the provider; the drop zone's card; "Verify it yourself" note; J4 and J10 copy |
+| P-1 | Video, video frames, music, brand assets, captions as edited and project edits are not uploaded. **A clip's sound leaves only as one compressed Opus file in the body of `POST /transcribe`, only for a signed-in person with Cloud chosen in the drop zone's card, and is forwarded only to the transcription provider; the words come back in its response** (cloud transcription release). **v1.4: a long video's sound leaves the same way, as compressed windows of at most 90 s, one `POST /transcribe` each, always: the long path has no on-device choice, and the long page says so before the work (§43.6).** A stock search query leaves only in `POST /broll/search` (P-17). Transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media but `POST /transcribe`'s `audio/ogg` (§22.1, DC-14); only `usecases/transcribe-cloud.ts` sends audio; DTOs carry no free-text field except `email`, `PlanRequest.words[].text` and the words of `TranscribeResponse`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `transcribe_route.rs`; `cloud-transcribe.spec.ts` (identity, On device sends nothing); `events.types.test.ts`; `log_redaction.rs` (plan and transcribe flows) | Settings → "What leaves your device" with the sound row and the provider; the drop zone's card; "Verify it yourself" note; J4 and J10 copy |
 | P-2 | Only allowlisted hosts are contacted (PS §17) | `allowlist-hosts.ts`; CSP; `check-hosts.mjs` | `privacy-network.spec.ts` assertion 1 | Settings lists the two hosts |
 | P-3 | Analytics carry only allowlisted names with numeric/enum properties; never file names, transcript or caption text, event parameters or free text (PS §17) | `AnalyticsEvent` has no `String` field; `deny_unknown_fields`; client `track()` accepts only the generated union | `events.types.test.ts` (type-level); `analytics_allowlist.rs` (server rejects extras and strings); `privacy-network.spec.ts` assertions 3 and 5 | Event list rendered on the settings page |
 | P-4 | The "What leaves your device" page matches the allowlist exactly (PS §20.1) | Page renders `ANALYTICS_EVENT_DOCS`, generated from `analytics.rs` | `settings-what-leaves.spec.ts` compares rendered rows with `gen/api.ts` | The page itself |
-| P-5 | No request during processing other than allowlisted beacons, the `GET /healthz` warm-up, in cloud mode the one `POST /transcribe` (cloud transcription release), and (plan on) the one `POST /plan` (PS §17, v1.2) | Use-cases between import and `ready` import no `net` module except `transcribe-cloud.ts` and `request-plan.ts` (one boundaries edge each) | `privacy-network.spec.ts` assertion 4; `cloud-transcribe.spec.ts` (On device: only `/events`) | Processing card: "Everything runs on your computer" on the device, the cloud line in cloud mode |
-| P-15 | (v1.3) No pixel or audio sample of a source or an asset leaves the browser; vision reaches the AI only as enums and indexes (INV-28); chat text, sentence text and asset labels leave only in the AI request bodies, only with the AI switch on, and the server neither stores nor logs them | Types of `ShotLine`, `AssetLine`, `ChatEditRequest`; one use-case per route | `privacy-network.spec.ts` (long path, chat, assets); `log_redaction.rs` | The settings table lists each |
+| P-5 | No request during processing other than allowlisted beacons, the `GET /healthz` warm-up, in cloud mode the one `POST /transcribe` (cloud transcription release), and (plan on) the one `POST /plan` (PS §17, v1.2). v1.4: a long source sends one `POST /transcribe` per window, one `POST /shorts`, and per short one `POST /plan`; with stock on, `POST /broll/search` and `GET`s to `cdn.pixabay.com` for the items being resolved | Use-cases between import and `ready` import no `net` module except `transcribe-cloud.ts` and `request-plan.ts` (one boundaries edge each) | `privacy-network.spec.ts` assertion 4; `cloud-transcribe.spec.ts` (On device: only `/events`) | Processing card: "Everything runs on your computer" on the device, the cloud line in cloud mode |
+| P-15 | (v1.3; v1.4) No pixel of a source or an asset, and no audio sample of an asset, leaves the browser; a source's sound leaves only as P-1's windows; vision reaches the AI only as enums and indexes (INV-28); chat text, sentence text and asset labels leave only in the AI request bodies, only with the AI switch on, and the server neither stores nor logs them | Types of `ShotLine`, `AssetLine`, `ChatEditRequest`; one use-case per route | `privacy-network.spec.ts` (long path, chat, assets); `log_redaction.rs` | The settings table lists each |
 | P-14 | The server never stores or logs a plan request's transcript, and forwards it only to the configured AI provider (v1.2) | `/plan` handler holds the body in memory only; no DB write of `PlanRequest`; `log.rs` logs no body; one provider adapter selected by config | `log_redaction.rs` (marker words in a plan request); a grep test that no `sqlx` query in `server/src/plan/` writes text | Settings names the provider and its data-use terms (TE-15) |
 | P-16 | (cloud transcription release) The server never stores or logs a clip's sound or the words returned for it, and forwards the sound only to the configured transcription provider, whose retention is switched off (Zero Data Retention) | `transcribe/` names no database; `route.rs` logs a kind, a length bucket and the status; `groq.rs` never reads an error body | `log_redaction.rs` (marker word and marker bytes); `transcribe_route.rs` (no `sqlx` under `transcribe/`) | The Privacy Policy's "Cloud captions"; the settings table |
+| P-17 | (v1.4, V6.8) A stock search query leaves only in `POST /broll/search`, only while the stock switch is on; the server forwards it only to Pixabay, never stores or logs it, and caches results by its hash. Stock video comes from `cdn.pixabay.com` straight to the browser, and nothing goes back | `server/src/broll/` names no database; the cache key type is a hash; `net/stock-fetch.ts` is the one caller of host 4 | `broll_search_route.rs`; `log_redaction.rs` (marker word in a query); `stock-broll.spec.ts` (switch off: no search, no CDN request); `privacy-network.spec.ts` | Settings lists the switch, Pixabay and what is sent; "From Pixabay" on each stock asset |
 | P-6 | The model stays in the browser and is verified (PS §10 J4, §17) | Bundled manifest hashes; OPFS-only cache adapter | `download.test.ts`; `model-download.spec.ts` | Settings shows model version, cache size |
 | P-7 | "Clear local data" removes clips, transcripts and render cache (PS §20.1) | §23.3 | `clear-local-data.spec.ts` | Settings button |
 | P-8 | Account deletion removes server records within 30 days (PS §17) | §22.7 (immediate) | `account_delete.rs` | Account page |
@@ -3348,6 +3365,11 @@ assert:
  4b (v1.2) a second run with "AI edit plan" off: no POST /api/v1/plan and no transcript word in any request
  5 every /api/v1/events body parses as EventsBatch from gen/api.ts with no extra keys
  6 no WebSocket, WebRTC, EventSource or sendBeacon activity
+ 7 (v1.4, long path) a 12-minute source through /app/long: audio leaves only as audio/ogg bodies of
+   POST /api/v1/transcribe carrying the window header; no 32-byte window of the source file or of any
+   part copy in any request; no frame or file name anywhere
+ 8 (v1.4, V6.8) stock on: search words only in POST /api/v1/broll/search bodies, cdn.pixabay.com GETs only
+   with no body and no cookie, no asset bytes anywhere; stock off: neither appears
 ```
 
 The suite blocks every release (PS §18 "privacy-claim regression").
@@ -3364,7 +3386,8 @@ The suite blocks every release (PS §18 "privacy-claim regression").
 | Anonymous allowlisted events | `analytics_events` | 90 days |
 | AI request counts per user per month (v1.3) | `ai_usage`, `ai_shorts_grants` | Until account deletion |
 | Plan-request bodies (transcript text and timings) (v1.2) | none: memory only, for the duration of the request | Not stored |
-| A clip's compressed sound and the words returned for it (cloud transcription release) | none: memory only, for the duration of `POST /transcribe` | Not stored |
+| A clip's compressed sound and the words returned for it (cloud transcription release); from v1.4 also each window of a long source | none: memory only, for the duration of `POST /transcribe` | Not stored |
+| A stock search query (v1.4, V6.8) | none: memory only, for the duration of `POST /broll/search`; the results (Pixabay ids, sizes, URLs) are cached 24 h under the query's hash, as Pixabay's terms require | Not stored; the hash cannot be read back to the words |
 
 **Built: cloud transcription** (cloud transcription release). A signed-in person's choice in the drop zone's card, Cloud by default, replaces PS §12.6's per-clip prompt; P-1 is revised for it and P-16 added; the provider's Zero Data Retention is on; the founder approved the wording, and a lawyer's review of it is on the launch checklist (PS §17). (The v1.2 plan request sends text only and is specified in §40.7 and P-1, P-14.)
 
@@ -3506,16 +3529,16 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 | M1.6 | Export, verifier, render cache | M1.4 | `export-creator.spec.ts` with all 11 verifier checks; `timeline-preserved.spec.ts`; `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` | E-4 re-measured |
 | M1.7 | Backend: auth, entitlement, receipts, account; client sign-in and gate | M0.1 | `auth_flow.rs`, `entitlement_rules.rs`, `usage_receipts.rs`, `account_delete.rs`, `account_export.rs`, `rate_limit.rs`, `log_redaction.rs`, `no_media_routes.rs`, `token_roundtrip.rs`, `profile.rs`, `auth-machine.test.ts`, `entitlement.test.ts`, `http.test.ts`, `signin.spec.ts`, `export-free.spec.ts` | TE-8 |
 | M1.8 | Billing | M1.7 | `webhook_idempotency.rs`, `billing_events.rs`, `checkout.spec.ts`; provider test-mode purchase updates `subscriptions` | TE-9. **M1 gate: all P0 working on dev machines (PS §9.9)** |
-| M1.16 | (v1.3, V6.1) Long source: `route_probe`, HEVC and 4K, copy, windowed audio, checkpointed ASR, source machine, flags | M1.8 | `route_probe.rs`, `audio_region.rs`, `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` | TE-17, TE-18, TE-20, TE-21 |
+| M1.16 | (v1.3, V6.1; v1.4) Long source: the long page, `route_probe` with `Entry`, HEVC and 4K, reading in place, windowed audio, cloud transcription in checkpointed windows, source machine, flags | M1.8 | `route_probe.rs`, `audio_region.rs`, `transcribe-source.test.ts`, `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` | TE-17, TE-18, TE-20, TE-21 |
 | M1.9 | (V6.2) Edit plan: `/plan`, provider adapter, spend cap, quotas, `plans` store, settings switch, catalog kinds, text extras | M1.8 | `validate.rs`, `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `ai_cap.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (fallbacks), `privacy-network.spec.ts` (plan on/off) | TE-15; E-11 instrumentation |
-| M1.10 | (V6.3) Cuts and `Assembly`: `timemap::build`, `assemble` splices, jump-cut zoom, cuts review, regions, rebase | M1.9 | `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `stitched.spec.ts` | TE-22 |
+| M1.10 | (V6.3) Cuts and `Assembly`: `timemap::build`, `assemble` splices, jump-cut zoom, cuts review, regions, rebase; part copies (v1.4) | M1.9 | `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `remux.rs`, `source_media.rs`, `stitched.spec.ts` | TE-22, TE-17 (copies) |
 | M1.17 | (V6.4) Director: `/shorts`, `validate_shorts`, rules producer, list page, batch export | M1.16, M1.10 | `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts`, `long-to-shorts.spec.ts` | TE-19; E-13 instrumentation |
 | M1.18 | (V6.5) Vision and framing | M1.17 | `shots.rs`, `tracking.rs`, `framing.rs`, `vision-pass.spec.ts` | TE-23 |
 | M1.12 | (V6.6, parts A and B) Structure visuals | M1.9 | Goldens per kind and style; V-5 cases; V-9 | none |
 | M1.13 | (V6.6, parts C and D) Kinetic presets, video masks, shape transitions | M1.12 | Goldens; `frame_at` budget at the heaviest preset; `composite.rs` simple-path identity | none |
 | M1.14 | (V6.6, part E) Hook title, progress bar, end card `Hold` | M1.13 | Goldens; end-card export duration test | none |
 | M1.11 | (V6.7) Music, ducking, sound cues | M1.10 | `mix_ducking.rs`, `music-import.spec.ts`, `sound_cues.rs`; verifier check 7 on a music export | TE-16 |
-| M1.19 | (V6.8) Layers, B-roll, asset box, join transitions, split layout | M1.13, M1.18 | `layers_goldens`, `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`; verifier 11/11 | TE-14 re-read |
+| M1.19 | (V6.8) Layers, B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions, split layout | M1.13, M1.18 | `layers_goldens`, `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`, `plan_ops.rs` (`PlaceAsset`, `RemoveAsset`), `broll_search_route.rs`, `resolve-stock.test.ts`, `stock-broll.spec.ts`; verifier 11/11 | TE-14 re-read, TE-26 |
 | M1.20 | (V6.9) Chat editing | M1.19 | `plan_ops.rs`, `chat_prompt_snapshot.rs`, `chat_route.rs`, `chat-edit.spec.ts`, `privacy-network.spec.ts` (chat) | E-14 instrumentation |
 | M1.15 | (V6.10) Brand kit | M1.14 | Golden matrix under a test kit; `profile.rs` brand-kit cases (INV-9) | none |
 | M1.21 | (V6.10) Creator memory, queue | M1.17 | `creator_memory.rs`, `queue.spec.ts` | none |
@@ -3809,8 +3832,8 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 |---|---|---|
 | INV-1 | The browser contacts no host outside `config/allowlist-hosts.ts` | `privacy-network.spec.ts` (1); `check-hosts.mjs`; CSP |
 | INV-2 | No request URL, header or body contains media bytes, caption text as edited, event or plan parameters, or a file name; transcript text appears only in the body of `POST /api/v1/plan`, and never while "AI edit plan" is off (v1.2) | `privacy-network.spec.ts` (3, 4b) |
-| INV-3 | Import, processing, preview and review complete with the API unreachable. Processing waits on the API only in cloud mode, at most 45 s for a waking API and one 30 s request, and completes on the device when it cannot (cloud transcription release, D-375) | `api-cold-start.spec.ts`; `transcribe-cloud.test.ts`; `cloud-transcribe.spec.ts` (fallbacks) |
-| INV-4 | The server has no route that accepts more than 64 kB or a media content type, except `POST /transcribe`: `audio/ogg` only, at most 1 MiB, bearer only (DC-14) | `no_media_routes.rs` |
+| INV-3 | Import, processing, preview and review complete with the API unreachable. Processing waits on the API only in cloud mode, at most 45 s for a waking API and one 30 s request, and completes on the device when it cannot (cloud transcription release, D-375). **v1.4: the long path is the exception.** It needs a session and cloud transcription, says so before the work, and with the API unreachable mid-job it pauses with Continue, losing nothing (§43.6); a short, once prepared, opens, previews and exports with the API unreachable | `api-cold-start.spec.ts`; `transcribe-cloud.test.ts`; `cloud-transcribe.spec.ts` (fallbacks) |
+| INV-4 | The server has no route that accepts more than 64 kB or a media content type, except `POST /transcribe`: `audio/ogg` only, at most 1 MiB, bearer only (DC-14); and `POST /shorts`: JSON only, at most 160 kB, bearer only (DC-15, v1.4) | `no_media_routes.rs` |
 | INV-5 | `TIMELINE_INTEGRITY` (v1.2). Every removed span is a validated, unrestored `Cut` of the stored plan; no cut starts or ends inside a word; nothing is reordered or retimed; the export has `ceil(time_map.out_duration x 30 / 1000)` frames. With the identity map (V4-V6, and whenever the plan has no applied cuts) source time equals output time and the export has `ceil(source duration x 30 / 1000)` frames | `timeline-preserved.spec.ts` (identity); `timemap_build.rs`, `cuts_applied.spec.ts` (V6.3); `verify_mp4.py` (3, 5, 8) |
 | INV-6 | No `DetectedEvent` exists with confidence below its kind's threshold | `rules_table.rs`; assertion in `precision_recall.rs` |
 | INV-7 | Equal scene inputs and renderer version give byte-identical display lists for every frame | `offcut-scene/tests/determinism.rs` |
@@ -3849,7 +3872,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | Bundled music without a licence TE-16 has confirmed | PS §9.2 (c). User-supplied music with ducking is built in V6.7 |
 | A plug-in system for item kinds; an item kind without drawing code and a golden | §40.3: a kind is a catalog entry plus its layout and draw files (INV-23) |
 | User-inserted plan items through any control other than chat | PS §12.4 (e); the user toggles what the plan proposed, and from V6.9 asks in words, through the same validator (§49) |
-| Stock or generated B-roll, avatars, scheduling, public API, native app, teams | PS §9.2 (d)(c); stock is PS §21 item 14. The user's own B-roll is built in V6.8 (§48) |
+| Generated B-roll, avatars, scheduling, public API, native app, teams | PS §9.2 (d)(c). The user's own B-roll and Pixabay stock (v1.4) are built in V6.8 (§48) |
 | Sending frames to any server, a local caption model, diarization | §46: the founder's decision of 2026-11-02 |
 | YouTube-link import, a server that fetches or holds video | INV-4 and the platform's terms |
 | A virality score | §45: unverifiable; the reason is shown instead |
@@ -3915,7 +3938,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | TE-16 | (v1.2) Is there a music source whose licence allows bundling tracks inside a paid app, with no attribution the export cannot carry? | Read licences of candidate libraries; check redistribution and "in an app" clauses | A written licence that allows it; otherwise none | V6.7 | Ship user-supplied music only |
 | E-11 | (v1.2, PS §19) Is the AI plan better than the rules? | `plan_result`, `export_done` (`items_kept`, `items_disabled`, `cuts_restored`), `post_export_answer` split by plan source | PS §19 E-11 targets | V6.2 → M3 | PS §19 E-11 action |
 
-**v1.3 experiments:** TE-17 to TE-25 are in §53.1. E-12, E-13, E-14 are PS §19's.
+**v1.3 experiments:** TE-17 to TE-25 are in §53.1, and from v1.4 TE-26; TE-17 and TE-18 were rewritten in v1.4. E-12, E-13, E-14 are PS §19's.
 
 **Non-blocking decisions**
 - Router and store libraries may be swapped; only `routes.tsx` and `state/` depend on them.
@@ -3950,7 +3973,7 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 
 **TDR-22 (v1.3). A short is a virtual clip behind an `Assembly`.** Chosen over stretching `TimeMap` and over a new timeline through the scene. Why: every proven stage keeps its contract; reordering costs nothing (§44); the founder's rule against needless breakage. Cost: a third clock and a second decode session at joins. Reversal: none needed; `Assembly::whole` is V5.
 
-**TDR-23 (v1.3). Sentence-level selection for the Director.** Chosen over word-level. Why: mid-sentence cuts become impossible by type, and the body stays under INV-4's 64 kB. Cost: depends on sentence segmentation (`sentences_long.rs`); a sentence cannot be split by the model. Reversal: `SentenceRange` becomes a word range with a validator rule; not planned.
+**TDR-23 (v1.3). Sentence-level selection for the Director.** Chosen over word-level. Why: mid-sentence cuts become impossible by type, and the body stays small (under 64 kB for 20 minutes; v1.4: about 115 kB for 45 minutes, inside DC-15's 160 kB, where a word-level body would pass 400 kB). Cost: depends on sentence segmentation (`sentences_long.rs`); a sentence cannot be split by the model. Reversal: `SentenceRange` becomes a word range with a validator rule; not planned.
 
 **TDR-24 (v1.3). Chat returns typed operations.** Chosen over a whole new plan and over scripts. Why: small requests stay small, undo is the existing history, the validator stays the only gate. Cost: a request with no op fitting it gets "I can't do that yet". Reversal: more ops.
 
@@ -4220,7 +4243,7 @@ pub struct MusicCue { pub fits: bool, pub energy: MusicEnergy }   // MusicEnergy
 | Release | Kinds (params in brief) |
 |---|---|
 | V4 | `NumberReveal { value: QuantityRef, label }`, `ListReveal { header: Label, items: [{ at: WordIdx, label: Label }] }`, `FromTo { from: QuantityRef, to: QuantityRef, label }`, `KeywordPop { word }` |
-| V6.2 (v1.3: launch list in §47) | `Emphasis { word, treatment: Colour | Underline | Highlight }`, `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong }`, `Emoji { word, emoji: EmojiId }` |
+| V6.2 (v1.3: launch list in §47) | `Emphasis { word, treatment: Colour | Underline | Highlight }`, `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong, motion: Snap | Push }` (v1.4: the auto zoom of §47.2), `Emoji { word, emoji: EmojiId }` |
 | V6.6 | `ListBuilder`, `NumberMoment { value: QuantityRef, form: Count | Bar }`, `QuoteCard { quote: WordRange }`, `DefinitionCard { term: Label, gloss: Label }`, `Versus { left: Label, right: Label, values: Option<(QuantityRef, QuantityRef)> }`, `StepTracker { steps: [{ at, label }] }`, `Timeline { points: [{ at, label }] }`, `Checklist { items: [{ at, label }] }` |
 | V6.6 | `ShapeFrame { shape: ShapeId }` (video inside a shape), `Transition { at: WordIdx, kind: TransitionId }` |
 | V6.6 | `HookTitle`, `ProgressBar`, `EndCard { cta: Label }`; `LowerThird` and `ChapterMarker` moved post-launch (§42) (adds a `Hold` segment of `END_CARD_DUR = 2.5 s`, assumption) |
@@ -4400,14 +4423,14 @@ v1.3 reorders them; §42 maps the old numbers. Each row's detail is in the secti
 
 | Release | Builds | Section | Done when |
 |---|---|---|---|
-| V6.1 Long source | `route_probe`, 4K and HEVC input, copy, windowed audio, checkpointed ASR, source machine, flags, multi-manifest | §43 | A 20-minute file reaches a resumable master transcript; flags off equals V5 |
+| V6.1 Long source | The long page, `route_probe` with `Entry`, 4K and HEVC input, reading in place, windowed audio, cloud transcription in checkpointed windows, source machine, flags, multi-manifest (v1.4) | §43 | A 45-minute file reaches a resumable master transcript; flags off equals V5 |
 | V6.2 Edit plan | `/plan`, provider adapter, spend cap, quotas, `ai_usage`; `request-plan.ts`, `plans` store, settings switch; `Emphasis`, `IconPop`, `PunchIn`, `Emoji`; `DrawCmd::Image`; text extras panel | §40.7, §40.8, §47, §52 | AI plans validate and render on the reference clip; fallback works with the API down; `privacy-network.spec.ts` revised; E-11 instrumentation; TE-15 recorded |
 | V6.3 Cuts and Assembly | `Cut` arms, `timemap::build`, `assemble` splices, jump-cut alternation (`JUMP_ZOOM = 1.08`, assumption), cuts list, filler switch; `Assembly`, regions, rebase | §40.1, §40.6, §44 | `cuts_applied.spec.ts`; `stitched.spec.ts`: out-of-order parts export correctly |
 | V6.4 Director | `/shorts`, `validate_shorts`, rules producer, shorts list, batch export | §45 | A long fixture gives 5 exported shorts passing 11 checks, with the API up or down |
 | V6.5 Vision and framing | Coarse and fine passes, `ShotSummary`, `FramePath` | §46 | A moving speaker stays framed; the Director reads shot lines; `FramePath::none` equals V5 |
 | V6.6 Finished look | Parts A-E of §47: cards, number moments, kinetic presets, masks and shape transitions, hook title, progress bar, end card | §47, §40.5 | Goldens per kind and style; heaviest preset within budget; simple lists unchanged |
 | V6.7 Music and sound | Music import, ducking, mix loudness, music cue, sound cues | §40.6, §47.1 | `mix_ducking.rs`; verifier check 7 on a music export |
-| V6.8 Layers | `VideoSlot`, multi-run compositor, asset box, B-roll, join transitions, split and full layouts | §48 | Verifier 11/11 with B-roll and transitions; simple lists unchanged |
+| V6.8 Layers | `VideoSlot`, multi-run compositor, asset box, B-roll (own and Pixabay stock, placed by the plan or by hand on a word, v1.4), join transitions, split and full layouts | §48 | Verifier 11/11 with B-roll and transitions; simple lists unchanged |
 | V6.9 Chat | `PlanOp`, `effective_plan`, `/chat-edit`, `ChatPanel` | §49 | Each op applies, refuses and undoes; privacy test covers chat; non-part ops within the edit budget |
 | V6.10 Brand, memory, queue | `BrandKit`, `CreatorMemory`, queue | §50 | Golden matrix under a kit; memory changes the next prompt; a queue of three finishes around a failure |
 | V6.11 Person mask | Matte pass, `Video.matte`, text behind, background | §51 | TE-25's gate, per effect; verifier 11/11 |
@@ -4418,7 +4441,7 @@ v1.3 reorders them; §42 maps the old numbers. Each row's detail is in the secti
 - A cut inside a word, a reorder inside a `TimeMap`, a speed change (PS §9.2). (v1.3: choosing and ordering whole sentences is §44's; a user-asked whole-sentence cut is §49's.)
 - The browser calling the AI provider, the key in the client bundle, streaming provider output to the browser.
 - Storing or logging the transcript, sentence list, chat text or asset labels on the server; sending media, music, logos, fonts, frames or edits anywhere.
-- Stock or generated B-roll (PS §21 item 14). The user's own B-roll is §48.
+- Generated B-roll (PS §21 item 14). The user's own B-roll and, from v1.4, Pixabay stock are §48.
 
 ---
 
@@ -4454,9 +4477,9 @@ A protected behaviour changes only here. Each row names what changes, when, what
 
 | # | Release | What changes | What stays | Proof |
 |---|---|---|---|---|
-| DC-1 | V6.1, flag `long_video` | A file longer than 90 s routes to the long path instead of `REJECT_DURATION`. `REJECT_DURATION` now fires above 20 minutes. Fixture `rej_too_long_91s.mp4` moves to `route_long.spec.ts`; `rej_too_long_21min.mp4` (a sparse low-bitrate file) joins `rejections.spec.ts` | Flag off: exact V5 behaviour | `route_probe.rs`; both test runs of §41.1 |
+| DC-1 | V6.1, flag `long_video` | **v1.4:** a second page, `/app/long`, takes long videos (§43.1); `/app` gains one link to it, and `REJECT_DURATION`'s panel on `/app` gains one action, "Make shorts from it", with its words unchanged. On `/app/long`, `REJECT_DURATION` fires above 45 minutes, and a file of at most 90 s opens on the clip path. `rej_too_long_91s.mp4` stays in `rejections.spec.ts` (the clip page keeps V5's rule), which gains one assertion for the new action with the flag on; `rej_too_long_46min.mp4` (a sparse low-bitrate file) joins `route_long.spec.ts`. *(v1.3 routed by duration from one page.)* | Flag off: exact V5 behaviour. Flag on: the clip page's rules, rejections and words | `route_probe.rs`; both test runs of §41.1 |
 | DC-2 | V6.1, flag `high_res` | Inputs up to 3840 px on the long side and HEVC where `isConfigSupported` says yes are accepted on both paths. `rej_4k.mp4` moves to an acceptance case; `rej_8k.mp4` takes its place. `REJECT_HEVC` fires only when the browser cannot decode it | Output sizes; every H.264 clip decodes as before | `demux_fixtures.rs` (hvcC), `high-res.spec.ts` |
-| DC-3 | V6.1, flag `long_video` | `MAX_FILE_SIZE` becomes 16 GB. The in-page `REJECT_FILE_SIZE` fixture references 15,259 × 1 MiB. The check still runs before any copy | Flag off: 500 MB | `rejections.spec.ts` |
+| DC-3 | V6.1, flag `high_res` (v1.4; v1.3: `long_video`) | On the clip page, `MAX_FILE_SIZE` becomes 16 GB, so a 90 s 4K clip fits. The in-page `REJECT_FILE_SIZE` fixture references 15,259 × 1 MiB. The check still runs before any copy. The long page has no size check (§43.2) | Flag off: 500 MB | `rejections.spec.ts` |
 | DC-4 | V6.1 | `model-manager.ts` removes a directory only if no manifest in `config/models/` names it, instead of "any other model" | The ASR manifest, hashes, and download behaviour | `download.test.ts`, `model-download.spec.ts` |
 | DC-5 | V6.3 | `set_scene` stops refusing a non-identity `TimeMap`, and refuses only a map whose duration disagrees with the program audio | Identity behaviour | `scene_api.rs`, `cuts_applied.spec.ts` |
 | DC-6 | V6.3 | §36's "no reorder" and "no removing a whole sentence" apply to `Cut`s only. Selecting and ordering whole sentences belongs to the `Assembly` (§44). `TimeMap` keeps refusing out-of-order segments | `TimeMap`, its deserializer and `Cut` are unchanged | `timemap_identity.rs`, `assembly.rs` |
@@ -4468,10 +4491,11 @@ A protected behaviour changes only here. Each row names what changes, when, what
 | DC-12 | V6 | `export-creator.spec.ts`, the case "no token" only: what the person is told changes from "accounts are not open yet" to the sign-in dialog with the limits. Founder's yes of 2026-11-02, "carefully": its title and one assertion change, and one line closes the dialog | Every other assertion of that case, and every other case of the file, unchanged: no download, no `export_started`, nothing in `exports`, the button still enabled. No exported file changes | The spec's diff read in P147; the file's other cases passing unchanged; `verify_mp4.py`'s 11 checks |
 | DC-13 | Design release | Caption lines below the middle of the band are lowered in the caption block instead of centred: by a share of the room under centred lines (to the block's bottom less the style's vertical decoration, `StyleSpec::decoration_height`: Clean 6.5 lp, Bold 9, Mono 32) that rises evenly from 0 at the band's middle to `BOTTOM_LINE_DROP` = 0.5 at Bottom (`placement::line_drop`). At Bottom a one-line caption moves 36-45 lp lower (Clean 45, Bold 40, Mono 36), a two-line one 15-23 lp, and the Middle snap (0.55) about 4 lp. Clips saved at Bottom render their captions lower on reopening. Goldens and display-list snapshots of placements below the middle are regenerated; their diffs are only glyph runs', pills' and panels' `y`. The e2e helper `dragCaptions` takes the block at its centre on `data-hit` "captions" or "word" (it named "block", a kind the page never reports, so it matched only a word). Founder's choice, 2026-11-05: option A's mechanism, but "a little bit low", as the apps draw their own UI at the bottom (designchangelog Entry 16) | The block, event zone, safe area, watermark, hit regions, `CaptionPlacement` values and their storage; every frame at placements 0 to 0.5, bit for bit; the export's 11 checks | `layout_safe_area.rs`, `display_list_snapshots.rs` (40 files, every diff a `y`), `golden_frames.rs` (14 of 16 regenerated), `export-*.spec.ts`, `preview-sync.spec.ts`, `review-edit.spec.ts`, `pipeline-preview.spec.ts` |
 | DC-14 | Cloud transcription | `media_guard` admits exactly `POST /api/v1/transcribe` with `audio/ogg`; that route's body limit is 1 MiB. `no_media_routes.rs` names it as the one exception (`AUDIO_BODY`): its other media types get 415, `audio/ogg` passes the guard (401 without a bearer, 413 over 1 MiB with one). `/healthz`'s body gains `cloud_transcribe` (`notify_me.rs`'s exact-body assertion gains the field). Founder's decision of 2026-11-06 | Every other route: 415 for every media type, no body over 64 kB, the same assertions. The device path, its frames, samples, transcripts and exports: with the fake's `/healthz` (no field) every protected suite runs on the device | `no_media_routes.rs`, `router.rs`'s unit tests, `transcribe_route.rs`, `cloud-transcribe.spec.ts` (identity); every §41.1 proof unchanged |
+| DC-15 | V6.4 (v1.4) | `POST /shorts` takes a JSON body of up to `SHORTS_BODY_LIMIT = 160 kB`, for a 45-minute source (§45.2). `no_media_routes.rs` names it as the second exception to "no body above 64 kB", for size only: it still answers 415 to every media type. Founder's decision of 2026-11-08 (45-minute sources) | Every other route's 64 kB and 415s; DC-14's exception | `no_media_routes.rs`, `shorts_route.rs` |
 
 ### 41.3 How each release is made safe
 
-1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
+1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `stock_broll` (v1.4, §48.6), `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
 2. **Baseline read first.** Before a release's first code commit, read the protected proofs and record them in its changelog.
 3. **Additive data.** A new field on a stored or sent type has `#[serde(default)]` and a default that means "the V5 behaviour". A new IndexedDB store comes through a numbered migration. A server migration stays compatible with the previously deployed binary (§23.3). The plan's wire format stays `PLAN_FORMAT = 1`; new kinds take new codes (§40.2).
 4. **Old callers keep their function.** `transcribe`, `decodeAudio`, `importClip`, `run-pipeline.ts` and `validate_probe` keep their signatures. New paths call new functions, which call shared stages.
@@ -4499,14 +4523,14 @@ The implementer stops, writes the question into the changelog's "Open items" and
 |---|---|---|
 | V6 | Accounts, entitlement token, `ai_usage`-ready account lists (S-10) | V6.2 quotas, V6.4 long-video grant, V6.10 brand gating |
 | Cloud transcription | `Transcriber`, `POST /transcribe`, `encodeForCloud`, `fromCloud`, `ogg-opus.ts`, `transcribe-cloud.ts`, the availability gate, `features.ts` | V6.1 windows of long sources, at most 90 s each |
-| V6.1 | `route_probe`, `SourceInfo`, `sources/` storage, windowed ASR with checkpoints, the source machine, `features.ts`, multi-manifest model manager | V6.4, V6.5, V6.10 queue, V6.11 |
+| V6.1 | `route_probe` with `Entry`, `SourceInfo`, the long page, reading in place, `pcm16` in `sources/`, cloud windows with checkpoints and pauses, the source machine, multi-manifest model manager | V6.4, V6.5, V6.10 queue, V6.11 |
 | V6.2 | `/plan`, provider trait, spend cap, plan store, catalog growth rule, `DrawCmd::Image` | Every release that adds a kind; V6.4 and V6.9 routes share the provider |
-| V6.3 | Non-identity `TimeMap`, `Assembly`, `SourcePos`, region audio, rebased transcripts, join handling | V6.4 shorts, V6.8 transitions at joins |
+| V6.3 | Non-identity `TimeMap`, `Assembly`, `SourcePos`, region audio, rebased transcripts, join handling; `remux_range` and `SourceMedia` (v1.4) | V6.4 shorts and their part copies, V6.8 transitions at joins |
 | V6.4 | Virtual clips, shorts list, batch export, `shorts_from_rules` | V6.5 framing per short, V6.9 chat over a short, V6.10 queue |
 | V6.5 | `ShotSummary`, `FramePath`, sampled-frame hand-off | V6.8 split layout, V6.11 mask pass |
 | V6.6 | Mask path in the renderer, kinds and cards, kinetic motion rows | V6.8 layers, V6.10 brand theme coverage, V6.11 matte |
 | V6.7 | Multi-source `assemble`, sound items | V6.8 B-roll audio, V6.9 chat music ops |
-| V6.8 | `VideoSlot`, multi-run compositor, asset store, `SceneAssets` | V6.9 `PlaceAsset`, V6.11 background and matte |
+| V6.8 | `VideoSlot`, multi-run compositor, asset store, `SceneAssets`; `plan_ops` with `PlaceAsset` and `RemoveAsset`, the stock search route (v1.4) | V6.9's other ops and chat, V6.11 background and matte |
 | V6.9 | `PlanOp` log, `effective_plan`, op validation | V6.10 memory reads ops |
 | V6.10 | Theme from kit, `CreatorMemory`, queue | Launch |
 | V6.11 | Person matte, background layer | Launch; catalog additions after it |
@@ -4537,11 +4561,22 @@ On 2026-11-02 the founder set the order: **V6 first, then V6.1-V6.11, then V7-V1
 
 ---
 
-## 43. The Long Path: Source, Route, Storage, Transcription (V6.1)
+## 43. The Long Path: Source, Route, Reading in Place, Transcription (V6.1; revised in v1.4)
 
-**Model: a file longer than 90 seconds is a source, not a clip. A source is copied once into OPFS, its audio is decoded in windows onto disk, its transcript is built in checkpointed windows, and nothing else in the product reads it directly: shorts read it through an `Assembly`. Rejected: reading the original file in place with a `FileSystemFileHandle` (the handle's name is a file name stored in the browser, against P-11; permission prompts on every return; `render.worker` and `media.worker` both open OPFS sync handles today), YouTube-link import (a server that downloads video breaks INV-4 and the platform's terms), cloud transcription of a whole source in one request (the route takes at most 92 s; V6.1 sends windows of at most 90 s through the cloud transcription release's `encodeForCloud` and `POST /transcribe`).**
+**Model (v1.4, the founder's decisions of 2026-11-08): the long path has its own page, and the person chooses it; a file's duration no longer chooses the path. A long video is a source. The dropped `File` is read in place for the session and is never copied whole. Its audio is decoded once, in windows, into OPFS; its transcript is built in the cloud, in checkpointed windows of at most 90 s; after the Director picks the parts (§45), only those ranges are copied into OPFS, as one small MP4 per part (§44.8). Nothing else in the product reads the source directly: shorts read their parts through an `Assembly`. Rejected: copying the whole file into OPFS first (v1.3's design: up to 16 GB of disk and minutes of copying before any work, for a video of which a few minutes are used), storing a `FileSystemFileHandle` to read the file again later (the handle's name is a file name stored in the browser, against P-11; permission prompts on every return), transcribing a long source on the device (about 50-60 minutes for 45 minutes of speech on D1, derived from §16's speed, against a few minutes in the cloud, TE-C4), YouTube-link import (a server that downloads video breaks INV-4 and the platform's terms), cloud transcription of a whole source in one request (the route takes at most 92 s).**
 
-### 43.1 Routing
+**What reading in place costs.** A `File` lives only as long as the page that received it. A reload, a crash or a discarded tab before the parts are copied keeps the audio, the transcript and every checkpoint, but not the file: a stage that needs the file asks for the same file again, checked by `sourceHashPrefix` and `sourceBytes` (§43.7). Once a short's parts are copied, that short never needs the original file again.
+
+### 43.1 Entry and routing
+
+Two entry points (PS §10, §10.1):
+
+| Page | Route | Takes | With `long_video` off |
+|---|---|---|---|
+| Edit a clip | `/app`, as today | A clip of at most 90 s, by V5's rules exactly, plus DC-2 under `high_res` | Unchanged, with no link to the long page |
+| Make shorts from a long video | `/app/long` (new, flag `long_video`) | A video of more than 90 s, up to 45 minutes. A file of at most 90 s dropped here opens on the clip path, with one line: "This one is short, so it opens as a clip." | The route does not exist and redirects to `/app` |
+
+`/app` gains one link to `/app/long` (flag on), and the landing page's "Start free" offers both pages. `/app`'s first screen, drop zone and copy are otherwise unchanged, so `openEditor` and every protected suite see the page they know (DC-1).
 
 ```rust
 // offcut-types/src/source.rs
@@ -4558,18 +4593,19 @@ pub struct SourceInfo {                   // constructed only by route_probe
     pub audio_sample_rate: Hz, pub audio_channels: u32,
     pub audio_track: u32,                 // the first enabled track; the long path accepts more than one
 }
+pub enum Entry { Clip, Long }             // v1.4: the page the file was dropped on
 pub enum Route { Clip(ClipInfo), Long(SourceInfo) }
 pub struct RouteFlags { pub long_video: bool, pub high_res: bool, pub hdr_ok: bool }   // from features.ts; hdr_ok from TE-21
 
 // offcut-mp4/src/validate.rs  [ONLY]
 pub fn validate_probe(p: &ProbeInfo, decode_supported: bool) -> Result<ClipInfo, RejectReason>;   // unchanged
-pub fn route_probe(p: &ProbeInfo, decode_supported: bool, flags: RouteFlags) -> Result<Route, RejectReason>;
+pub fn route_probe(p: &ProbeInfo, decode_supported: bool, entry: Entry, flags: RouteFlags) -> Result<Route, RejectReason>;
 ```
 
 `route_probe`, first failing rule wins:
 
 ```text
- 1 flags.long_video == false && flags.high_res == false  → validate_probe(p).map(Route::Clip)     // exact V5
+ 1 entry == Clip && !flags.high_res                       → validate_probe(p).map(Route::Clip)     // exact V5
  2 container, no video, no audio                          → as validate_probe
  3 video.codec == Hevc && !flags.high_res                 → Hevc                       // V5's rule while the flag is off
  4 video.codec not in {H264, Hevc}                        → VideoCodec
@@ -4579,12 +4615,14 @@ pub fn route_probe(p: &ProbeInfo, decode_supported: bool, flags: RouteFlags) -> 
  8 video.avg_fps > MAX_INPUT_FPS + INPUT_FPS_TOLERANCE    → FrameRate
  9 is_hdr && !flags.hdr_ok                                → Hdr
 10 !decode_supported                                      → DecodeUnsupported
-11 p.duration <= MAX_CLIP_DURATION && audio_tracks == 1   → Route::Clip
-12 p.duration <= MAX_CLIP_DURATION                        → MultiAudioTrack            // clip path keeps its rule
-13 !flags.long_video                                      → Duration                   // V5's rule while the flag is off
-14 p.duration > MAX_SOURCE_DURATION                       → Duration
+11 p.duration <= MAX_CLIP_DURATION && audio_tracks == 1   → Route::Clip                // from either page
+12 p.duration <= MAX_CLIP_DURATION                        → MultiAudioTrack            // the clip path keeps its rule
+13 entry == Clip                                          → Duration                   // the clip page keeps V5's limit
+14 p.duration > MAX_SOURCE_DURATION                       → Duration                   // the long page's limit
 15 else                                                   → Route::Long
 ```
+
+`entry == Long` with `flags.long_video == false` cannot be reached (the page does not exist); `route_probe` treats it as `Entry::Clip`, and a test proves it. On the clip page, `REJECT_DURATION`'s copy is unchanged; with `long_video` on, its panel gains one action, "Make shorts from it", which opens `/app/long` with the same `File` still in memory (DC-1).
 
 `RejectReason::Hdr` joins the enum with `REJECT_HDR`, copy ("This video is HDR. Export it as SDR, then drop it again.") and fixture `rej_hdr_hlg.mov`.
 
@@ -4592,8 +4630,7 @@ pub fn route_probe(p: &ProbeInfo, decode_supported: bool, flags: RouteFlags) -> 
 
 ```rust
 // limits.rs, additions (PS §9.4)
-pub const MAX_SOURCE_DURATION: DurMs   = DurMs::new(1_200_000);         // 20 minutes
-pub const MAX_SOURCE_FILE_SIZE: Bytes  = Bytes::new(16_000_000_000);    // (assumption, TE-17)
+pub const MAX_SOURCE_DURATION: DurMs   = DurMs::new(2_700_000);         // 45 minutes (founder, 2026-11-08; v1.3: 20)
 pub const MAX_INPUT_LONG_SIDE: Px      = Px::new(3840);
 pub const MAX_SHORTS_PER_SOURCE: u32   = 10;
 pub const MIN_SHORTS_PER_SOURCE: u32   = 3;                             // ask for 5-10; accept 3
@@ -4605,24 +4642,20 @@ pub const CREATOR_LONG_SOFT_PER_MONTH: u32 = 200;                       // (assu
 pub const MAX_QUEUED_SOURCES: u32      = 50;                            // (assumption, V6.10)
 ```
 
-`MAX_CLIP_DURATION`, `MAX_LONG_SIDE` and `MAX_FILE_SIZE` stay in the file, and each rules exactly as in V5 while its flag is off. `MAX_CLIP_DURATION` remains the clip path's limit with flags on too. The generated `LIMITS` the copy reads gains the new constants; `messages.ts` picks by flag.
+**The long page has no file-size limit** (founder, 2026-11-08): nothing is copied whole, so a file's size costs reading time, not disk. Duration and resolution are its limits. v1.3's `MAX_SOURCE_FILE_SIZE` is not built. `MAX_CLIP_DURATION`, `MAX_LONG_SIDE` and `MAX_FILE_SIZE` stay in the file and rule the clip page exactly as in V5 while `high_res` is off (DC-3 for `high_res` on). The generated `LIMITS` the copy reads gains the new constants; `messages.ts` picks by page and flag.
 
-### 43.3 Probing before the copy
-
-Copying 10 GB to discover the file is unusable is not acceptable, so the probe runs on the `File` first:
+### 43.3 Reading the file in place
 
 ```ts
 // workers/media/file-random-access.ts
 export function fileRandomAccess(file: File): RandomAccessReader;   // FileReaderSync over file.slice; 1 MiB read cache
 // workers/media/import.ts, addition
 export function probeFile(file: File): Promise<ProbeResult>;
-export function importSourceToOpfs(sourceId: SourceId, file: File, onBytes: (n: Bytes) => void,
-                                   isCancelled: () => boolean): Promise<void>;   // 8 MiB chunks; sync access handle
 ```
 
-`offcut-mp4` gains `hvcC` parsing behind `video_decoder_description` (`hevc.rs`), the HEVC codec string, and `is_hdr` from the `colr` box and the HEVC VUI. Its `RandomAccess` trait does not change. `moof` stays a rejection unless TE-12 reads at least 10% of the long corpus fragmented; then it joins V6.1's scope through §41.4.
+The `File` is posted to `media.worker` (a structured clone of the reference; its bytes are not copied), which reads it through `fileRandomAccess` for the probe, the audio (§43.5), the coarse vision pass (§46) and the part copies (§44.8). `sourceHashPrefix` is computed from `file.slice` exactly as §23.1 defines it for clips. `offcut-mp4` gains `hvcC` parsing behind `video_decoder_description` (`hevc.rs`), the HEVC codec string, and `is_hdr` from the `colr` box and the HEVC VUI. Its `RandomAccess` trait does not change. `moof` stays a rejection unless TE-12 reads at least 10% of the long corpus fragmented; then it joins V6.1's scope through §41.4.
 
-**Why a copy is still right.** Chrome's quota is a share of the free disk, an SSD copies 10 GB in about 1-2 minutes (assumption, TE-17), and every worker keeps the handle it has. The cost is disk: `import-source.ts` calls `navigator.storage.estimate()` and shows `B_STORAGE_LOW` before the copy when free quota is under `file.size + LONG_SCRATCH` (`LONG_SCRATCH = 2 GB`, assumption, TE-17). **Reversal:** a `RandomAccess` over the `File` already exists from §43.3; a future File-backed source is one more implementation, with P-11 revisited.
+**Disk.** Only `pcm16.f32` (about 173 MB for 45 minutes) and the part copies (§44.8) are written. `import-source.ts` calls `navigator.storage.estimate()` before the audio step and shows `B_STORAGE_LOW` when free quota is under `LONG_SCRATCH = 2 GB` (assumption, TE-17).
 
 ### 43.4 Local storage
 
@@ -4630,30 +4663,30 @@ export function importSourceToOpfs(sourceId: SourceId, file: File, onBytes: (n: 
 
 | Path | Contents | Written by |
 |---|---|---|
-| `sources/<sourceId>/source` | The long file, byte-identical | `media.worker` |
-| `sources/<sourceId>/pcm16.f32` | 16 kHz mono, whole duration: about 77 MB for 20 minutes | `media.worker`, in windows |
+| `sources/<sourceId>/pcm16.f32` | 16 kHz mono, whole duration: about 173 MB for 45 minutes | `media.worker`, in windows |
 | `sources/<sourceId>/thumbs/<n>.jpg` | Poster frames, one per short, at most 360 px wide | `render.worker` |
-| `assets/<assetId>/source` (V6.8) | A user's B-roll or image | `media.worker` |
+| `clips/<clipId>/parts/<k>.mp4` (V6.3) | One part of a short, remuxed from the source without re-encoding, with its handles (§44.8) | `media.worker` |
+| `assets/<assetId>/source` (V6.8) | A user's B-roll or image, or a downloaded stock clip (§48.6) | `media.worker` |
 | `clips/<clipId>/matte.mp4` (V6.11) | Person matte of one short | `render.worker` |
 
-A short's `out48.f32` and `prog48.f32` live in `clips/<clipId>/` exactly as a clip's do. A short has no `clips/<clipId>/source`.
+A short's `out48.f32` and `prog48.f32` live in `clips/<clipId>/` exactly as a clip's do. A short has no `clips/<clipId>/source`; its parts take its place.
 
 **IndexedDB version 3** (`persistence/schema.ts`):
 
 | Store | Key | Value |
 |---|---|---|
 | `sources` | `sourceId` | `{ sourceId, createdAt, lastOpenedAt, sourceInfo, sourceBytes, sourceHashPrefix, stage, windowsDone, windowsTotal }`. No name, no path (P-11) |
-| `sourceTranscripts` | `[sourceId, window]` | `{ words }` of one ASR window, the checkpoint |
+| `sourceTranscripts` | `[sourceId, window]` | `{ words }` of one cloud window, the checkpoint |
 | `masterTranscripts` | `sourceId` | `{ transcript, shotSummary }` |
 | `shorts` | `[sourceId, shortId]` | `{ spec: ShortSpec, clipId, state }` |
-| `plans` | `clipId` | `{ plan, opLog }`, V6.2 (§40.8) with V6.9's log |
+| `plans` | `clipId` | `{ plan, opLog }`, V6.2 (§40.8) with the op log of V6.8 and V6.9 (§49) |
 | `assets` | `assetId` | V6.8 |
 | `creatorMemory` | `"current"` | V6.10 |
 | `queue` | `queueIndex` | V6.10 |
 
-The `clips` record gains `sourceRef: Option<SourceId>` and `assembly: Option<Assembly>`, both default `None`, which reads as "this clip owns its file", so a V5 record is valid unchanged.
+The `clips` record gains `sourceRef: Option<SourceId>`, `assembly: Option<Assembly>` and `media: Option<SourceMedia>` (§44.8), each default `None`, which reads as "this clip owns its file", so a V5 record is valid unchanged.
 
-**Eviction (§23.3 addition).** A source and all its shorts count as one entry against `MAX_RECENT_CLIPS`. `ensureFree` deletes a source's `pcm16.f32` first, then the `source` file of a source all of whose shorts are exported, keeping transcript, shorts and plans so that a re-dropped file with an equal `sourceHashPrefix` resumes without re-transcribing. A short's export is evicted before its source.
+**Eviction (§23.3 addition).** A source and all its shorts count as one entry against `MAX_RECENT_CLIPS`. `ensureFree` deletes a source's `pcm16.f32` first (nothing reads it once the shorts are prepared), then the part copies of shorts that are exported, keeping transcript, shorts and plans. A short whose parts were evicted reopens by dropping the same file again, which copies only that short's parts.
 
 ### 43.5 Audio in windows
 
@@ -4661,43 +4694,52 @@ The clip path's `decodeAudio` allocates the whole duration. The long path does n
 
 ```ts
 // workers/media/audio-decode.ts, additions; decodeAudio stays
-export function decodeAudioRegion(handle: FileSystemSyncAccessHandle, info: SourceInfo, from: SourceMs, to: SourceMs,
+export function decodeAudioRegion(reader: RandomAccessReader, info: SourceInfo, from: SourceMs, to: SourceMs,
                                   onChunk: (mono: Float32Array, at: SourceMs) => void,
                                   isCancelled: () => boolean): Promise<void>;
-export function writeWholePcm16(sourceId: SourceId, info: SourceInfo, onProgress: (done: DurMs) => void,
+export function writeWholePcm16(sourceId: SourceId, reader: RandomAccessReader, info: SourceInfo,
+                                onProgress: (done: DurMs) => void,
                                 isCancelled: () => boolean): Promise<void>;   // decode → resample → append to pcm16.f32
 ```
 
-- `decodeAudioRegion` starts at the audio sample whose time is at most `from - AAC_PREROLL` (`AAC_PREROLL = 100 ms`, assumption), decodes forward, and hands chunks of at most 10 s. Peak audio memory on the long path is under 50 MB (assumption, TE-14). **Learned from Tooscut's `audio-render.worker.ts`:** decode only the regions that are needed, in windows. Our code, our types; §54.
+- The reader is the dropped `File` (§43.3) for a source, or an OPFS part file for a short (§44.5).
+- `decodeAudioRegion` starts at the audio sample whose time is at most `from - AAC_PREROLL` (`AAC_PREROLL = 100 ms`, assumption), decodes forward, and hands chunks of at most 10 s. Peak audio memory on the long path is under 50 MB (assumption, TE-14). **Learned from Tooscut's `audio-render.worker.ts`:** decode only the regions that are needed, in windows. Our code, our types; §53.4.
 - **Sample-rate correction.** If a decoded chunk's rate differs from the container's (HE-AAC commonly reports half), the region continues at the decoded rate and the resampler is rebuilt. The clip path's `decodeFailure("SampleRate")` stays as it is; TE-12 decides whether to bring the correction to the clip path through §41.4.
+- `writeWholePcm16` is checkpointed by the bytes already in `pcm16.f32`: after a reload with the same file, it continues from the last whole second.
 - `pcm16.f32` is read by windows from OPFS, never held whole in memory.
 
-### 43.6 Transcription in checkpointed windows
+### 43.6 Transcription in the cloud, in checkpointed windows (v1.4)
 
 ```ts
-// workers/asr/whisper-runtime.ts, addition; transcribe stays
-export function transcribeWindows(windows: AsyncIterable<AsrWindowInput>, onWindow: (done: number, total: number) => void,
-                                  onResult: (w: AsrWindowResult) => Promise<void>, isCancelled: () => boolean): Promise<void>;
-export type AsrWindowInput = { index: number; startMs: SourceMs; pcm16: Float32Array };
+// usecases/transcribe-source.ts (new); transcribe-cloud.ts, transcribe and run-pipeline.ts stay
+export function transcribeSourceWindows(sourceId: SourceId, duration: DurMs,
+                                        onWindow: (done: number, total: number) => void,
+                                        isCancelled: () => boolean): Promise<SourceAsrOutcome>;
+export type SourceAsrOutcome = { kind: "done" } | { kind: "paused"; reason: CloudPauseReason };
+export type CloudPauseReason = "unavailable" | "busy" | "signed_out" | "offline";
 ```
 
-- Windows are the existing `ASR_WINDOW_S = 30` and `ASR_OVERLAP_S = 5`, so a 20-minute file is 48 windows (`1200 ÷ 25`). Merging uses the same `mergeWindows`.
-- After each window the result is written to `sourceTranscripts`. A resume reads which windows exist and starts at the next. The merge runs when all exist.
+- **Windows.** `CLOUD_WINDOW_S = 90` and `CLOUD_OVERLAP_S = 5`, so 45 minutes is 32 windows (`⌈(2700 − 5) ÷ 85⌉`). Each window is read from `pcm16.f32`, encoded by `encodeForCloud` (Opus at 32 kbps, about 0.32 MB) and sent as one `POST /transcribe` marked as a window of a source (§22.1). Its words pass `fromCloud` (D-382's silence guard, then `postProcess`) and are shifted to source time. Merging uses the existing `mergeWindows`.
+- At most `CLOUD_LONG_CONCURRENCY = 2` windows are in flight (assumption, TE-18).
+- **Checkpoints.** Each window's words are written to `sourceTranscripts` as it returns. A resume sends only the missing windows; this needs `pcm16.f32`, not the file. The merge runs when all exist.
+- **No device fallback on the long path** (founder, 2026-11-08). A failed window is retried `CLOUD_WINDOW_RETRIES = 2` times, after 1 s and 4 s (assumptions). Then the job pauses (§43.8) with its reason: the switch off or `/healthz` saying no gives `unavailable`; 503 from the audio budget, or 429, gives `busy`; 401 gives `signed_out`; a network failure gives `offline`. The page says why and offers Continue. Clips keep D-348's fallback to the device, unchanged.
+- **Before the work.** The long page needs the flag `cloud_transcribe`, `/healthz` saying yes, and a session. It checks all three at the gate (PS L1) and says which is missing before anything is read.
 - `normalize_transcript` runs once on the merged words and gives the **master transcript**: `Transcript` with `SourceMs` numerically in its `TimeMs` fields. It is never given to the scene (§44.4).
 - **Sentence quality.** The Director selects by sentence (§45), so `sentences.rs` now carries weight it did not have. V6.1 adds `sentences_long.rs` over the long corpus: no sentence longer than `MAX_SENTENCE_MS = 25 s` (assumption, E-12), split at the longest pause inside otherwise.
 
-**Time budget.** On D1 the small-size model reads 80 s for a 60 s clip, about 21-27 minutes for 20 minutes of speech (derived, unmeasured at this length). TE-18 reads it. **Two-pass seam (only if TE-18 says so):** a base-size model over the whole file, with the small-size model re-run on the chosen parts, behind `AsrPass` in `run-source-pipeline.ts`. This adds a second manifest entry and a re-anchoring step; it is not built unless the budget fails.
+**Time budget.** The cloud read about 13× faster than the device on a minute of speech (TE-C4). For 45 minutes at a concurrency of 2 the estimate is a few minutes, plus the audio step of §43.5; TE-18 reads both. v1.3's two-pass seam (a faster model over the whole file) is not built: it existed only for device transcription of a source.
 
 ### 43.7 Staying alive
 
 | Threat | Answer | Test |
 |---|---|---|
 | The screen sleeps | `navigator.wakeLock.request("screen")` while a source job runs; re-acquired on `visibilitychange`; released at end, on pause and on cancel | `long-resume.spec.ts` |
-| The laptop sleeps or the tab is discarded | Checkpoints: at most one ASR window and one short's render are lost | `long-resume.spec.ts`, kills the tab mid-run |
+| The laptop sleeps or the tab is discarded | Checkpoints: at most the windows in flight and one short's preparation are lost | `long-resume.spec.ts`, kills the tab mid-run |
 | The tab is hidden | Workers keep running under Chrome's rules; TE-20 reads throttling. The copy advises "Keep this tab open" | TE-20 |
-| A worker or GPU device dies | `pool.ts` restart budget (§14.3) per window; `E_ASR_DEVICE_LOST` falls back to `wasm` once | `failure-recovery.spec.ts` |
-| Reload mid-job | `start-app.ts` finds a `sources` row with `stage` below `shorts_ready` and shows "Continue your video" | `long-resume.spec.ts` |
-| The source was evicted | The row stays; "Drop the same file to continue" compares `sourceHashPrefix` | `long-resume.spec.ts` |
+| A worker or GPU device dies | `pool.ts` restart budget (§14.3) per window; `E_ASR_DEVICE_LOST` falls back to `wasm` once (the face model of V6.5) | `failure-recovery.spec.ts` |
+| Cloud transcription fails | The job pauses with its reason and Continue (§43.6); no window already done is sent again | `transcribe-source.test.ts`, `long-resume.spec.ts` |
+| Reload mid-job | `start-app.ts` finds a `sources` row with `stage` below `shorts_ready` and shows "Continue your video". Transcription, the Director and preparing shorts continue at once; audio extraction, the coarse vision pass and the part copies need the file, so they ask "Drop the same file to continue", checked by `sourceHashPrefix` and `sourceBytes` | `long-resume.spec.ts` |
+| A short's parts were evicted | The short's row stays; opening it asks for the same file, and only its parts are copied again | `long-resume.spec.ts` |
 
 Progress also goes into `document.title` ("42% - Offcut"), so a hidden tab shows it. No notification permission is requested.
 
@@ -4706,19 +4748,20 @@ Progress also goes into `document.title` ("42% - Offcut"), so a hidden tab shows
 `state/machines/source-machine.ts`, under the same `transition()` rule as the other four (INV-16):
 
 ```text
-idle → probing → gated_signin? → copying → extracting_audio → transcribing → scanning(V6.5) → directing(V6.4)
-     → preparing_shorts → shorts_ready
-any working state → paused (wake lost, user pause) → the state it left
+idle → probing → gated_signin? → extracting_audio → scanning(V6.5) → transcribing → directing(V6.4)
+     → copying_parts(V6.4) → preparing_shorts → shorts_ready
+any working state → paused (wake lost, user pause, cloud paused §43.6) → the state it left
+extracting_audio | scanning | copying_parts, after a reload → awaiting_file → the state it left, once the same file is dropped
 any working state → cancelled | failed
 ```
 
-The clip machine is not changed. Opening a short loads it as a clip (§45.7).
+The coarse vision pass runs while the file is surely in hand, before transcription. The clip machine is not changed. Opening a short loads it as a clip (§45.7).
 
 ### 43.9 Errors and copy
 
-`E_SOURCE_COPY`, `E_SOURCE_AUDIO`, `E_SOURCE_ASR_STALLED`, `E_SHORTS_QUOTA` join `ErrorCode` and `messages.ts`, each with a `.persistent` variant (`check-copy-codes.mjs`). Every string comes from `messages.ts` (INV-15).
+`E_SOURCE_READ` (the file could not be read in place, for example because it was moved or deleted mid-job), `E_SOURCE_AUDIO`, `E_SOURCE_PART_COPY` (V6.4) and `E_SHORTS_QUOTA` join `ErrorCode` and `messages.ts`, each with a `.persistent` variant (`check-copy-codes.mjs`). The four pause reasons of §43.6 and `awaiting_file` have their own copy keys. Every string comes from `messages.ts` (INV-15).
 
-**Acceptance (V6.1).** `route_probe.rs` (one case per rule, and rule 1's exact equality with `validate_probe` on every existing fixture); `demux_fixtures.rs` (hvcC); `audio_region.rs`; `route_long.spec.ts`; `high-res.spec.ts`; `long-resume.spec.ts`; `flags_identity.spec.ts`. Peak memory read on a 20-minute 4K file. TE-17, TE-18, TE-20, TE-21 recorded.
+**Acceptance (V6.1).** `route_probe.rs` (one case per rule from both pages, and rule 1's exact equality with `validate_probe` on every existing fixture); `demux_fixtures.rs` (hvcC); `audio_region.rs`; `transcribe-source.test.ts` (windows, checkpoints, each pause reason, no device fallback); `route_long.spec.ts` (both pages, the hand-over of a short file, the clip page's new action), with `fake-api.ts`'s cloud option of the cloud transcription release; `high-res.spec.ts`; `long-resume.spec.ts` (a kill during transcription resumes without the file; a kill during audio extraction asks for it); `flags_identity.spec.ts`. Peak memory read on a 45-minute 4K file. TE-17, TE-18, TE-20, TE-21 recorded.
 
 ---
 
@@ -4768,12 +4811,12 @@ Exactly four places, in a test-enforced list (`assembly_readers.rs`, a grep test
 
 | Reader | Change | Identity |
 |---|---|---|
-| `workers/render/video-source.ts` (through `source-position.ts`) | `frameAt(t: TimeMs)` asks `to_source(t)` | `Assembly::whole` returns the same number |
-| `workers/render/export-loop.ts` | `recorded(pos)` then `to_source`; the file's frame index comes from the source time | Same |
-| `usecases/prepare-short.ts` | Decodes the regions into `pcm48` | Not used for dropped clips |
+| `workers/render/video-source.ts` (through `source-position.ts`) | `frameAt(t: TimeMs)` asks `to_source(t)`, then `SourceMedia` for the part file and the time inside it (§44.8, v1.4) | `Assembly::whole` returns the same number; `SourceMedia::whole` is the clip's own file |
+| `workers/render/export-loop.ts` | `recorded(pos)` then `to_source`; the frame index comes from the part file's own time (§44.8) | Same |
+| `usecases/prepare-short.ts` | Decodes the regions from the part files into `pcm48` | Not used for dropped clips |
 | `crates/offcut-wasm-render/src/scene_api.rs` | Hands `assembly.joins()` to the scene as `join_points` | Empty for `whole` |
 
-**Decoding across a join.** A jump needs a decoder restart at a keyframe. Export is already blocking and needs nothing new. **Preview must not stall:** `video-source.ts` keeps a second decode session (`#next`, at most two alive) that starts `JOIN_LEAD = 2 s` before a join at `keyframe_at_or_before(next part's start)`, and swaps at the join. At most two decoders exist at once per slot. Measured by `preview-sync.spec.ts`'s new join case: no gap above the late-frame budget across a join on the reference fixture, and TE-22 on 4K with long GOPs. **Learned from Tooscut's `frame-renderer.worker.ts`:** request frames per source in ascending time and keep one iterator per contiguous run (§54).
+**Decoding across a join.** A jump needs a decoder restart at a keyframe. Export is already blocking and needs nothing new. **Preview must not stall:** `video-source.ts` keeps a second decode session (`#next`, at most two alive) that starts `JOIN_LEAD = 2 s` before a join at `keyframe_at_or_before(next part's start)`, and swaps at the join. At most two decoders exist at once per slot. Measured by `preview-sync.spec.ts`'s new join case: no gap above the late-frame budget across a join on the reference fixture, and TE-22 on 4K with long GOPs. **Learned from Tooscut's `frame-renderer.worker.ts`:** request frames per source in ascending time and keep one iterator per contiguous run (§53.4).
 
 ### 44.4 Rebased transcript
 
@@ -4792,7 +4835,7 @@ pub fn concat_parts(chunks: &[&[f32]], rate: Hz, xfade: DurMs) -> Vec<f32>;
 pub const JOIN_XFADE: DurMs = DurMs::new(30);      // (assumption, V6.3) equal-power
 ```
 
-`prepare-short.ts`: for each part, `decodeAudioRegion` into a 48 kHz buffer; `concat_parts`; pad or trim by at most one sample so `pcm48.len() == round(assembly.duration × 48)`. Then the existing stages run: `runChain` → `out48` (INV-10 holds on the virtual clip) → `measureProsody` → `silence_profile` → plan → `timemap::build` → `assemble` → `prog48`. One loudness target applies to the whole short, so parts recorded at different levels do not jump. **`assemble` is unchanged by this section.**
+`prepare-short.ts`: for each part, `decodeAudioRegion` over the part's file (§44.8) into a 48 kHz buffer; `concat_parts`; pad or trim by at most one sample so `pcm48.len() == round(assembly.duration × 48)`. Then the existing stages run: `runChain` → `out48` (INV-10 holds on the virtual clip) → `measureProsody` → `silence_profile` → plan → `timemap::build` → `assemble` → `prog48`. One loudness target applies to the whole short, so parts recorded at different levels do not jump. **`assemble` is unchanged by this section.**
 
 **Part edges.** A part extends `PART_LEAD = 120 ms` before its first word and `PART_TAIL = 200 ms` after its last word, never past the neighbouring sentence's word (assumptions, E-12). The `Cut` rules then treat lead-in and tail as usual.
 
@@ -4804,15 +4847,42 @@ pub const JOIN_XFADE: DurMs = DurMs::new(30);      // (assumption, V6.3) equal-p
 
 ### 44.7 Render cache and restore
 
-The cache key's canonical JSON gains `assembly` and, for a short, `sourceHashPrefix` of the source instead of the clip's. With `Assembly::whole` the key's field is omitted, so a V5 key stays valid. `restore-clip.ts` loads a short by its `clips` row, opening `sources/<sourceRef>/source`.
+The cache key's canonical JSON gains `assembly` and, for a short, `sourceHashPrefix` of the source instead of the clip's. With `Assembly::whole` the key's field is omitted, so a V5 key stays valid. `restore-clip.ts` loads a short by its `clips` row and opens its part files through `SourceMedia` (§44.8, v1.4; v1.3 opened a whole-source copy, which no longer exists).
 
-**Acceptance (V6.3).** `assembly.rs` (every refusal, round trip, property: `to_recording(to_source(t).at) == t`); `assembly_readers.rs`; `rebase.rs`; `regions.rs` (no click across a join; length exact); `stitched.spec.ts`: a fixed `Assembly` with three parts out of order over the 60 s fixture, exported, passes checks 1-11 with the expected duration, and every white marker frame comes from the source time it should; `cuts_applied.spec.ts`; all §41.1 proofs unchanged.
+### 44.8 Part copies: the media a short keeps (v1.4)
+
+A short's parts are copied from the source into OPFS once the Director has chosen them (§43), so the short never needs the original file again.
+
+```rust
+// offcut-mp4/src/remux.rs  [ONLY]
+pub fn remux_range(src: &mut dyn RandomAccess, probe: &ProbeInfo, span: SourceSpan, handle: DurMs,
+                   out: &mut dyn std::io::Write) -> Result<PartFileInfo, RemuxError>;
+pub struct PartFileInfo { pub covers: SourceSpan, pub starts_at: SourceMs, pub bytes: Bytes }
+
+// offcut-types/src/assembly.rs
+pub struct PartFile { pub covers: SourceSpan, pub starts_at: SourceMs, pub path: OpfsPath }
+pub struct SourceMedia { files: Vec<PartFile> }                        // private
+impl SourceMedia {
+    pub fn whole(path: OpfsPath, duration: DurMs) -> SourceMedia;    // a dropped clip: its own file
+    pub fn file_at(&self, s: SourceMs) -> (&PartFile, DurMs);          // the file, and the time inside it
+}
+```
+
+- **What is copied.** Video: the encoded samples from the sync sample at or before `span.start − handle` to the first sample at or after `span.end + handle`, as they are, with the source's `avcC` or `hvcC`; nothing is re-encoded. Audio: the AAC samples over the same range plus `AAC_PREROLL`. The output is an ordinary MP4 with `moov` first, which `offcut-mp4`'s demuxer reads as it reads a clip, so `video-source.ts`, the export loop and `decodeAudioRegion` need no new parsing.
+- `handle = PART_COPY_HANDLE = 1 s` (assumption, V6.3): room for `PART_LEAD`, `PART_TAIL`, V6.8's transition handles (`MAX_HANDLE = 500 ms`) and a small part edit, without the original file.
+- `starts_at` is the source time of the file's first sample, so `file_at` turns a `SourceMs` into a time inside the file. `to_source` stays the only door from recording time to source time (INV-27): `SourceMedia` maps a source time to a file, never a recording time.
+- Two parts of one short that overlap once their handles are added share one file. Parts of different shorts are copied separately (S-6 allows 20% overlap), so evicting one short never breaks another.
+- **Who calls it.** `run-source-pipeline.ts`, in `copying_parts` (§43.8), for every validated short in list order, before `prepare-short.ts`. In V6.3, `stitched.spec.ts` copies its fixed parts of the 60 s fixture the same way, so the real path is tested before the Director exists.
+- `remux_range` writes no `udta`, keeps zero creation times and copies no metadata (P-13).
+- **Adding a part later** (V6.9 chat's `AddSentences`) needs media the short does not have: the request asks for the same file again, copies the new part, and continues (§49.2).
+
+**Acceptance (V6.3).** `assembly.rs` (every refusal, round trip, property: `to_recording(to_source(t).at) == t`); `assembly_readers.rs`; `rebase.rs`; `regions.rs` (no click across a join; length exact); `remux.rs` (H.264 and HEVC ranges: starts on a sync sample, every sample of the range present, durations exact, the part file passes the clip probe; no metadata copied); `source_media.rs` (`whole` is the identity; `file_at` at every boundary); `stitched.spec.ts`: a fixed `Assembly` with three parts out of order over the 60 s fixture, copied by `remux_range` and exported, passes checks 1-11 with the expected duration, and every white marker frame comes from the source time it should; `cuts_applied.spec.ts`; all §41.1 proofs unchanged.
 
 ---
 
 ## 45. The Director: From a Long Video to a List of Shorts (V6.4)
 
-**Model: one LLM request per source reads the master transcript by sentence and returns a `ShortsPlan`: which sentences make each short, in what order, and why. A validator checks it like a plan. Each accepted short becomes a virtual clip, then gets its own ordinary `/plan`. If the service fails, local rules produce a smaller list, so no job dead-ends. Rejected: one giant call that also writes every short's visuals (a 180 kB word-level body breaks INV-4's 64 kB, and a failed part loses everything), word-level selection (allows the mid-sentence cuts users complain about in other tools), a virality score (unverifiable; `why` is shown instead).**
+**Model: one LLM request per source reads the master transcript by sentence and returns a `ShortsPlan`: which sentences make each short, in what order, and why. A validator checks it like a plan. Each accepted short becomes a virtual clip, then gets its own ordinary `/plan`. If the service fails, local rules produce a smaller list, so no job dead-ends. Rejected: one giant call that also writes every short's visuals (a word-level body is several times the route's limit, 400 kB or more for 45 minutes, and a failed part loses everything), word-level selection (allows the mid-sentence cuts users complain about in other tools), a virality score (unverifiable; `why` is shown instead).**
 
 ### 45.1 Types
 
@@ -4841,7 +4911,7 @@ pub struct ShortsSentence { pub text: String, pub start: SourceMs, pub end: Sour
 pub struct ShotLine { pub start: SentenceIdx, pub kind: ShotKind, pub face: FacePos }   // §46; empty until V6.5
 ```
 
-Size: 20 minutes at 200 words a minute is 4,000 words, about 24 kB of text; about 300 sentences at about 40 B each is 12 kB; 100 shot lines at 16 B is 1.6 kB; the total is under 40 kB, inside INV-4's 64 kB. `no_media_routes.rs` keeps passing. **A body above the limit is trimmed by the client:** shot lines first, then `energy_z`; a test proves a 20-minute worst case fits.
+Size (v1.4, 45 minutes): at 200 words a minute, 9,000 words, about 54 kB of text; about 700 sentences at about 80 B of JSON each beside their text, 56 kB; 225 shot lines at 16 B, 3.6 kB; the total is about 115 kB. **`POST /shorts` therefore takes up to `SHORTS_BODY_LIMIT = 160 kB`** (DC-15, the second exception to INV-4's 64 kB, JSON only); every other JSON route keeps 64 kB. **A body above the limit is trimmed by the client:** shot lines first, then `energy_z`; a test proves a 45-minute worst case fits.
 
 Prosody here is per sentence (`energy_z` averaged), read cheaply from `pcm16`; the word-level pass stays per short.
 
@@ -4849,7 +4919,7 @@ Prosody here is per sentence (`energy_z` averaged), read cheaply from `pcm16`; t
 
 | Item | Value |
 |---|---|
-| Route | `POST /api/v1/shorts`, bearer **required**, 64 kB, 6/min per user |
+| Route | `POST /api/v1/shorts`, bearer **required**, 160 kB (DC-15; v1.3: 64 kB), 6/min per user |
 | Response | `ShortsResponse { plan: ShortsPlan, long_videos_remaining: Option<u32> }`, at most 32 kB |
 | Errors | `E_SHORTS_QUOTA` (429), `E_PLAN_UNAVAILABLE` (502/504, or at the spend cap §52), `E_PLAN_INVALID` (502 after one retry) |
 | Timeout | `SHORTS_UPSTREAM_TIMEOUT = 60 s` (assumption, TE-15), client 75 s |
@@ -4857,7 +4927,7 @@ Prosody here is per sentence (`energy_z` averaged), read cheaply from `pcm16`; t
 | Prompt | `offcut-plan::shorts_prompt` (feature `prompt`), snapshot-tested with `SHORTS_PROMPT_VERSION` |
 | Retry of a source | A second call for the same `sourceHashPrefix` in a month does not use another grant (the client sends the prefix's hash; the server keeps `(user, month, prefix_hash)`), so a failed run is not charged twice |
 
-**Why sign-in is required.** PS §10 keeps the AHA before sign-in for clips. A long video costs the user 30 minutes and costs money per call, and a limit must be shown before the work (PS §8 principle 5). So the long path gates at the drop (`gated_signin`), not after the transcript. Anonymous users keep the whole clip path.
+**Why sign-in is required.** PS §10 keeps the AHA before sign-in for clips. A long video costs the user several minutes, is transcribed in the cloud (§43.6, which needs a session) and costs money per call, and a limit must be shown before the work (PS §8 principle 5). So the long path gates at the drop (`gated_signin`), not after the transcript. Anonymous users keep the whole clip path.
 
 ### 45.4 What the prompt asks for
 
@@ -4901,10 +4971,11 @@ pub fn validate_shorts(plan: ShortsPlan, t: &Transcript, cfg: &ShortsConfig) -> 
 
 ```text
 usecases/run-source-pipeline.ts
-  probe → gate → copy → pcm16 → windowed ASR → master transcript → [V6.5 coarse vision]
-  → request-shorts.ts → validate_shorts → for each ShortSpec in order: prepare-short.ts
+  probe → gate → pcm16 (from the File, in place) → [V6.5 coarse vision, from the File] → cloud windows (§43.6)
+  → master transcript → request-shorts.ts → validate_shorts → remux_range for every short's parts (§44.8)
+  → for each ShortSpec in order: prepare-short.ts
 usecases/prepare-short.ts (one short)
-  rebase_transcript → decodeAudioRegion×parts → concat_parts → runChain → measureProsody → silence_profile
+  rebase_transcript → decodeAudioRegion×part files → concat_parts → runChain → measureProsody → silence_profile
   → detect → request-plan.ts (existing, per short, or rules) → validate → timemap::build → assemble → store
   → poster frame → state = ready
 ```
@@ -4919,7 +4990,7 @@ usecases/prepare-short.ts (one short)
 |---|---|
 | `ui/pages/ShortsPage.tsx` | The list: poster, title, length, parts count, reason. Keep or delete; "Open" |
 | Opening a short | Loads it as a clip into the existing editor (`clip-machine`, `EditorLayout`). Everything from V4-V5 works: words, toggles, style, undo, export. A "Back to all shorts" link is the only addition to that page |
-| Parts list (in `CutsSection`) | Each part with its text and role; delete a part; restore a deleted one. The user cannot type a new range before V6.9 (chat). Deleting a part rebuilds the virtual clip without re-requesting the plan: the plan's items outside it are dropped by V-3 |
+| Parts list (in `CutsSection`) | Each part with its text and role; delete a part; restore a deleted one. The user cannot type a new range before V6.9 (chat), and adding one then asks for the original file (§44.8). Deleting a part rebuilds the virtual clip without re-requesting the plan: the plan's items outside it are dropped by V-3 |
 | `usecases/export-shorts.ts` | "Export kept shorts": sequential, one `start-export` at a time, each with its own `ExportId`, each counted as one export. Free users see "3 exports left" before the click (INV-14). A failure skips to the next and reports at the end |
 | Downloads | One file per short through the existing download path (`offcut-<yyyymmdd-hhmm>-<n>.mp4`). No zip at launch |
 
@@ -4927,7 +4998,7 @@ usecases/prepare-short.ts (one short)
 
 `long_source_accepted { duration_bucket, resolution_bucket, codec }`, `source_stage_timing { stage, ms_bucket }`, `director_result { source, outcome, shorts, dropped_by_reason, joined_shorts }`, `short_action { action: opened | kept | deleted | part_deleted | exported, style, parts_bucket }`. `export_done` gains `from_short: bool`. The E-12 and E-13 readings need these.
 
-**Acceptance (V6.4).** `shorts.rs` (one case per rule), `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts` (each failure kind ends in a usable list), `long-to-shorts.spec.ts`: a 12-minute fixture with a fake provider goes to 5 exported shorts, each passing all 11 checks. E-13 instrumentation live.
+**Acceptance (V6.4).** `shorts.rs` (one case per rule), `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts` (each failure kind ends in a usable list), `long-to-shorts.spec.ts`: a 12-minute fixture with a fake provider and the fake transcription goes to 5 exported shorts, each passing all 11 checks, and the shorts reopen after the file is gone (part copies, §44.8); a 45-minute worst-case request fits `SHORTS_BODY_LIMIT`; `no_media_routes.rs` with DC-15. E-13 instrumentation live.
 
 ---
 
@@ -4939,8 +5010,8 @@ usecases/prepare-short.ts (one short)
 
 | Pass | When | Reads | Gives |
 |---|---|---|---|
-| **Coarse**, whole source | After ASR, before the Director | Keyframes only, at most 1 per 3 s (`COARSE_STEP`, assumption). A long GOP gives fewer | `ShotSummary`: shot boundaries, kind, face presence |
-| **Fine**, per short | In `prepare-short.ts` | Decoded frames at `FACE_FPS = 5` (assumption, TE-23) over the short's parts | `FramePath` |
+| **Coarse**, whole source | After the audio step and before transcription, while the dropped file is in hand (v1.4, §43.8); it reads the `File` in place | Keyframes only, at most 1 per 3 s (`COARSE_STEP`, assumption). A long GOP gives fewer | `ShotSummary`: shot boundaries, kind, face presence |
+| **Fine**, per short | In `prepare-short.ts` | Decoded frames at `FACE_FPS = 5` (assumption, TE-23) over the short's part files (§44.8) | `FramePath` |
 
 **Frame hand-off.** `media.worker` decodes and scales to at most 320 px on the long side, and transfers `ImageBitmap`s through the main hub to `asr.worker` (no worker-to-worker channel, §36).
 
@@ -4983,7 +5054,7 @@ impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub 
 
 **A 4K source helps here.** A vertical crop of 3840 × 2160 is 1215 px wide before scaling to 1080, so face-tracked 4K stays sharp; a 1080p crop is upscaled from 607 px. The review shows a one-time note: "Filmed in 4K? Use the 4K file for a sharper short."
 
-**Acceptance (V6.5).** `shots.rs`, `tracking.rs` (table of paths: still face, walking face, cut, lost face), `vision_summary_prompt.rs` (the lines reach the prompt within budget), `framing.rs` (none equals V5), `vision-pass.spec.ts`. Reads: coarse pass under 3 minutes on a 20-minute file; fine pass under 20 s per 60 s short on D1 (assumptions, TE-23). TE-23 recorded.
+**Acceptance (V6.5).** `shots.rs`, `tracking.rs` (table of paths: still face, walking face, cut, lost face), `vision_summary_prompt.rs` (the lines reach the prompt within budget), `framing.rs` (none equals V5), `vision-pass.spec.ts`. Reads: coarse pass at most 0.15× the source's duration (about 7 minutes on a 45-minute file; v1.3 read 3 minutes on 20); fine pass under 20 s per 60 s short on D1 (assumptions, TE-23). TE-23 recorded.
 
 ---
 
@@ -4994,14 +5065,14 @@ impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub 
 | Release | Kinds | Notes |
 |---|---|---|
 | V4 | `NumberReveal`, `ListReveal`, `FromTo`, `KeywordPop` | Built |
-| V6.2 | `Emphasis`, `IconPop`, `PunchIn`, `Emoji` | `DrawCmd::Image` first used here, for raster emoji and icons from a closed bundled set (licence recorded) |
+| V6.2 | `Emphasis`, `IconPop`, `PunchIn`, `Emoji` | `DrawCmd::Image` first used here, for raster emoji and icons from a closed bundled set (licence recorded). `PunchIn` is the auto zoom (§47.2, v1.4) |
 | V6.6, part A | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus` | The cards shorts use most, first |
 | V6.6, part B | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Kept by the founder |
-| V6.6, part C | Kinetic `CaptionMotion` rows, per-glyph animation | Data in `StyleSpec` plus `MotionPreset` arms |
+| V6.6, part C | Kinetic `CaptionMotion` rows, per-glyph animation | Data in `StyleSpec` plus `MotionPreset` arms. v1.4 candidates from the founder's references (§47.2): a typographic lockup, a mixed-font pair beside the head, and a glass treatment for part A's cards |
 | V6.6, part D | `ShapeFrame`, `Transition` (shape wipes at topic shifts) | First use of `Video.mask`; kept by the founder. §41.4's cost trigger applies here by name |
 | V6.6, part E | `HookTitle`, `ProgressBar`, `EndCard` | `EndCard` adds a `Hold` |
 | V6.7 | `SoundCue { at: WordIdx, sound: SoundId }` | A closed bundled set if TE-16 passes |
-| V6.8 | `Broll { anchors, asset: AssetRef, fit: Cover \| Contain \| Pip, keep_audio: bool }`, `JoinTransition { after_part, kind: Dissolve \| Whip \| SlideUp }`, `Layout { from_word, kind: FollowFace \| ScreenAndFace \| Full }` | Non-text assets only from the asset box |
+| V6.8 | `Broll { anchors, source: BrollSource, fit: Cover \| Contain \| Pip, keep_audio: bool }` with `BrollSource = Asset(AssetRef) \| Stock { query: Label }` (v1.4; a `Stock` source is resolved to an asset before validation, §48.6), `JoinTransition { after_part, kind: Dissolve \| Whip \| SlideUp }`, `Layout { from_word, kind: FollowFace \| ScreenAndFace \| Full }` | Non-text assets only from the asset box |
 | V6.11 | `TextBehind { anchors, text: Label }`, `Background { from_word, background: BackgroundRef }` | Gated by TE-25 |
 | Post-launch | `ChapterMarker`, `LowerThird` | PS §21 item 15 |
 
@@ -5013,11 +5084,25 @@ impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub 
 
 Music, ducking and bed values are §40.6, unchanged. Sound cues are short bundled sounds mixed in `assemble` after ducking at `SFX_LEVEL = -18 dB` (assumption, E-2). `assemble`'s `MusicInput` becomes part of a `MixInput { music, sounds, broll_audio }`, and `MixInput::none()` is the identity (`program_identity.rs` unchanged).
 
+### 47.2 Auto zoom and the quality bar (v1.4)
+
+The founder's decision of 2026-11-08: shorts should move and look like those made by Submagic-class tools. The zoom is the plan's, through `PunchIn`, with no new render path: a `PunchIn` changes only the `Video` command's crop (TDR-21).
+
+| `motion` | What the viewer sees | Timing (assumptions, E-11) |
+|---|---|---|
+| `Snap` | A cut-in to the zoom at the anchor word's start, held over the anchors | In within one frame; out over `ZOOM_RELEASE = 300 ms`, ease-out, after the anchors |
+| `Push` | A slow push-in across the anchors | `ease_in_out` from 1.0 to the scale over the anchors; out as `Snap` |
+
+- **Scales:** `Mild = 1.12`, `Strong = 1.25` (assumptions, E-11). With a `FramePath` (V6.5) the zoom centres on the face; without one, on the crop's centre. The crop never leaves the source (§46.4's clamp).
+- **Rules (V-3):** two `PunchIn`s never overlap; a `PunchIn` never overlaps a cut's jump zoom (§44.6), which wins; at most one `PunchIn` per sentence (assumption, E-11). V-9's density rule does not count `PunchIn`, which adds nothing to the frame.
+- **Prompt addition:** zoom on the claim, the number or the punchline, never on filler; `Snap` on one strong word, `Push` across a sentence that builds.
+- **The bar.** Quality is judged in the quality pass after V6.11 (`buildplan.md` §8A.12) against the founder's benchmark: Submagic-made shorts and caption references, kept outside git (the repository is public). The references point at three caption families that V6.6 part C weighs: **typographic lockups** (words of mixed size and weight stacked into one block, one accent colour, the camera pushing through the block as it grows); **mixed-font pairs beside the speaker's head** (a bold sans with an italic serif, which needs an OFL serif italic in the font registry and the face position of V6.5); and **glass cards** with the video blurred behind them (§48.4's reduced-resolution blur, brought forward to V6.6 if kept). Each is a §41.4 cost check by name, as part D is.
+
 ---
 
 ## 48. Layers: B-roll, Asset Box, Transitions, Split Layout (V6.8)
 
-**Model: a frame's display list may hold several `Video` commands from several sources, drawn in list order with Vello runs between them. Assets are user files stored locally, labelled by the user. The plan, and later chat, places them by pointing at words. Rejected: stock footage at launch (the founder's decision of 2026-11-02: licences, a server search route, a new browser host), a timeline for placing them (PS §8 principle 3), a second compositor (one list, one renderer).**
+**Model: a frame's display list may hold several `Video` commands from several sources, drawn in list order with Vello runs between them. Assets are the person's own files stored locally and labelled by them, or (v1.4) stock clips from Pixabay downloaded into the same local store. The plan places them by pointing at words; the person can place one by hand on a word (v1.4), and from V6.9 chat can. Rejected: a timeline for placing them (PS §8 principle 3), a second compositor (one list, one renderer), other stock providers at launch (read 2026-10-29: Pexels had paused new keys, Coverr's free API is non-commercial, Mixkit has no API), generated B-roll. v1.3 rejected stock too (the founder's decision of 2026-11-02); the founder reversed that on 2026-11-08, and §48.6 answers its three reasons: the licence, a server search route, a new browser host.**
 
 ### 48.1 Slots and sources
 
@@ -5032,7 +5117,7 @@ pub struct VideoSources<'a> { pub main: (&'a VideoFrame, Rotation), pub asset: O
 
 - `Scene::source_at(t)` keeps its signature for `Main`. New `Scene::asset_at(t) -> Option<(AssetRef, AssetTime)>` tells the loops what else to fetch.
 - **At most three decoders run at once** (`Main`, one asset, one matte), plus a join's lead decoder on `Main`. An asset that starts soon gets its decoder `JOIN_LEAD` ahead. Tested at the budget on D1, then R1 in V9.
-- **Learned from Tooscut's `RenderFrameTask.textureRequests`:** each frame states which sources and times it needs; the worker groups them by source. Ours sits behind `Scene::asset_at`, and the frames stay `VideoFrame`s (§54).
+- **Learned from Tooscut's `RenderFrameTask.textureRequests`:** each frame states which sources and times it needs; the worker groups them by source. Ours sits behind `Scene::asset_at`, and the frames stay `VideoFrame`s (§53.4).
 
 ### 48.2 Compositor
 
@@ -5069,7 +5154,9 @@ A handle is frames available past `src.end`, at most `MAX_HANDLE = 500 ms`, read
 pub struct AssetId(Uuid);
 pub enum AssetKind { Video, Image }
 pub struct AssetMeta { pub id: AssetId, pub kind: AssetKind, pub label: Label, pub note: Option<Label>,
-                       pub duration: Option<DurMs>, pub width: Px, pub height: Px, pub has_audio: bool, pub added_at: UnixSecs }
+                       pub duration: Option<DurMs>, pub width: Px, pub height: Px, pub has_audio: bool, pub added_at: UnixSecs,
+                       pub origin: AssetOrigin }                     // v1.4; #[serde(default)]: Own
+pub enum AssetOrigin { Own, Pixabay { id: u64 } }
 pub struct AssetRef { pub id: AssetId, pub start_in_asset: DurMs }
 ```
 
@@ -5079,12 +5166,38 @@ pub struct AssetRef { pub id: AssetId, pub start_in_asset: DurMs }
 | Storage | `assets/<assetId>/source` in OPFS and the `assets` store. `AssetMeta` has no file name (P-11). "Clear local data" removes them |
 | Limits | At most 50 assets, 10 GB, per browser (assumptions) |
 | Label | The user types a label ("my office", "product demo") and an optional note, at most `ASSET_NOTE_CHARS = 120`. **Label and note leave the device in plan requests while the AI plan is on, and the settings table says so.** The asset's pixels and audio never do |
-| Placement by plan | The plan request lists `AssetLine { id, kind, label, note, duration_bucket }`. The model places `Broll` items pointing at words where they fit |
-| Placement by the user | From V6.9, by chat: "use my office clip when I say headquarters". Before V6.9 the review toggles what the plan placed, and offers "Place again" |
+| Placement by plan | The plan request lists `AssetLine { id, kind, label, note, duration_bucket }`, and `stock: bool` (§48.6). The model places `Broll` items pointing at words where they fit |
+| Placement by the person (v1.4) | **By hand, from V6.8:** a word in the caption editor, then "Add B-roll here", then one of the person's assets or a stock search (§48.6) and, for a video, which part of it to use. Stored as `PlanOp::PlaceAsset` in `EditState.plan_ops` through `effective_plan` (§49.2; V6.8 builds the op log with `PlaceAsset` and `RemoveAsset` only), so it is one undo step and passes the same validator. From V6.9, also by chat ("use my office clip when I say headquarters"). The review still toggles what the plan placed |
+| Choosing the part (v1.4) | For a video asset, a strip of its frames with a window as long as the anchored words; dragging the window sets `AssetRef.start_in_asset`. It is the one direct control besides the crop offset (PS §8 principle 3, v1.4), and it is not a timeline |
+| Rights (v1.4) | The Terms of Service say the person must hold the rights to clips they add (for example a lecture they did not film). Stock clips carry Pixabay's licence (§48.6) |
 | Audio | `keep_audio` is off by default; speech stays on top, ducked like music |
 | Failure | A missing asset drops the item (V-2), and the review says so |
 
-**Acceptance (V6.8).** `composite.rs` (simple path identical), `layers_goldens` (B-roll cover, contain, picture-in-picture, split, full), `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`, verifier 11/11 on an export with B-roll and transitions, memory read at three decoders (TE-14 re-read).
+### 48.6 Stock B-roll from Pixabay (v1.4, flag `stock_broll`)
+
+**The founder's decision of 2026-11-08:** stock is in, from Pixabay, beside the person's own clips. Pixabay's terms as read on 2026-10-29 (re-read before V6.8 is planned, TE-26): a free API key; 100 requests per 60 s per key; searches cached for 24 h; "show your users where the images and videos are from" wherever results are shown; videos may be embedded directly; no mass downloads; the content licence allows commercial use with no credit required, but no standalone redistribution and no competing stock service. `cdn.pixabay.com` sends `Access-Control-Allow-Origin: *`, so the browser can fetch from it under COEP.
+
+```text
+search    client → POST /api/v1/broll/search { query } → our server → Pixabay's video API
+          ← { results: [{ id, duration, width, height, thumb_url, video_url }] }      (at most 12)
+download  client → GET video_url on cdn.pixabay.com → assets/<assetId>/source, origin Pixabay { id }
+```
+
+| Item | Value |
+|---|---|
+| Route | `POST /api/v1/broll/search`, bearer required, JSON, 1 kB body, 20/min per user (assumption) |
+| Query | A `Label` of at most 40 characters (V-4's digit rule applies), typed by the person or written by the plan |
+| Server | `server/src/broll/`: a `StockProvider` trait and `PixabayProvider`; key `PIXABAY_API_KEY`; a global token bucket of 90 requests per 60 s, under Pixabay's 100 |
+| Cache | 24 h in memory, as Pixabay requires, keyed by the SHA-256 of the normalised query. **The query text is neither stored nor logged** (P-17); a cache entry holds only Pixabay's ids, sizes and URLs |
+| Rendition | The smallest rendition at least 1080 px on its short side, else the largest; landscape clips are cropped by `fit: Cover` |
+| Download | From the browser straight to `cdn.pixabay.com` (§24.1, browser row 4): video bytes never pass through our server |
+| Attribution | "From Pixabay" in the search panel and on each stock asset in the asset box; no credit inside the export (the licence asks for none) |
+| Switch | Settings, "Stock B-roll (Pixabay)": on by default while the AI plan is on (assumption; the founder confirms at V6.8). Off: the plan request says `stock: false`, and the search box is hidden |
+| Failure | Search down, over the limit or empty: a `Stock` item is dropped (V-2) and the review says so once; the person's own assets are unaffected |
+
+**Placed by the plan.** The model may write `Broll { source: Stock { query } }` on words that name something visual when none of the person's assets fits. `usecases/resolve-stock.ts` runs after the plan returns and before `validate`: for each `Stock` item it searches, takes the first result long enough for the anchors, downloads it into the asset store and rewrites the item to `Asset(AssetRef)`. An item it cannot resolve is dropped. The renderer only ever sees local assets. **Placed by hand.** "Add B-roll here" offers the person's assets and a stock search box filled with the anchored words.
+
+**Acceptance (V6.8).** `composite.rs` (simple path identical), `layers_goldens` (B-roll cover, contain, picture-in-picture, split, full), `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts` (including placing by hand on a word, choosing the part, and undo), `plan_ops.rs` (`PlaceAsset` and `RemoveAsset`: apply, refuse, undo equals before), `broll_search_route.rs` (bearer, limits, the cache keyed by hash), `log_redaction.rs` (a marker word in a search query), `resolve-stock.test.ts`, `stock-broll.spec.ts` (a fake provider and a fake CDN; the switch off sends nothing), verifier 11/11 on an export with own and stock B-roll and transitions, memory read at three decoders (TE-14 re-read). TE-26 recorded.
 
 ---
 
@@ -5110,7 +5223,7 @@ pub enum PlanOp {
     AddSentences { range: SentenceRange, position: u32 },       // from the master transcript; shorts only
     MovePart { from: u32, to: u32 },
     SetMusic { on: bool, energy: Option<MusicEnergy> },
-    PlaceAsset { asset: AssetId, words: WordRange, fit: BrollFit },
+    PlaceAsset { asset: AssetRef, words: WordRange, fit: BrollFit },   // v1.4: built in V6.8 for placing by hand (§48.5)
     RemoveAsset { id: EventId },
     SetLayout { from_word: WordIdx, kind: LayoutKind },
     SetCaptionPosition { snap: CaptionSnap },
@@ -5129,7 +5242,8 @@ pub fn effective_plan(base: &EditPlan, ops: &[PlanOp]) -> EditPlan;     // pure
 pub fn validate_ops(ops: &[PlanOp], ctx: &OpContext) -> Vec<OpVerdict>;  // each op: applied or refused with a reason enum
 ```
 
-- The stored plan never changes. `EditState` gains `plan_ops: Vec<PlanOp>` (`#[serde(default)]`), so the existing history (`history.ts`, 50 steps) gives chat undo at no extra cost: one chat message is one undo step.
+- The stored plan never changes. `EditState` gains `plan_ops: Vec<PlanOp>` (`#[serde(default)]`), so the existing history (`history.ts`, 50 steps) gives chat undo at no extra cost: one chat message is one undo step. **v1.4:** V6.8 builds `plan_ops`, `effective_plan` and `validate_ops` with `PlaceAsset` and `RemoveAsset` only, for B-roll placed by hand (§48.5); V6.9 adds the other operations and the chat route.
+- `AddSentences` needs media the short does not hold: it asks for the original file, copies the new part (§44.8), then rebuilds.
 - Everything downstream reads `validate(effective_plan(base, ops), ...)`. INV-21 holds: **chat cannot put anything on screen that the validator has not returned.**
 - An op that changes parts (`RemovePart`, `AddSentences`, `MovePart`) rebuilds the `Assembly` and re-runs `prepare-short.ts` from the audio step; the UI says "Rebuilding this short" for those only. Every other op reaches the preview through the existing `review-update` path, within the existing 150 ms budget.
 - `CutWords` is user-invented cutting, which §36 used to forbid. It is allowed here because the user asked in words, it must be whole sentences or a detected filler, and it appears in the cuts list with a restore (PS §8 principle 7).
@@ -5149,7 +5263,7 @@ pub fn validate_ops(ops: &[PlanOp], ctx: &OpContext) -> Vec<OpVerdict>;  // each
 
 ### 49.4 Interface
 
-`ui/components/ChatPanel.tsx`, a tab beside Captions and Visuals. A text box, the conversation, and for every applied message a one-line summary with an Undo button. Refused ops are explained in plain words ("I can't show a number you didn't say"). Three starter suggestions come from `messages.ts`. **All the review controls stay;** chat is another way to do the same things, and no feature is chat-only except typed requests for new placement.
+`ui/components/ChatPanel.tsx`, a tab beside Captions and Visuals. A text box, the conversation, and for every applied message a one-line summary with an Undo button. Refused ops are explained in plain words ("I can't show a number you didn't say"). Three starter suggestions come from `messages.ts`. **All the review controls stay;** chat is another way to do the same things, and no feature is chat-only except adding sentences to a short (v1.4: B-roll is placed by hand from V6.8, §48.5).
 
 **Failure.** Chat offline or over quota never blocks review: the panel shows why, and every control still works.
 
@@ -5194,9 +5308,10 @@ usecases/manage-queue.ts              one source at a time, through run-source-p
 state/queue-store.ts                  order, state, estimate; `File` objects live for the tab's life
 ```
 
-- A queued `File` stays an in-memory reference, not a copy. Only the running source is copied. After its shorts are prepared and the disk is short, its `source` copy is evicted (§43.4); opening a short then asks for the same file again, verified by hash prefix.
+- A queued `File` stays an in-memory reference, as every source does (v1.4, §43.3): nothing is copied whole, and each finished source keeps only its shorts' part copies (§44.8).
 - **A reload loses queued `File`s** (they cannot be persisted without a handle, P-11): the queue shows the finished ones and asks to drop the rest again.
-- Wake lock for the whole queue. A running estimate: "about 9 hours left on this computer." No promise of background work with the tab closed.
+- Wake lock for the whole queue. A running estimate ("about 2 hours left on this computer"). No promise of background work with the tab closed.
+- Every source is transcribed in the cloud (§43.6), so a long queue meets the per-user and global audio budgets of §22.1: when one is reached the queue pauses with the reason, as a single source does.
 - Each source uses one Director call, counted toward `CREATOR_LONG_SOFT_PER_MONTH`.
 
 **Acceptance (V6.10).** `profile.rs` brand cases; golden matrix; `creator_memory.rs`; prompt snapshot with a fixed memory; `queue.spec.ts` (three small sources, one failing: the others finish; state correct after a reload).
@@ -5294,7 +5409,9 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | At 100% | Every AI route answers `E_PLAN_UNAVAILABLE` until the next month; clients fall back to rules (INV-24). Chat says so. **The founder can raise the cap in a redeploy** |
 | Secret | No client sees a price or the cap |
 
-**Cost model (PS §11; re-read in TE-15).** A 20-minute Director call is about 12,000 input tokens at about 3 tokens per word plus overhead, and about 1,500 output tokens. A per-short plan is about 3,000 input and 1,000 output. One long video with 8 shorts is about 36,000 input and 9,500 output. At the Gemini Flash-Lite rates seen on 2026-11-01 ($0.10 and $0.40 per million, from aggregators, unverified at the source) that is about 0.7 cents; at Gemini Flash ($0.30 and $2.50) about 3.5 cents. **Model choice is TE-15's, by quality on the labelled set rather than by price:** clip choice is the product, so a stronger model is worth 10× this.
+**Cost model (PS §11; re-read in TE-15; v1.4 for 45 minutes).** A 45-minute Director call is about 28,000 input tokens (9,000 words at about 3 tokens per word, plus overhead) and about 1,500 output tokens; v1.3's 20 minutes was about 12,000. A per-short plan is about 3,000 input and 1,000 output. One 45-minute video with 8 shorts is about 52,000 input and 9,500 output. At the Gemini Flash-Lite rates seen on 2026-11-01 ($0.10 and $0.40 per million, from aggregators, unverified at the source) that is about 0.9 cents; at Gemini Flash ($0.30 and $2.50) about 4 cents.
+
+**Transcription (v1.4).** A long video is transcribed in the cloud (§43.6). On Groq's paid tier, $0.04 per hour of audio (cloudimplementation D-342), 45 minutes costs about 3 cents. The free tier's limits (7,200 audio-seconds a rolling hour, 2,000 requests a day, TE-C2) carry about two 45-minute videos an hour across all users, so the founder moves to Groq's Dev tier before the private alpha (D-342's trigger, brought forward). Its cost is not counted in `ai_spend`; it is bounded by the global audio budget of §22.1, whose values the founder raises by configuration with the Dev tier. **Model choice is TE-15's, by quality on the labelled set rather than by price:** clip choice is the product, so a stronger model is worth 10× this.
 
 **Provider rules.** The `PlanProvider` trait gets `complete(request: ProviderRequest) -> ProviderOutput` with token counts. One adapter per candidate. A provider whose terms train on this data is not used. The settings page names the provider and its data terms (P-1, P-14).
 
@@ -5306,10 +5423,10 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 
 | ID | Question | Method | Pass | When | If it fails |
 |---|---|---|---|---|---|
-| TE-17 | Does a large file copy into OPFS within reason, and does the quota hold? | Copy 2, 8 and 16 GB on D1, R1, R2; `storage.estimate` | 10 GB in at most 3 min; no quota error at 2× the file on a 256 GB disk at 50% full | V6.1 | Lower `MAX_SOURCE_FILE_SIZE`; ask (§41.4) about reading in place |
-| TE-18 | Whole-file ASR time and memory | 20-min fixture, `bench/device-bench.ts --long` | Total pipeline at most 60 min p90 on R1 (PS §20.2A) | V6.1, V9 | Two-pass ASR (§43.6) |
+| TE-17 | (v1.4) Does reading in place hold up, and are part copies fast and correct? | On D1, R1, R2: the probe and the audio step over a 45-minute 1080p H.264 file and a 45-minute 4K HEVC file read in place (`fileRandomAccess`); `remux_range` of 10 parts of 60 s from each; `storage.estimate` | Probe at most 2 s; audio step at most 4 min; 10 part copies at most 60 s; every part file passes the clip probe and the verifier's decode checks (assumptions) | V6.1 (reading), V6.3 (copies) | Larger read cache; copy the parts during the Director's call; ask (§41.4) |
+| TE-18 | (v1.4) Cloud transcription of a long source: time, limits, quality at the seams | A 45-minute fixture through `transcribe-source.ts` on Groq; then the labelled long set | To the master transcript at most 6 min p90 on D1 after the audio step; no word lost or doubled at window seams on the labelled set; the per-user and global budgets hold (assumptions) | V6.1, V9 | A larger overlap; a lower concurrency; the Dev tier; ask (§41.4) |
 | TE-19 | Director quality with sentences only | The labelled long set (E-13's) through two candidates | At least 60% of the model's shorts rated postable by the panel | V6.4 | Tune prompt; stronger model; more shot lines |
-| TE-20 | Do long jobs survive a hidden tab, Memory Saver and sleep? | Run a 20-min job hidden; with Memory Saver on; with a sleep mid-job | Progress continues hidden, at most 2× slower; after discard or sleep it resumes with at most one window lost | V6.1 | Copy tells the user to keep the tab visible; ask (§41.4) |
+| TE-20 | Do long jobs survive a hidden tab, Memory Saver and sleep? | Run a 45-min job hidden; with Memory Saver on; with a sleep mid-job | Progress continues hidden, at most 2× slower; after discard or sleep it resumes with at most the windows in flight lost, and asks for the file only in the stages of §43.7 | V6.1 | Copy tells the user to keep the tab visible; ask (§41.4) |
 | TE-21 | HDR (HLG, PQ) from phones and cameras | Decode through `importExternalTexture`; compare with an SDR render on `verify_mp4.py` | No washed or clipped frames on 5 clips | V6.1 | `REJECT_HDR`; with advice |
 | TE-22 | Preview across a join on long-GOP 4K | `preview-sync.spec.ts` join case at 4K | Late frames within budget | V6.3 | Lower the lead's resolution; a longer `JOIN_LEAD` |
 | TE-23 | Which face detector: speed, accuracy, licence | Three candidates on 20 corpus shorts | Under 15 ms a frame on D1; at least 95% of faces found on frontal shots; a licence that allows bundling in a paid product | V6.5 | Next candidate; a coarser `FACE_FPS` |
@@ -5320,6 +5437,7 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | TE-C3 | The same visual events, cloud and device | the same | Every event on six clips, plus the 3-item list the device misses | Cloud transcription | Stop and ask |
 | TE-C4 | Drop to ready, cloud and device | the same | 13-14× faster on a minute of speech, model cached | Cloud transcription | Recorded |
 | TE-C5 | Vercel's rewrite carries the body; a live request's time | the same, at the merge | (P170) | Cloud transcription | Lower the limit or the bitrate |
+| TE-26 | (v1.4) Stock B-roll from Pixabay: terms, relevance, the browser fetch | Re-read Pixabay's API terms and content licence; 20 plan-written queries from the labelled set; a fetch from `cdn.pixabay.com` under the app's COEP and CSP; rendition sizes | Terms as §48.6 states them; at least 12 of 20 queries give a clip the founder would use; the fetch works with no proxy (assumptions) | V6.8 | Stock by hand only (no plan-written queries); ask (§41.4) if the terms changed |
 
 TE-15 now also covers the paid provider: price, the `/shorts` and `/chat-edit` latency, data terms. Its "free tier" pass line becomes "free tier for development; the cost model of §52 fits the cap".
 
@@ -5332,35 +5450,38 @@ E-12 and E-13 are PS §19's. Their instrument is §45.9's analytics plus `script
 | INV-25 | Nothing reads a shorts plan that `validate_shorts` has not returned; every part is whole sentences | `shorts.rs`; trybuild on `ShortSpec` |
 | INV-26 | With every flag off and with `Assembly::whole`, frames and samples equal V5's | `flags_identity.spec.ts`, §41.1 |
 | INV-27 | Source time reaches recording time only through `Assembly`; only the four files of §44.3 call it | `assembly_readers.rs`; types with no `From` |
-| INV-28 | No pixel, audio sample or frame of a source or asset leaves the browser. The vision signals sent are enums and sentence indexes | `privacy-network.spec.ts`; `ShotLine` type has no float coordinates or bytes |
+| INV-28 | No pixel or frame of a source or asset, and no audio of an asset, leaves the browser. A source's sound leaves only as compressed windows in `POST /transcribe` bodies (§43.6, P-1; v1.4). The vision signals sent are enums and sentence indexes | `privacy-network.spec.ts`; `ShotLine` type has no float coordinates or bytes |
 | INV-29 | `plan_ops` are applied only through `effective_plan`, and the result only reaches the scene through `validate` | `plan_ops.rs`; INV-21's test |
 | INV-30 | AI spend never passes `AI_MONTHLY_CAP_USD` by more than one in-flight call per worker | `ai_cap.rs` |
 | INV-31 | `CreatorMemory` holds no text | Type-level test: no `String` reachable from it |
+| INV-32 | (v1.4) The renderer reads only local media: a `Stock` B-roll item reaches `validate` only after `resolve-stock.ts` has downloaded it into the asset store; a stock search query is neither stored nor logged on the server | `resolve-stock.test.ts`; `broll_search_route.rs`; `log_redaction.rs` |
 
 **INV-5 is reread:** every removed span of **a clip's recording** is a validated, unrestored `Cut`; a short's parts are a validated `Assembly`; nothing inside a clip's recording is reordered (`TimeMap` ascending). **INV-12 is reread** per DC-10. **INV-2 and P-1 add:** the chat message, its short history, and asset labels and notes, each only in the AI request bodies, only with the AI switch on.
 
-### 53.3 Performance budgets for the long path (assumptions, TE-18)
+### 53.3 Performance budgets for the long path (assumptions, TE-17, TE-18; v1.4)
 
-Reference: a 20-minute 1080p H.264 source, model cached, shorts 60 s each, 5 kept.
+Reference (v1.4): a 45-minute 1080p H.264 source, read in place, transcribed in the cloud, shorts 60 s each, 8 prepared, 5 kept. v1.3's reference was 20 minutes, copied whole and transcribed on the device, with 55 minutes to the list.
 
 | Stage | Budget on R1 | Note |
 |---|---|---|
-| Probe | 2 s | |
-| Copy to OPFS | 60 s per 5 GB | |
-| Audio to `pcm16` | 90 s | |
-| ASR | 40 min | D1 estimate 21-27 min |
-| Coarse vision | 3 min | |
-| Director | 75 s | |
+| Probe | 2 s | Reads the `File` in place |
+| Audio to `pcm16` | 4 min | No copy of the file first |
+| Coarse vision | 7 min | At most 0.15× the duration (§46) |
+| Cloud transcription | 6 min | 32 windows, 2 in flight; network-bound (TE-18) |
+| Director | 90 s | A body of about 115 kB (§45.2) |
+| Part copies | 60 s | 8 shorts' parts (§44.8, TE-17) |
 | Prepare 8 shorts (audio chain, plan, fine vision) | 8 min | |
-| **To the list of shorts** | **at most 55 min** | |
+| **To the list of shorts** | **at most 30 min** | |
 | Export 5 × 60 s | 5 × 90 s = 7.5 min | |
-| Peak tab memory | at most 1.5 GB | Unchanged; ASR is the peak |
+| Peak tab memory | at most 1.5 GB | Unchanged; no ASR model on the long path, so the render session is the peak |
 
 Clip budgets of §30 do not change. A 4K source is read separately and has no budget in its first read.
 
 ### 53.4 What we learned from the study folder (Tooscut, read 2026-11-01)
 
 `old_project_study_editor/` holds parts of Tooscut (`github.com/mohebifar/tooscut`), Elastic License 2.0. **Rule (founder, 2026-11-02): we read it to learn how a problem is solved, then design and write Offcut's version in Offcut's types with Offcut's tests. No copying or line-by-line translation of code, shaders, structs or constants. It is outside this repository and is never added.** Mediabunny, which it uses, is MPL-2.0; it is not a dependency of Offcut, and using it would need the §41.4 question.
+
+**v1.4 (founder, 2026-11-08):** Tooscut is the main study source for Offcut's editing engine. Each V6.x plan names the parts of Tooscut it read, and each idea taken from them is recorded in the release's changelog and in the table below. The rule above does not change: the engine is designed for shorts and written in Offcut's own code. The local copy holds no licence file (the `Cargo.toml` and `package.json` files name none); the founder keeps upstream's licence text beside it (v6changelog open item 22).
 
 | Idea | Where it applies here | What differs |
 |---|---|---|
@@ -5381,6 +5502,7 @@ Clip budgets of §30 do not change. A 4K source is read separately and has no bu
 |---|---|---|
 | `long_source_accepted` | V6.1 | `duration_bucket`, `resolution_bucket`, `codec` |
 | `source_stage_timing` | V6.1 | `stage`, `ms_bucket`, `resumed: bool` |
+| `source_paused` | V6.1 (v1.4) | `reason` (the four of §43.6, or `awaiting_file`), `stage` |
 | `plan_result` | V6.2 | As §40.8 |
 | `director_result` | V6.4 | `source`, `outcome`, `shorts`, `dropped_by_reason`, `joined_shorts` |
 | `short_action` | V6.4 | `action`, `style`, `parts_bucket` |
@@ -5402,6 +5524,9 @@ Each (assumption) of §41-§52 is measured by the experiment or release named be
 3. Whether to run E-12 (optional; recommended).
 4. Which V6.8-V6.11 release to reorder or drop after the alpha (§8A.0 of `buildplan.md`).
 5. Each person-mask effect after TE-25.
-6. A 10-minute cap if TE-18 or TE-20 fails on real laptops.
+6. ~~A 10-minute cap if TE-18 or TE-20 fails on real laptops.~~ v1.4: long sources are transcribed in the cloud (§43.6); a failed TE-20 is still a stop-and-ask.
 7. The launch date, when V6.11 closes.
 8. Paid hosting, once there is revenue (`buildplan.md` Appendix D).
+9. (v1.4) Groq's Dev tier before the private alpha, and the audio budgets it allows (§22.1, §52).
+10. (v1.4) The per-user audio budget for long sources, `LONG_AUDIO_PER_USER_DAY` (§22.1), and the stock switch's default (§48.6).
+11. (v1.4) Which of the caption families of §47.2 V6.6 part C keeps.

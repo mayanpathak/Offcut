@@ -11,13 +11,19 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 3 | Whether to run E-12 (optional, recommended) | Founder | PS §19 |
 | 4 | Reorder or drop any of V6.8-V6.11 after the alpha | Founder | BP §8A.0 |
 | 5 | Each person-mask effect after TE-25 | Founder | TS §51.4 |
-| 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
+| 6 | ~~A 10-minute cap, if TE-18 or TE-20 fails on real laptops~~ No longer applies: long sources are transcribed in the cloud (Entry 21, decision 6). TE-20 (hidden tab, sleep) still stands | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 10 | Dodo Payments' verification. **Read 2026-11-04:** identity and bank approved; the product review is on hold because the live landing page reads as a waitlist ("Offcut is not open yet", no way into the app), with a resubmission allowed once the site is public. Not V6's: live mode is the founding release's (D-285, D-303). The founder decides after V6 | Founder, after P150 | Entry 0.1, Entry 18 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 16 | Delete the webhook logger service on Render and its endpoint in Dodo's test mode (keep the `offcut-api` endpoint, registered 2026-11-04); remove `MAIL_API_KEY` from Render, as the V6 deploy is healthy | Founder | Entry 13, Entry 20 |
 | 17 | V6 went live with P148's legal and pricing words and with the account page's two offers, which lead to Dodo's test mode while the pages say Creator is not on sale (D-285). Keep the offers or hide them until the founding release; decide with open item 10's resubmission | Founder, after V6 | Entry 17, Entry 20 |
+| 18 | Spec revision v1.4 (TS §43, §45, §48; PS §12.9-§12.15; BP §8A) from Entry 21's decisions, before V6.1's plan. **Done 2026-11-08 (Entry 22);** the founder reads it | Agent, founder approves | Entry 21, Entry 22 |
+| 23 | ~~Confirm or change the agent's 15 design choices of Entry 22~~ **Confirmed by the founder, 2026-11-08** | Founder | Entry 22, Entry 23 |
+| 19 | Groq's Dev tier before the private alpha (45-minute sources are about 30 windows each) | Founder | Entry 21, D-342 |
+| 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
+| 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
+| 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
 
 ## Known issues for later prompts
 
@@ -650,3 +656,150 @@ So the order held: the old API and the old site stayed together while the new AP
 **Open after V6.** Open item 10: Dodo's product review, on hold as the live site read as a waitlist; with V6 live, the site now has free accounts and exports. Items 16 and 17 above. Then V6.1 opens its own branch from `main` (BP §8A.0).
 
 **Final counts.** Rust 812 / 0 / 4; Vitest 522; `pnpm e2e` 45; verifier self-test 16; media 106 passed, 1 skipped, on D1. Every box of v6implementation §20 is ticked, each with its evidence.
+
+## Entry 21 - 2026-11-08 - Founder's decisions for spec v1.4: two paths, 45-minute sources, stock B-roll (outside a prompt)
+
+A brainstorming session after the cloud release closed (`cloudchangelog.md` Entry 12). Nothing in the code changed. The specs are not yet revised: these decisions are the input to the v1.4 revision, which comes before V6.1's plan is written. Where a line below contradicts TS v1.3, PS v1.3 or BP v1.3, this entry wins until v1.4 copies it in.
+
+**Founder's decisions.**
+
+| # | Decision | Replaces |
+|---|---|---|
+| 1 | **Two separate entry points and pages:** "Make shorts from a long video" and "Edit my clip". The person chooses the path; a file's duration no longer chooses it. Both paths open the same editor | TS §43.1's model line ("a file longer than 90 seconds is a source") |
+| 2 | **One flow for both paths:** the transcript and a base prompt describing everything the editor can do go to the LLM; the plan is validated; **our editor applies it automatically**. The person sees a finished short and can switch any item off or undo. There is no approve-each-step screen. On the long path the LLM first returns the parts to cut and stitch (the Director), then one edit plan per short, exactly as for a clip | As designed (TS §40, §45); the "apply, then review" behaviour is now explicit |
+| 3 | **The build order stays as BP §8A.0 sets it** (V6.1 first). Quality is inspected and improved after all features work, against a Submagic benchmark | BP §8A.0 confirmed; the "core first" reorder offered in the session was declined |
+| 4 | **B-roll from two sources:** the person's own clips (for example a diagram or a lecture clip on "black hole", which stock cannot give) and **Pixabay stock**. The person can place B-roll on a specific word by hand ("Add B-roll here"); the plan also places it. Own clips need a choose-the-part trim | TS §48's model line (stock rejected, 2026-11-02) and its "Placement by the user" row (chat only, from V6.9). V6.8 keeps the feature |
+| 5 | **Long sources up to 45 minutes**, and **no copy of the whole file**: the dropped file is read in place for the session, its audio is extracted and transcribed, the Director picks the parts, and only those ranges (from the keyframe before each part) are copied into OPFS | TS §43.2's 20-minute and 16 GB limits; §43.4's whole-file copy |
+| 6 | **A long video requires cloud transcription.** If Groq fails, the job pauses with "Continue"; it does not fall back to the device (about 50-60 minutes for 45 minutes of speech on D1, derived). Clips keep the device fallback (D-348) | TS §43.6's on-device windows, its time budget and the two-pass seam |
+| 7 | **Limits by duration and resolution only;** no file-size cap on the long path | TS §43.2's 16 GB |
+| 8 | **Submagic-style auto zoom and visual editing** (zooms on key words, emoji, highlights, cards, sound cues, transitions) so a short is visual and engaging. Quality bar: Submagic and the founder's caption references | Extends V6.2's `PunchIn` and V6.6 part C |
+| 9 | **Tooscut is the main study source for the editing engine:** read how it solves each problem, then design and write Offcut's own version, customised to shorts. Same rule as Entry 0: no copying or line-by-line translation of code, shaders, structs or constants; each idea learned is named in the changelog (TS §54) | Entry 0's rule, confirmed with more weight |
+
+**What the decisions imply (the agent's reading, for v1.4).**
+
+- **V6.1 gets smaller:** no 16 GB copy, no quota eviction for sources, no device transcription of a source, no two-pass seam. Range copying moves to where the parts are known (V6.3, V6.4). A tab closed before the parts are copied resumes by dropping the same file again (`sourceHashPrefix`, TS §43.7).
+- **45 minutes is about 30 cloud windows of 90 s.** Groq's free tier (7,200 audio-seconds per rolling hour, 2,000 requests per day, read in TE-C1) carries about 2-3 such videos an hour, shared with every clip: the Dev tier is needed before the alpha, not at launch (D-342).
+- **The Director's request grows** to about 7,000 words of transcript: the 64 kB request bound (BP §8A.4) and the body limit of `POST /shorts` rise to about 160 kB.
+- **Pixabay** (terms read 2026-10-29, to be re-read before building): a free key, 100 requests per 60 s, searches cached 24 h, "from Pixabay" shown wherever results appear, commercial use without credit, `cdn.pixabay.com` sends `Access-Control-Allow-Origin: *`. A server search route keeps the key off the client and holds the cache. Search terms are transcript words that leave the device: the "What leaves" table, P-rules and `privacy-network.spec.ts` must name them. The plan proposes a search term at a word; the person can swap the result.
+- **Own-clip B-roll** adds a Terms line: the person is responsible for the rights to clips they add.
+- **The founder's caption references** (`sh2clips/documents/`, outside the repo; read by the agent as frame sheets) show three families beyond today's word-by-word captions: (a) **typographic lockups**: words of mixed size and weight stacked into one block, one accent colour, a rotated side word, the camera pushing through the block as it grows; (b) **mixed-font pairs** placed beside the speaker's head ("THIS" bold sans with "Style" in an italic serif), which needs a serif italic in the font registry and the face position of V6.5; (c) **glass cards** with icons, numbers and a soft glow, with the background blurred behind them. V6.6 part C and parts A/E are where these are weighed.
+
+**Benchmark (founder).** A few Submagic-made shorts downloaded from YouTube, kept outside git (the repository is public), as the bar to beat in the final quality pass.
+
+**Open items added:** 18 to 22 in the table at the top. Open item 6 (a 10-minute cap if TE-18 fails) no longer applies: long sources are transcribed in the cloud (decision 6).
+
+## Entry 22 - 2026-11-08 - Spec revision v1.4: the core documents rewritten for Entry 21 (outside a prompt)
+
+The founder asked for every core document to carry Entry 21's decisions, carefully. `technicalspec.md`, `product.md` and `buildplan.md` are now v1.4. Each change is marked "v1.4" where it sits, and v1.3's wording is kept beside it where a reader needs the history. No code changed. Uncommitted on the working tree; V6.1's setup commits it with this entry.
+
+**Where each decision landed.**
+
+| Entry 21 decision | TS | PS | BP |
+|---|---|---|---|
+| 1 Two pages | §43.1 (`Entry`, `route_probe` rules 11-15, `/app/long`), DC-1 rewritten | Positioning, §3, J2, L0, §9.4 | §0, §8A.1 |
+| 2 One flow; the editor applies the plan | §40 unchanged (it already worked so) | §12.8 "applies the plan automatically", L6 | §8A.0 goal |
+| 3 Order kept; quality pass at the end | §47.2 "The bar" | §9.5 row, E-15 in §19 | Table row, §8A.0, new §8A.12 |
+| 4 Own and Pixabay B-roll, placed by hand | §48 model line, §48.5, new §48.6, §49.1-§49.2, P-17, INV-32, TE-26, §24.1 host 4, §24.3 CSP, §22.1 route, §22.8 key | §9.2, §9.5, §12.7, §12.8, §12.12, §17, §20.1, §21 item 14 | §8A.8, §8A.9, appendices |
+| 5 45 minutes, read in place, parts copied | §43 rewritten, new §44.8 (`remux_range`, `SourceMedia`), §45.2, DC-15, §46, §50.3, §52, §53.3 | §9.1, §9.4, §12.9, §20.2A | §8A.1, §8A.3, §8A.4, §8A.5 |
+| 6 Long path cloud only, pause on failure | §43.6, §43.7, §43.8, §16, §22.1 window budget, P-1, P-5, INV-3, INV-28, TE-18 | Principle 4, §9.2, §12.6, §12.7, L1, L3, L4, §17, §18 | §1.1, §8A.1 |
+| 7 Duration and resolution limits only | §43.2, DC-3 | §9.4 | §8A.1 |
+| 8 Auto zoom, Submagic-class look | §40.2, §47 table, new §47.2 | §9.5, §12.8 | §8A.2, §8A.6 part C |
+| 9 Tooscut as main study source | §53.4 | §18 licences row | §0 paragraph |
+
+**The agent's design choices, for the founder to confirm or change.** Entry 21 gave the decisions; these are the ways the specs now carry them, chosen by the agent:
+
+1. **Pages.** `/app` stays the clip page, exactly as today (so every protected suite sees the page it knows), with one link to the new `/app/long`. A file of 90 s or less dropped on the long page opens as a clip. The clip page's "too long" panel gains a "Make shorts from it" button, with its words unchanged (DC-1).
+2. **Clip-page file size** follows `high_res` instead of `long_video`: 16 GB with 4K input on, 500 MB off (DC-3).
+3. **The sound is still written to OPFS** as `pcm16.f32` (about 173 MB for 45 minutes), so transcription, the Director and preparing shorts resume after a reload without the file. Only the audio step, the coarse vision pass and the part copies need the file again.
+4. **Part copies** are one small MP4 per part, remuxed without re-encoding, with a 1 s handle each side (`PART_COPY_HANDLE`, assumption), built in V6.3 and called in V6.4 (TS §44.8). Adding a part later through chat asks for the original file.
+5. **Cloud windows:** 90 s with 5 s overlap (32 windows for 45 minutes), 2 in flight, 2 retries, then a pause for one of four reasons (unavailable, busy, signed out, offline).
+6. **Server limits for windows** (the founder sets the values): a window header on `POST /transcribe`, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per day instead of the 20 clips, 200 an hour per IP, and the global budget read from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` so the Dev tier raises it without code.
+7. **`POST /shorts` takes 160 kB** (DC-15): a 45-minute request is about 115 kB.
+8. **The coarse vision pass runs before transcription,** while the file is surely in hand.
+9. **Auto zoom** is `PunchIn`'s new `motion: Snap | Push`, scales 1.12 and 1.25, one per sentence at most, never over a jump-cut zoom (all assumptions, E-11).
+10. **Stock search** is `POST /api/v1/broll/search`, signed-in only, 20 a minute per person and 90 a minute for the server (under Pixabay's 100), cached 24 h by the query's hash so the words are never stored; the browser downloads the clip from `cdn.pixabay.com` through a new `net/stock-fetch.ts`. The plan writes a search term; `resolve-stock.ts` turns it into a local asset before validation, so the renderer only sees local files.
+11. **The stock switch is on by default while the AI plan is on.** This is the founder's call at V6.8.
+12. **Placing B-roll by hand** goes through `plan_ops` (`PlaceAsset`, `RemoveAsset`), built in V6.8 instead of V6.9, so it is one undo step and passes the same validator. The part picker (a window dragged along a clip's frames) is written into principle 3 as the one direct control besides the crop offset.
+13. **The caption references** become three named candidates for V6.6 part C (typographic lockup, mixed-font pair beside the head, glass cards with a blurred background), each a cost check by name, not a commitment.
+14. **The quality pass** is a step of its own after V6.11 (BP §8A.12, PS E-15): tuning inside the existing contracts; a new kind is a stop-and-ask.
+15. **Estimates:** V6.1 12 prompts (was 14), V6.3 16 (was 14), V6.8 19 (was 16); about 150 in all with V6.
+
+**Older errors fixed while editing.**
+- PS principle 4 still said "Video and audio never leave", which has been untrue for clips since the cloud release. It now says what leaves.
+- Two references in TS pointed at a "§54" that does not exist; they now point at §53.4, where the Tooscut table is.
+
+**Checked.** Every "20 minutes", "16 GB", "64 kB", "copy" and "stock" in the three files was read after the edits; the remaining ones are history marked v1.3, the clip path's own import, or unrelated (CI runner times). Two table rows that an edit had joined were split again.
+
+**Open items.** 18 is done, pending the founder's read of the choices above. New: 23 (the agent's choices 1-15 above, founder to confirm). Open items 19-22 stand.
+
+## Entry 23 - 2026-11-08 - The founder confirms v1.4; V6.1's implementation plan (outside a prompt)
+
+**Founder's confirmation.** On 2026-11-08 the founder answered "yes i confirm" to the agent's fifteen design choices of Entry 22. Open item 23 is closed; open item 18 is done.
+
+**V6.1's plan written:** `docs/v6.1/v6.1implementation.md` (decisions D-383 to D-432; declared changes DC-1 to DC-4 only; prompts P171 to P182 after a Setup), modelled on `cloudimplementation.md` and V6's plan, after reading the code at `afb82bf`. TS §5 has its row. The build guide, the prompts file and `docs/v6.1/experiments.md` come next. This changelog stays V6.1's (BP §8A.0 step 1; D-384).
+
+**What reading the code changed against the specs** (each copied back in P182, plan §18):
+
+- **IndexedDB is at version 1 today,** not the "version 3" TS §43.4 assumed. V6.1 adds a structure version 2 opened only by the long path, keeps the records' `schemaVersion` at 1, and adds a `VersionError` rule so a later rollback can still open the database (D-414, plan §12.4).
+- **The demuxer opens only an OPFS sync handle** (a web-sys type), so reading a `File` in place needs a new additive entry point in `offcut-wasm-core` with a structural reader (D-399).
+- **The clip path decodes a whole track into one buffer** (about 520 MB for 45 minutes at 48 kHz), so the long path resamples in a stream: a new `StreamResampler` beside `resample_mono`, proved equal to it sample for sample (D-401).
+- **HEVC is recognised by its four letters only;** `hvcC` parsing, the codec string and HDR from `colr` are new (D-396, D-397).
+- **Feature flags all default to on** (cloud release, D-365). A V6.1 flag that did would ship at the merge, so flags get defaults and the V6.x flags default to off, turned on by `OFFCUT_FEATURES_ON` (D-393), with a second e2e build for the flag suites (D-394).
+- **`POST /transcribe`'s IP limit is a route layer,** which cannot see a header, so the window header's rate groups move the IP check into the handler (D-411).
+- **A clip import wipes `clips/` and every clip store** until V7's eviction, so sources live apart, and V6.1 keeps one source (D-415). `quota.ts` (BP §8A.1) moves to V7.
+- **D-382's silence guard judges a word against the clip's own level;** a long source's quiet windows need the source's level, measured during the audio step (D-404, D-407).
+
+**Open for the founder:** F-1 (45 minutes of the looped reference clip to Groq for TE-18), F-2 (a phone HDR clip for TE-21, or HDR stays rejected), F-3 (`high_res` on in production after V6.1), F-4 (`long_video` off in production until V6.4's alpha), F-5 (the copy of plan §10.5).
+
+## Entry 24 - 2026-11-08 - The founder's answers; V6.1's guide, prompts and overnight run (outside a prompt)
+
+**The founder's answers,** 2026-11-08, word for word: "yes to all". Read as (plan §15):
+
+| # | Answer |
+|---|---|
+| F-1 | Yes: the looped reference clip's audio may go to Groq in P171 and P181 (about 5,400 s in all) |
+| F-2 | Yes, the founder has a phone HDR clip. It is used locally only if placed at `sh2clips/testclips_private/hdr/` before the run, never committed or sent. **V6.1 ships with `hdr_ok = false` whatever TE-21 reads**: an unattended night does not widen what is accepted (the agent's reading, recorded in the plan) |
+| F-3 | Yes: `high_res` on in production after V6.1 if TE-17's 4K memory read passes. It is the founder's morning step (a Vercel variable, then a re-run of `deploy-web`), not the night's |
+| F-4 | Yes: `long_video` stays off in production until V6.4's alpha |
+| F-5 | Yes: the copy of plan §10.5 as drafted |
+
+**The founder's instruction for the build:** one unattended overnight session; "when I wake up tomorrow the feature must be implemented and merged, strictly without breaking, and do everything carefully". The agent is authorised to merge and tag under `overnight-run.md` §3 and §7, and never to change a production setting.
+
+**Written:** `docs/v6.1/v6.1buildguide.md` (phases 0-12, the frozen and additive checks, tiers, 22 "bites"), `docs/v6.1/coding-promptsv6.1.md` (the SAB, Setup and Prompts 171-182, each with a "think first" rule and an overnight path for every stop), `docs/v6.1/overnight-run.md` (the master prompt: the founder's pre-sleep checklist, authorisations, safe paths, merge gates with a 06:30 cut-off, live checks, rollback, morning steps, report). Modelled on the cloud release's guide and prompts and the design release's overnight run. TS §5 has their rows; `check-file-tree.mjs` passes.
+
+**Found while writing them** (each now in the guide):
+
+- **An unattended session cannot sign in to a local API:** the magic link goes by the real relay (STARTTLS only) to an inbox nobody reads at night. P181 drives the real product build signed in through the e2e fake API, and real Groq calls go through a scratch proxy that calls Groq as `groq.rs` does (G Phase 11).
+- **`.env.deploy` must never be sourced whole:** it holds the real mail relay and billing settings beside the Groq key. Scripts read `TRANSCRIBE_API_KEY` alone.
+- **`fixtures/.gen-local/` and `web/dist-flags/` are not git-ignored at `afb82bf`;** P171 and P173 add them.
+- **pnpm runs scripts through `cmd.exe` on Windows,** so `build:e2e:flags` wraps its environment prefix in `sh -c`, as `dev` does.
+- **CI builds the keyed `web/dist` in the `ci` job and hands it to `e2e-media`;** the flags build follows the same path (plan §12.1, as read).
+- **Production's flags come from the Vercel project's variables** (`vercel pull` in `deploy-web`), so turning a flag on is the founder's dashboard step plus a re-run of `deploy-web`, never the Redeploy button.
+
+## Entry 25 - 2026-11-08 - V6.1 Setup: the branch, the documents, the floor
+
+Built in one unattended session under `docs/v6.1/overnight-run.md`, started at 04:46 IST.
+
+**Branch.** `v6.1-build` from `origin/main` at `2568a6e` (checked). Cherry-picked `429d8aa` and `afb82bf` (the cloud release's closing entries) as `1f71eca` and `277b0d6`; they change `docs/cloud_transcription/cloudchangelog.md` only. This commit holds the v1.4 specs (`technicalspec.md`, `product.md`, `buildplan.md`), Entries 21-25 of this changelog, and `docs/v6.1/` (plan, guide, prompts, overnight run, and the new `experiments.md` with one heading per experiment, "Not read yet"). TS §5 gains `experiments.md`'s row; `check-file-tree.mjs`: ok, 551 files.
+
+**The founder's answers** are Entry 24's ("yes to all", F-1 to F-5). **Before sleeping, the founder also answered the run's own questions** (2026-11-08, 04:50 IST), recorded in `overnight-run.md` §12 (A-1 to A-7), which wins over its §7.2:
+
+- A-1: the run began too late for §7.2's "merge before 06:30". The merge may start **whenever every §7.2 gate is green, never after 22:00 IST**; the work continues after the founder wakes.
+- A-2: no HDR clip. TE-21 is read on `rej_hdr_hlg.mov` only; `hdr_ok` stays `false`.
+- A-3: the real Groq calls go through production's key as planned (about 5,400 s, at most 3,000 s an hour), stopping if Groq's remaining hourly or daily audio falls under 25%.
+- A-4: if free disk falls under 15 GB, the whole `target/` may be deleted (66 GB free at the start).
+- A-5: narrow local allow rules for the pushes, the pull request and the merge, in a git-excluded `.claude/settings.local.json`; pushes to `main`, force-pushes and deletes are denied. Removed at the close.
+- A-6: phone notifications at key moments only. A-7: building goes on while the founder uses the laptop; a media case failing only under load is re-run once.
+
+**The floor (V6.1's baseline, BP §8A.0 step 1),** read on D1:
+
+| Suite | Read | D-386 floor |
+|---|---|---|
+| Rust (`cargo test --workspace`) | 863 / 0 / 4 | 863 / 0 / 4 |
+| Vitest | 568 (24 files) | 568 |
+| `pnpm e2e --workers=4` (after `pnpm build`, `check-hosts.mjs` ok) | 57 passed | 57 |
+| Media | not run (D-385); floor 112 passed, 1 skipped (CT CL Entry 11) | |
+
+**Checks.** `git diff --name-only origin/main` lists docs only. No product code changed.
+
+**Open:** nothing new. **Found, not fixed:** none.

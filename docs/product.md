@@ -1,6 +1,6 @@
-# Offcut - Speech-driven short-form video maker that runs in your browser (Product Spec v1.3)
+# Offcut - Speech-driven short-form video maker that runs in your browser (Product Spec v1.4)
 
-> **Positioning (launch pitch, v1.3).** Two paths, equal on the landing page. **Drop a long video** (up to 20 minutes) and get 5-10 finished vertical shorts, each built from the best moments, even from different parts of the video, with face-tracked framing, kinetic captions and visuals that follow what you said. **Drop a short clip** (up to 90 seconds) and get one finished short. All of it renders on your computer: your video is not uploaded. To write captions fast, a clip's sound is sent for transcription when you choose Cloud in the drop zone, which is the default for an account (cloud transcription release, §12.6). An AI edit plan reads your transcript and decides what goes where; only text and timings are sent to make the plan (§12.8). You edit by clicking or by asking in words; there is no timeline. Flat price, no per-minute credits, because the heavy work runs on your machine (§11). **Not a launch promise:** stock footage, avatars, phones, languages other than English.
+> **Positioning (launch pitch, v1.4).** Two paths, equal on the landing page, each with its own page. **Make shorts from a long video** (up to 45 minutes) and get 5-10 finished vertical shorts, each built from the best moments, even from different parts of the video, with face-tracked framing, kinetic captions, auto zoom, B-roll and visuals that follow what you said. **Edit a clip** (up to 90 seconds) and get one finished short. The editing all renders on your computer: your video is not uploaded. To write captions fast, the sound is sent for transcription: for a clip when you choose Cloud in the drop zone, which is the default for an account (§12.6), and always for a long video (§12.9). An AI edit plan reads your transcript and decides what goes where; only text and timings are sent to make the plan (§12.8). You edit by clicking or by asking in words; there is no timeline. Flat price, no per-minute credits, because the heavy work runs on your machine (§11). **Not a launch promise:** avatars, phones, languages other than English.
 
 > *Earlier pitch, for reference (v1.2):* a raw talking-head clip up to 90 seconds becomes a finished vertical 1080p short, with an AI edit plan, kinetic captions, cards and a brand kit.
 
@@ -17,7 +17,8 @@
 | "Month 0 / Month 1..." | Calendar growth-model months (§13). Month 0 = build + stabilization; Month 1 = first 30 days after public launch |
 
 **Revision notes**
-- v1.3 (founder decisions of 2026-11-02): **Offcut adds a long path.** A video up to 20 minutes, with 4K and HEVC input, becomes 5-10 finished shorts, each made of whole sentences chosen by a Director request and optionally stitched from different parts (§12.9). Added: local vision signals and face-tracked framing, B-roll from the user's own asset box, transitions at joins, chat editing, creator memory, a back-catalogue queue, text behind the speaker and background change (gated on quality). A paid AI provider is allowed with a spending cap (A-3). Chapter markers and the lower third move post-launch. **V6 stays first, then V6.1-V6.11, then V7-V10**; the releases are renumbered (`technicalspec.md` §42). **The clip path does not change**: a clip of at most 90 seconds with new features off behaves exactly as V5 (`technicalspec.md` §41). The founder's rule: nothing that works is broken without being certain the new thing works, and a feature not worth what it would break goes back to the founder.
+- v1.4 (founder decisions of 2026-11-08, `docs/v6/v6changelog.md` Entries 21 and 22): **the long path is reshaped before it is built.** Two separate pages: "Make shorts from a long video" and "Edit a clip"; the person chooses, and both open the same editor. One flow on both: the transcript and a prompt describing everything the editor can do go to the AI; the plan is validated and **the editor applies it automatically**, and the person switches off or undoes what they do not want. Long videos **up to 45 minutes**, with no file-size limit: the file is read where it is and never copied whole; only the parts chosen for shorts are kept. **A long video is transcribed in the cloud only;** if that fails, the job pauses with Continue. **B-roll from the person's own clips and from Pixabay stock**, placed by the plan or by hand on a word, with a choice of which part of a clip plays. **Auto zoom** and Submagic-class visual editing; quality is judged against the founder's benchmark after all features work. The build order stays as v1.3 set it. Tooscut stays a study source for the editing engine, never copied.
+- v1.3 (founder decisions of 2026-11-02): **Offcut adds a long path.** A video up to 20 minutes (v1.4: 45), with 4K and HEVC input, becomes 5-10 finished shorts, each made of whole sentences chosen by a Director request and optionally stitched from different parts (§12.9). Added: local vision signals and face-tracked framing, B-roll from the user's own asset box, transitions at joins, chat editing, creator memory, a back-catalogue queue, text behind the speaker and background change (gated on quality). A paid AI provider is allowed with a spending cap (A-3). Chapter markers and the lower third move post-launch. **V6 stays first, then V6.1-V6.11, then V7-V10**; the releases are renumbered (`technicalspec.md` §42). **The clip path does not change**: a clip of at most 90 seconds with new features off behaves exactly as V5 (`technicalspec.md` §41). The founder's rule: nothing that works is broken without being certain the new thing works, and a feature not worth what it would break goes back to the founder.
 - v1: Initial version. Key decisions: one product path (talking-head clip in, vertical short out); four visual-event types, rule-based and precision-first; desktop Chromium only; English only; one paid plan at $15/month; validation experiments run in parallel with the build, not after it; month-6 base-case MRR is about $234, and $1,000 MRR is a month-12+ goal (§13).
 - v1.1: Automatic timeline editing is removed from the product. Pause tightening (P0 in v1) and dramatic-pause preservation (P1 in v1) no longer exist. New principle 7 (§8) and scope section §9.2.1: the user provides the take; Offcut enhances the whole take and never cuts it. The only audio transformation is enhancement, which keeps the recording's duration.
 - v1.2 (founder decision of 2026-10-21): **Offcut becomes an AI-planned editor.** One cloud LLM call per clip reads the transcript text, word timings and per-word loudness and pitch scores (never audio or video) and returns an **edit plan**: which pauses to trim, which words to emphasize, which lists, numbers, cards, furniture and transitions to show, and the hook title, chapters, post caption and hashtags (§12.8). The rule detector of v1.1 stays as the offline fallback and the first producer of the same plan. Principle 7 is rewritten: Offcut now trims pauses and silences, and every cut is shown and can be restored (§8, §9.2.1). Principle 4 is rewritten: media never leaves the device; the transcript leaves for the plan, disclosed and switchable off (§12.7). Background music with ducking, brand kits, kinetic caption presets, video inside shapes, shape transitions, structure cards and furniture move from P1/P2 into the launch scope as releases V6.1 to V6.11 (§9.5, `buildplan.md` §8A). V4 to V6 are built with the seams these need, so V6.2 starts without rework (`technicalspec.md` §40). Stock-footage B-roll stays out (§21). Launch follows V6.10 and V7-V10; the date is re-set when V6.10 closes (A-2).
@@ -71,7 +72,7 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 | A-9 | Merchant-of-record fee is about 5% + $0.50 per transaction (general-market knowledge, re-verify before launch) |
 | A-10 | Fixed infrastructure cost, apart from the capped AI provider (A-3), is $0/month with no paid fallback: frontend on Vercel's free plan, backend on a Render free web service, plus free tiers for Postgres, model/asset storage, transactional email and uptime monitoring (each verified by a tech-spec experiment). No domain is purchased. When a free tier stops fitting, the component moves to another free tier, not a paid one |
 | A-11 | Product name "Offcut" is a working name |
-| A-12 | Customers: YouTubers who publish 10-20 minute talking-head or explainer videos and edit on a desktop, and creators who film short talking-head clips on a laptop or transfer phone clips to one (v1.3: equal on the landing page; E-14 reads which pays) |
+| A-12 | Customers: YouTubers who publish 10-45 minute talking-head or explainer videos (v1.4; v1.3: 10-20) and edit on a desktop, and creators who film short talking-head clips on a laptop or transfer phone clips to one (v1.3: equal on the landing page; E-14 reads which pays) |
 
 ---
 
@@ -87,7 +88,7 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 **Architecture / business-model thesis.** Local processing means near-zero cost of goods per export, so one flat monthly price with unlimited normal use is possible against competitors that meter by credits or minutes (reported, §7). The thin server is the only recurring cost.
 
 **The long path (v1.3).**
-`long video (≤ 20 min) → local transcription (resumable) → local vision signals → Director (AI over sentences; local rules if unavailable) → 5-10 shorts of whole sentences, stitched if that makes the point → for each: the pipeline above, plus face-tracked framing → list of shorts → keep, edit by clicking or chat → export the ones you keep`
+`long video (≤ 45 min, v1.4, read in place) → cloud transcription (resumable) → local vision signals → Director (AI over sentences; local rules if unavailable) → 5-10 shorts of whole sentences, stitched if that makes the point → for each: the pipeline above, plus face-tracked framing → list of shorts → keep, edit by clicking or chat → export the ones you keep`
 
 **The wedge (three bullets).**
 - What you said decides the edit: lists, numbers, comparisons, chapters and topic shifts become visuals, and pauses that carry nothing are trimmed, all from one plan that never puts a number on screen that you did not say.
@@ -129,9 +130,9 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 
 ## 3. Target Customer
 
-**Two equal launch audiences (founder, 2026-11-02).** The landing page speaks to both; one drop zone serves both. E-14 reads which one pays, and marketing follows that evidence.
+**Two equal launch audiences (founder, 2026-11-02).** The landing page speaks to both; each has its own page from v1.4 ("Make shorts from a long video", "Edit a clip"). E-14 reads which one pays, and marketing follows that evidence.
 
-**Long-path ICP (v1.3).** Solo YouTubers who publish 10-20 minute talking-head or explainer videos, one speaker, in English, edit on a desktop, and want Shorts, Reels and TikToks without filming twice. About 1,000 to 500,000 subscribers (ASSUMPTION). Budget: $15-$30/month (ASSUMPTION, E-5). They have master files on disk, often 4K.
+**Long-path ICP (v1.3; v1.4).** Solo YouTubers who publish 10-45 minute talking-head or explainer videos (talks and solo podcasts often run past 30), one speaker, in English, edit on a desktop, and want Shorts, Reels and TikToks without filming twice. About 1,000 to 500,000 subscribers (ASSUMPTION). Budget: $15-$30/month (ASSUMPTION, E-5). They have master files on disk, often 4K.
 
 **Primary ICP (MVP serves this one; widened in V4, the founder's decision of 2026-10-22).** Short-form creators who film talking-head clips, 2-5 per week, technical or not, for X, LinkedIn, YouTube Shorts, Reels or TikTok. Technical creators and indie founders, who talk about software, metrics, benchmarks, launches or lessons learned, stay the first distribution channel: their speech is full of the numbers and lists the four MVP visuals show. As first written: technical creators and indie founders making 2-5 short talking-head videos per week for X, LinkedIn, YouTube Shorts, Reels or TikTok about software, metrics, benchmarks, launches or lessons learned. Solo or two-person operations. Budget ceiling for a video tool: $15-$30/month (ASSUMPTION; tested by E-5). Comfortable with desktop Chrome, file uploads and account sign-up. Currently use CapCut, a caption tool, or DaVinci/Premiere for occasional polish.
 
@@ -218,8 +219,8 @@ No clarifying questions were needed to write the spec; these assumptions are exp
 
 1. **Time to AHA beats feature count.** The user must see their own clip animated within minutes of dropping it. If a feature adds a step before the first preview, it is cut or made optional.
 2. **Precision beats recall for visual events.** Show no graphic rather than a wrong graphic. A missed list is a shrug; a wrong number on screen is a lost user. Rule-detector thresholds are tuned to ≥ 90% precision (TARGET) even if that means fewer events. For the AI edit plan the same principle is structural: the model never writes a number; it points at the words that said it, and the value shown is parsed from the transcript (§12.8). A plan item that fails validation is dropped, not repaired.
-3. **Defaults beat configuration.** One default style, one voice chain, no sliders. The plan decides; the user reviews with on/off toggles: per plan item, per cut ("restore this pause"), per part of a short, music on/off, and a brand kit chosen once, or says what they want in chat (v1.3). No timeline, no keyframes.
-4. **Media never leaves the device; what does leave is stated in the UI, and a test proves it.** Video and audio never leave. From V6.2 the transcript text, word timings and per-word loudness/pitch scores are sent to our server and the AI provider named on the settings page, only to make the edit plan, and are stored by neither us nor (per TE-15) the provider beyond the request. The "AI edit plan" switch in settings turns it off and falls back to local rules, after which nothing but account and analytics traffic leaves (§12.7). **v1.3:** the long path sends sentence text and timings to choose shorts, chat sends the typed message with that short's words, and asset labels the user typed go with plan requests: all only with the switch on, none stored. Local vision sends only categories such as "talking head, face left", never a frame. The network test (§17) blocks any other regression.
+3. **Defaults beat configuration.** One default style, one voice chain, no sliders. The plan decides; the user reviews with on/off toggles: per plan item, per cut ("restore this pause"), per part of a short, music on/off, and a brand kit chosen once, or says what they want in chat (v1.3). No timeline, no keyframes. (v1.4: placing B-roll by hand on a word, and choosing which part of a clip plays by dragging a window along its frames, is the one direct control besides the crop offset, §12.12.)
+4. **Media never leaves the device; what does leave is stated in the UI, and a test proves it.** Video never leaves. Sound leaves only to be transcribed: a clip's while Cloud is chosen in the drop zone (cloud transcription release, §12.6), and a long video's always (v1.4, §12.9), compressed, passed to the transcription provider and kept by neither. From V6.2 the transcript text, word timings and per-word loudness/pitch scores are sent to our server and the AI provider named on the settings page, only to make the edit plan, and are stored by neither us nor (per TE-15) the provider beyond the request. The "AI edit plan" switch in settings turns it off and falls back to local rules, after which nothing but account and analytics traffic leaves (§12.7). **v1.3:** the long path sends sentence text and timings to choose shorts, chat sends the typed message with that short's words, and asset labels the user typed go with plan requests: all only with the switch on, none stored. Local vision sends only categories such as "talking head, face left", never a frame. The network test (§17) blocks any other regression.
 5. **The free tier must be genuinely usable.** Full-length processing and preview, 3 exports per month at 720p with a small watermark. Paywalls are shown before the action, never after the work (§10).
 6. **Complexity must buy a hypothesis, and may not break what works (v1.3).** New features are added beside the working product. A feature not worth what it would break goes back to the founder (`technicalspec.md` §41). Every subsystem has a row in §9.7 and §9.8. "It is a lot of code" is not a reason to cut; "it does not test H1-H4" is.
 7. **The take is the user's; the cut is a suggestion the user can see.** (Rewritten in v1.2.) Real speech is not its transcript: a pause can be dramatic or dead air, a silence can be a beat, "first" can start a list or not. The edit plan judges this from the whole transcript with its timings and prosody, and proposes cuts: trimmed lead-in and tail silence, shortened pauses, and (off by default) filler words and false starts. Every cut is listed in review and can be restored with one toggle. A cut never starts or ends inside a word, a pause is shortened rather than removed (a breath of at least 150 ms stays, TARGET), cuts are snapped to the quietest point and cross-faded, and jump cuts are hidden with an alternating punch-in. With the plan off and no cuts, the export is exactly as long as the clip that was dropped in, as in v1.1 (§9.2.1). **v1.3:** a short from a long video is whole sentences only, its parts are listed with their words, any part can be removed and restored, and a moved hook must mean the same in its new place (§12.9). The model never invents a claim by joining sentences that change meaning; E-13 reads this.
@@ -241,13 +242,13 @@ Open site → drop raw clip (≤ 90 s, English) → [first run: one-time model d
  → [sign in if needed] → export 1080×1920 MP4 (free: 720×1280 + watermark)
 ```
 
-**The long path (v1.3, from V6.4; full flow in §12.9):**
+**The long path (v1.3, from V6.4; v1.4; full flow in §12.9):**
 
 ```text
-Open site → drop long video (≤ 20 min, English, one speaker) → sign in (limits shown first)
- → local transcription, resumable → local vision signals → Director picks 5-10 shorts
- → list of shorts: poster, title, length, why → open one: the same review as above, plus chat
- → export the ones you keep (each counts as one export)
+Open site → "Make shorts from a long video" → drop it (≤ 45 min, English, one speaker) → sign in (limits shown first)
+ → read in place, cloud transcription, resumable → local vision signals → Director picks 5-10 shorts
+ → only the chosen parts are kept → list of shorts: poster, title, length, why
+ → open one: the same review as above (plan applied, B-roll by hand), plus chat → export the ones you keep (each counts as one export)
 ```
 
 Both paths share everything after the short exists. There is no timeline, no project library beyond "recent clips" in browser storage (the 5 most recent, shown by date and duration; file names are not stored), and no collaboration.
@@ -261,14 +262,14 @@ Both paths share everything after the short exists. There is no timeline, no pro
 | Semantic "story" timeline editor and general timeline | (d) it is an editor, a different product; (f) high cognitive and maintenance cost |
 | Bundled music library | (c) licensing: in only for tracks whose licence TE-16 confirms allows redistribution inside an app. User-supplied music with ducking is **in** (V6.7) |
 | Local LLM for deeper semantic understanding | (f) download size, device variance; the v1.2 plan uses a cloud LLM over the transcript instead (§12.8). A local model stays P2 as the offline producer of the same plan |
-| Cloud transcription (audio upload) | **Built in the cloud transcription release** for signed-in people, chosen in the drop zone's card (§12.6); the video is never sent. The cloud **LLM over transcript text** is in from V6.2 (§12.8) |
+| Cloud transcription (audio upload) | **Built in the cloud transcription release** for signed-in people, chosen in the drop zone's card (§12.6); the video is never sent. **v1.4: always on the long path** (§12.9). The cloud **LLM over transcript text** is in from V6.2 (§12.8) |
 | Languages other than English (including Hindi/Hinglish) | (f) separate accuracy testing, font shaping and caption rules per language; (e) not needed by the primary ICP |
 | Phones and tablets (browser) | (f) memory limits, WebCodecs/WebGPU variance; *reach is a known risk*, measured by E-8 |
 | Safari, Firefox | (f) test matrix and encoder/GPU differences; P1 gated on E-8 |
 | Linux desktop | (f) reported lack of AAC encoding in browsers on desktop Linux (*general-market knowledge, re-verify*) |
 | 4K output | (f) memory and time budgets; (e) vertical shorts do not require it. **4K input is in (v1.3):** a face-tracked vertical crop from it is sharper |
 | 100+ visual primitives | (a) the v1.2 catalog (§12.8) is the launch set; additions are catalog entries, measured by E-11 |
-| Stock-footage B-roll, AI-generated B-roll, AI avatars | (d) second product; (c) stock licences and API terms; (b) a browser fetch of stock video under COEP needs the stock CDN's CORS headers or a proxy we pay bandwidth for. Post-launch candidate (§21). **The user's own B-roll is in (V6.8)** |
+| AI-generated B-roll, AI avatars | (d) second product. **The user's own B-roll is in (V6.8), and v1.4 adds Pixabay stock footage (V6.8, §12.12):** its licence allows commercial use, its CDN works under COEP, and searches go through our server. *(v1.3 kept stock out for those three reasons; the founder reversed that on 2026-11-08.)* |
 | Sending video frames to the AI | Founder decision 2026-11-02: it changes the privacy promise; local signals only. A possible later opt-in if E-13 shows clip choice needs it |
 | YouTube-link import | (c) a server that downloads video breaks "not uploaded" and platform terms; creators have the file |
 | Virality score | (c) unverifiable and doubted by reviewers; each short shows its reason instead |
@@ -306,11 +307,11 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 
 ### 9.4 Hard input/output constraints
 
-| Dimension | Clip path | Long path (v1.3, V6.1) | Explicitly deferred |
+| Dimension | Clip path ("Edit a clip") | Long path (v1.3, V6.1; v1.4: "Make shorts from a long video") | Explicitly deferred |
 |---|---|---|---|
 | Container / codec | MP4 or MOV, H.264 **or HEVC where the browser decodes it (v1.3)**, AAC audio | Same | ProRes, AV1, WebM, MKV, MP3-only audio |
-| Duration | ≤ 90 s | Over 90 s, up to 20 minutes | Over 20 minutes (f); TE-18 and E-14 read demand |
-| File size | Up to 16 GB (v1.3; 500 MB with the flag off) | Up to 16 GB (TE-17), with a disk check first | Larger files (f) |
+| Duration | ≤ 90 s | Over 90 s, up to **45 minutes** (v1.4; v1.3: 20). A file of 90 s or less dropped here opens as a clip | Over 45 minutes (f); E-14 reads demand |
+| File size | Up to 16 GB with 4K input on (v1.3; 500 MB with it off) | **No limit** (v1.4): the file is read where it is, never copied whole; a small disk check covers the extracted sound and the chosen parts | |
 | Resolution | Up to 3840 px on the long side (v1.3; 1920 with the flag off) | Same | Above 4K (f) |
 | HDR | Rejected with advice unless TE-21 passes | Same | |
 | Frame rate | Up to 60 fps input; 30 fps output | Same | 60 fps output (f) |
@@ -320,7 +321,7 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 | Audio tracks | One | The first track, if several | Multi-track choice |
 | Output | MP4 H.264/AAC, 1080×1920 at 30 fps (Free: 720×1280 with watermark) | Same, per short: 15-90 s | 4K, 1:1/16:9 output, other containers |
 
-**Violations show a specific, actionable rejection, never a generic error.** Each message states the limit and the advice, not the clip's measured size or duration (decided 2026-10-15; `technicalspec.md` §15.3, v3implementation D-80). Examples (v1.3 keeps each while its flag is off; the long-path versions state 20 minutes and 16 GB): "This clip is too long. Offcut handles clips up to 90 seconds right now. Trim it in your phone's gallery or in your editor, then drop it again." / "This video is larger than Offcut handles. Offcut handles video up to 1920 pixels on its long side. Record or export at a lower resolution, then drop it again." / "This file uses HEVC, which this browser cannot decode here. Export as H.264 or use 'Most Compatible' in your camera settings." Every rejection is counted as `reject_reason` (analytics allowlist, §17) with no file name, content or transcript.
+**Violations show a specific, actionable rejection, never a generic error.** Each message states the limit and the advice, not the clip's measured size or duration (decided 2026-10-15; `technicalspec.md` §15.3, v3implementation D-80). Examples (v1.3 keeps each while its flag is off; v1.4: the clip page keeps them, and the long page states 45 minutes and has no size message; with the long path on, the clip page's "too long" message adds a button, "Make shorts from it"): "This clip is too long. Offcut handles clips up to 90 seconds right now. Trim it in your phone's gallery or in your editor, then drop it again." / "This video is larger than Offcut handles. Offcut handles video up to 1920 pixels on its long side. Record or export at a lower resolution, then drop it again." / "This file uses HEVC, which this browser cannot decode here. Export as H.264 or use 'Most Compatible' in your camera settings." Every rejection is counted as `reject_reason` (analytics allowlist, §17) with no file name, content or transcript.
 
 **Two constraints are stated, not detected.** One speaker and English are shown at the drop zone (J2) but are not checked at import: a multi-speaker clip is processed as one speaker, and non-English speech usually ends in "no English speech found" or poor captions. A clip with fewer than 3 transcribed words is rejected as having no speech. Fragmented MP4 files are rejected as an unsupported container at MVP.
 
@@ -345,17 +346,18 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 | Checkout via merchant of record, Creator plan | P0 | J9, J12. Needed for H2 |
 | Settings page "What leaves your device" | P0 | J1, J4. Required for H4 and trust (§12.7) |
 | Allowlisted analytics + network-privacy test | P0 | All steps. Required to measure activation and to prove the privacy claim (§17) |
-| **Long source** (20 minutes, 16 GB, 4K and HEVC input, resumable transcription) | P0 (V6.1) | §9.4, §12.9. Foundation of the long path; first because it holds the biggest feasibility risk |
-| **AI edit plan** (cloud LLM over transcript text, timings and prosody scores; validated; local rules as fallback), with emphasis picks (colour, icon pop, punch-in zoom), transcript-aware emoji, and text extras (hook title, post caption, hashtags) | P0 (V6.2) | The backbone every later release reads (§12.8). Founder decision 2026-10-21; emoji kept 2026-11-02 |
+| **Long source** (its own page; 45 minutes, read in place, 4K and HEVC input, cloud transcription in resumable windows; v1.4) | P0 (V6.1) | §9.4, §12.9. Foundation of the long path; first because it holds the biggest feasibility risk |
+| **AI edit plan** (cloud LLM over transcript text, timings and prosody scores; validated; applied automatically; local rules as fallback), with emphasis picks (colour, icon pop, **auto zoom**: a snap or a slow push on the key words, v1.4), transcript-aware emoji, and text extras (hook title, post caption, hashtags) | P0 (V6.2) | The backbone every later release reads (§12.8). Founder decision 2026-10-21; emoji kept 2026-11-02; auto zoom 2026-11-08 |
 | Intelligent pause and silence trimming (cuts proposed by the plan, restorable in review), **and stitched parts** | P0 (V6.3) | §9.2.1, §12.9. Raises the quality of the final short more than any visual (founder) |
 | **Director: a long video becomes 5-10 shorts** of whole sentences, optionally stitched from different parts; list page; batch export | P0 (V6.4) | §12.9. The headline feature of the long path |
 | **Local vision and face-tracked framing** | P0 (V6.5) | §12.10. A long landscape video is unusable as a short without it |
 | **Finished look:** list builder, number moments, cards (quote, X-versus-Y, definition, step tracker, timeline, checklist), kinetic caption presets, video inside shapes, shape transitions, hook title, progress bar, end card with a call to action | P0 (V6.6) | Founder kept all of these on 2026-11-02. Parts A-E in release order, so the tail can be reconsidered (§41.4 of the tech spec) |
 | Background music with automatic speech ducking (user-supplied track; bundled tracks only if TE-16 passes), and sound cues | P0 (V6.7) | Founder decision 2026-10-21 |
-| **Layers:** B-roll from the user's asset box, placed by the plan or chat; transitions at joins; screen-and-face and full-frame layouts | P0 (V6.8) | §12.12. Founder decision 2026-11-02: own files only |
+| **Layers:** B-roll from the user's own clips and from **Pixabay stock** (v1.4), placed by the plan, **by hand on a word** (v1.4) or by chat; transitions at joins; screen-and-face and full-frame layouts | P0 (V6.8) | §12.12. Founder decision 2026-11-02: own files only; reversed 2026-11-08: own files and Pixabay |
 | **Chat editing** | P0 (V6.9) | §12.11. No timeline ever; ask in words |
 | Brand kit: logo, colours and fonts applied to every template (one kit per account; Creator plan). **Creator memory. Back-catalogue queue (Creator)** | P0 (V6.10) | §12.14, §12.13. Why people stay subscribed (founder) |
 | **Person mask:** text behind the speaker, background change, each gated on quality | P0 (V6.11), gated | §12.15. Founder decision 2026-11-02: both, at launch, if TE-25 passes; either can stay off |
+| **Quality pass** against the founder's benchmark (Submagic-made shorts and caption references, kept outside the public repository) | P0, after V6.11 (v1.4) | Founder, 2026-11-08: build every feature first, then inspect and improve against the benchmark (`buildplan.md` §8A.12) |
 | Safari/Firefox support | P1 | Promoted when E-8 shows > 25% of visitors blocked by browser |
 | Mobile browsers | P1 | Same trigger as above plus a viable WebGPU/WebCodecs path |
 | Pro plan ($29) | P1 | Promoted when two P1 features exist that are worth a higher tier (§21) |
@@ -364,7 +366,7 @@ Inside a clip's recording, Offcut does **not**: remove whole sentences or retake
 | Three versions per recording, remix | P2 | After retention evidence (§21); a second plan request with a different "energy" setting is the cheap path |
 | Style DNA | P2 | After retention evidence |
 | Local LLM producer of the edit plan | P2 | When provider cost or terms (TE-15) or the privacy messaging (E-6) argue for it |
-| Stock-footage B-roll suggested by the plan | P2 | §21 item 14 |
+| Stock-footage B-roll suggested by the plan | **P0 (V6.8), v1.4** | Moved into launch scope by the founder on 2026-11-08 (Pixabay); motion-graphic B-roll stays P2, §21 item 14 |
 | Chapter markers, lower third | P2 | §21 item 15 |
 
 **V6.x scope rule (v1.3).** The eleven V6.x rows are launch scope in release order. **V6 (accounts and checkout) comes first.** If V6.x overruns, the founder chooses between moving the launch date and cutting from the tail; a release is never shipped half-done, and V7-V10 keep their five weeks (`buildplan.md` §8A). At any release's stop-and-ask trigger (`technicalspec.md` §41.4), the founder decides to keep, defer or drop.
@@ -486,13 +488,13 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | Step | What the user sees and does | Notes (limits and microcopy) |
 |---|---|---|
 | **J1** Land | Hero (design release, 2026-11-05): "Say it once. Post it finished.", with the hero clip, "Start free" into the app and "See how it works". Below: "Your video stays on your computer." and a link to "What leaves your device." Then short product clips (made with Remotion, in place of the hand-made demo), every feature that works today, everything after V6 marked "Coming soon", the drop zone, pricing and the update form | Supported-browser line: "Works in Chrome or Edge on Windows and Mac." Shown before any upload |
-| **J2** Drop | Large drop zone: "Drop a clip or a full video (up to 20 minutes, English)." Optional "Try with a sample clip". (With `long_video` off: "Drop a clip (up to 90 seconds, English).") | No account needed for a clip; a long video goes to L1 |
+| **J2** Drop | Large drop zone: "Drop a clip (up to 90 seconds, English)." Optional "Try with a sample clip". (v1.4, with the long path on: one link, "Got a long video? Make shorts from it", to its own page, L0. v1.3's single drop zone for both is replaced.) | No account needed for a clip |
 | **J3** Capability check | 1-3 second check, green tick or a clear unsupported page (§9.3) | Tone: plain, specific. "Your browser can do this." |
 | **J4** First-run model download | "One-time setup: downloading the speech model (about 250 MB). It stays in your browser, and your video is not uploaded." Progress bar with time remaining. **Only on the device path:** a cloud clip needs no model (cloud transcription release) | TARGET ≤ 90 s at 25 Mbps (§20.2). Subsequent runs skip this |
 | **J5** Validate | Probe the file; reject with specific guidance if constraints fail (§9.4) | Counted as `reject_reason` only |
 | **J6** Processing | Live "what we found" feed: "Transcribing…", "Planning your edit…", "Found: 3-item list", "Found: $2k to $20k", "Trimmed 6.4 s of pauses", "Cleaning voice" | Shows real plan items and cuts only; no fake steps. If the plan falls back to rules, the feed says so once ("Edit plan unavailable: using local rules") |
 | **J7** Preview (AHA) | Preview plays with animated captions and visual events; two buttons: "Looks good → Export" and "Fix something" | If no events were confident enough: "No numbers or lists found in this clip. Captions and cleanup applied." (honest, no padding) |
-| **J8** Review | Edit caption words inline; toggle each plan item on/off; restore any cut (or switch on filler-word cuts); music on/off and track choice; choose a caption preset; choose the brand kit; set crop offset for landscape; copy the hook title, post caption and hashtags; "Regenerate plan" (counts against the plan quota) | No sliders beyond the crop offset (principle 3). No timeline or keyframes. Cuts are only what the plan proposed; the user can restore, not invent, cuts (principle 7) |
+| **J8** Review | Edit caption words inline; toggle each plan item on/off; restore any cut (or switch on filler-word cuts); music on/off and track choice; choose a caption preset; choose the brand kit; set crop offset for landscape; add B-roll on a word (V6.8, v1.4); copy the hook title, post caption and hashtags; "Regenerate plan" (counts against the plan quota) | No sliders beyond the crop offset and the B-roll part picker (principle 3, v1.4). No timeline or keyframes. Cuts are only what the plan proposed; the user can restore, not invent, cuts (principle 7) |
 | **J9** Export click | If not signed in: "Create a free account to export. Free: 3 exports a month, 720p, small watermark. Creator ($15/month): no watermark, 1080p." Magic-link email sign-in | **Limits shown before the click that triggers them, never as a surprise.** Export counter ("2 of 3 left") visible on the button |
 | **J10** Render + export | Progress by stage with elapsed time; "Everything is rendering on your computer." | TARGET total for 60 s clip ≤ 3 minutes on R1 (§20.2) |
 | **J11** Download + summary | MP4 downloads. "What we changed": voice cleaned, N pauses shortened (T seconds removed), music added, N words emphasized, M visual moments, chapters (only changes that were made) | **Activation event fires here** |
@@ -504,12 +506,13 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 
 | Step | What the user sees and does | Notes (limits and microcopy) |
 |---|---|---|
-| **L1** Gate | After the probe, before any copy: "This is a long video. It takes about 30-60 minutes on your computer and needs a free account. Free: 1 long video a month. Creator: unlimited." Sign in, or cancel | Limits shown before the work (principle 5). A clip never reaches this |
-| **L2** Disk check | If space is short: the exact need, and the option to clear older clips | No surprise failure an hour in |
-| **L3** Working | Stages with progress and an honest time left: copying, audio, transcribing, looking at shots, choosing shorts. "You can use your computer. Keep this tab open." Pause and Cancel. Progress also in the tab title | Wake lock on. Live feed shows real findings only |
-| **L4** Return | After a reload, crash or sleep: "Continue your video" from the last saved step. If the copy was cleared: "Drop the same file to continue" | At most one window of work lost |
+| **L0** Page (v1.4) | "Make shorts from a long video": its own page, from the landing page and from J2's link. Drop zone: "Drop a video (up to 45 minutes, English, one speaker)." A file of 90 seconds or less dropped here opens as a clip | The person chooses the path; duration does not |
+| **L1** Gate | After the probe, before any work: "This is a long video. It needs a free account, and its sound is sent to be transcribed; the video stays on your computer. Free: 1 long video a month. Creator: unlimited." Sign in, or cancel. If cloud transcription is off right now, the page says so and offers to try later | Limits and what is sent shown before the work (principles 4 and 5). A clip never reaches this |
+| **L2** Disk check | If space is short for the extracted sound and the chosen parts: the exact need, and the option to clear older clips | No surprise failure mid-job |
+| **L3** Working | Stages with progress and an honest time left: sound, looking at shots, transcribing, choosing shorts, keeping the chosen parts, preparing. "You can use your computer. Keep this tab open." Pause and Cancel. Progress also in the tab title. If transcription cannot continue (offline, busy, signed out), the job pauses and says why, with Continue | Wake lock on. Live feed shows real findings only |
+| **L4** Return | After a reload, crash or sleep: "Continue your video" from the last saved step. Transcribing, choosing and preparing continue at once; a step that reads the video asks "Drop the same file to continue" | At most the windows in flight are lost |
 | **L5** List | Shorts appear as each is ready: poster, title, length, parts count and one-line reason. Keep, delete or open | First short can be opened while the rest finish |
-| **L6** Open a short | The clip review (J7, J8), plus the list of parts with their words, "Back to all shorts", and chat from V6.9 | Same editor; nothing new to learn |
+| **L6** Open a short | The clip review (J7, J8) with the plan already applied, plus the list of parts with their words, "Back to all shorts", B-roll by hand from V6.8 and chat from V6.9. The original file is no longer needed | Same editor; nothing new to learn |
 | **L7** Export | "Export kept shorts": the count and exports left, before the click | Free: each short is one of the month's 3 exports; the rest stay in preview. Sequential, on this computer |
 | **L8** Summary | What changed per short; post captions and hashtags to copy | Activation fires at the first short |
 
@@ -531,7 +534,7 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 
 **The one real per-clip cost (v1.2).** Each AI edit plan is one LLM request over a transcript of a few thousand tokens. It is the only cost that grows with use, so it is the only quota enforced on the server (`technicalspec.md` §40.8). The quotas are set by TE-15 from the chosen provider's free-tier limits and are meant to be generous beside credit-metered competitors ("bigger quotas"): a clip with no plan left still gets the local-rules plan, so a spent quota never blocks an export. Starting values (ASSUMPTION, TE-15): anonymous 3 plans per day per network, Free 40 per month, Creator 1,000 per month soft (logged above, blocked only at 3× to stop abuse). v1.3: a paid provider is allowed under the cap (A-3); raising the cap is the founder's call.
 
-**Long videos and chat (v1.3).** A long video costs one Director request plus one plan per short; a chat message is one request. **The founder allows a paid provider with a monthly cap** (A-3). Estimated cost of a long video with 8 shorts: about 0.7 to 3.5 cents on cheap models at rates seen on 2026-11-01 (third-party listings, re-verify, TE-15), and model choice follows quality, since clip choice is the product: 10× that would still fit. At 3,000 paying users making 8 long videos a month at 30 cents each, the bill is about $7,200 a month against about $42,750 of revenue; at 3 cents it is $720. **At the cap,** AI requests stop until next month and the local rules take over: fewer, simpler shorts, marked "Picked without AI", and nothing blocks. **Creator stays $15/month** (H2, E-5 reads it). Long-video and chat quotas are server-enforced because they are real costs; export limits stay conversion mechanisms.
+**Long videos and chat (v1.3; v1.4).** A long video costs one Director request plus one plan per short, and (v1.4) its cloud transcription; a chat message is one request. **The founder allows a paid provider with a monthly cap** (A-3). Estimated cost of a 45-minute video with 8 shorts: about 0.9 to 4 cents of AI on cheap models at rates seen on 2026-11-01 (third-party listings, re-verify, TE-15), plus about 3 cents of transcription on Groq's paid tier ($0.04 per hour of audio, `technicalspec.md` §52), and model choice follows quality, since clip choice is the product: 10× that would still fit. Groq's free tier carries only about two 45-minute videos an hour across all users, so its paid tier starts before the private alpha (founder's decision of 2026-11-06, brought forward). At 3,000 paying users making 8 long videos a month at 30 cents each, the bill is about $7,200 a month against about $42,750 of revenue; at 3 cents it is $720. **At the cap,** AI requests stop until next month and the local rules take over: fewer, simpler shorts, marked "Picked without AI", and nothing blocks. **Creator stays $15/month** (H2, E-5 reads it). Long-video and chat quotas are server-enforced because they are real costs; export limits stay conversion mechanisms.
 
 **Honest statement about enforcement.** Because processing is local, limits are **conversion mechanisms, not security controls**. A determined user can bypass the watermark or export counter by tampering with the client. That is acceptable: the target user pays for convenience and updates, and the cost of enforcing harder (obfuscation, server-side rendering) breaks the model. Metering at a high level: the client holds a signed entitlement token (plan, period, free exports remaining) cached for up to 7 days offline; each export sends an idempotent usage receipt (`export_id`, no content) to the server; the server computes counts; the watermark is rendered into the video by the pipeline unless the token says Creator.
 
@@ -585,7 +588,7 @@ At MVP (V4-V6): style choice (3), visual on/off per visual, crop offset (by drag
 
 ### 12.6 Cloud transcription and its consent rules (built in the cloud transcription release)
 
-**As built (founder, 2026-11-06; `docs/cloud_transcription/`).** Cloud transcription is the default for a signed-in person and is chosen in a card inside the drop zone, before any clip is dropped: "Cloud · fast" or "On device · private", with one line saying what each means ("Only your clip's sound is sent to write them, and it is not kept. Your video stays on your computer."). The choice is remembered on the device. Signed out, everything runs on the device and the card offers sign-in. The provider is Groq (`whisper-large-v3-turbo`), with Zero Data Retention on; the sound is compressed to Opus and passes through our server in memory only. Any failure finishes the clip on the device with one notice. This replaces the per-clip prompt below, and the per-export mode display: the card is shown before every drop, and the processing card says where the captions are written. The settings table and the Privacy Policy name the provider. Video frames are never uploaded in any mode. The founder approved the wording; a lawyer's review is on the launch checklist (§17).
+**As built (founder, 2026-11-06; `docs/cloud_transcription/`).** Cloud transcription is the default for a signed-in person and is chosen in a card inside the drop zone, before any clip is dropped: "Cloud · fast" or "On device · private", with one line saying what each means ("Only your clip's sound is sent to write them, and it is not kept. Your video stays on your computer."). The choice is remembered on the device. Signed out, everything runs on the device and the card offers sign-in. The provider is Groq (`whisper-large-v3-turbo`), with Zero Data Retention on; the sound is compressed to Opus and passes through our server in memory only. Any failure finishes the clip on the device with one notice. **v1.4: a long video has no card and no device path.** Its sound is always transcribed in the cloud, in windows of at most 90 seconds; the long page says so before the work (L1), and a failure pauses the job with Continue instead (§12.9). This replaces the per-clip prompt below, and the per-export mode display: the card is shown before every drop, and the processing card says where the captions are written. The settings table and the Privacy Policy name the provider. Video frames are never uploaded in any mode. The founder approved the wording; a lawyer's review is on the launch checklist (§17).
 
 **As first written (superseded):**
 
@@ -599,6 +602,8 @@ A "What leaves your device" table, always visible:
 |---|---|
 | Video, frames, music files, assets, brand logo and fonts, captions as edited, project edits | **No** |
 | A clip's sound, compressed (cloud transcription release) | **Yes, while "Cloud" is chosen in the drop zone and you are signed in:** to our server, which sends it to the transcription provider named here and returns the words. Neither keeps the sound or the words after the request. Choose "On device" and nothing of the clip leaves |
+| A long video's sound, compressed, in pieces of at most 90 seconds (v1.4, V6.1) | **Yes, always, for every long video:** the same way and the same rules as a clip's. The long path has no on-device choice, and the long page says so before you start |
+| Words you search for stock B-roll, typed or chosen by the plan (v1.4, V6.8) | **Yes, while "Stock B-roll (Pixabay)" is on:** to our server, which asks Pixabay and returns clips. We do not keep or log the words; the results are kept for a day under a scrambled key, as Pixabay requires. The stock clip you choose comes straight from Pixabay's servers to your browser |
 | Transcript text, word timings and per-word loudness/pitch scores (v1.2, from V6.2) | **Yes, while "AI edit plan" is on:** once per plan request, to our server, which forwards it to the AI provider named here and returns the plan. Neither we nor the provider keep it after the request (provider terms recorded by TE-15). Switch it off and nothing of the clip leaves |
 | Sentence text and timings of a long video, and shot categories like "talking head, face left" (v1.3, V6.4) | **Yes, while "AI edit plan" is on:** once per long video, to choose shorts. Same rules as above |
 | What you type in chat, with that short's words (v1.3, V6.9) | **Yes, while "AI edit plan" is on:** per message. Same rules. Never used in analytics |
@@ -612,19 +617,20 @@ It also shows: processing mode ("Local rendering; AI edit plan on/off" with the 
 
 ### 12.8 The AI edit plan (v1.2, from V6.2)
 
-**What it is.** One request per clip (and per "Regenerate plan"). The client sends the transcript with timings and prosody scores; the server adds a system prompt that lists everything the renderer can draw and forwards both to the LLM; the LLM returns a plan in a fixed JSON schema; the client validates it and the renderer draws it. The plan is stored with the clip, so preview, export and a reload all use the same plan (deterministic rendering, §12.5).
+**What it is.** One request per clip (and per "Regenerate plan"). The client sends the transcript with timings and prosody scores; the server adds a system prompt that lists everything the renderer can draw and forwards both to the LLM; the LLM returns a plan in a fixed JSON schema; the client validates it and the renderer draws it. **The editor applies the plan automatically (v1.4, founder 2026-11-08):** there is no approve-each-step screen; the person sees a finished short and switches off or undoes what they do not want. The same flow serves both paths. The plan is stored with the clip, so preview, export and a reload all use the same plan (deterministic rendering, §12.5).
 
 **What the plan contains.**
 
 | Part | Examples |
 |---|---|
 | Cuts | Lead-in and tail silence, shortened pauses, intentional pauses marked to keep, filler words and false starts (off by default) (§9.2.1) |
-| Emphasis picks | Which words get colour, an icon pop or a punch-in zoom |
+| Emphasis picks | Which words get colour, an icon pop or a zoom: a snap onto one strong word or a slow push across a sentence that builds (auto zoom, v1.4) |
 | Structure visuals | List builder (items appear as each is spoken), number moments (counting number or simple bar), quote card, definition card, X-versus-Y comparison, step tracker, timeline, checklist |
 | Emoji | Transcript-aware emoji beside a word, from the catalog's fixed emoji set |
 | Structure of the talk | Hook (opening line), topic shifts (each gets a transition), call to action |
 | Furniture | Progress bar, hook title card, end card with a call to action |
 | Music cue | Whether music fits and its energy (the user picks the track) |
+| B-roll (V6.8) | Which words get one of the person's own clips, or a stock search on Pixabay (v1.4) |
 | Text extras | Hook title, post caption, hashtags (shown in review to copy; not drawn unless an item uses them) |
 
 **How it is kept honest.**
@@ -637,9 +643,11 @@ It also shows: processing mode ("Local rendering; AI edit plan on/off" with the 
 
 **Measured by.** E-11: plan items kept versus switched off in review, cuts restored, and the "Would you post this?" answer for AI plans versus rule plans (§19).
 
-### 12.9 From a long video to finished shorts (v1.3, V6.1, V6.3, V6.4)
+### 12.9 From a long video to finished shorts (v1.3, V6.1, V6.3, V6.4; v1.4)
 
-**What it is.** A Director request reads the whole transcript sentence by sentence and returns 5-10 shorts. Each short is 15-90 seconds (aim 30-60), made of **whole sentences**, in up to 4 parts from anywhere in the video, with a title, a style and a one-line reason.
+**Its own page (v1.4).** "Make shorts from a long video" is a separate page from "Edit a clip" (L0); both open the same editor.
+
+**What it is.** The video, up to 45 minutes, is read where it is on the computer and never copied whole. Its sound is transcribed in the cloud in pieces of at most 90 seconds, each saved as it returns, so a reload loses almost nothing; if transcription cannot continue, the job pauses with Continue rather than switching to the much slower on-device model. A Director request then reads the whole transcript sentence by sentence and returns 5-10 shorts. Each short is 15-90 seconds (aim 30-60), made of **whole sentences**, in up to 4 parts from anywhere in the video, with a title, a style and a one-line reason.
 
 **Rules the validator enforces.**
 
@@ -654,11 +662,11 @@ It also shows: processing mode ("Local rendering; AI edit plan on/off" with the 
 
 **How it is kept honest.** Each short lists its parts with their words, so the creator can see exactly what was joined, remove a part or restore it. If AI is unavailable, the local rules give up to 5 single-run shorts, marked "Picked without AI", so a long job never dead-ends. A Free user out of long videos is told before the work starts.
 
-**After selection,** each short is a clip like any other: its own transcript, clean audio at one loudness, its own edit plan, cuts, captions and visuals.
+**After selection,** only the chosen parts of the video are kept on the computer, so each short works without the original file. Each short is then a clip like any other: its own transcript, clean audio at one loudness, its own edit plan applied automatically, cuts, captions and visuals. The two-step flow is the founder's: first the AI says which parts to cut and stitch, then it plans each short exactly as it plans a dropped clip.
 
 **Encoded only if kept.** Preparing a short does not render it. Previews play live, and only what the user keeps gets encoded.
 
-**Time.** About 30-60 minutes for a 20-minute video on the reference laptop (TARGET, §20.2A), most of it transcription, while the computer stays usable. That is slower than a server, and is said so plainly on the page.
+**Time.** About 15-30 minutes for a 45-minute video on the reference laptop (TARGET, §20.2A), most of it looking at shots and preparing shorts, while the computer stays usable. *(v1.3: 30-60 minutes for 20 minutes, most of it on-device transcription.)*
 
 ### 12.10 Vision: local signals and framing (v1.3, V6.5)
 
@@ -674,13 +682,13 @@ A chat panel beside the other tabs. "Make this shorter." "Use a stronger hook." 
 
 ### 12.12 Asset box and B-roll (v1.3, V6.8)
 
-The user drops their own clips and images and labels them ("my office", "product demo"). The plan places them on the words that fit, and chat places them on request. Fit: full, contained, or picture-in-picture. Speech stays on top. The assets never leave the computer; their typed labels go with AI requests so they can be placed. **No stock at launch** (founder, 2026-11-02).
+The user drops their own clips and images and labels them ("my office", "product demo"). Their own clips matter most when stock cannot help: a creator explaining black holes wants their own diagram or a lecture clip, not a generic space photo. **Stock footage from Pixabay is in too (v1.4, founder 2026-11-08; v1.3 said no stock at launch).** The plan places B-roll on the words that fit, from the person's clips or a stock search; **the person can also place it by hand:** click a word, "Add B-roll here", pick a clip or search stock, and for a video choose which part plays by dragging a window along its frames. Chat places it on request from V6.9. Fit: full, contained, or picture-in-picture. Speech stays on top. The person's assets never leave the computer; their typed labels go with AI requests so they can be placed; stock search words go to our server and Pixabay (§12.7), and each stock clip is marked "From Pixabay". The Terms say the person must hold the rights to clips they add.
 
 Also in this release: dissolve, whip and slide transitions at the joins of a stitched short; a split layout for screen recordings (screen above, face below); a full-frame layout over a blurred copy for footage.
 
 ### 12.13 Back-catalogue queue (v1.3, V6.10, Creator)
 
-Drop many videos, up to 50 in a session. They run one after another on this computer, with a running estimate ("about 9 hours left"). Nothing is uploaded and no minutes are counted; this is the clearest difference from credit-metered tools. It needs the tab open and the computer awake, and it says so. After a reload, finished videos stay and the rest are dropped again.
+Drop many videos, up to 50 in a session. They run one after another on this computer, with a running estimate. The videos are not uploaded (their sound is transcribed in the cloud, as for any long video, v1.4) and no minutes are counted; this is the clearest difference from credit-metered tools. A very long queue can meet the daily transcription budget; it then pauses and says so. It needs the tab open and the computer awake, and it says so. After a reload, finished videos stay and the rest are dropped again.
 
 ### 12.14 Creator memory (v1.3, V6.10)
 
@@ -920,7 +928,9 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | **Analytics rules** | Allowed: anonymous event names and numeric/enum properties from an explicit list (capability pass/fail, reject_reason, stage timings, error codes, export success, plan outcome and item/cut counts). **Never allowed:** file names, transcript text, caption text, event or plan params, audio/video content, free-text user input. Enforced by an automated browser test that processes a fixture clip while capturing all network traffic: it fails if any request goes to a non-allowlisted host, if any payload other than the one plan request contains a transcript word, if any payload contains media bytes, or if a request is sent during processing other than analytics beacons, the API warm-up and the plan request |
 | **Edit-plan request (v1.2)** | Only from the plan use-case; body = transcript text, timings, prosody scores, catalog version; no media, no file name, no user edits. The server holds it in memory for the request only, never writes it to the database or logs, and forwards it only to the configured AI provider over HTTPS. The provider's retention and training terms are recorded by TE-15 and shown on the settings page; a provider that trains on the data or keeps it is not chosen unless the founder accepts that in writing and the settings page says so |
 | **AI requests of the long path and chat (v1.3)** | One use-case per route; bodies carry sentence text and timings, shot categories, the typed message and short history, the words of the short, asset labels and memory counts. **Never a frame, an audio sample, a file name.** Held in memory for the request only, never written to a database or log. Chat text is never in analytics |
-| **Legal-review gate** | Before any public claim of GDPR, India DPDP Act, CCPA, SOC 2 or similar compliance, or any absolute wording such as "never leaves your device", a lawyer reviews the claim (*general-market knowledge, re-verify before launch*). The MVP's factual claim is "your video is not uploaded to our servers," backed by the network test; from V6.2 the copy also says that the transcript is sent to make the edit plan, with the provider named. Cloud transcription (§12.6, built in the cloud transcription release) needs its own review before launch; until then the founder approved its wording (2026-11-06) |
+| **A long video's sound (v1.4)** | Always transcribed in the cloud, in compressed pieces of at most 90 seconds, through `POST /transcribe` under the same rules as a clip's (§12.6): memory only, never logged, the provider's retention off. The long page says so before the work |
+| **Stock search (v1.4, V6.8)** | Only while "Stock B-roll (Pixabay)" is on; the words go to our server and Pixabay only, are never stored or logged by us, and results are cached for a day under a hash of the words, as Pixabay's terms require. The chosen clip is downloaded from Pixabay's server straight into the browser |
+| **Legal-review gate** | Before any public claim of GDPR, India DPDP Act, CCPA, SOC 2 or similar compliance, or any absolute wording such as "never leaves your device", a lawyer reviews the claim (*general-market knowledge, re-verify before launch*). The MVP's factual claim is "your video is not uploaded to our servers," backed by the network test; from V6.2 the copy also says that the transcript is sent to make the edit plan, with the provider named. Cloud transcription (§12.6, built in the cloud transcription release) needs its own review before launch; until then the founder approved its wording (2026-11-06). v1.4 adds the long path's always-cloud sound and the stock search to that review |
 | **Deletion/export** | "Delete account" first cancels any active subscription, then immediately removes the user, sessions, subscription link, usage receipts and waitlist entries from our servers (well inside a 30-day bound); analytics hold no account link, so there is nothing to remove there and they expire at 90 days; billing records may be retained by the merchant of record for tax reasons and are out of our control. "Clear local data" removes OPFS/IndexedDB content in that browser but cannot remove files the user already downloaded. "Export my account data" returns a JSON of server-side records only (there is nothing else) |
 
 ---
@@ -949,7 +959,8 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | **Competing on OpusClip's home ground (v1.3)** | Compared on speed and convenience, where local loses | Lost deals citing speed; low long-path activation | Lead with stitched shorts, whole sentences, instant edits and the back catalogue; keep the clip path (§7) |
 | **Scope (v1.3):** eleven releases before launch, with no customer yet | Months built on an untested guess | E-12 not run; no alpha by V6.4 | Alpha after V6.4; public demos after V6.6; the founder may reorder or drop any later release |
 | **AI cost above plan (v1.3)** | The cap trips and plans fall back to rules for everyone | `ai_spend` at 80% early in a month | Cheaper model for per-short plans; lower Free quotas; the founder raises the cap |
-| **Model and code licences (v1.3)** | A GPL model or copied code forces a rewrite or a takedown | TE-23, TE-24 readings | Licence check is a pass line of each; study Tooscut for approach only, never copying (Elastic License 2.0) |
+| **Model and code licences (v1.3)** | A GPL model or copied code forces a rewrite or a takedown | TE-23, TE-24 readings | Licence check is a pass line of each; study Tooscut for approach only, never copying (Elastic License 2.0). v1.4: Tooscut is the main study source for the editing engine, under the same rule |
+| **Outside services on the long path (v1.4)** | A long video cannot be transcribed when Groq is down or over budget (no device fallback, by choice); stock B-roll stops if Pixabay changes its terms | `source_paused` events with `busy` or `unavailable`; TE-26 | Pause with Continue, never fail; Groq's paid tier and configurable budgets; stock behind its own switch and flag, with own clips unaffected |
 | Odd real-world inputs (VFR, rotation metadata, odd audio) | Broken exports for a slice of users | Reject or error rate > 15% of attempts | The 40+ clip corpus, specific rejection messages, fix top error weekly |
 | **Free-tier dependence** (A-10: nothing is paid for) | A provider changes or enforces its terms and a component stops working; Vercel's free plan is restricted to non-commercial use; without a purchased domain, magic-link emails may land in spam | A terms notice from a host; API cold starts over 70 s; magic-link delivery under 95% | Each component can move to another free provider without code changes; the uptime monitor keeps the API warm; free-tier facts are re-verified before launch (tech spec TE-5 to TE-11). No paid fallback exists, so a failure here can delay launch |
 | Launch timing near the holidays | Lower attention, slower feedback | Month 1 traffic below plan | Keep the launch date but time the Show HN/Product Hunt launch for the first week of January if Month 0 ends clean (ASSUMPTION; slightly delays the model) |
@@ -985,6 +996,7 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 | Is the stitched-shorts idea wanted, before it is built? | **E-12** (optional, founder's decision of 2026-11-02; recommended). One week beside V6: run one real video through OpusClip, Submagic, Vizard and Descript by hand to see whether any stitch moments; a throwaway script (transcript → LLM → ffmpeg) makes single-run and stitched shorts for 20 YouTubers free; offer the $99 founding plan | Beside V6, or any time before V6.4 | ≥ 8 of 20 post at least one; stitched shorts perform at least as well as single-run ones; ≥ 5 strangers prepay (TARGET) | Yes: confidence in V6.3-V6.5. No: lead with whole-sentence quality and the back catalogue, and re-plan V6.8-V6.11. **The build does not wait for this; the founder carries that risk knowingly** |
 | Are the Director's shorts good? | **E-13** Panel rating on a labelled set of ≥ 10 real long videos, then real users: `short_action`, deleted parts, "Would you post this?" | V6.4 (set), M2.5, M3 | ≥ 60% of proposed shorts kept; parts deleted on ≤ 25%; ≥ 50% "post as is or small edits" (TARGET) | Yes: keep. No: tune the prompt, try a stronger model; if still low, offer fewer shorts; the founder decides |
 | Which path pays? | **E-14** Conversion and retention split by first path used, plus landing message | M2.5 → M3 | Directional: paid and repeat rates by path | Marketing follows the winner. The other path stays unless it costs more than it brings |
+| Do our shorts reach the benchmark? (v1.4) | **E-15** The founder's quality pass: 3-5 source videos made into shorts in Offcut and compared side by side with Submagic-made shorts and the caption references; the differences become a checklist | After V6.11, before V7 (`buildplan.md` §8A.12) | Every difference fixed, tuned, or knowingly accepted by the founder (TARGET) | Yes: the feature freeze holds and V7 starts. No: fixes are presets, timing and catalog tuning; a new kind is a stop-and-ask (`technicalspec.md` §41.4) |
 
 ### Minor
 
@@ -1024,14 +1036,16 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 
 **Long path (v1.3).**
 
-- [ ] A 20-minute 1080p fixture goes from drop to at least 5 exported shorts on R1 and R2 without errors; each passes the verifier.
-- [ ] A 20-minute 4K HEVC fixture does the same on D1, or is rejected with a specific message on a machine that cannot decode it.
+- [ ] A 45-minute 1080p fixture (v1.4; v1.3: 20 minutes) goes from drop on the long page to at least 5 exported shorts on R1 and R2 without errors; each passes the verifier; the shorts reopen after the original file is gone.
+- [ ] A 45-minute 4K HEVC fixture does the same on D1, or is rejected with a specific message on a machine that cannot decode it.
+- [ ] With cloud transcription unavailable, a long video pauses with its reason and Continue, and finishes after Continue with nothing sent twice.
+- [ ] B-roll placed by hand on a word, from the person's own clip and from Pixabay, exports and passes the verifier; each stock clip shows "From Pixabay".
 - [ ] No exported short starts or ends inside a sentence; every number on screen is parsed from its own words.
 - [ ] A short stitched out of order is in sync at every join, with no audible click.
-- [ ] Killing the tab mid-transcription loses at most one window; after a reload the job resumes.
+- [ ] Killing the tab mid-transcription loses at most the windows in flight; after a reload the job resumes without the file, and a step that reads the video asks for the same file.
 - [ ] With AI unavailable, a long video still gives a usable list, marked "Picked without AI".
 - [ ] A moving speaker stays in frame across the fixture, with no pan across a cut.
-- [ ] The privacy test covers the long path, chat and assets: no frame, audio sample or file name in any request.
+- [ ] The privacy test covers the long path, chat, assets and stock: no frame or file name in any request, sound only in `/transcribe` windows, search words only in the stock search, and no asset bytes anywhere.
 - [ ] **With every new feature off, frames and samples equal V5's (`technicalspec.md` INV-26).**
 - [ ] Each person-mask effect has passed TE-25, or is off.
 
@@ -1053,21 +1067,22 @@ The tech spec (`technicalspec.md`) is authoritative. Every high-complexity eleme
 
 **Status on 2026-10-09 (D-67 of `docs/v2/v2implementation.md`).** The transcription budget is not met by the speech model V2 uses, the small-size one: about 150 s on an R1-class laptop for the 74.7 s reference clip, which is about 120 s for 60 s. The founder accepts that for the quality of the transcript, up to 145 s for 60 s. The budgets above stay the targets. On these numbers the median total is 3 + 120 + 2 + 4 + 90 + 2 = 221 s, so the three-minute promise does not hold until the model or the promise changes.
 
-### 20.2A Long-path budgets (v1.3, TARGETS, TE-18)
+### 20.2A Long-path budgets (v1.3; v1.4, TARGETS, TE-17, TE-18)
 
-Reference: 20-minute 1080p H.264 source, R1, model cached, 8 shorts prepared, 5 exported at 60 s each.
+Reference (v1.4): 45-minute 1080p H.264 source, R1, read in place, transcribed in the cloud, 8 shorts prepared, 5 exported at 60 s each.
 
 | Stage | Budget |
 |---|---|
-| Probe, copy (per 5 GB), audio extraction | about 3 min |
-| Transcription | 40 min (D1 estimate from today's speed: 21-27 min, not measured at this length) |
-| Vision over the whole file | 3 min |
-| Director | about 1 min |
+| Probe and sound extraction (no copy of the file) | about 4 min |
+| Vision over the whole file | 7 min |
+| Cloud transcription | 6 min |
+| Director | about 1.5 min |
+| Keeping the chosen parts | 1 min |
 | Prepare 8 shorts | 8 min |
-| **To the list of shorts** | **at most 55 min** |
+| **To the list of shorts** | **at most 30 min** |
 | Export 5 shorts | 7.5 min |
 
-**If transcription misses:** a faster model over the whole video and the accurate one on the chosen parts (TE-18). **If long jobs still fail on typical laptops:** cap at 10 minutes and say why (the founder decides).
+**If transcription misses:** more pieces in flight, Groq's paid tier, or a larger overlap between pieces (TE-18). **If long jobs fail on typical laptops** (TE-20): the copy tells people to keep the tab visible, and the founder decides. *(v1.3's reference was 20 minutes, copied whole and transcribed on the device: at most 55 minutes to the list, with a 10-minute cap as the fallback.)*
 
 ### 20.3 Critical-path arithmetic for the end-to-end promise
 
@@ -1134,7 +1149,7 @@ All thresholds are TARGETS. Measure from public launch (planned as Mon 21 Dec 20
 | 11 | Local LLM producer of the edit plan (P2) | Provider cost or terms (TE-15), or privacy-led messaging wins E-6 | Device capability data shows adequate hardware share |
 | 12 | Native desktop app (P2) | Web product validated and requests for offline/GPU speed | M4 continue decision |
 | 13 | Multi-language (P2) | English retention validated; demand from a specific language | Accuracy testing per language; font and shaping support |
-| 14 | **Stock** B-roll suggested by the edit plan (P2; the user's own B-roll is V6.8): first motion-graphic B-roll drawn by the renderer (diagrams, icons, charts), then stock footage | E-11 shows plan items are kept; users ask for footage | Stock licence and API terms verified; the stock CDN's CORS works under COEP or a free proxy exists; a second video slot in the renderer (`technicalspec.md` §40.5) |
+| 14 | Motion-graphic B-roll drawn by the renderer (diagrams, icons, charts) (P2). *v1.4: stock footage from Pixabay moved into launch scope (V6.8, §12.12), beside the user's own B-roll* | E-11 shows plan items are kept; users ask for drawn diagrams | A second video slot in the renderer (`technicalspec.md` §40.5) |
 | 15 | Chapter markers, lower third (P2, founder's decision of 2026-11-02) | Users ask, or long-format output is added | `Chapter` already in the plan's format |
 | 16 | Colour looks through 3D LUTs (P2) | Users ask for a consistent look | Renderer pass; closed preset list |
 | 17 | Brand kit and creator memory sync across browsers (P1) | Users on two machines ask | A small server store; PS §17 review |

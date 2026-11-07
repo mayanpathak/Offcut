@@ -1,10 +1,10 @@
 # buildplan.md - Offcut Build Plan (V1 to V10, with V6.1 to V6.11)
 
-**Status:** v1.3. Built from `product.md` (PS, Product Spec v1.3) and `technicalspec.md` (TS, Technical Spec v1.3).
+**Status:** v1.4. Built from `product.md` (PS, Product Spec v1.4) and `technicalspec.md` (TS, Technical Spec v1.4).
 
 **What this document is.** The order in which Offcut gets built, as ten versions plus eleven point releases. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the MVP product and, from v1.2, **the seams the AI edit plan needs** (TS §40.9), so that nothing written in V4-V6 has to be rewritten later. V6.1 to V6.11 add the long path and the AI-planned editor (TS §40.10, §41-§53, §8A below), and V6.11 ends with the feature freeze. V7 to V10 add no features: they are testing, hardening and the launch gate.
 
-**v1.3 in one paragraph (founder decisions of 2026-11-02).** V6 comes first, then V6.1-V6.11, then V7-V10. A long video up to 20 minutes becomes 5-10 finished shorts, built on a "virtual clip" design that leaves everything downstream unchanged. **A clip of at most 90 seconds with new features off stays V5, byte for byte: TS §41, the compatibility contract, binds every release.** The old V6.x are renumbered (table below; TS §42), so older documents and code comments are read through that map. Chapter markers and the lower third moved post-launch.
+**v1.3 in one paragraph (founder decisions of 2026-11-02).** V6 comes first, then V6.1-V6.11, then V7-V10. A long video up to 20 minutes (v1.4: 45) becomes 5-10 finished shorts, built on a "virtual clip" design that leaves everything downstream unchanged. **A clip of at most 90 seconds with new features off stays V5, byte for byte: TS §41, the compatibility contract, binds every release.** The old V6.x are renumbered (table below; TS §42), so older documents and code comments are read through that map. Chapter markers and the lower third moved post-launch.
 
 **v1.2 in one paragraph (founder decision of 2026-10-21).** V4, V5 and V6 are written for the edit-plan design from the start: the scene reads an `EditPlan` (the rule detector is its first producer), time runs through an identity `TimeMap`, the video is a draw command, fonts and colours come from a registry and a theme, and the audio the preview plays is assembled program audio. V6.2 then adds the cloud LLM producer, and each later point release adds drawing code and data, not new contracts.
 
@@ -18,7 +18,9 @@
 
 **The cloud transcription release (2026-11-06).** Between the design release and V6.1, built as a version of its own (plan, guide, prompts P161-P170 and record in `docs/cloud_transcription/`, decisions D-336 to D-382, declared change DC-14, tag `cloud`). A signed-in person's clips are transcribed by Groq's `whisper-large-v3-turbo` by default, chosen in a card in the drop zone ("Cloud · fast" or "On device · private"): the clip's 16 kHz sound is compressed in the browser to Ogg Opus (about 0.32 MB for 90 s), sent once through `POST /api/v1/transcribe` on our API, and the words come back; nothing is stored. Any failure finishes the clip on the device. Signed out, or with the card on device, the product is today's. Two kill switches: `TRANSCRIBE_ENABLED` on Render and the build flag `cloud_transcribe`. Measured on D1: about 13× faster than the device on a minute of speech, the same visual events and one more (TE-C3, TE-C4).
 
-**Where things stand (2026-11-02).** V1-V5 are closed, tagged and live. **V6 is next.** Dates below are as first written; V1-V5 ran ahead of them, and everything after V6 moves. Estimated public launch: about February 2027 (§8A.0); the founder sets it when V6.11 closes.
+**v1.4 in one paragraph (founder decisions of 2026-11-08; `docs/v6/v6changelog.md` Entries 21 and 22).** The long path is reshaped before it is built; the build order does not change. Two separate pages, "Make shorts from a long video" and "Edit a clip", sharing one editor that applies the AI's plan automatically. Long videos up to 45 minutes, read in place and never copied whole; only the parts chosen for shorts are copied (TS §43, §44.8). A long video is transcribed in the cloud only, and pauses with Continue on failure (TS §43.6). B-roll from the person's own clips and from Pixabay stock, placed by the plan or by hand on a word (TS §48). Auto zoom (TS §47.2). After V6.11, a quality pass against the founder's Submagic benchmark (§8A.12). Tooscut stays the study source for the engine, never copied (TS §53.4).
+
+**Where things stand (2026-11-08).** V1-V6 are closed, tagged and live, and so are two releases between V6 and V6.1: the design release (tag `design`) and cloud transcription (tag `cloud`). **V6.1 is next**, under v1.4. *As first written on 2026-11-02:* V1-V5 are closed, tagged and live. **V6 is next.** Dates below are as first written; V1-V5 ran ahead of them, and everything after V6 moves. Estimated public launch: about February 2027 (§8A.0); the founder sets it when V6.11 closes.
 
 | Version | Name | Spec steps | Calendar (build starts Mon 12 Oct 2026) | Gate at the end |
 |---|---|---|---|---|
@@ -28,17 +30,18 @@
 | **V4** | The look and the editor | M1.4, M1.5 | Week 4, second half: 5-8 Nov | Preview + review UI working |
 | **V5** | Export that an independent tool accepts | M1.6 | Week 5, first half: 9-11 Nov | All 11 verifier checks pass |
 | **V6** | Accounts, limits, payments: the MVP features complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all v1.1 P0 features work |
-| **V6.1** | Long source: 20 minutes, 16 GB, 4K, HEVC, resumable transcription | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5 |
+| **V6.1** | Long source (v1.4): its own page, 45 minutes read in place, 4K, HEVC, cloud transcription in resumable windows | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5 |
 | **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap | M1.9 | | AI plans validate and render; fallback works; privacy test revised |
 | **V6.3** | Pause and silence cuts; the `Assembly` (stitched parts) | M1.10 | | Cut and stitched exports pass the verifier at the map's duration |
 | **V6.4** | Director: a long video becomes 5-10 shorts; list; batch export | M1.17 | | A long fixture gives 5 exported shorts, API up or down. **Private alpha after this** |
 | **V6.5** | Local vision and face-tracked framing | M1.18 | | A moving speaker stays framed; no frame leaves; `FramePath::none` equals V5 |
 | **V6.6** | Finished look: cards, number moments, kinetic presets, shapes, hook title, progress bar, end card | M1.12, M1.13, M1.14 | | Goldens per kind; frame budget. **First public demos after this** |
 | **V6.7** | Music, ducking, sound cues | M1.11 | | Ducking and mix loudness measured |
-| **V6.8** | Layers: B-roll, asset box, join transitions, split layout | M1.19 | | Verifier 11/11 with B-roll; simple lists unchanged |
+| **V6.8** | Layers: B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions, split layout | M1.19 | | Verifier 11/11 with B-roll; simple lists unchanged |
 | **V6.9** | Chat editing | M1.20 | | Ops apply, refuse and undo; privacy test covers chat |
 | **V6.10** | Brand kit, creator memory, back-catalogue queue | M1.15, M1.21 | | Golden matrix; memory changes the next prompt |
 | **V6.11** | Person mask: text behind speaker, background change | M1.22 | | TE-25 per effect. **M1.x gate**: every PS §9.5 V6.x row works, or the founder dropped it. **Feature freeze** |
+| **Quality pass** | (v1.4) Shorts compared with the founder's Submagic benchmark; presets, timing and catalog tuned (§8A.12) | E-15 | After V6.11; length set by the founder | Every difference fixed, tuned or knowingly accepted |
 | **V7** | Survive real life: restore and failure recovery | M2.1 | Week 6: 16-22 Nov | Reload, crash and quota cases recover |
 | **V8** | Prove the privacy claim; security hardening | M2.2 | Week 7: 23-29 Nov | Network-privacy test blocks releases |
 | **V9** | Real clips and real speed | M2.3, M2.4 | Weeks 8-9: 30 Nov - 13 Dec | Corpus checkpoint (Sun 6 Dec); budgets met |
@@ -56,7 +59,7 @@ Build work ends at V10. M3 (Sun 21 Mar 2027) and M4 (Sat 19 Jun 2027) are decisi
 
 ### 1.1 Money and hosting (fixed)
 
-- Recurring cost is 0 USD/month with no paid fallback (PS A-3, PS A-10, TS TDR-17), **except the AI provider from V6.2: paid, under a monthly cap the founder sets (`AI_MONTHLY_CAP_USD`, TS §52).**
+- Recurring cost is 0 USD/month with no paid fallback (PS A-3, PS A-10, TS TDR-17), **except the AI provider from V6.2: paid, under a monthly cap the founder sets (`AI_MONTHLY_CAP_USD`, TS §52)**, and (v1.4) Groq's paid tier for transcription, from before the private alpha (about 3 cents per 45-minute video, bounded by the audio budget; cloudimplementation D-342, TS §52). Pixabay's API is free.
 - Frontend: static files on Vercel's free plan, which also proxies `/api/v1/*`. Backend: one Docker container on a Render free web service. Nothing else is deployed by you.
 - Free external services, each chosen by an experiment in V1: Postgres (TE-6), model/asset storage (TE-7), transactional email (TE-8), merchant of record (TE-9), uptime monitor, GitHub Actions + GHCR (TE-10).
 - When a free tier stops fitting, the component moves to another free tier. A paid tier is a founder decision plus a spec revision, never a quiet fix.
@@ -665,13 +668,13 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 ## 8A. V6.1 to V6.11 - The long path and the AI-planned editor (v1.3)
 
-**Goal.** After V6, turn the product into a finished-shorts maker on two paths: a long video becomes 5-10 finished shorts, and a raw clip becomes one. One AI edit plan per short drives cuts, music, kinetic captions, structure visuals, transitions and the brand kit. Each release is tagged (`v6.1` ... `v6.11`), deployed and demoable, under the §1.2 rules.
+**Goal.** After V6, turn the product into a finished-shorts maker on two paths: a long video becomes 5-10 finished shorts, and a raw clip becomes one. One AI edit plan per short drives cuts, music, kinetic captions, auto zoom, structure visuals, B-roll, transitions and the brand kit, and the editor applies it automatically (v1.4). Each path has its own page (v1.4). Each release is tagged (`v6.1` ... `v6.11`), deployed and demoable, under the §1.2 rules.
 
 **Read first.** TS §41, the compatibility contract, binds every release: flags, declared changes, both-path test runs, and when to stop and ask the founder. PS §12.9-§12.15 say what each feature is. TS §43-§53 give the contracts. This section gives the order, the build lists, the demos and the exit boxes.
 
 ### 8A.0 Rules for all eleven releases
 
-**Order and why.** V6.1 first because it holds the largest feasibility risk: if long jobs do not survive on real computers, everyone should learn that now. V6.2 builds the one new contract with the provider. V6.3 changes time and audio while the visual layer is small. V6.4 is the headline feature. V6.5 makes a landscape video usable. Then the look (V6.6) and sound (V6.7), layers (V6.8), chat (V6.9), retention (V6.10) and the riskiest effects (V6.11). The order may change only where the "Depends on" lines allow it.
+**Order and why.** V6.1 first because it holds the largest feasibility risk: if long jobs do not survive on real computers, everyone should learn that now. (v1.4: cloud transcription removed the device-speed half of that risk; reading a 45-minute 4K file in place, keeping the tab alive and the cloud windows remain. The founder kept the order on 2026-11-08.) V6.2 builds the one new contract with the provider. V6.3 changes time and audio while the visual layer is small. V6.4 is the headline feature. V6.5 makes a landscape video usable. Then the look (V6.6) and sound (V6.7), layers (V6.8), chat (V6.9), retention (V6.10) and the riskiest effects (V6.11). The order may change only where the "Depends on" lines allow it.
 
 **Every release does these, in this order:**
 
@@ -693,25 +696,27 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 | After V6.4 | **Private alpha** with 10-15 YouTubers on their own videos (the long-path half of E-2) | What to fix first; which of V6.6's parts and V6.7-V6.11 matter |
 | After V6.6 | **First public demos,** made with the product; **the founding release (§8A.6): live payments, then the founding-plan offer (E-5)**; waitlist, affiliate talks | Whether the look is good enough to sell |
 | V6.11 | The person-mask panel on 20 shorts (TE-25) | Which effects ship |
-| After V6.11 | **Feature freeze.** Marketing runs alongside V7-V10 | The launch date |
+| Any time before the quality pass (v1.4) | **The benchmark:** a few Submagic-made shorts downloaded from YouTube and the caption references (`sh2clips/documents/`), kept outside git, as the repository is public | What "good enough" looks like |
+| After V6.11 | **The quality pass (§8A.12), then feature freeze.** Marketing runs alongside V7-V10 | What to tune; the launch date |
 
 **Estimate (founder's pace: V4, 38 prompts in about 8 days; V5, 8 prompts in about 2 days).** Rough, with no rework and no failed experiment. A release at twice its estimate is a stop-and-ask.
 
 | Release | Prompts (rough) |
 |---|---|
 | V6 | 14, as built (P137-P150) |
-| V6.1 | 14 |
+| V6.1 | 12 (v1.4: no whole copy and no device transcription; v1.3: 14) |
 | V6.2 | 10 |
-| V6.3 | 14 |
+| V6.3 | 16 (v1.4: part copies; v1.3: 14) |
 | V6.4 | 14 |
 | V6.5 | 8 |
 | V6.6 | 20 |
 | V6.7 | 7 |
-| V6.8 | 16 |
+| V6.8 | 19 (v1.4: stock, placing by hand, the op log; v1.3: 16) |
 | V6.9 | 10 |
 | V6.10 | 10 |
 | V6.11 | 10 |
-| **Total** | **about 147, about 5-8 weeks** |
+| Quality pass | Set by the founder (§8A.12) |
+| **Total** | **about 150 with V6, about 5-8 weeks** |
 
 V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIMATE). The founder sets the date when V6.11 closes.
 
@@ -719,42 +724,45 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 ### 8A.1 V6.1 - Long source (M1.16)
 
-**Goal.** A file up to 20 minutes and 16 GB, 4K or HEVC, reaches a resumable master transcript. Nothing else uses it yet. With the flags off, nothing has changed.
+**Goal (v1.4).** A long video up to 45 minutes, 4K or HEVC, dropped on its own page, is read in place and reaches a resumable master transcript, transcribed in the cloud. Nothing else uses it yet. With the flags off, nothing has changed. *(v1.3: 20 minutes and 16 GB, copied whole, transcribed on the device.)*
 
-**Demo (dev flag).** Drop a 20-minute 4K file. Watch copy, audio and transcription progress. Kill the tab at window 20. Reopen, press Continue, and see it finish from window 20 or 21.
+**Demo (dev flag).** Open "Make shorts from a long video" and drop a 45-minute 4K file. Watch sound and transcription progress; nothing is copied first. Kill the tab at window 16. Reopen, press Continue, and see it finish from window 16 without the file. Kill it again during the sound step: it asks for the same file. Turn the cloud off: the job pauses with its reason and Continue.
 
-**Depends on.** V6 (the gate needs an account).
+**Depends on.** V6 (the gate needs an account); the cloud transcription release (`encodeForCloud`, `POST /transcribe`, `fake-api.ts`'s cloud option).
 
 **Build (TS §43).**
 
 | Create or change | Purpose |
 |---|---|
-| `web/src/config/features.ts`, Vite `define` | The flags (TS §41.3) |
-| `offcut-types`: `source.rs`, `SourceId`, limits of TS §43.2, `RejectReason::Hdr` | Types, additive |
-| `offcut-mp4`: `route_probe` in `validate.rs`, `hevc.rs` | Routing. `validate_probe` is untouched and rule 1 calls it |
-| `workers/media/file-random-access.ts`; `probeFile`, `importSourceToOpfs` in `import.ts` | Probe before any copy |
-| `audio-decode.ts`: `decodeAudioRegion`, `writeWholePcm16`, rate correction on the region path | Windows. `decodeAudio` is untouched |
-| `whisper-runtime.ts`: `transcribeWindows` | Checkpoints. `transcribe` is untouched |
+| `web/src/config/features.ts`, Vite `define` | The flags `long_video` and `high_res` (TS §41.3) |
+| `offcut-types`: `source.rs` with `SourceId`, `Entry`, limits of TS §43.2, `RejectReason::Hdr` | Types, additive |
+| `offcut-mp4`: `route_probe(p, decode_supported, entry, flags)` in `validate.rs`, `hevc.rs` | Routing by page. `validate_probe` is untouched and rule 1 calls it |
+| `ui/pages/LongPage.tsx` at `/app/long`; one link on `/app`; "Make shorts from it" on `REJECT_DURATION`'s panel; the landing page's "Start free" offers both | The two pages (TS §43.1, DC-1) |
+| `workers/media/file-random-access.ts`; `probeFile` in `import.ts` | Reading the `File` in place |
+| `audio-decode.ts`: `decodeAudioRegion` and `writeWholePcm16` over a `RandomAccessReader`, rate correction on the region path | Sound in windows to `pcm16.f32`. `decodeAudio` is untouched |
+| `usecases/transcribe-source.ts` | Cloud windows, checkpoints, retries, the four pause reasons (TS §43.6). `transcribe-cloud.ts` and `transcribe` are untouched |
+| Server: the window header on `POST /transcribe`, `LONG_AUDIO_PER_USER_DAY`, `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` (TS §22.1) | The long path's audio budget |
 | `offcut-text`: `sentences_long.rs` tests, `MAX_SENTENCE_MS` split | Sentences carry weight from V6.4 |
 | `persistence/`: IndexedDB v3, `sources-repo.ts`; `opfs.ts` paths; `quota.ts` eviction | Storage |
-| `state/source-store.ts`, `machines/source-machine.ts` | The job's state |
-| `usecases/import-source.ts`, `run-source-pipeline.ts` | The job; wake lock; resume; title progress |
-| `ui/components/SourceProgress.tsx`; drop zone route | Stages, pause, continue |
+| `state/source-store.ts`, `machines/source-machine.ts` with `paused` and `awaiting_file` | The job's state |
+| `usecases/import-source.ts`, `run-source-pipeline.ts` | The job; wake lock; resume; asking for the same file; title progress |
+| `ui/components/SourceProgress.tsx` | Stages, pause, continue, the pause reasons |
 | `models/model-manager.ts`, `config/models/` | Several manifests (DC-4) |
-| Fixtures: `long_12min.mp4`, `long_20min_4k_hevc.mov` (outside git, generated), `rej_too_long_21min.mp4`, `rej_8k.mp4`, `rej_hdr_hlg.mov` | Test inputs |
+| Fixtures: `long_12min.mp4`, `long_45min_4k_hevc.mov` (outside git, generated), `rej_too_long_46min.mp4`, `rej_8k.mp4`, `rej_hdr_hlg.mov` | Test inputs |
 
-**Experiments.** TE-17 (copy), TE-18 (whole-file ASR), TE-20 (hidden tab, sleep), TE-21 (HDR), TE-12 re-read on long files (moof, audio rate).
+**Experiments.** TE-17 (reading in place), TE-18 (cloud windows), TE-20 (hidden tab, sleep), TE-21 (HDR), TE-12 re-read on long files (moof, audio rate).
 
 **Exit.**
 
-- [ ] `route_probe.rs`: every rule; rule 1 equals `validate_probe` on every existing fixture.
-- [ ] `demux_fixtures.rs` (hvcC), `audio_region.rs`, `sentences_long.rs`, `source-machine.test.ts`.
-- [ ] `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts`.
-- [ ] Peak memory under 1.5 GB on the 20-minute file on D1.
+- [ ] `route_probe.rs`: every rule from both pages; rule 1 equals `validate_probe` on every existing fixture.
+- [ ] `demux_fixtures.rs` (hvcC), `audio_region.rs`, `sentences_long.rs`, `source-machine.test.ts`, `transcribe-source.test.ts`.
+- [ ] `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts`; `transcribe_route.rs` with the window budget.
+- [ ] Peak memory under 1.5 GB on the 45-minute file on D1.
 - [ ] TE-17, TE-18, TE-20, TE-21 recorded. If TE-18 or TE-20 fails: stop and ask.
 - [ ] Every §41.1 proof unchanged except the rows DC-1 to DC-4. Tagged `v6.1`.
+- [ ] Groq's Dev tier is on, or the founder has decided to stay on the free tier for now (TS §52).
 
-**Watch.** Fragmented MP4 from OBS, PCM audio from cameras. If the corpus shows these are common, this is a stop-and-ask, not a quiet addition.
+**Watch.** Fragmented MP4 from OBS, PCM audio from cameras. If the corpus shows these are common, this is a stop-and-ask, not a quiet addition. Reading a file in place on a slow external drive: TE-17 reads it.
 
 ---
 
@@ -762,11 +770,11 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Goal.** One AI request per clip returns a validated plan; the renderer draws it; a failed request never blocks anything. As the old V6.1, plus the spend cap and `DrawCmd::Image`.
 
-**Demo.** The reference clip with the AI plan on shows emphasis, a punch-in, an icon and an emoji. Turn off the API: the same clip reaches `ready` on the local rules, and the feed says so once.
+**Demo.** The reference clip with the AI plan on opens already edited: emphasis, a snap zoom on one word and a slow push across a sentence (auto zoom, v1.4), an icon and an emoji. Switch any of them off; undo. Turn off the API: the same clip reaches `ready` on the local rules, and the feed says so once.
 
 **Depends on.** V6.
 
-**Build.** `server/src/plan/` (`route.rs`, `provider.rs`, `quota.rs`, `spend.rs`), `migrations/0002_ai_usage.sql` (TS §52); `usecases/request-plan.ts`, `persistence/plans-repo.ts`; settings switch and provider text; catalog kinds `Emphasis`, `IconPop`, `PunchIn`, `Emoji` with drawing and goldens; `DrawCmd::Image` and a closed icon and emoji bundle; text extras panel with copy buttons; DC-7 on V-1; prompt additions of TS §47.
+**Build.** `server/src/plan/` (`route.rs`, `provider.rs`, `quota.rs`, `spend.rs`), `migrations/0002_ai_usage.sql` (TS §52); `usecases/request-plan.ts`, `persistence/plans-repo.ts`; settings switch and provider text; catalog kinds `Emphasis`, `IconPop`, `PunchIn` (with `motion: Snap | Push`, the auto zoom of TS §47.2, v1.4), `Emoji` with drawing and goldens; `DrawCmd::Image` and a closed icon and emoji bundle; text extras panel with copy buttons; DC-7 on V-1; prompt additions of TS §47.
 
 **Experiment.** TE-15: provider, price, parse rate, latency, data terms; labelled transcripts.
 
@@ -794,17 +802,18 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 | Cuts | `Cut` arms in validation; `timemap::build` with silence snapping; `assemble` splices; jump-cut alternation; cuts list with restore; filler switch; `ChangeSummary` cut fields; `set_scene` (DC-5) |
 | Assembly | `offcut-types/src/assembly.rs`, `SourceMs`; `offcut-text/src/rebase.rs`; `offcut-dsp/src/regions.rs`; `workers/render/source-position.ts`; second decode session across joins in `video-source.ts`; `join_points` in the scene; cache key field; `clips` row fields |
 | Use-case | `usecases/prepare-short.ts`: everything from `ShortSpec` to `ready`, driven by a test fixture until V6.4 |
+| Part copies (v1.4) | `offcut-mp4/src/remux.rs` (`remux_range`, H.264 and HEVC); `SourceMedia` in `assembly.rs`; `source-position.ts` and the export loop read part files; `clips/<clipId>/parts/` in `opfs.ts` (TS §44.8) |
 
 **Experiment.** TE-22: preview across a join on long-GOP 4K.
 
 **Exit.**
 
 - [ ] `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts`.
-- [ ] `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `stitched.spec.ts`; `preview-sync.spec.ts` join case.
+- [ ] `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `remux.rs`, `source_media.rs`, `stitched.spec.ts` (its parts copied by `remux_range`); `preview-sync.spec.ts` join case; TE-17's part-copy reading.
 - [ ] `program_identity.rs` and `timemap_identity.rs` unchanged and passing: `Assembly::whole` is V5 (INV-26).
 - [ ] A dropped clip's render-cache key is unchanged. Tagged `v6.3`.
 
-**Watch.** This release touches the most protected code. If `Assembly` needs more readers than the four listed, stop and ask.
+**Watch.** This release touches the most protected code. If `Assembly` needs more readers than the four listed, stop and ask. `SourceMedia::whole` must leave a dropped clip's reading exactly as V5's.
 
 ---
 
@@ -812,7 +821,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Goal.** The headline feature. Drop a long video; get a list of 5-10 shorts of whole sentences; open any; export the ones you keep. A failed AI request still gives a usable list.
 
-**Demo.** A 12-minute talk becomes a list with titles and reasons. One short joins a claim from minute 3 with its proof from minute 8. Delete a part; restore it. Export three. All pass the verifier.
+**Demo.** A 12-minute talk becomes a list with titles and reasons. One short joins a claim from minute 3 with its proof from minute 8. Delete a part; restore it. Close the tab, reopen without the file: every short still opens (part copies). Export three. All pass the verifier.
 
 **Depends on.** V6.1, V6.2, V6.3.
 
@@ -822,7 +831,8 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 |---|---|
 | `offcut-plan`: `shorts.rs`, `shorts_prompt.rs`, `shorts_rules.rs` | Validator S-1 to S-10, prompt, offline list |
 | `offcut-api-types/src/ai.rs`; `server/src/plan/shorts.rs`; grants in `quota.rs` | `POST /shorts` |
-| `usecases/request-shorts.ts`; `run-source-pipeline.ts` complete; `prepare-short.ts` complete; `open-short.ts`; `export-shorts.ts` | The flow |
+| `usecases/request-shorts.ts`; `run-source-pipeline.ts` complete, with `copying_parts` (v1.4, TS §44.8); `prepare-short.ts` complete; `open-short.ts`; `export-shorts.ts` | The flow |
+| Server: `SHORTS_BODY_LIMIT = 160 kB` on `/shorts` (DC-15) | 45-minute requests |
 | `state/shorts-store.ts`; `persistence/shorts-repo.ts` | The list |
 | `ui/pages/ShortsPage.tsx`, `ui/components/ShortCard.tsx`; a parts list in `CutsSection`; "Back to all shorts" | The UI. The editor itself is unchanged |
 | `analytics`: the events of TS §45.9 | E-13 |
@@ -837,7 +847,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 - [ ] `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `log_redaction.rs` (shorts).
 - [ ] `run-source-pipeline.test.ts`: each failure kind ends with a usable list.
 - [ ] `long-to-shorts.spec.ts` with a fake provider: 5 exported shorts, 11 checks each. API down: the rules list.
-- [ ] A worst-case 20-minute request fits in 64 kB; `no_media_routes.rs` unchanged.
+- [ ] A worst-case 45-minute request fits in 160 kB; `no_media_routes.rs` passes with DC-15's exception and nothing else changed.
 - [ ] TE-19 at or above its line, or the founder has decided. Tagged `v6.4`.
 - [ ] `long_video`, `assembly`, `director` flags on in production only after the alpha reading.
 
@@ -860,7 +870,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 - [ ] `shots.rs`, `tracking.rs`, `vision_summary_prompt.rs`.
 - [ ] `framing.rs`: `FramePath::none` equals V5 on every existing case; goldens unchanged.
 - [ ] `vision-pass.spec.ts`; `privacy-network.spec.ts`: no frame in any request (INV-28).
-- [ ] Coarse pass under 3 min on 20 minutes; fine pass under 20 s per 60 s short on D1. TE-23 recorded, with its licence. Tagged `v6.5`.
+- [ ] Coarse pass at most 0.15× the duration (about 7 min on 45 minutes), reading the file in place; fine pass under 20 s per 60 s short on D1, over part files. TE-23 recorded, with its licence. Tagged `v6.5`.
 
 ---
 
@@ -872,7 +882,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 |---|---|---|
 | **A** Core visuals | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus`; V-9 density rule | V-5 cases for each number-bearing kind |
 | **B** More cards | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Same |
-| **C** Kinetic captions | `CaptionMotion` rows, per-glyph animation | `frame_at` within budget at the heaviest preset on D1 |
+| **C** Kinetic captions | `CaptionMotion` rows, per-glyph animation. **v1.4 candidates from the founder's references (TS §47.2):** a typographic lockup, a mixed-font pair beside the head (an OFL serif italic; the face position of V6.5), a glass treatment with the video blurred behind part A's cards. Each is a cost check by name | `frame_at` within budget at the heaviest preset on D1 |
 | **D** Shapes | `Video.mask` in the renderer's second path; `ShapeFrame`; shape `Transition` at topic shifts | **`composite.rs`: a simple list takes the old path, byte for byte (DC-8)**; render budget held |
 | **E** Furniture | `HookTitle`, `ProgressBar`, `EndCard` with a `Hold` segment | End-card export duration equals the map's |
 
@@ -912,20 +922,23 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 ### 8A.8 V6.8 - Layers, B-roll, asset box (M1.19)
 
-**Goal.** Several videos in one frame. The user's own B-roll placed by the plan; real transitions at joins; a split layout for screen recordings.
+**Goal.** Several videos in one frame. B-roll from the person's own clips and (v1.4) from Pixabay stock, placed by the plan or by hand on a word; real transitions at joins; a split layout for screen recordings.
 
-**Demo.** Drop an office clip, label it. The plan places it on "our headquarters". A dissolve at a join. A screen recording shows the screen above and the face below.
+**Demo.** Drop an office clip, label it. The plan places it on "our headquarters". On "black hole", the plan places a Pixabay clip, marked "From Pixabay". Click another word, "Add B-roll here", pick a lecture clip of your own, drag the window to the 4 seconds you want; undo; redo. A dissolve at a join. A screen recording shows the screen above and the face below. Turn the stock switch off: nothing is searched.
 
 **Depends on.** V6.6 part D (second render path), V6.5 (regions).
 
-**Build (TS §48).** `VideoSlot`, `Scene::asset_at`, `VideoSources`; `composite.rs` runs up to `RUNS_PER_FRAME`; decoder limit of three; `offcut-types/src/assets.rs`, `AssetRef`; `persistence/assets-repo.ts`; `usecases/add-asset.ts`, `remove-asset.ts`; `ui/components/AssetBox.tsx`; `Broll`, `JoinTransition`, `Layout` kinds; `Part.handle`; `AssetLine` in plan requests; `keep_audio` in `MixInput`; "What leaves" row for labels.
+**Build (TS §48).** `VideoSlot`, `Scene::asset_at`, `VideoSources`; `composite.rs` runs up to `RUNS_PER_FRAME`; decoder limit of three; `offcut-types/src/assets.rs`, `AssetRef`, `AssetOrigin`; `persistence/assets-repo.ts`; `usecases/add-asset.ts`, `remove-asset.ts`; `ui/components/AssetBox.tsx`; `Broll` (with `BrollSource`), `JoinTransition`, `Layout` kinds; `Part.handle`; `AssetLine` and `stock` in plan requests; `keep_audio` in `MixInput`; "What leaves" rows for labels and stock search. **v1.4:** `plan_ops` with `PlaceAsset` and `RemoveAsset`, `effective_plan`, `validate_ops` (TS §49.2, the rest in V6.9); "Add B-roll here" in the caption editor; the part picker; `server/src/broll/` (`StockProvider`, `PixabayProvider`, the hashed 24 h cache, `POST /broll/search`); `net/stock-fetch.ts`, `usecases/resolve-stock.ts`, the search panel; `cdn.pixabay.com` in `allowlist-hosts.ts`, CSP and `check-hosts.mjs`; the flag `stock_broll` and the settings switch; `PIXABAY_API_KEY` in Render before the deploy that reads it; one Terms of Service line on the rights to added clips.
+
+**Experiment (v1.4).** TE-26: Pixabay's terms re-read, relevance of plan-written queries, the browser fetch under COEP.
 
 **Exit.**
 
 - [ ] `composite.rs`: the simple path identical; goldens unchanged. New goldens for cover, contain, picture-in-picture, split, full.
-- [ ] `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`.
-- [ ] Verifier 11/11 on an export with B-roll and transitions; TE-14 re-read at three decoders.
-- [ ] `privacy-network.spec.ts`: labels only in AI bodies; no asset bytes. Tagged `v6.8`.
+- [ ] `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts` (placing by hand, the part picker, undo).
+- [ ] `plan_ops.rs` (`PlaceAsset`, `RemoveAsset`), `broll_search_route.rs`, `resolve-stock.test.ts`, `stock-broll.spec.ts`, `log_redaction.rs` (a search query).
+- [ ] Verifier 11/11 on an export with own and stock B-roll and transitions; TE-14 re-read at three decoders.
+- [ ] `privacy-network.spec.ts`: labels only in AI bodies; search words only in `POST /broll/search`; `cdn.pixabay.com` only with the switch on; no asset bytes. TE-26 recorded. Tagged `v6.8`.
 
 ---
 
@@ -937,7 +950,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Depends on.** V6.4, V6.8 (`PlaceAsset`). Ops for later kinds are added with their kinds.
 
-**Build (TS §49).** `offcut-types/src/plan_ops.rs`; `offcut-plan/src/plan_ops.rs`, `chat_prompt.rs`; `EditState.plan_ops` (default empty); `server/src/plan/chat.rs`; `usecases/send-chat-edit.ts`, `state/chat-store.ts`; `ui/components/ChatPanel.tsx`; settings row for chat text; `chat_edit` analytics (enums only: `ops`, `refused`, `outcome`).
+**Build (TS §49).** `offcut-types/src/plan_ops.rs` and `offcut-plan/src/plan_ops.rs` (v1.4: started in V6.8 with `PlaceAsset` and `RemoveAsset`; this release adds the other operations), `chat_prompt.rs`; `EditState.plan_ops` (from V6.8); `AddSentences` asking for the original file to copy the new part (TS §44.8); `server/src/plan/chat.rs`; `usecases/send-chat-edit.ts`, `state/chat-store.ts`; `ui/components/ChatPanel.tsx`; settings row for chat text; `chat_edit` analytics (enums only: `ops`, `refused`, `outcome`).
 
 **Exit.**
 
@@ -983,6 +996,20 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 ---
 
+### 8A.12 Quality pass (v1.4, the founder's decision of 2026-11-08)
+
+**Goal.** Shorts that stand beside the best of the category. The founder chose to build every feature first, then inspect and improve.
+
+**Input.** The founder's benchmark: Submagic-made shorts downloaded from YouTube, and the caption references in `sh2clips/documents/`, all outside git (the repository is public).
+
+**How.** The founder takes 3-5 source videos (both paths), makes shorts in Offcut, and compares them side by side with the benchmark: captions (motion, timing, fonts, placement), auto zoom, cards, B-roll, transitions, sound, pacing. Each difference becomes a row of a checklist in the changelog, with the agent's estimate.
+
+**What changes.** Presets, timings, theme values, prompt text and catalog limits, inside the existing contracts. A new item kind or a new render path is a stop-and-ask (TS §41.4). Every §41.1 proof holds; a golden that moves needs a row of TS §41.2.
+
+**Exit.** E-15 (PS §19): every row fixed, tuned or knowingly accepted by the founder. Its length is the founder's; V7 starts after it.
+
+---
+
 ## 9. V7 - Survive real life: restore and failure recovery (M2.1; week 6: 16-22 Nov)
 
 **From here on, no features.** V7 to V10 make the V6.11 product reliable, provably private, fast enough and launchable. A change that adds a capability is out of scope until after the M2 gate (TS §28: no P1 item starts before M2 passes).
@@ -993,7 +1020,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Depends on.** V6.11.
 
-**v1.3: long jobs raise the stakes here.** V6.1 built the source job's checkpoints; V7 proves the rest. A reload during `preparing_shorts`, a crash in a batch export, a disk filling mid-copy, a queue with a bad file, and restore of a short whose source was evicted all join `restore.spec.ts`, `failure-recovery.spec.ts` and `long-resume.spec.ts`.
+**v1.3: long jobs raise the stakes here.** V6.1 built the source job's checkpoints; V7 proves the rest. A reload during `preparing_shorts`, a crash in a batch export, a disk filling mid-copy of the parts, a queue with a bad file, a long job paused by the cloud (v1.4), and restore of a short whose part copies were evicted all join `restore.spec.ts`, `failure-recovery.spec.ts` and `long-resume.spec.ts`.
 
 ### 9.1 Build
 
@@ -1059,7 +1086,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 - [ ] Production responses carry every header of TS §24.3; `crossOriginIsolated` is true.
 - [ ] `check-hosts.mjs` finds no `http(s)://` host in the bundle outside `allowlist-hosts.ts`.
 - [ ] `log_redaction.rs` re-run: no email, token, IP address or body in server logs (INV-19).
-- [ ] `no_media_routes.rs` re-run: no route accepts more than 64 kB or a media content type (INV-4).
+- [ ] `no_media_routes.rs` re-run: no route accepts more than 64 kB or a media content type (INV-4), except DC-14's `POST /transcribe` and (v1.4) DC-15's `POST /shorts`.
 - [ ] `rate_limit.rs` re-run with the hop count from TE-5.
 - [ ] Secret scan, `cargo deny check`, `pnpm audit --prod --audit-level high` clean in CI.
 - [ ] Cookie attributes, CSRF header, refresh rotation and reuse revocation asserted in `auth_flow.rs`.
@@ -1182,7 +1209,7 @@ The founding offer has been live since §8A.6's release (founder's decision of 2
 - [ ] The "What leaves your device" page matches the allowlist exactly.
 - [ ] "Clear local data" removes clips, transcripts and the render cache.
 - [ ] The 40+ clip corpus exports at 90% or better; the rest are rejected specifically; none crash.
-- [ ] (v1.3) Every long-path box of PS §20.1 is ticked: 20-minute fixture to 5 exported shorts on R1 and R2; no short starts or ends inside a sentence; a killed tab loses at most one window; the AI-down list works.
+- [ ] (v1.3; v1.4) Every long-path box of PS §20.1 is ticked: 45-minute fixture to 5 exported shorts on R1 and R2; no short starts or ends inside a sentence; a killed tab loses at most the windows in flight; a cloud failure pauses with Continue; the AI-down list works; B-roll by hand and from Pixabay exports.
 - [ ] (v1.3) With every new feature off, frames and samples equal V5's (INV-26).
 - [ ] Error codes and stage timings flow through the allowlist; the uptime monitor is on the API.
 
@@ -1260,14 +1287,14 @@ The founding offer has been live since §8A.6's release (founder's decision of 2
 | V4 | `display_list_snapshots.rs`, `layout_safe_area.rs`, `framing.rs`, `determinism.rs` (scene), `golden_frames.rs` | `rpc.test.ts`, `clip-machine.test.ts`, `model-machine.test.ts`, `run-pipeline.test.ts` | `pipeline-preview.spec.ts` (complete), `preview-sync.spec.ts`, `review-edit.spec.ts`, `cancel.spec.ts` |
 | V5 | none new | `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` | `export-creator.spec.ts` (all 11 checks), `timeline-preserved.spec.ts` |
 | V6 | `auth_flow.rs`, `entitlement_rules.rs`, `usage_receipts.rs`, `account_delete.rs`, `account_export.rs`, `rate_limit.rs`, `log_redaction.rs`, `no_media_routes.rs`, `webhook_idempotency.rs`, `billing_events.rs`, `token_roundtrip.rs`, `profile.rs` | `auth-machine.test.ts`, `entitlement.test.ts`, `http.test.ts` | `signin.spec.ts`, `export-free.spec.ts`, `checkout.spec.ts` |
-| V6.1 | `route_probe.rs`, `audio_region.rs`, `sentences_long.rs` | `source-machine.test.ts` | `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` |
+| V6.1 | `route_probe.rs`, `audio_region.rs`, `sentences_long.rs`, `transcribe_route.rs` (window budget, v1.4) | `source-machine.test.ts`, `transcribe-source.test.ts` (v1.4) | `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` |
 | V6.2 | `plan_route.rs`, `ai_cap.rs`, `ai_quota.rs`, `catalog_complete.rs` (kinds) | `run-pipeline.test.ts` (fallbacks) | `privacy-network.spec.ts` (plan on and off, early form) |
-| V6.3 | `timemap_build.rs`, `program_splice.rs`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs` | none | `cuts_applied.spec.ts`, `stitched.spec.ts` |
+| V6.3 | `timemap_build.rs`, `program_splice.rs`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `remux.rs` and `source_media.rs` (v1.4) | none | `cuts_applied.spec.ts`, `stitched.spec.ts` |
 | V6.4 | `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs` | `run-source-pipeline.test.ts` | `long-to-shorts.spec.ts` |
 | V6.5 | `shots.rs`, `tracking.rs`, `vision_summary_prompt.rs` | none | `vision-pass.spec.ts` |
 | V6.6 | Goldens per kind; `composite.rs` simple-path identity | none | end-card duration |
 | V6.7 | `mix_ducking.rs`, `sound_cues.rs` | none | `music-import.spec.ts` |
-| V6.8 | `layers_goldens`, `handles.rs` | none | `join_transition.spec.ts`, `asset-box.spec.ts` |
+| V6.8 | `layers_goldens`, `handles.rs`, `plan_ops.rs` (v1.4), `broll_search_route.rs` (v1.4) | `resolve-stock.test.ts` (v1.4) | `join_transition.spec.ts`, `asset-box.spec.ts`, `stock-broll.spec.ts` (v1.4) |
 | V6.9 | `plan_ops.rs`, `chat_prompt_snapshot.rs`, `chat_route.rs` | none | `chat-edit.spec.ts` |
 | V6.10 | `creator_memory.rs`, brand-kit golden matrix | none | `queue.spec.ts` |
 | V6.11 | `matte_goldens` | none | `prepare-matte.spec.ts` |
@@ -1292,14 +1319,14 @@ Weeks 1-10 are the calendar as first written; the v1.3 rows are by release.
 | 9 | 7-13 Dec | E-2 ends; E-5; E-3, E-4 final | TE-11, TE-14 re-checked |
 | 10 | 14-20 Dec | E-5 ends; E-7 instrumentation live | all free-tier facts re-verified |
 | V6 | as it closes | E-12 (optional), any time before V6.4 | TE-8, TE-9 |
-| V6.1 | | | TE-17, TE-18, TE-20, TE-21; TE-12 re-read |
+| V6.1 | | | TE-17 (reading in place), TE-18 (cloud windows), TE-20, TE-21; TE-12 re-read |
 | V6.2 | | E-11 instrumentation | TE-15 |
 | V6.3 | | | TE-22 |
 | V6.4 | | E-13 labelled set; private alpha (long-path E-2) | TE-19 |
 | V6.5 | | | TE-23 |
 | V6.6 | | First public demos; E-5 opens | none |
 | V6.7 | | | TE-16 |
-| V6.8 | | | TE-14 re-read |
+| V6.8 | | | TE-14 re-read, TE-26 (v1.4) |
 | V6.11 | | | TE-24, TE-25 |
 | After launch | from launch | E-6, E-7, E-8, E-9, E-13, E-14 read at M3 | none |
 
@@ -1313,7 +1340,7 @@ Weeks 1-10 are the calendar as first written; the v1.3 rows are by release.
 | V4 | `review_action`, `job_cancelled`, `client_error` |
 | V5 | `post_export_answer` |
 | V6 | `signin_step`, `upgrade_prompt`, `checkout_step` |
-| V6.1 | `long_source_accepted`, `source_stage_timing` |
+| V6.1 | `long_source_accepted`, `source_stage_timing`, `source_paused` (v1.4) |
 | V6.2 | `plan_result` |
 | V6.4 | `director_result`, `short_action` |
 | V6.5 | `vision_result` |
