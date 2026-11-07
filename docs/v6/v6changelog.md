@@ -24,6 +24,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
 | 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
 | 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
+| 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
 
 ## Known issues for later prompts
 
@@ -803,3 +804,30 @@ Built in one unattended session under `docs/v6.1/overnight-run.md`, started at 0
 **Checks.** `git diff --name-only origin/main` lists docs only. No product code changed.
 
 **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 26 - 2026-11-08 - P171: the probes
+
+No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.md`; the scripts stayed in the scratchpad.
+
+- **`.gitignore`** gains `fixtures/.gen-local/` before anything was written there (G item 18); `git check-ignore` confirms it.
+- **Local long files** (D1 only, never staged): `long_45min_4k_hevc.mov` (1.48 GB), `long_45min_1080p_h264.mp4` (5.61 GB, past 4 GiB on purpose), `hevc_main10_2s.mov`, from the reference clip's sound looped with 5 s of room tone, made in about 2 minutes by encoding a 10 s video segment and copying it in a loop.
+- **TE-17, first read:** `FileReaderSync` in a worker reads 1 MiB blocks in 3-7 ms p50 (warm cache), reads `moov` (3 MB) in under 9 ms, and **reads blocks past 4 GiB correctly** (7 of 7 hashes equal to Node's); page memory stays near 1 MB. D-400 stands.
+- **HEVC:** D1's Chrome decodes Main and Main 10 through hardware only (strings from real `hvcC`: `hvc1.1.6.L150.90`, `hvc1.2.4.L120.90`, `hvc1.1.6.L93.90`). P171's "no HEVC" stop does not fire.
+- **Long AAC:** 45 minutes through one `AudioDecoder` in 5.3 s, 48 kHz on every output, 9.7 MB peak. HE-AAC could not be made on D1 (no encoder); it stays a unit-test case and TE-12's.
+- **Audio track:** `demux.rs` reads the first audio track in file order already; D-402 needs no new demuxer code.
+- **TE-18, first read (F-1), the decision of the night so far.** 32 windows of the looped reference sound to Groq: 2.8 s p50, 5.9 s p90 per window, about 80 s for all 32 two at a time. Merged as `mergeWindows` merges, **3 of 31 seams lost or doubled a word** (1 lost, 2 doubled), and 25 of 32 windows had words at their edges: TE-18's seam line fails and P171's stop condition fires. **ON §6's safe path: `CLOUD_OVERLAP_S = 10`** (step 80 s, 34 windows for 45 minutes, `MAX_SOURCE_WINDOWS = 35`), written as "As read" under D-405 and D-411. P181 re-reads it through the product.
+- **Found: Groq's free tier limits requests per minute.** A 429 (`retry-after: 3`) came after 27 requests in about 66 s while 4,872 of the hour's 7,200 audio seconds were left. D-409's two in flight (confirmed by the founder, Entry 23) is kept; open item 24 asks the founder to choose the Dev tier or one in flight before `long_video` goes on.
+
+**As read in the plan:** D-398 (HEVC answers), D-402 (the audio track), D-405 (10 s overlap), D-409 (latency and the per-minute limit), D-411 (`MAX_SOURCE_WINDOWS = 35`).
+
+**Real Groq calls (F-1, `overnight-run.md` §12 A-3).** The looped reference clip's sound only, through production's `TRANSCRIBE_API_KEY` read alone by the script's process.
+
+| When (IST) | Windows | Audio sent | Statuses |
+|---|---|---|---|
+| 05:06:36-05:07:46 | 0-28 (two in flight) | 28 × 90 s answered | 28 × 200, 1 × 429 (window 27) |
+| 05:08:43-05:08:56 | 27, 29, 30, 31 | 3 × 90 s + 65 s | 4 × 200 |
+| **Total** | 32 windows, 33 requests | **2,855 s** (under the hour's 3,000 s) | Groq's hour: 4,597 of 7,200 s left at the end |
+
+**Counts:** unchanged from Entry 25 (no code): Rust 863 / 0 / 4, Vitest 568, `pnpm e2e` 57.
+
+**Open:** item 24 (new). **Found, not fixed:** the per-minute limit above (a founder decision, not a code fix).

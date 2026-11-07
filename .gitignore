@@ -35,3 +35,6 @@ introvideoscript.md
 fixtures/.gen/
 corpus/.clips/
 corpus/.results/
+
+# Long local fixtures, D1 only (v6.1implementation D-430); never committed.
+fixtures/.gen-local/
