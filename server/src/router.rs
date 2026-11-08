@@ -83,7 +83,8 @@ pub fn build(state: AppState) -> Router {
         .route(
             "/transcribe",
             post(transcribe::route::transcribe)
-                .layer((body(MAX_AUDIO_BYTES), ip(RouteGroup::TranscribeIp))),
+                // The address's bucket is checked in the handler, before the bearer (D-411).
+                .layer(body(MAX_AUDIO_BYTES)),
         )
         // These two are limited per user in their handlers.
         .route(

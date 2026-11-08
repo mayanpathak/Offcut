@@ -5,14 +5,18 @@
 //! nothing is stored, and the log line holds a kind, a length bucket and
 //! the status (D-347, D-364).
 
+use std::net::SocketAddr;
+
 use axum::Json;
-use axum::extract::{Request, State};
+use axum::extract::{ConnectInfo, FromRequestParts, Request, State};
+use axum::http::HeaderMap;
 use axum::http::header::CONTENT_TYPE;
 use offcut_api_types::TranscribeResponse;
-use offcut_types::MAX_CLIP_DURATION;
+use offcut_types::{MAX_CLIP_DURATION, MAX_SOURCE_WINDOWS};
 use time::OffsetDateTime;
 
 use crate::auth::extract::AuthUser;
+use crate::client_ip::client_ip;
 use crate::error::AppError;
 use crate::rate_limit::{RateKey, RouteGroup, limit};
 use crate::router::media_type;
@@ -41,20 +45,90 @@ fn length_bucket(duration_ms: u32) -> &'static str {
     }
 }
 
-fn logged(kind: &'static str, duration_ms: Option<u32>) {
+/// The log line: a kind, a length bucket and whether it was a window of a
+/// long source (V6.1, D-411; never the window's index).
+fn logged_as(window: bool, kind: &'static str, duration_ms: Option<u32>) {
     match duration_ms {
-        Some(ms) => tracing::info!(kind, duration_s_bucket = length_bucket(ms), "transcribe"),
-        None => tracing::info!(kind, "transcribe"),
+        Some(ms) => tracing::info!(
+            kind,
+            duration_s_bucket = length_bucket(ms),
+            window,
+            "transcribe"
+        ),
+        None => tracing::info!(kind, window, "transcribe"),
+    }
+}
+
+/// A window header that is not `<index>/<total>` within the limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BadWindow;
+
+/// The name of the header that marks a window of a long source (V6.1, D-411).
+pub const WINDOW_HEADER: &str = "x-offcut-window";
+
+/// `X-Offcut-Window: <index>/<total>`, with `0 <= index < total <= MAX_SOURCE_WINDOWS`.
+/// `Ok(None)` when the header is absent: the request is a clip's, as before V6.1.
+pub fn window_of(headers: &HeaderMap) -> Result<Option<(u32, u32)>, BadWindow> {
+    let Some(value) = headers.get(WINDOW_HEADER) else {
+        return Ok(None);
+    };
+    let text = value.to_str().map_err(|_| BadWindow)?;
+    let (index, total) = text.split_once('/').ok_or(BadWindow)?;
+    let digits = |part: &str| -> Result<u32, BadWindow> {
+        if part.is_empty() || part.len() > 3 || !part.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(BadWindow);
+        }
+        part.parse().map_err(|_| BadWindow)
+    };
+    let (index, total) = (digits(index)?, digits(total)?);
+    if index < total && total <= MAX_SOURCE_WINDOWS {
+        Ok(Some((index, total)))
+    } else {
+        Err(BadWindow)
     }
 }
 
 pub async fn transcribe(
     State(state): State<AppState>,
-    auth: AuthUser,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     request: Request,
 ) -> Result<Json<TranscribeResponse>, AppError> {
-    // 2. The person's own bucket (the IP's is the route's layer).
-    limit(&state, RouteGroup::TranscribeUser, RateKey::User(auth.user))?;
+    // 0. V6.1 (D-411): a window of a long source says so; a malformed or out-of-range
+    // header is refused here, before anything else is read.
+    let Ok(window) = window_of(request.headers()) else {
+        logged_as(true, "bad_window", None);
+        return Err(AppError::BadRequest);
+    };
+    let is_window = window.is_some();
+    let logged =
+        |kind: &'static str, duration_ms: Option<u32>| logged_as(is_window, kind, duration_ms);
+
+    // 1. The address's bucket, first, as the route's layer had it before V6.1: an
+    // unauthenticated request still takes the address's tokens. Windows have their own.
+    let ip = client_ip(
+        request.headers(),
+        peer.ip(),
+        state.config.trusted_proxy_hops,
+    );
+    let ip_group = if is_window {
+        RouteGroup::TranscribeWindowIp
+    } else {
+        RouteGroup::TranscribeIp
+    };
+    limit(&state, ip_group, RateKey::Ip(ip))?;
+
+    // The bearer, after the address's bucket and before the body.
+    let (mut parts, body) = request.into_parts();
+    let auth = AuthUser::from_request_parts(&mut parts, &state).await?;
+    let request = Request::from_parts(parts, body);
+
+    // 2. The person's own bucket; a window counts against the window group (D-411).
+    let user_group = if is_window {
+        RouteGroup::TranscribeWindowUser
+    } else {
+        RouteGroup::TranscribeUser
+    };
+    limit(&state, user_group, RateKey::User(auth.user))?;
 
     // 3. The kill switch.
     if !state.transcriber.enabled() {
@@ -115,6 +189,26 @@ pub async fn transcribe(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn headers(value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(WINDOW_HEADER, value.parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn the_window_header_is_index_slash_total_within_the_45_minute_count() {
+        assert_eq!(window_of(&HeaderMap::new()), Ok(None));
+        assert_eq!(window_of(&headers("0/34")), Ok(Some((0, 34))));
+        assert_eq!(window_of(&headers("33/34")), Ok(Some((33, 34))));
+        assert_eq!(window_of(&headers("34/35")), Ok(Some((34, 35))));
+        for bad in [
+            "34/34", "0/36", "a/b", "-1/3", "1", "/3", "3/", "0/0", " 1/3", "1/3 ", "+1/3",
+            "0001/3",
+        ] {
+            assert_eq!(window_of(&headers(bad)), Err(BadWindow), "{bad}");
+        }
+    }
 
     #[test]
     fn lengths_are_logged_in_three_buckets() {

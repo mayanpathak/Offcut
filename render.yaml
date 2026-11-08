@@ -61,5 +61,12 @@ services:
         sync: false
       - key: TRANSCRIBE_API_BASE_URL
         sync: false
+      # V6.1 (v6.1implementation D-412): the global budget in audio seconds per
+      # UTC hour and day. Optional; unset keeps the free-tier defaults (7,000 and
+      # 27,000). The founder sets them with Groq's Dev tier.
+      - key: TRANSCRIBE_BUDGET_HOUR_S
+        sync: false
+      - key: TRANSCRIBE_BUDGET_DAY_S
+        sync: false
       - key: TRUSTED_PROXY_HOPS
         sync: false

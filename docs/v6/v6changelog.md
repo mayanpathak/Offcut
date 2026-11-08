@@ -24,6 +24,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
 | 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
 | 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
+| 26 | D-428's three analytics events (`long_source_accepted`, `source_stage_timing`, `source_paused`) are not built: `analytics.rs`' tests pin the event list and no existing test may change tonight. Build them, editing those pinned lists, before `long_video` goes on in production (V6.4); nothing is lost while it is off | Founder decides, V6.4 | Entry 30, D-428 |
 | 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
 | 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
 
@@ -895,3 +896,20 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 900 / 0 / 4 (unchanged), Vitest 582 (571 + 11), `pnpm e2e` 57 (not re-run). Checks: `tsc` (both), eslint, file tree (564; rows for the four new files). Media: none run.
 
 **Open:** item 25 (new). **Found, not fixed:** the 0.986 above, recorded rather than chased: the long path's sound is the clip path's sound by construction.
+
+## Entry 30 - 2026-11-08 - P175: the server, windows, budget, events, no-store
+
+**Built.**
+
+- **The window header (D-411, REOPENED CONTRACT CT D-363).** `transcribe/route.rs`: `window_of()` parses `X-Offcut-Window: <index>/<total>` (`0 ≤ index < total ≤ MAX_SOURCE_WINDOWS = 35`, digits only); absent is a clip, as before. The handler now runs: the header (malformed is 400, logged `bad_window`); **the address's bucket** (`TranscribeWindowIp` or `TranscribeIp`, from `client_ip` as the layer had it); **the bearer**, extracted by hand after the address's bucket so an unauthenticated request still takes its tokens; the person's bucket (`TranscribeWindowUser` or `TranscribeUser`); then steps 3-8 unchanged. `router.rs` drops the route's `ip(…)` layer and keeps `body(MAX_AUDIO_BYTES)`. The log line gains `window: true/false`, never the index. `rate_limit.rs`: `TranscribeWindowUser` 120 a day, `TranscribeWindowIp` 200 an hour (members at the end).
+- **The budget from configuration (D-412).** `config::transcribe_budget()` reads `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` (optional; unset or empty keeps 7,000 and 27,000; anything else but a whole number above 0 stops the boot with its name); `main.rs` builds the `Budget` from them. `budget.rs` is unchanged. `render.yaml` lists both, `sync: false`, unset.
+- **No-store reaches the browser (D-429).** `web/vercel.json`'s no-cache rule is `/((?!assets/|ort/|api/).*)`. `check-headers.mjs` gains a static assertion that no no-cache rule covers `/api/v1/*` (it fails on the old rule; read) and passes against `vite preview`.
+- **D-428's three analytics events: not built.** `analytics.rs`' tests pin the list (20 samples zipped with the docs, the union's count); adding events means editing them, which ON §3 forbids. `long_video` is off in production until V6.4, so nothing would be sent before then. Open item 26; As read under D-428.
+
+**What differs from the plan (As read under D-411, D-412, D-428).** `Config` gains no field: four test files build it as a literal. The log check is a new binary, `server/tests/transcribe_window_log.rs` (TS §5 row): in `transcribe_route.rs` it raced the other tests over tracing's process-wide callsite state (it passed alone, failed in parallel), as `log_redaction.rs`' own note warns.
+
+**Tests.** Every existing case of the server's test files passes **with no change to its code** (`git diff $BASE -- server/tests/` adds cases and one file only). New: `transcribe_route.rs` 4 (windows answered as clips; malformed headers 400 before bearer and body; the 121st window of a person in a day is 429 while their clips pass; an address's clip and window buckets are apart, 60 and 200); `transcribe_window_log.rs` 1; `route.rs` 1 (the header's grammar); `config.rs` 1; `rate_limit.rs` 1.
+
+**Counts.** Rust 908 / 0 / 4 (900 + 8), Vitest 582, `pnpm e2e` 57 (not re-run; `check-headers` against `vite preview` ok). No migration; no new dependency.
+
+**Open:** item 26 (new). **Found, not fixed:** none.

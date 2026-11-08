@@ -38,6 +38,15 @@ if (rule === undefined || rule.headers.length === 0) {
   fail(`web/vercel.json has no header rule for ${ALL_PATHS}.`);
 }
 
+// V6.1 (v6.1implementation D-429): the site's no-cache rule must not reach the API's
+// responses, so the API's own `Cache-Control: no-store` is what the browser gets.
+for (const entry of JSON.parse(readFileSync(VERCEL, "utf8")).headers) {
+  const noCache = entry.headers.some((h) => h.key.toLowerCase() === "cache-control" && h.value === "no-cache");
+  if (noCache && new RegExp(`^${entry.source}$`).test("/api/v1/me")) {
+    fail(`web/vercel.json: the no-cache rule ${entry.source} covers /api/v1/*; the API's no-store must reach the browser.`);
+  }
+}
+
 let response;
 try {
   // A redirect is not followed: the headers must be on the page itself.

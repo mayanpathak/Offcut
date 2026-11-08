@@ -38,8 +38,14 @@ pub enum RouteGroup {
     AccountExport,
     /// `POST /transcribe`, per user, checked in its handler (cloudimplementation D-363).
     TranscribeUser,
-    /// `POST /transcribe`, per IP, as a layer.
+    /// `POST /transcribe`, per IP, checked first in its handler (V6.1 moved it there from
+    /// the route's layer, so the window header can choose the group, D-411).
     TranscribeIp,
+    /// V6.1 (D-411): a long source's windows (`X-Offcut-Window`), per user: 120 a day is
+    /// at most 3 hours of audio (`LONG_AUDIO_PER_USER_DAY`, TS §22.1).
+    TranscribeWindowUser,
+    /// V6.1: a long source's windows, per IP, checked in the handler with the clips' bucket.
+    TranscribeWindowIp,
 }
 
 /// `capacity` requests per `window`.
@@ -75,6 +81,8 @@ impl RouteGroup {
             Self::AccountExport => per(6, HOUR),
             Self::TranscribeUser => per(20, DAY),
             Self::TranscribeIp => per(60, HOUR),
+            Self::TranscribeWindowUser => per(120, DAY),
+            Self::TranscribeWindowIp => per(200, HOUR),
         }
     }
 }
@@ -398,5 +406,25 @@ mod tests {
         assert_eq!(accepted(&limiter, RouteGroup::NotifyMe, ip(3), 1), 1);
         assert_eq!(accepted(&limiter, RouteGroup::NotifyMe, ip(1), 1), 0);
         assert_eq!(accepted(&limiter, RouteGroup::NotifyMe, ip(2), 5), 5);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_window_groups_of_v6_1_have_their_limits_and_their_own_buckets() {
+        // TS §22.1 (v1.4): 120 windows a user a day (3 hours of audio), 200 an address an hour.
+        assert_eq!(RouteGroup::TranscribeWindowUser.limit(), per(120, DAY));
+        assert_eq!(RouteGroup::TranscribeWindowIp.limit(), per(200, HOUR));
+        let limiter = RateLimiter::new(100);
+        let user = RateKey::User(UserId::new(uuid::Uuid::from_u128(7)));
+        assert_eq!(
+            accepted(&limiter, RouteGroup::TranscribeWindowUser, user, 125),
+            120
+        );
+        // The clips' bucket of the same person is untouched.
+        assert_eq!(accepted(&limiter, RouteGroup::TranscribeUser, user, 25), 20);
+        assert_eq!(
+            accepted(&limiter, RouteGroup::TranscribeWindowIp, ip(9), 205),
+            200
+        );
+        assert_eq!(accepted(&limiter, RouteGroup::TranscribeIp, ip(9), 65), 60);
     }
 }

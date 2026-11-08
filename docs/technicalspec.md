@@ -632,6 +632,7 @@ offcut/
 │       ├── log_redaction.rs
 │       ├── no_media_routes.rs         INV-4, with DC-14's one exception
 │       ├── transcribe_route.rs        (cloud transcription) POST /transcribe on a fake provider
+│       ├── transcribe_window_log.rs   (V6.1) the log line says window: true or false, never the index; one test per binary (v6.1implementation D-411)
 │       ├── groq_adapter.rs            (cloud transcription) the adapter, from fixtures/groq/, against a local mock
 │       ├── fixtures/groq/             real Groq responses for the reference clip's audio, request ids replaced
 │       ├── fixtures/ogg/              small Ogg Opus files: a tone from ffmpeg and one from the browser's encoder
