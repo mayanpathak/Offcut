@@ -13,8 +13,8 @@ import { transition } from "./machines/transition";
 /** Why the cloud work stopped (D-410, D-418). */
 export type PauseReason = "unavailable" | "busy" | "signed_out" | "offline" | "wake_lost";
 
-/** Why a dropped file waits before any work (§10.2). */
-export type GateReason = "signed_out" | "checking" | "unavailable" | "storage_low";
+/** Why a dropped file waits before any work (§10.2); `ready` is the last line, on what is sent, with Start. */
+export type GateReason = "signed_out" | "checking" | "unavailable" | "storage_low" | "ready";
 
 /** Where a stage stands; `done` and `total` in the stage's own unit (ms of sound, windows). */
 export type SourceProgress = { stage: "audio" | "transcribe"; done: number; total: number; startedAt: number };

@@ -950,3 +950,27 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 908 / 0 / 4, Vitest 638 (624 + 14), `pnpm e2e` 57 (not re-run). Media: none.
 
 **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 33 - 2026-11-08 - P178: the job, import, run, resume, hand-over
+
+**Built.**
+
+- `platform/wake-lock.ts` (D-418): `holdAwake(onLost)` takes the screen lock, takes it again when the tab is shown, reports once a lock lost while visible that cannot be taken again; `showProgressInTitle` ("42% - Offcut", then the page's title back).
+- `usecases/import-source.ts` (§9.3): `dropSource` (blockers, the hash prefix, `routeFile` in place; a refusal, a failure, or a short file handed to `/app` through `handOff`/`takeHandOff`, memory only, read once), the gate in order (signed in; cloud, waiting up to 45 s; room on the disk, `round(D × 16) × 4 B + 2 GB`; then `ready`, the line on what is sent and Start), `recheckGate`, `startSource` (the previous source swept, D-415; the record made at `extracting_audio`; the job run).
+- `usecases/run-source-pipeline.ts` (§9.5): extraction with the file (checkpoints every 10 s of flushed sound, D-403; the level and `windowsTotal` kept), then the windows; pause, failure and the end let go of the wake lock and the title; `cancelSource` removes the source; the file stays in hand for Continue while the page lives.
+- `usecases/continue-source.ts` (D-419): `restoreSource` (at start, `long_video` on only: the newest source offered as "Continue your video", or its transcript shown), `resumeSource` (transcription goes on at once, extraction waits for the file), `dropSameFile` (size and hash prefix both match, or "This is a different file"), `continueSource` (after a pause or a failure, back to the stage it left; a pause during extraction with the file gone asks for it).
+- `start-app.ts` (step 9, D-419): `restoreSource()` only when `FEATURES.long_video`, so production never opens the source stores.
+- `import-clip.ts` (D-427, D-421): with `high_res` on, `importAndRoute`; otherwise today's `importAndProbe`, unmoved in the `else` (`git diff -w` shows only `probed`'s type widened); `REJECT_HDR` is shown but not sent as `clip_rejected` (open item 26); with `long_video` on, `REJECT_DURATION` hands the `File` to the long page ("Make shorts from it").
+- `clip-store.ts`: `reject` is a `RouteReject` (V5's codes and `REJECT_HDR`). `copy/long.ts` (new): §10.5's strings as approved, `REJECT_HDR`, `E_SOURCE_READ`, `E_SOURCE_AUDIO`; `messages.ts` gains `long` and spreads `REJECT_HDR` into `rejections` (`satisfies Record<RouteReject, …>`); 673 of 700 lines.
+- `eslint.config.js`: §4.1's edges (`run-source-pipeline → transcribe-source`; `import-source`, `continue-source → run-source-pipeline`; `import-clip → import-source`) and `start-app → continue-source`.
+- `crates/offcut-text/tests/sentences_long.rs` (new): 45 minutes of Script A's words looped with room tone: every word in one sentence, in order; none over 40 words; none across a loop's pause; a stretch written without stops split at its 400 ms pauses; every sentence of this corpus within TS §43.6's 25 s.
+
+**What differs from the plan.** The job's cancel is its own controller in `run-source-pipeline.ts` with `pool.cancel("media")`, not a `"source"` scope of `cancel-job.ts`. The gate ends in `ready` with Start (§10.2's last line), so nothing is written before Start. `sentences_long.rs` builds its corpus from Script A, since the fake windows that write the 12-minute master transcript are P180's. TS §43.6 names `MAX_SENTENCE_MS = 25 s`; `offcut-text` splits by 40 words and may not change (D-387): the test holds 25 s over this corpus, and the rule itself is for the release that may reopen `sentences.rs` (Found, not fixed).
+
+**Tests.** `import-source.test.ts` 6 (each gate in order, Start with the sweep, the hand-over once, a refusal and a failure, the blockers both ways); `run-source-pipeline.test.ts` 5 (stages in order with the checkpoint, the wake lock and the title; a resume without the file; no file asks for it; a worker's failure; a pause; cancel). `sentences_long.rs` 2. Existing cases: none changed.
+
+**Tier 2 on the keyed `dist/`** (rebuilt): `pipeline-preview.spec.ts` and `rejections.spec.ts` whole, with `media-setup`: **32 passed, 1 skipped** (the existing skip), 4.4 min. Their code unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (908 + 2), Vitest 649 (638 + 11), `pnpm e2e` 57 (not re-run).
+
+**Open:** nothing new. **Found, not fixed:** TS §43.6's `MAX_SENTENCE_MS` is not a rule of the code (above). The clip page's `REJECT_RESOLUTION` and `REJECT_FILE_SIZE` copy names V5's limits; with `high_res` on it must name 3,840 px and 16 GB (TS §43.2, "messages.ts picks by page and flag"): P179.

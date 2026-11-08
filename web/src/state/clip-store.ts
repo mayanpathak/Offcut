@@ -13,7 +13,7 @@ import type {
   EditState,
   PipelineStage,
   Prosody,
-  RejectReason,
+  RouteReject,
   TimeMap,
   Transcript,
 } from "../gen/domain";
@@ -54,7 +54,7 @@ export type ClipState = {
   edit: EditState;
   /** The lines of the processing feed, in the order they came. */
   feed: readonly FeedLine[];
-  reject?: RejectReason;
+  reject?: RouteReject;
   failure?: AppFailure;
   /**
    * Where a failure of a clip that stays `ready` happened: in a review
@@ -133,7 +133,7 @@ export function accepted(info: ClipInfo): void {
 }
 
 /** importing → rejected: the clip cannot be used, and why. */
-export function rejected(reason: RejectReason): void {
+export function rejected(reason: RouteReject): void {
   apply("reject", (current) => ({ ...settled(current), reject: reason }));
 }
 

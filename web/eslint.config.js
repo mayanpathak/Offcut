@@ -187,6 +187,26 @@ const layerPolicies = [
     from: fromFile("usecases", "start-app.ts"),
     allow: { to: to("usecases", "restore-session.ts") },
   },
+  // V6.1, the long path (v6.1implementation §4.1): the job and its windows; the
+  // import, the Continue and the start of the app run the job; the clip page hands
+  // a long file over (D-421). transcribe-source.ts is the second use-case that sends
+  // audio (P-5), beside transcribe-cloud.ts.
+  {
+    from: fromFile("usecases", "run-source-pipeline.ts"),
+    allow: { to: to("usecases", "transcribe-source.ts") },
+  },
+  {
+    from: fromFile("usecases", "import-source.ts", "continue-source.ts"),
+    allow: { to: to("usecases", "run-source-pipeline.ts") },
+  },
+  {
+    from: fromFile("usecases", "import-clip.ts"),
+    allow: { to: to("usecases", "import-source.ts") },
+  },
+  {
+    from: fromFile("usecases", "start-app.ts"),
+    allow: { to: to("usecases", "continue-source.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------

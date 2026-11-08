@@ -3,6 +3,7 @@
 
 import { initAnalytics, track } from "../analytics/client";
 import { env } from "../config/env";
+import { FEATURES } from "../config/features";
 import type { AnonId } from "../gen/domain";
 import * as modelManager from "../models/model-manager";
 import { checkHealth } from "../net/api-client";
@@ -14,6 +15,7 @@ import { beginCheck, setSupported, setUnsupported } from "../state/capability-st
 import { setAvailability, setChoice } from "../state/cloud-store";
 import { setIllegalTransitionReporter } from "../state/machines/transition";
 import { preload } from "../workers/pool";
+import { restoreSource } from "./continue-source";
 import { connectAccount, restoreSession } from "./restore-session";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -102,6 +104,12 @@ async function run(options: StartOptions): Promise<void> {
     // 8. What of the speech model is on this device. Nothing waits for the
     //    answer, and a storage that cannot be read counts as no model.
     void modelManager.inspect();
+  }
+
+  // 9. V6.1 (D-419): a long source a reload left. Only with `long_video` on, so a
+  //    build with it off never opens the source stores (D-414).
+  if (FEATURES.long_video && (reason === undefined || reason === null)) {
+    void restoreSource();
   }
 
   // V7: restoreClip()

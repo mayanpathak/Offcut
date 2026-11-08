@@ -6,8 +6,9 @@
 // the video is not uploaded. Legal and certification terms are not used.
 
 import type { AnalyticsEvent, BillingInterval, Wanted } from "../gen/api";
-import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
+import { type ErrorCode, type EventKind, LIMITS, type RouteReject, type UnsupportedReason } from "../gen/domain";
 import { landingCopy, pricingCopy } from "./landing";
+import { longCopy, longRejections } from "./long";
 import { transcriptionCopy } from "./transcription";
 
 type EventName = AnalyticsEvent["name"];
@@ -90,6 +91,8 @@ export const messages = {
 
   // Cloud transcription's card, line and toasts: copy/transcription.ts (cloudimplementation D-380).
   transcription: transcriptionCopy,
+  // The long page (V6.1): copy/long.ts (v6.1implementation D-426).
+  long: longCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
@@ -664,5 +667,7 @@ export const messages = {
       body: "Offcut could not hear enough English words in this clip to write captions.",
       action: "Drop a clip of you talking in English.",
     },
-  } satisfies Record<RejectReason, ErrorCopy>,
+    // V6.1 (TS §43.1): REJECT_HDR, from copy/long.ts.
+    ...longRejections,
+  } satisfies Record<RouteReject, ErrorCopy>,
 };

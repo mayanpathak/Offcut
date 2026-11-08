@@ -355,7 +355,8 @@ offcut/
 │   │   └── tests/
 │   │       ├── numbers_table.rs
 │   │       ├── numbers_prop.rs
-│   │       └── sentences.rs
+│   │       ├── sentences.rs
+│   │       └── sentences_long.rs      (V6.1) 45 minutes of words: none lost, none over 40 words, none across a loop's pause
 │   ├── offcut-detect/
 │   │   ├── Cargo.toml
 │   │   ├── src/
@@ -671,6 +672,7 @@ offcut/
 │   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
 │   │   │   ├── landing.ts             the landing page's and the prices' copy, imported by messages.ts (designimplementation D-321)
 │   │   │   ├── transcription.ts       (cloud transcription) the card, the processing line and the two toasts (cloudimplementation D-380)
+│   │   │   ├── long.ts                (V6.1) the long page's words, REJECT_HDR and the two E_SOURCE_* (v6.1implementation §10.5, D-426)
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
@@ -682,6 +684,7 @@ offcut/
 │   │   │   ├── capability.ts
 │   │   │   ├── capability.test.ts
 │   │   │   ├── simd-probe.ts
+│   │   │   ├── wake-lock.ts           (V6.1) the screen wake lock and the title while a long source works (D-418)
 │   │   │   └── broadcast.ts           BroadcastChannel "offcut-auth"
 │   │   ├── state/
 │   │   │   ├── capability-store.ts
@@ -732,8 +735,10 @@ offcut/
 │   │   │   ├── replace-all.ts         (V4) "Change all N" for a repeated mis-hearing (D-175)
 │   │   │   ├── undo-redo.ts           (V4) D-184
 │   │   │   ├── review-update.ts       (V4) the shared update rule of an edit: pause, queue, setScene, restore, undo (D-147)
-│   │   │   ├── import-source.ts       (V6.1) probe, gate, quota check, copy
-│   │   │   ├── run-source-pipeline.ts (V6.1, V6.4, V6.5) the long job, resumable
+│   │   │   ├── import-source.ts       (V6.1) route in place, gate, Start, the hand-over of a short file (D-421)
+│   │   │   ├── import-source.test.ts
+│   │   │   ├── run-source-pipeline.ts  (V6.1, V6.4, V6.5) the long job, resumable
+│   │   │   ├── continue-source.ts     (V6.1) Continue after a pause, a failure or a reload; the same file dropped again (D-419)
 │   │   │   ├── run-source-pipeline.test.ts
 │   │   │   ├── transcribe-source.ts   (V6.1) a source's cloud windows to its master transcript; the second use-case that sends audio (v6.1implementation §8.1)
 │   │   │   ├── transcribe-source.test.ts
