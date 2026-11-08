@@ -1168,6 +1168,7 @@ everything ─► gen (types only)
 - Stores never import use-cases; use-cases write stores through exported action functions only.
 - **Edges added in V6.** `start-app.ts` to `restore-session.ts`: `connectAccount()` runs first in `start-app.ts` and hands `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links, so `net` and `persistence` import no store (v6implementation D-306). `blockers.ts` to `entitlement.ts`, as §12.5 asks `effective()` (D-309). `offcut-api` uses `getrandom` directly, as a wrapper in `deny.toml`, for the 32 random bytes of a link and a refresh token (D-257).
 - **Edges added in the cloud transcription release.** `run-pipeline.ts` to `transcribe-cloud.ts` (cloudimplementation D-372): the pipeline hands the clip's sound to the one use-case that sends it.
+- **Edges added in V6.1 (as built, the V6.1 plan §4.1).** `run-source-pipeline.ts` to `transcribe-source.ts`, the second use-case that sends audio (a long source's windows); `import-source.ts` and `continue-source.ts` to `run-source-pipeline.ts`; `import-clip.ts` to `import-source.ts` (the hand-over of a too-long clip's `File`, D-421); `start-app.ts` to `continue-source.ts` (D-419). The UI may name `transcribe-source.ts`' `windowCount` (the long page's progress).
 
 ---
 
@@ -2990,7 +2991,7 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | `POST /billing/webhook` | provider signature over raw body | Apply subscription events | 64 kB | 120/min per IP | `provider_event_id` primary key; replays return 200 and change nothing |
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
 | `POST /notify-me` | none | Waitlist / unsupported-platform email | 1 kB | 5/h per IP | Primary key (email, wanted) |
-| `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`). **v1.4, windows of a long source** (header `X-Offcut-Window: <index>/<total>`, §43.6): instead of the 20, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per 24 h, and 200/h per IP (assumptions; the founder sets them). A client that marks clips as windows gains at most that budget. The global budget's values come from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S`, defaulting to the values above, so the Dev tier raises them without a code change (§52) | None; each success counts against the budget |
+| `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`). **v1.4, windows of a long source** (header `X-Offcut-Window: <index>/<total>`, §43.6): instead of the 20, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per 24 h, and 200/h per IP (assumptions; the founder sets them). A client that marks clips as windows gains at most that budget. The global budget's values come from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S`, defaulting to the values above, so the Dev tier raises them without a code change (§52). **(V6.1, as built: D-411, D-412.)** `0 ≤ index < total ≤ MAX_SOURCE_WINDOWS = 35`; a malformed header is 400 before the body is read. A request with the header is counted by `TranscribeWindowUser` (120 windows per 24 h, at most 3 hours of 90 s windows) and `TranscribeWindowIp` (200/h); one without it by `TranscribeUser` and `TranscribeIp` as before. The IP check moved from the route's layer into the handler, at the same place (before the body is read; an unauthenticated request still spends the address's token), so the header chooses the group. The log line gains `window: true/false`, never the index. `config::transcribe_budget()` reads the two budget variables apart from `Config`; `budget.rs`' constants stay the defaults | None; each success counts against the budget |
 | `POST /plan` (v1.2, V6.2) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
 | `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | **160 kB** (DC-15, v1.4) | 6/min per user | A repeat for the same prefix in a month uses no new grant |
 | `POST /broll/search` (v1.4, V6.8) | bearer | Stock B-roll search: one query → at most 12 Pixabay results (§48.6); the query is never stored or logged; the cache is keyed by its hash | 1 kB | 20/min per user; 90 per 60 s for the whole server | Cached 24 h by query hash |
@@ -3147,6 +3148,8 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 
 ---
 
+
+**(V6.1, as built: D-412.)** Two optional variables, read by `config::transcribe_budget()` apart from `Config`: `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S`, the global audio budget's seconds per UTC hour and day (default 7,000 and 27,000, `budget.rs`' constants). A value that is not a positive whole number stops the server with its name. `render.yaml` lists both with `sync: false`, unset until Groq's Dev tier (V6 CL open item 19).
 ## 23. Persistence
 
 ### 23.1 Local stores
@@ -3265,7 +3268,7 @@ CREATE TABLE platform_waitlist (
 - **Eviction.** `quota.ts::ensureFree(bytes)` deletes, in order, until enough space: exports other than the newest per clip; whole clips beyond `MAX_RECENT_CLIPS` by `lastOpenedAt`; remaining clips oldest first (never the current clip). Model files are never evicted automatically. Deleting a clip removes its OPFS directory, its exports and its rows in `clips`, `transcripts`, `events`, `edits`, `renderCache`.
 - **Write order.** OPFS file first, then the IndexedDB row that references it. A row without its file is deleted at startup (`restoreClip`); a file without a row is deleted by `opfs.sweepTemp()`.
 - **Clear local data.** Removes all OPFS content and clears `clips`, `transcripts`, `events`, `edits`, `renderCache`. Keeps `receiptOutbox` (pending counts), `entitlement` and `meta`. Files the user already downloaded cannot be removed (PS §17).
-- **Local migrations.** `db.ts` runs numbered upgrade functions in `onupgradeneeded`. A value with a `schemaVersion` newer than the code is treated as absent and deleted.
+- **Local migrations.** `db.ts` runs numbered upgrade functions in `onupgradeneeded`. A value with a `schemaVersion` newer than the code is treated as absent and deleted. **(V6.1, as built: D-414.)** The database's version (its stores) and the records' `schemaVersion` are two numbers: `DB_STRUCTURE_VERSION = 2` adds stores, `DB_VERSION = 1` stays every record's version. The upgrade loop runs only up to the version being opened, so the clip path's opening at 1 never makes the source stores; only `sources-repo.ts` opens at 2. A build that meets a database newer than it asks for (`VersionError`) opens it at its own version and uses only the stores it knows, so a rollback never locks a person out of their clips.
 - **Server migrations.** Forward-only `sqlx` migrations run at boot. Each must be compatible with the previously deployed binary (add first, remove in a later release), because Render swaps instances without coordination.
 - **Server retention.** `analytics/retention.rs` deletes `analytics_events` older than 90 days (PS §16), `magic_links` older than 1 day, `webhook_events` older than 90 days (assumption, TE-9: longer than the provider's retry horizon), revoked or expired `sessions`.
 - **Backups.** None on a free database tier (assumption, TE-6). Accepted cost: subscription state is rebuilt from the merchant by replaying events; usage receipts and waitlist would be lost. Reversal: none inside the 0 USD constraint (PS A-10); a paid tier with backups needs a founder decision and a spec revision.
@@ -3327,7 +3330,7 @@ Logged per request: request id, method, route template, status, latency, and for
 
 ### 24.5 Rate limiting
 
-In-memory token buckets keyed by (route group, key), at most 50,000 keys with least-recently-used eviction. Loss at restart is accepted. `client_ip.rs` takes the address `TRUSTED_PROXY_HOPS` positions from the right of `X-Forwarded-For`, or the socket peer when the header is absent; TE-5 establishes the hop count behind the Vercel rewrite. Limit exceeded → 429 with `retry_after_secs`. Cloud transcription (cloud transcription release) adds `TranscribeUser` (20 per 24 h) and `TranscribeIp` (60 per hour), and a global audio budget in `transcribe/budget.rs`, the only place it is set: 7,000 s per UTC hour and 27,000 s per UTC day, under the provider's free tier, charged before the provider is called and lost at a restart.
+In-memory token buckets keyed by (route group, key), at most 50,000 keys with least-recently-used eviction. Loss at restart is accepted. `client_ip.rs` takes the address `TRUSTED_PROXY_HOPS` positions from the right of `X-Forwarded-For`, or the socket peer when the header is absent; TE-5 establishes the hop count behind the Vercel rewrite. Limit exceeded → 429 with `retry_after_secs`. Cloud transcription (cloud transcription release) adds `TranscribeUser` (20 per 24 h) and `TranscribeIp` (60 per hour), and a global audio budget in `transcribe/budget.rs`, the only place it is set: 7,000 s per UTC hour and 27,000 s per UTC day, under the provider's free tier, charged before the provider is called and lost at a restart. **(V6.1, as built.)** Windows of a long source have their own groups, `TranscribeWindowUser` (120 per 24 h) and `TranscribeWindowIp` (200 per hour), chosen in the handler by `X-Offcut-Window` (§22.1); the budget's two values come from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` when set (§22.8), `budget.rs`' constants otherwise.
 
 ### 24.6 Integrity and supply chain
 
@@ -3354,7 +3357,7 @@ In-memory token buckets keyed by (route group, key), at most 50,000 keys with le
 
 | # | Promise (PS reference) | Structural | Automatic | In the product |
 |---|---|---|---|---|
-| P-1 | Video, video frames, music, brand assets, captions as edited and project edits are not uploaded. **A clip's sound leaves only as one compressed Opus file in the body of `POST /transcribe`, only for a signed-in person with Cloud chosen in the drop zone's card, and is forwarded only to the transcription provider; the words come back in its response** (cloud transcription release). **v1.4: a long video's sound leaves the same way, as compressed windows of at most 90 s, one `POST /transcribe` each, always: the long path has no on-device choice, and the long page says so before the work (§43.6).** A stock search query leaves only in `POST /broll/search` (P-17). Transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media but `POST /transcribe`'s `audio/ogg` (§22.1, DC-14); only `usecases/transcribe-cloud.ts` sends audio; DTOs carry no free-text field except `email`, `PlanRequest.words[].text` and the words of `TranscribeResponse`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `transcribe_route.rs`; `cloud-transcribe.spec.ts` (identity, On device sends nothing); `events.types.test.ts`; `log_redaction.rs` (plan and transcribe flows) | Settings → "What leaves your device" with the sound row and the provider; the drop zone's card; "Verify it yourself" note; J4 and J10 copy |
+| P-1 | Video, video frames, music, brand assets, captions as edited and project edits are not uploaded. **A clip's sound leaves only as one compressed Opus file in the body of `POST /transcribe`, only for a signed-in person with Cloud chosen in the drop zone's card, and is forwarded only to the transcription provider; the words come back in its response** (cloud transcription release). **v1.4: a long video's sound leaves the same way, as compressed windows of at most 90 s, one `POST /transcribe` each, always: the long path has no on-device choice, and the long page says so before the work (§43.6).** A stock search query leaves only in `POST /broll/search` (P-17). Transcript text, word timings and prosody scores leave only in the body of `POST /plan`, only while "AI edit plan" is on (PS v1.2 §12.7, §15, §17) | No route accepts media but `POST /transcribe`'s `audio/ogg` (§22.1, DC-14); only `usecases/transcribe-cloud.ts` sends audio, and (V6.1, as built) `usecases/transcribe-source.ts` a long source's windows; DTOs carry no free-text field except `email`, `PlanRequest.words[].text` and the words of `TranscribeResponse`; only `usecases/request-plan.ts` builds a `PlanRequest`; server cannot link media crates (§7); fetch exists in four files (§7); CSP `connect-src` (§24.3) | `privacy-network.spec.ts` (plan on and plan off); `no_media_routes.rs`; `transcribe_route.rs`; `cloud-transcribe.spec.ts` (identity, On device sends nothing); `events.types.test.ts`; `log_redaction.rs` (plan and transcribe flows) | Settings → "What leaves your device" with the sound row and the provider; the drop zone's card; "Verify it yourself" note; J4 and J10 copy |
 | P-2 | Only allowlisted hosts are contacted (PS §17) | `allowlist-hosts.ts`; CSP; `check-hosts.mjs` | `privacy-network.spec.ts` assertion 1 | Settings lists the two hosts |
 | P-3 | Analytics carry only allowlisted names with numeric/enum properties; never file names, transcript or caption text, event parameters or free text (PS §17) | `AnalyticsEvent` has no `String` field; `deny_unknown_fields`; client `track()` accepts only the generated union | `events.types.test.ts` (type-level); `analytics_allowlist.rs` (server rejects extras and strings); `privacy-network.spec.ts` assertions 3 and 5 | Event list rendered on the settings page |
 | P-4 | The "What leaves your device" page matches the allowlist exactly (PS §20.1) | Page renders `ANALYTICS_EVENT_DOCS`, generated from `analytics.rs` | `settings-what-leaves.spec.ts` compares rendered rows with `gen/api.ts` | The page itself |
@@ -4198,6 +4201,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 31. (v1.2) Music licensing for bundled tracks — TE-16.
 32. (v1.3) The launch date: V6.1-V6.11 sit before V7; the founder re-sets M2 when V6.11 closes (PS A-2).
 33. (v1.2) Colour emoji: the embedded emoji font is monochrome (§19.6); whether V6.2's emoji items need a colour font (and whether Vello draws its colour tables) is decided in V6.2.
+34. (V6.1, measured) The long path's assumptions as read: `CLOUD_LONG_CONCURRENCY = 2` meets Groq's free tier's per-minute limit on every long source (open item 24; Groq's Dev tier, or one in flight, before `long_video` goes on); `CLOUD_OVERLAP_S` 10, not 5 (TE-18's first read); the read cache of 8 blocks of 1 MiB and in-place reading hold 34-37 MB for 45 minutes (TE-17); `LONG_SCRATCH = 2 GB` is kept, not measured (`pcm16.f32` is 173 MB for 45 minutes); the window group of 120 a day and the global budget's 7,000 s an hour and 27,000 s a day are unchanged; `MAX_SOURCE_DURATION` is exact, so a file a fraction of a second over 45:00 is refused (the founder decides on a tolerance).
 
 ---
 
@@ -4521,7 +4525,7 @@ A protected behaviour changes only here. Each row names what changes, when, what
 
 ### 41.3 How each release is made safe
 
-1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `stock_broll` (v1.4, §48.6), `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`.
+1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `stock_broll` (v1.4, §48.6), `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`. **(V6.1, as built: D-393, D-394.)** Each flag has a default, and the V6.x flags default to off: `DEFAULTS = { cloud_transcribe: true, long_video: false, high_res: false }`; a build turns flags on with `OFFCUT_FEATURES_ON` (a comma list) beside `OFFCUT_FEATURES_OFF`, and an unknown name, or a name in both, stops the build. So "every flag is on unless the build names it" (the cloud release) becomes "every flag takes its default unless the build names it". Two e2e builds: `pnpm build:e2e` (production's flags) into `dist/`, and `pnpm build:e2e:flags` (`long_video,high_res` on) into `dist-flags/`, served on a second port to the Playwright project `media-flags`, which runs `FLAG_SUITES`; CI builds and runs both. Production sets `OFFCUT_FEATURES_ON` in Vercel only to turn a flag on, after the release (the V6.1 plan's §12.3).
 2. **Baseline read first.** Before a release's first code commit, read the protected proofs and record them in its changelog.
 3. **Additive data.** A new field on a stored or sent type has `#[serde(default)]` and a default that means "the V5 behaviour". A new IndexedDB store comes through a numbered migration. A server migration stays compatible with the previously deployed binary (§23.3). The plan's wire format stays `PLAN_FORMAT = 1`; new kinds take new codes (§40.2).
 4. **Old callers keep their function.** `transcribe`, `decodeAudio`, `importClip`, `run-pipeline.ts` and `validate_probe` keep their signatures. New paths call new functions, which call shared stages.
@@ -4625,30 +4629,37 @@ pub struct RouteFlags { pub long_video: bool, pub high_res: bool, pub hdr_ok: bo
 
 // offcut-mp4/src/validate.rs  [ONLY]
 pub fn validate_probe(p: &ProbeInfo, decode_supported: bool) -> Result<ClipInfo, RejectReason>;   // unchanged
-pub fn route_probe(p: &ProbeInfo, decode_supported: bool, entry: Entry, flags: RouteFlags) -> Result<Route, RejectReason>;
+// offcut-mp4/src/route.rs, re-exported by validate.rs (V6.1, as built: D-395 as read)
+pub fn route_probe(p: &ProbeInfo, detail: &VideoDetail, decode_supported: bool, entry: Entry, flags: RouteFlags)
+    -> Result<Route, RouteReject>;   // RouteReject = V5's RejectReason, or SourceReject::Hdr (REJECT_HDR)
 ```
 
-`route_probe`, first failing rule wins:
+**(V6.1, as built.)** V5's tests pin `RejectReason`, `ErrorCode`, `limits.rs` and `VideoTrackInfo`, so the new members live beside them: `REJECT_HDR` is `SourceReject::Hdr`, carried with V5's reasons by `RouteReject` (serialized as the bare code); `E_SOURCE_READ` and `E_SOURCE_AUDIO` are `SourceErrorCode`; V6.1's constants are `source.rs`' `SOURCE_LIMITS`; `is_hdr` and the HEVC codec string come in a `VideoDetail` beside the `ProbeInfo` (`Demuxer::video_entry_boxes()` gives the `hvcC` and `colr`). `SourceId` is TypeScript-only.
+
+`route_probe`, first failing rule wins (as built, `route.rs`):
 
 ```text
+ 0 entry == Long && !flags.long_video                     → entry = Clip               // the page does not exist
  1 entry == Clip && !flags.high_res                       → validate_probe(p).map(Route::Clip)     // exact V5
- 2 container, no video, no audio                          → as validate_probe
- 3 video.codec == Hevc && !flags.high_res                 → Hevc                       // V5's rule while the flag is off
- 4 video.codec not in {H264, Hevc}                        → VideoCodec
- 5 video.codec == Hevc && !decode_supported               → Hevc
- 6 audio.codec != Aac                                     → AudioCodec
- 7 max(display_w, display_h) > (high_res ? MAX_INPUT_LONG_SIDE : MAX_LONG_SIDE) → Resolution
- 8 video.avg_fps > MAX_INPUT_FPS + INPUT_FPS_TOLERANCE    → FrameRate
- 9 is_hdr && !flags.hdr_ok                                → Hdr
-10 !decode_supported                                      → DecodeUnsupported
-11 p.duration <= MAX_CLIP_DURATION && audio_tracks == 1   → Route::Clip                // from either page
-12 p.duration <= MAX_CLIP_DURATION                        → MultiAudioTrack            // the clip path keeps its rule
-13 entry == Clip                                          → Duration                   // the clip page keeps V5's limit
-14 p.duration > MAX_SOURCE_DURATION                       → Duration                   // the long page's limit
-15 else                                                   → Route::Long
+ 2 container not MP4/MOV                                  → Container
+ 3 no video track                                         → NoVideo
+ 4 video.codec == Hevc && !flags.high_res                 → Hevc                       // V5's rule while the flag is off
+ 5 video.codec not in {H264, Hevc}                        → VideoCodec
+ 6 video.codec == Hevc && !decode_supported               → Hevc                       // DC-2
+ 7 no audio track                                         → NoAudio
+ 8 the first audio track's codec != Aac                   → AudioCodec
+ 9 max(display_w, display_h) > (high_res ? MAX_INPUT_LONG_SIDE : MAX_LONG_SIDE) → Resolution
+10 video.avg_fps > MAX_INPUT_FPS + INPUT_FPS_TOLERANCE    → FrameRate
+11 detail.is_hdr && !flags.hdr_ok                         → Hdr
+12 !decode_supported                                      → DecodeUnsupported
+13 p.duration <= MAX_CLIP_DURATION && audio_tracks == 1   → Route::Clip                // from either page
+14 p.duration <= MAX_CLIP_DURATION                        → MultiAudioTrack            // the clip path keeps its rule
+15 entry == Clip                                          → Duration                   // the clip page keeps V5's limit
+16 p.duration > MAX_SOURCE_DURATION                       → Duration                   // the long page's limit
+17 else                                                   → Route::Long
 ```
 
-`entry == Long` with `flags.long_video == false` cannot be reached (the page does not exist); `route_probe` treats it as `Entry::Clip`, and a test proves it. On the clip page, `REJECT_DURATION`'s copy is unchanged; with `long_video` on, its panel gains one action, "Make shorts from it", which opens `/app/long` with the same `File` still in memory (DC-1).
+Because rule 6 comes before rule 11, an HDR HEVC file on a machine without HEVC decoding reads `REJECT_HEVC`, not `REJECT_HDR`. **(V6.1, as built: D-427 as read.)** The clip page refuses HEVC with `REJECT_HEVC` even with `high_res` on: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so `high_res` on `/app` means 4K H.264 and the 16 GB limit; the long page reads HEVC sources' sound (V6 CL open item 25). `entry == Long` with `flags.long_video == false` cannot be reached (the page does not exist); `route_probe` treats it as `Entry::Clip`, and a test proves it. On the clip page, `REJECT_DURATION`'s copy is unchanged; with `long_video` on, its panel gains one action, "Make shorts from it", which opens `/app/long` with the same `File` still in memory (DC-1).
 
 `RejectReason::Hdr` joins the enum with `REJECT_HDR`, copy ("This video is HDR. Export it as SDR, then drop it again.") and fixture `rej_hdr_hlg.mov`.
 
@@ -4670,6 +4681,8 @@ pub const MAX_QUEUED_SOURCES: u32      = 50;                            // (assu
 
 **The long page has no file-size limit** (founder, 2026-11-08): nothing is copied whole, so a file's size costs reading time, not disk. Duration and resolution are its limits. v1.3's `MAX_SOURCE_FILE_SIZE` is not built. `MAX_CLIP_DURATION`, `MAX_LONG_SIDE` and `MAX_FILE_SIZE` stay in the file and rule the clip page exactly as in V5 while `high_res` is off (DC-3 for `high_res` on). The generated `LIMITS` the copy reads gains the new constants; `messages.ts` picks by page and flag.
 
+**(V6.1, as built.)** V6.1 builds only the limits it reads, in `offcut-types/src/source.rs` (generated as `SOURCE_LIMITS`, since `limits.rs` is pinned at 21 constants by V5's tests): `MAX_SOURCE_DURATION` (45 minutes), `MAX_INPUT_LONG_SIDE` (3840), `MAX_FILE_SIZE_HIGH_RES` (16 GB, DC-3), `CLOUD_WINDOW_S` (90), `CLOUD_OVERLAP_S` (10, §43.6) and `MAX_SOURCE_WINDOWS` (35). The shorts', queue's and plans' limits come with their releases. `messages.ts` words `REJECT_FILE_SIZE` (16 GB) and `REJECT_RESOLUTION` (3840) by `high_res`, today's words with it off; the long page words `REJECT_DURATION` as "longer than 45 minutes" (`copy/long.ts`).
+
 ### 43.3 Reading the file in place
 
 ```ts
@@ -4682,6 +4695,8 @@ export function probeFile(file: File): Promise<ProbeResult>;
 The `File` is posted to `media.worker` (a structured clone of the reference; its bytes are not copied), which reads it through `fileRandomAccess` for the probe, the audio (§43.5), the coarse vision pass (§46) and the part copies (§44.8). `sourceHashPrefix` is computed from `file.slice` exactly as §23.1 defines it for clips. `offcut-mp4` gains `hvcC` parsing behind `video_decoder_description` (`hevc.rs`), the HEVC codec string, and `is_hdr` from the `colr` box and the HEVC VUI. Its `RandomAccess` trait does not change. `moof` stays a rejection unless TE-12 reads at least 10% of the long corpus fragmented; then it joins V6.1's scope through §41.4.
 
 **Disk.** Only `pcm16.f32` (about 173 MB for 45 minutes) and the part copies (§44.8) are written. `import-source.ts` calls `navigator.storage.estimate()` before the audio step and shows `B_STORAGE_LOW` when free quota is under `LONG_SCRATCH = 2 GB` (assumption, TE-17).
+
+**(V6.1, as built.)** `fileRandomAccess(file)` (`workers/media/file-random-access.ts`) reads 1 MiB aligned blocks through `FileReaderSync`, with a cache of 8 blocks (least recently used); a `NotReadableError` (the file moved or was deleted) is `E_SOURCE_READ`. The demuxer reads it through `open_demuxer_reader` (`offcut-wasm-core/src/source_api.rs`, a structural `JsByteReader`), and `Demuxer::open_source` opens tracks of up to 400,000 samples (45 minutes of AAC is about 126,600; `open` keeps V5's 20,000). There is no `probeFile` in `import.ts` (frozen): the media worker's new `routeFile` handler opens the reader and calls `route_probe`. `is_hdr` comes from the `colr` box only (`nclx` or `nclc` with transfer 16 or 18), not from the HEVC VUI (D-397). The gate's disk check needs `round(D × 16) × 4 B + LONG_SCRATCH` (D-420).
 
 ### 43.4 Local storage
 
@@ -4697,7 +4712,9 @@ The `File` is posted to `media.worker` (a structured clone of the reference; its
 
 A short's `out48.f32` and `prog48.f32` live in `clips/<clipId>/` exactly as a clip's do. A short has no `clips/<clipId>/source`; its parts take its place.
 
-**IndexedDB version 3** (`persistence/schema.ts`):
+**(V6.1, as built: D-414.)** Today's database is version 1, and `DB_VERSION` (every record's `schemaVersion`) stays 1. V6.1 adds `DB_STRUCTURE_VERSION = 2`: upgrade 2 creates `sources`, `sourceTranscripts` and `masterTranscripts` (`SOURCE_STORES`), and only `sources-repo.ts` opens the database at structure version 2 (`openSourcesDb()`); the clip path keeps opening at 1, so a build with `long_video` off never upgrades anyone's database. A build that meets a newer database (`VersionError`) opens it at its own version and uses the stores it knows (V6.1 plan §12.4). As built, `sources` holds `{ sourceId, createdAt, lastOpenedAt, sourceInfo, sourceBytes, sourceHashPrefix, stage, pcm16Seconds, levelP95, windowsDone, windowsTotal }`, `sourceTranscripts` (key `[sourceId, index]`) one window's raw words relative to the window, its length and the model, and `masterTranscripts` the `Transcript`. V6.1 keeps one source (D-415). The rows below that V6.1 does not build come with their releases, each with its own structure version.
+
+**IndexedDB stores by release** (`persistence/schema.ts`):
 
 | Store | Key | Value |
 |---|---|---|
@@ -4734,6 +4751,8 @@ export function writeWholePcm16(sourceId: SourceId, reader: RandomAccessReader, 
 - `writeWholePcm16` is checkpointed by the bytes already in `pcm16.f32`: after a reload with the same file, it continues from the last whole second.
 - `pcm16.f32` is read by windows from OPFS, never held whole in memory.
 
+**(V6.1, as built.)** `decodeAudioRegion` and `writeWholePcm16` are in `workers/media/audio-region.ts` (`audio-decode.ts` is frozen). The resampler is `offcut-dsp`'s `StreamResampler`, whose whole output equals `resample_mono` bit for bit (D-401). `pcm16Seconds` is checkpointed every 10 s of flushed sound; a resume truncates to it and starts its resampler on an input sample on the 16 kHz grid (D-403 as read). A histogram of sample levels gives the source's 95th percentile, `levelP95`, which D-382's silence guard uses for every window (D-404, D-407).
+
 ### 43.6 Transcription in the cloud, in checkpointed windows (v1.4)
 
 ```ts
@@ -4745,13 +4764,15 @@ export type SourceAsrOutcome = { kind: "done" } | { kind: "paused"; reason: Clou
 export type CloudPauseReason = "unavailable" | "busy" | "signed_out" | "offline";
 ```
 
-- **Windows.** `CLOUD_WINDOW_S = 90` and `CLOUD_OVERLAP_S = 5`, so 45 minutes is 32 windows (`⌈(2700 − 5) ÷ 85⌉`). Each window is read from `pcm16.f32`, encoded by `encodeForCloud` (Opus at 32 kbps, about 0.32 MB) and sent as one `POST /transcribe` marked as a window of a source (§22.1). Its words pass `fromCloud` (D-382's silence guard, then `postProcess`) and are shifted to source time. Merging uses the existing `mergeWindows`.
+- **Windows.** `CLOUD_WINDOW_S = 90` and **`CLOUD_OVERLAP_S = 10` (V6.1, as built: TE-18's first read found 3 of 31 seams losing or doubling a word with 5 s)**, so 45 minutes is 34 windows (`max(1, ⌈(D − 10) ÷ 80⌉)`, window `k` covering `[80k, min(80k + 90, D))` s). Each window is read from `pcm16.f32`, encoded by `encodeForCloud` (Opus at 32 kbps, about 0.32 MB) and sent as one `POST /transcribe` marked as a window of a source (§22.1). Its words pass `fromCloud` (D-382's silence guard, then `postProcess`) and are shifted to source time. Merging uses the existing `mergeWindows`.
 - At most `CLOUD_LONG_CONCURRENCY = 2` windows are in flight (assumption, TE-18).
 - **Checkpoints.** Each window's words are written to `sourceTranscripts` as it returns. A resume sends only the missing windows; this needs `pcm16.f32`, not the file. The merge runs when all exist.
 - **No device fallback on the long path** (founder, 2026-11-08). A failed window is retried `CLOUD_WINDOW_RETRIES = 2` times, after 1 s and 4 s (assumptions). Then the job pauses (§43.8) with its reason: the switch off or `/healthz` saying no gives `unavailable`; 503 from the audio budget, or 429, gives `busy`; 401 gives `signed_out`; a network failure gives `offline`. The page says why and offers Continue. Clips keep D-348's fallback to the device, unchanged.
 - **Before the work.** The long page needs the flag `cloud_transcribe`, `/healthz` saying yes, and a session. It checks all three at the gate (PS L1) and says which is missing before anything is read.
 - `normalize_transcript` runs once on the merged words and gives the **master transcript**: `Transcript` with `SourceMs` numerically in its `TimeMs` fields. It is never given to the scene (§44.4).
 - **Sentence quality.** The Director selects by sentence (§45), so `sentences.rs` now carries weight it did not have. V6.1 adds `sentences_long.rs` over the long corpus: no sentence longer than `MAX_SENTENCE_MS = 25 s` (assumption, E-12), split at the longest pause inside otherwise.
+
+**(V6.1, as built.)** `transcribeSourceWindows({ sourceId, durationMs, levelP95, signal, onWindow })` gives `{ done, transcript } | { paused: reason } | { rejected: "NoSpeech" } | { failed: "encoder" } | { cancelled }`. Each window: `readPcm16Window` (main thread), `encodeForCloud` (unchanged), `transcribeAudio(ogg, signal, { index, total })` with `X-Offcut-Window` (a clip's request is byte-identical to before), then `asr.worker.cloudWindowWords` (D-382's guard against the source's `levelP95`; the words stay raw and relative to the window), kept in `sourceTranscripts`. When all are kept, `asr.worker.buildMasterTranscript` runs `mergeWindows`, `postProcess` and `normalizeTranscript`; fewer than `MIN_WORDS` is `REJECT_NO_SPEECH`. The asr worker takes one job at a time, so the two lanes' calls to it wait their turn in `transcribe-source.ts`; the requests stay two in flight. Failures (D-410): a timeout, `offline` or other failure is retried twice (1 s, 4 s), then pauses `offline` (when offline) or `busy`; 429 pauses `busy` at once; 503 asks `/healthz` again, and a body without `cloud_transcribe: true` pauses `unavailable`, otherwise it is retried, then `busy`; 401 after `authed()`'s refresh pauses `signed_out`, and Continue opens the sign-in dialog first; a window step that throws while offline (the asr worker's script cannot be fetched) pauses `offline`. A fifth reason, `wake_lost`, is the job's own (§43.7). `MAX_SENTENCE_MS` is not a rule of the code: `sentences_long.rs` holds it over its corpus, and the rule waits for the release that may reopen `sentences.rs`.
 
 **Time budget.** The cloud read about 13× faster than the device on a minute of speech (TE-C4). For 45 minutes at a concurrency of 2 the estimate is a few minutes, plus the audio step of §43.5; TE-18 reads both. v1.3's two-pass seam (a faster model over the whole file) is not built: it existed only for device transcription of a source.
 
@@ -4769,6 +4790,8 @@ export type CloudPauseReason = "unavailable" | "busy" | "signed_out" | "offline"
 
 Progress also goes into `document.title` ("42% - Offcut"), so a hidden tab shows it. No notification permission is requested.
 
+**(V6.1, as built.)** `platform/wake-lock.ts`: the lock is taken when the job starts, taken again when the tab is shown, and let go on pause, cancel, failure and end; a lock lost while visible that cannot be taken again pauses the job as `wake_lost` (D-418). There is no user Pause button in V6.1 (Cancel, and the automatic pauses). A reload finds the newest `sources` row: below `transcribed` it shows "Continue your video"; transcription goes on at once without the file; the audio step asks for the same file (size and hash prefix), and another is refused with "This is a different file" (D-419). TE-20 (experiments.md) reads a hidden and a frozen tab.
+
 ### 43.8 The source machine
 
 `state/machines/source-machine.ts`, under the same `transition()` rule as the other four (INV-16):
@@ -4783,11 +4806,24 @@ any working state → cancelled | failed
 
 The coarse vision pass runs while the file is surely in hand, before transcription. The clip machine is not changed. Opening a short loads it as a clip (§45.7).
 
+**(V6.1, as built: D-417.)** V6.1's machine has the states it builds:
+
+```text
+idle → probing → gated → (Start) → extracting_audio → transcribing → transcribed        // V6.1's end; V6.4 leads on to directing
+probing → rejected | failed | idle (a short file handed to /app)
+extracting_audio | transcribing → paused → the state it left (Continue)
+idle → awaiting_file (a reload during the audio step) → extracting_audio, once the same file is dropped
+idle → transcribing | transcribed (a reload later on)
+any working state → cancelled | failed; failed → awaiting_file | transcribing (Continue)
+```
+
 ### 43.9 Errors and copy
 
 `E_SOURCE_READ` (the file could not be read in place, for example because it was moved or deleted mid-job), `E_SOURCE_AUDIO`, `E_SOURCE_PART_COPY` (V6.4) and `E_SHORTS_QUOTA` join `ErrorCode` and `messages.ts`, each with a `.persistent` variant (`check-copy-codes.mjs`). The four pause reasons of §43.6 and `awaiting_file` have their own copy keys. Every string comes from `messages.ts` (INV-15).
 
-**Acceptance (V6.1).** `route_probe.rs` (one case per rule from both pages, and rule 1's exact equality with `validate_probe` on every existing fixture); `demux_fixtures.rs` (hvcC); `audio_region.rs`; `transcribe-source.test.ts` (windows, checkpoints, each pause reason, no device fallback); `route_long.spec.ts` (both pages, the hand-over of a short file, the clip page's new action), with `fake-api.ts`'s cloud option of the cloud transcription release; `high-res.spec.ts`; `long-resume.spec.ts` (a kill during transcription resumes without the file; a kill during audio extraction asks for it); `flags_identity.spec.ts`. Peak memory read on a 45-minute 4K file. TE-17, TE-18, TE-20, TE-21 recorded.
+**(V6.1, as built.)** `E_SOURCE_READ`, `E_SOURCE_AUDIO` and `REJECT_HDR`, the four pause reasons, `wake_lost`, `awaiting_file` and every word of the long page are in `copy/long.ts`, which `messages.ts` holds as `messages.long` (D-426); `check-copy-codes.mjs` reads both files. The two source errors are shown only on the long page's card, so they have no `.persistent` variant. `E_SOURCE_PART_COPY` and `E_SHORTS_QUOTA` come with V6.4.
+
+**Acceptance (V6.1).** `route_probe.rs` (one case per rule from both pages, and rule 1's exact equality with `validate_probe` on every existing fixture); `demux_fixtures.rs` (hvcC); `audio_region.rs`; `transcribe-source.test.ts` (windows, checkpoints, each pause reason, no device fallback); `route-long.spec.ts` (both pages, the hand-over of a short file, the clip page's new action), with `fake-api.ts`'s cloud option of the cloud transcription release and its `windows` option (V6.1); `high-res.spec.ts`; `long-resume.spec.ts` (a kill during transcription resumes without the file; a kill during audio extraction asks for it); `flags-identity.spec.ts`. Peak memory read on a 45-minute 4K file. TE-17, TE-18, TE-20, TE-21 recorded.
 
 ---
 
@@ -5465,6 +5501,8 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | TE-C5 | Vercel's rewrite carries the body; a live request's time | the same, at the merge | (P170) | Cloud transcription | Lower the limit or the bitrate |
 | TE-26 | (v1.4) Stock B-roll from Pixabay: terms, relevance, the browser fetch | Re-read Pixabay's API terms and content licence; 20 plan-written queries from the labelled set; a fetch from `cdn.pixabay.com` under the app's COEP and CSP; rendition sizes | Terms as §48.6 states them; at least 12 of 20 queries give a clip the founder would use; the fetch works with no proxy (assumptions) | V6.8 | Stock by hand only (no plan-written queries); ask (§41.4) if the terms changed |
 
+**(V6.1, read on D1, 2026-11-08/09; `docs/v6.1/experiments.md`.)** **TE-17:** read in place, a 45-minute 4K HEVC file (1.48 GB) and a 45-minute 1080p H.264 file (5.6 GB): probe 0.15 s, the audio step 22 s and 55 s, peak page memory 34 and 37 MB; the clip page's 4K read with `high_res` (an 89 s 4K H.264 clip, processed and exported): 883 MB, so F-3's condition holds. Cold reads and USB drives are R1's and R2's. **TE-18:** 40 minutes through Groq by the product (2,690 s of audio, 10 s overlap, two in flight): p50 0.72 s and p90 1.05 s a window, 33 s of windows after the audio step, one 429 (Groq's free tier, about 20 requests a minute) paused the job `busy` and Continue finished it; at the 29 seams, 5 of the 96 word edits against the first loop fall within 2 s of a seam (2 lost, 3 changed, none doubled), the rate of edits elsewhere (the seams' 4 s are 5% of the time), and no word lands in room tone; the plan's "no word lost at a seam" fails by 2 words, recorded for the founder (V6 CL open item 27). **TE-20:** a reload mid-run loses only the windows in flight; the hidden tab and a frozen page could not be simulated on the automated Chrome, so the real sleep test is the founder's. **TE-21:** read on the generated HLG file only (no phone clip): Chrome maps it into sRGB without washing it out but clips saturated colours to black; `hdr_ok` stays `false`.
+
 TE-15 now also covers the paid provider: price, the `/shorts` and `/chat-edit` latency, data terms. Its "free tier" pass line becomes "free tier for development; the cost model of §52 fits the cap".
 
 E-12 and E-13 are PS §19's. Their instrument is §45.9's analytics plus `scripts/metrics.sql`.
@@ -5526,9 +5564,9 @@ Clip budgets of §30 do not change. A 4K source is read separately and has no bu
 
 | Event | Release | Properties |
 |---|---|---|
-| `long_source_accepted` | V6.1 | `duration_bucket`, `resolution_bucket`, `codec` |
-| `source_stage_timing` | V6.1 | `stage`, `ms_bucket`, `resumed: bool` |
-| `source_paused` | V6.1 (v1.4) | `reason` (the four of §43.6, or `awaiting_file`), `stage` |
+| `long_source_accepted` | V6.1 plan; **not built in V6.1** (as built: `analytics.rs`' tests pin the event list, and no existing test changed in V6.1; built before `long_video` goes on, V6 CL open item 26) | `duration_bucket`, `resolution_bucket`, `codec` |
+| `source_stage_timing` | V6.1 plan; not built in V6.1 (as above) | `stage`, `ms_bucket`, `resumed: bool` |
+| `source_paused` | V6.1 plan (v1.4); not built in V6.1 (as above) | `reason` (the four of §43.6, or `awaiting_file`), `stage` |
 | `plan_result` | V6.2 | As §40.8 |
 | `director_result` | V6.4 | `source`, `outcome`, `shorts`, `dropped_by_reason`, `joined_shorts` |
 | `short_action` | V6.4 | `action`, `style`, `parts_bucket` |

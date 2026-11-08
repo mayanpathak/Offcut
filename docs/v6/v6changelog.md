@@ -1050,3 +1050,37 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4 (the workspace, run in this prompt), Vitest 650, `pnpm e2e` 57; the full media run on `dist/` (P182's Tier 4, run here while Groq's hour refilled): **112 passed, 1 skipped**, 40.5 min, the floor exactly. No product code changed in P181.
 
 **Open:** **27 (new)**, the 2 words lost near seams; 19 and 24 stand, re-read.
+
+## Entry 37 - 2026-11-09 - P182: copy-back, the two runs, ready to merge
+
+**The founder merges** (their instruction of 2026-11-08: "do everything and tell me to merge, don't merge yourself"). So this prompt ends at a green, ready pull request; the merge, the `main` run and the tag follow when the founder merges, then §12.2's live checks and the closing entry.
+
+**Copy-back (§18), each marked "(V6.1, as built)".**
+
+- TS §5 (rows as files came; `flags-identity` and `route-long` with hyphens), §7 (V6.1's lint edges; `transcribe-source.ts` the second use-case that sends audio; the P-1 row), §22.1 and §24.5 (the window header, the two groups, the IP check in the handler, the log field), §22.8 (the two budget variables), §23.3 (structure version and record version; the `VersionError` rule), §39.3 (item 34: the long path's assumptions as measured), §41.3 (flag defaults, `OFFCUT_FEATURES_ON`, the two builds), §43.1-§43.9 (the rules in their real order; the types beside V5's pinned ones; `SOURCE_LIMITS`; reading in place; storage version 2; `audio-region.ts`; the windows at 10 s overlap, 34 for 45 minutes; the failure rules as built; the machine as built; the copy in `copy/long.ts`), §53.1 (TE-17, TE-18, TE-20, TE-21 read), §53.5 (the three events: not built, open item 26).
+- PS §10.1 (L0-L4 as built, dark), §20.2A (the budgets read). BP §0 (V6.1's line), §8A.1 (as built; `quota.ts` eviction to V7, REOPENED BP §8A.1).
+- The plan's §17 exit checklist ticked, the founder's boxes named.
+
+**Tier 4 (the two runs and the rest), on the final code.** Rust workspace **910 / 0 / 4**; Vitest **650**; `pnpm e2e` **57**; the full media run on `dist/` **112 passed, 1 skipped** (40.5 min; the protected path as production runs it); `FLAG_SUITES` on `dist-flags/` **34 passed, 1 skipped** (P180's second run, after the last code change); `pnpm fixtures` up to date with both manifests. No product code changed after those runs: P181 and P182 changed documents only.
+
+**ON §7.2's gates, with their evidence.**
+
+- [x] Locally: `pnpm check` ok; Rust, Vitest, `pnpm e2e` as above; `pnpm build` ok with `check-hosts.mjs` ok (one host, the asset host, as in the CSP) and the bundle's `long_video:!1, high_res:!1`; counts at or above Setup's baseline (863 / 0 / 4, 568, 57).
+- [x] The full `pnpm e2e:media` on `dist/` passed once: 112 passed with the one existing skip, the floor.
+- [x] `FLAG_SUITES` on `dist-flags/` passed (`route-long`, `high-res`, `long-resume`, `flags-identity`, `rejections`), twice.
+- [x] G 0.4's frozen check prints nothing; the additive check prints only its named lines (the handlers lines; `db.ts`' `open()` body, D-414; `transcribeAudio`'s signature, D-413; `dropSilentWords`' signature and level line, D-407; `route.rs`' moved steps, D-411; and two import lines of `asr.worker.ts`, P177).
+- [x] `git diff --name-only $BASE...v6.1-build -- web/tests-e2e/`: the four new specs, `long-windows.ts` and `fake-api.ts` (its one option); `rejections.spec.ts` unchanged (no edit was needed); `server/tests/` adds cases only (0 removed lines).
+- [x] `git diff --stat $BASE...v6.1-build`: 104 files, the plan's §4 files, their tests, docs, the fixtures scripts and the two workflows.
+- [x] Goldens and snapshots: `git diff --name-only $BASE -- '*.snap' '*.png'` empty.
+- [ ] The CI run on the pull request's head: push 3 below; read before the founder is told to merge.
+- [x] The self-review rubric passed (P180).
+- [x] `git grep -nE "gsk_[A-Za-z0-9]{20}"` empty; nothing private staged (no `.env*`, `testclips*`, `fixtures/.gen*`, `web/dist*`, no `zz-` file).
+- **Time (A-1):** the founder merges when they choose; the deploy is watched by the agent after it.
+
+**After the founder merges (the agent, ON §7.3):** the `main` run (`ci`, `e2e-media`, `deploy-api`, `deploy-web` with its smoke); `/healthz` with the merge's version and `cloud_transcribe: true`; `/api/v1/me` 401 with `Cache-Control: no-store` (D-429); an unauthenticated `POST /transcribe` with `X-Offcut-Window: 0/2` 401; `@smoke` against the live site; `/app` with no long link and `/app/long` redirecting to `/app`; then the tag `v6.1` on the merge commit (the founder's, or the agent's at their word), and the closing entry.
+
+**For the founder, in the morning (ON §8).** (1) F-3: `high_res` may go on (TE-17's 4K clip read 883 MB); Vercel's `OFFCUT_FEATURES_ON=high_res` (Production), then re-run the `main` run's `deploy-web` job; never the Redeploy button. (2) TE-20's real test: a long video on `dist-flags/` through a five-minute sleep and a background tab. (3) Open items 19, 24 (Groq's Dev tier, or one window in flight, before `long_video` goes on), 25, 26, 27 (2 words lost near seams). (4) Found, not fixed: `MAX_SOURCE_DURATION` has no tolerance (a 45:00.067 file is refused). (5) `long_video` stays off until V6.4's alpha (F-4).
+
+**Counts.** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
+
+**Open:** 27 (P181). **Found, not fixed:** as above.

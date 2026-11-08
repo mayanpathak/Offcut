@@ -30,7 +30,7 @@
 | **V4** | The look and the editor | M1.4, M1.5 | Week 4, second half: 5-8 Nov | Preview + review UI working |
 | **V5** | Export that an independent tool accepts | M1.6 | Week 5, first half: 9-11 Nov | All 11 verifier checks pass |
 | **V6** | Accounts, limits, payments: the MVP features complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all v1.1 P0 features work |
-| **V6.1** | Long source (v1.4): its own page, 45 minutes read in place, 4K, HEVC, cloud transcription in resumable windows | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5 |
+| **V6.1** | Long source (v1.4): its own page, 45 minutes read in place, 4K, HEVC, cloud transcription in resumable windows | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5. **As built:** P171-P182 on `v6.1-build` (2026-11-08/09), merged dark (`long_video` and `high_res` off in production); tag `v6.1` on the merge commit |
 | **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap | M1.9 | | AI plans validate and render; fallback works; privacy test revised |
 | **V6.3** | Pause and silence cuts; the `Assembly` (stitched parts) | M1.10 | | Cut and stitched exports pass the verifier at the map's duration |
 | **V6.4** | Director: a long video becomes 5-10 shorts; list; batch export | M1.17 | | A long fixture gives 5 exported shorts, API up or down. **Private alpha after this** |
@@ -749,6 +749,8 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 | `ui/components/SourceProgress.tsx` | Stages, pause, continue, the pause reasons |
 | `models/model-manager.ts`, `config/models/` | Several manifests (DC-4) |
 | Fixtures: `long_12min.mp4`, `long_45min_4k_hevc.mov` (outside git, generated), `rej_too_long_46min.mp4`, `rej_8k.mp4`, `rej_hdr_hlg.mov` | Test inputs |
+
+**As built (V6.1, `docs/v6.1/v6.1implementation.md` and V6 CL Entries 25-37).** Twelve prompts, 171-182, on `v6.1-build`. `route_probe(p, detail, decode_supported, entry, flags)` lives in `offcut-mp4/src/route.rs`, re-exported by `validate.rs`, with `hevc.rs` and `colr.rs`; the reading is the media worker's `routeFile` handler over `file-random-access.ts` (`import.ts` is frozen, so there is no `probeFile`); the sound is `workers/media/audio-region.ts` (not `audio-decode.ts`, frozen) with `offcut-dsp`'s `StreamResampler`. Storage is IndexedDB structure version 2 (`DB_VERSION` stays 1), one source kept; **`quota.ts` eviction moved to V7** (REOPENED BP §8A.1), as did clearing older clips from the disk check. No model manifest changed (DC-4 is not used). The landing page is unchanged (D-425). The three analytics events wait for V6.4 (V6 CL open item 26). Windows overlap by 10 s (TE-18's first read). The tests as built: `route-long.spec.ts`, `long-resume.spec.ts`, `high-res.spec.ts`, `flags-identity.spec.ts` in the Playwright project `media-flags` over the flags-on build `dist-flags/`, and `audio-region.test.ts` in place of `audio_region.rs`.
 
 **Experiments.** TE-17 (reading in place), TE-18 (cloud windows), TE-20 (hidden tab, sleep), TE-21 (HDR), TE-12 re-read on long files (moof, audio rate).
 

@@ -516,6 +516,8 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 | **L7** Export | "Export kept shorts": the count and exports left, before the click | Free: each short is one of the month's 3 exports; the rest stay in preview. Sequential, on this computer |
 | **L8** Summary | What changed per short; post captions and hashtags to copy | Activation fires at the first short |
 
+**(V6.1, as built; dark in production.)** L0 to L4 exist behind `long_video`, and V6.1 ends at the master transcript: "Your video is transcribed", its length and its sentences at their times, and "Shorts from it come next." (V6.4 replaces that screen with L5). As built: the gate (L1) asks in order for an account, then whether transcription is on ("Checking that transcription is available…", at most 45 s), then the disk, then says what is sent and offers Start; no limit line yet (the Free plan's one long video a month comes with V6.4). L2 shows the amount needed but no way to clear older clips (V7). L3 has two stages, "Reading the sound" and "Transcribing N of M", each with its bar, the time left once a tenth is done, and Cancel; there is no user Pause button (the job pauses itself with a reason: off right now, busy, signed out, offline, or the computer slept). L4 is as written: transcription continues without the file; the sound step asks for the same file and refuses another. The landing page is unchanged in V6.1 (D-425).
+
 ---
 
 ## 11. Monetization
@@ -1083,6 +1085,8 @@ Reference (v1.4): 45-minute 1080p H.264 source, R1, read in place, transcribed i
 | Export 5 shorts | 7.5 min |
 
 **If transcription misses:** more pieces in flight, Groq's paid tier, or a larger overlap between pieces (TE-18). **If long jobs fail on typical laptops** (TE-20): the copy tells people to keep the tab visible, and the founder decides. *(v1.3's reference was 20 minutes, copied whole and transcribed on the device: at most 55 minutes to the list, with a 10-minute cap as the fallback.)*
+
+**(V6.1, read on D1.)** Probe and sound for 45 minutes read in place: 22 s (4K HEVC) to 55 s (5.6 GB 1080p), under the 4 minutes. Cloud transcription of 40 minutes: about 33 s of windows on Groq when not limited; Groq's free tier paused it once as busy (about 20 requests a minute), so the Dev tier comes before the alpha. The later stages are V6.2-V6.5's to read.
 
 ### 20.3 Critical-path arithmetic for the end-to-end promise
 
