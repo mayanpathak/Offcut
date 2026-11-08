@@ -23,9 +23,20 @@ A throwaway page and worker (`$SCRATCH/probe/`), served with cross-origin isolat
 
 **Reading.** `FileReaderSync` reads late blocks of a file over 4 GiB correctly (P171's stop condition does not fire), and reading holds no more memory than the block in hand. Both files had just been written, so the operating system's cache held much of them: these are warm reads, an upper bound on speed. The cold read (a file not touched since boot, and a USB drive) is P181's. D-400's 1 MiB blocks and 8-block cache stand as planned. The plan's "30 GB file" was not made: the 5.6 GB file already crosses the 32-bit boundary that matters, and 30 GB would have taken half the free disk.
 
-### Second read (P181)
+### Second read (P181, 2026-11-08 23:50 IST, d1)
 
-Not read yet.
+The real product: the keyed flags-on build (`dist-flags/`) in Chrome, signed in through `fake-api.ts`, the fake answering each window from the reference clip's cloud fixture (so this times reading and the audio step, not Groq: TE-18 does). Each file chosen in the long page's own file field, so Chrome reads it from the disk as a person's file is. Page memory is `performance.measureUserAgentSpecificMemory()` (the app is cross-origin isolated; it counts the page and its workers, not the GPU process), sampled about every 15-25 s, as each call takes that long to answer.
+
+| File | Probe (pick to the gate's Start) | Audio step (Start to transcribing) | 34 windows, fake | Sentences | Page memory peak |
+|---|---|---|---|---|---|
+| 4K HEVC, 44:59, 1.48 GB | 0.16 s | **22 s** | 32 s | 544 | **34 MB** |
+| 1080p H.264, 45:00, 5.61 GB | 0.15 s | **55 s** | 32 s | 544 | **37 MB** |
+
+**The clip path with `high_res` (F-3's condition).** The 4K file's first 89 s, re-encoded as 3840 × 2160 H.264 (the clip page refuses HEVC, D-427 as read), on `/app`, signed in as Creator: processed in 97 s, exported at 1080 × 1920 in 52 s, **peak page memory 883 MB**. `rej_4k.mp4` (1 s, a tone): taken at import, refused `REJECT_NO_SPEECH` after it was heard, peak 5 MB.
+
+**Reading.** Every pass line holds: the probe well under 2 s, the audio step well under 4 minutes, peak memory far under 1.5 GB. Reading in place holds almost nothing: 34-37 MB for a 45-minute source, against the 520 MB `decodeAudio` would hold for its sound alone. The 5.6 GB file takes longer because its bytes are 3.8 times as many: the demuxer reads every audio sample from among them. Both files were written today, so the operating system's cache may hold some of them: these are warm reads; a cold read and a USB drive are the founder's (R1, R2). **F-3: 4K clip peak 883 MB: `high_res` may be turned on** (the founder's morning step; the plan's condition is the 1.5 GB line).
+
+**Found.** `long_45min_4k_hevc.mov`'s video track lasts 2,700.067 s, 67 ms over 45:00, and the long page refuses it as longer than 45 minutes: `MAX_SOURCE_DURATION` is exact, with no tolerance. A phone's "45:00" recording can run a fraction of a second over. Recorded for the founder (V6 CL, Found, not fixed); TE-17 read a 44:59 copy (`-t 2699 -c copy`).
 
 ## TE-18 - Cloud windows over 45 minutes
 
@@ -58,17 +69,54 @@ A throwaway script (`$SCRATCH/te18.mjs`) cut the 45-minute sound (16 kHz mono) i
 
 **For the founder (not changed tonight).** On the free tier, the per-minute request limit binds before the hourly audio: two windows in flight (D-409, confirmed in Entry 23) will meet it on every 45-minute source, and D-410 turns the server's 503 into retries then a `busy` pause. Groq's Dev tier (open item 19) before `long_video` goes on removes it; otherwise one window in flight (about 2 minutes for 45 minutes at the latency read) stays under it.
 
-### Second read (P181)
+### Second read (P181, 2026-11-09 00:54-00:56 IST, d1; F-1, A-3)
 
-Not read yet.
+The real product: `dist-flags/` in Chrome, signed in through `fake-api.ts`, a 40-minute source (`long_45min_4k_hevc.mov`'s first 2,400 s, `-c copy`: 45 minutes with the 10 s overlap is 3,060 s of windows, over A-3's 3,000 s an hour) read in place; each window's `POST /transcribe` (its Ogg body, as the page sent it) answered by the test from a real Groq call made as `server/src/transcribe/groq.rs` does (the same model and fields, the times rounded to ms, the words trimmed: `align.rs` is the identity on Groq's words). The key was read alone from `.env.deploy` into that process; nothing printed a value.
+
+| Measure | Read |
+|---|---|
+| Requests | 31: 30 answered 200, **one 429** (window 20/30, `retry-after: 3`) |
+| Audio sent to Groq | **2,690 s** (29 × 90 s + 80 s); Groq's hour showed 7,110 s left after the first window, 4,690 s after the last |
+| Latency per window | p50 0.72 s, p90 1.05 s, max 1.11 s |
+| The audio step | 27 s |
+| The windows, Start of transcription to the transcript | 98 s, of which 65 s was the `busy` pause |
+| The 429 | The product paused **"Transcription paused: it is busy. Continue in a few minutes."**; Continue after a minute sent the missing windows and finished. Nothing was lost or sent twice |
+
+**Reading.** Time: far inside "6 min p90 after the audio step" (33 s of windows without the pause). D-410's busy path works against the real provider. Groq's free tier still answers 429 at about 20 requests a minute (window 20 of 30 here, as P171 read at 27): open item 24 stands; Groq's Dev tier (open item 19), or one window in flight, before `long_video` goes on. An earlier attempt (started 23:51, stopped at 00:21) waited on a page state the test did not recognise and kept no record of its calls: **how much audio it sent is not known**, at most the same 2,690 s, and Groq's allowance refills as it goes, so its 7,110 s at 00:54 does not tell. If it sent all of it before 00:21, the hour from 23:56 to 00:56 held up to 5,380 s of these tests' audio, over A-3's 3,000 s (Groq's own limit, 7,200 s, was not reached). The harness now writes every call as it is made, and the next run waited an hour after this one.
+
+**The seams (a second run at 01:57-01:59, the same 2,690 s: 31 requests, 30 × 200, one 429 at window 20 that paused and continued).** The master transcript held **4,677 words**. Each of the 29 whole loops was compared word by word with loop 0's 155 words (an edit distance, counts only; no transcript is kept in the repository): **96 edits in all** (2.1%: 30 lost, 26 added, 40 changed), of which **5 fall within 2 s of one of the 29 seams: 2 lost, 3 changed, none doubled**. The seams' 4 s are 5% of the time, so about 4.8 of the 96 would fall there by chance: at the 10 s overlap the merge adds nothing measurable, and the doubling the 5 s overlap showed (2 of 31 seams in P171) is gone. **No word was placed in room tone** after the guard. Groq's hour showed 4,684 s left after the last window. **Against §13: "no word lost or doubled at a seam" fails by 2 lost words**, at the base rate of the model's own variation: a stop-and-ask, recorded for the founder (V6 CL open item 27) and not a blocker for a dark merge (`long_video` stays off in production); V6.4's labelled long set re-reads it on real speech.
 
 ## TE-20 - A hidden tab and a sleep
 
-Not read yet.
+### Simulated read (P181, 2026-11-09 00:30 IST, d1)
+
+The product on `dist-flags/`, `long_12min.mp4` (9 windows), the fake answering each window after 20 s, headed Chrome.
+
+| Step | Read |
+|---|---|
+| Visible | 10.6 s per window (20 s each, two in flight): as expected |
+| **Reload after 3 windows kept**, then "Continue your video" | Finished without the file; **no kept window sent again**; 10 requests in all for 9 windows: only the one in flight was lost |
+| Hidden: the page's own window minimised (`Browser.setWindowBounds`), and a second page in front | `document.visibilityState` stayed `visible`, in both Playwright's Chrome and one started without its `--disable-renderer-backgrounding`, `--disable-backgrounding-occluded-windows` and `--disable-background-timer-throttling`: 10.8 s per window, as visible |
+| Frozen 60 s (`Page.setWebLifecycleState`) | Not taken: windows 6-8 were requested during the 60 s and the job finished |
+
+**Reading.** The resume half of TE-20 passes: a reload loses at most the windows in flight (§13's line). **The hidden-tab and frozen halves could not be simulated faithfully on this machine's automated Chrome** (the page never became hidden, and a visible page is not frozen), so they are not read. **The real test is the founder's** (`overnight-run.md` §8 step 3): start a long video on `dist-flags/`, close the lid for five minutes, open it, and see the job pause and continue; and a run with the tab in the background. The copy already asks to keep the tab open (§10.5).
 
 ## TE-21 - HDR
 
-Not read yet. No phone HDR clip was supplied (`overnight-run.md` §12, A-2); it is read on `rej_hdr_hlg.mov` only.
+No phone HDR clip was supplied (`overnight-run.md` §12, A-2); it is read on `rej_hdr_hlg.mov` only.
+
+### Read (P181, 2026-11-09 00:25 IST, d1)
+
+`rej_hdr_hlg.mov` (640 × 360 HEVC Main 10, BT.2020, HLG, `colr` written: the HLG is in the metadata; the picture is `testsrc2`'s saturated pattern) played in a `<video>` on the app's own origin, one frame at 0.5 s drawn to a 2D canvas (Chrome's own colour management, as a frame reaches the page), against ffmpeg's straight decode of the same frame (no conversion). The render path itself was not forced to `hdr_ok`: that would change frozen render code even in a scratch build (ON §3).
+
+| Measure | Chrome | ffmpeg, straight |
+|---|---|---|
+| Mean R / G / B | 119.9 / 115.0 / 123.6 | 122.3 / 127.4 / 127.1 |
+| Channels at 255 | 24.7% | 24.7% |
+| Channels at 0 | 49.0% | 31.8% |
+| Mean saturation | 0.994 | 0.959 |
+
+**Reading.** Chrome maps the BT.2020 HLG frame into sRGB: not washed out (the levels and highlights match), but more channels clip to black, the gamut mapping of colours outside sRGB. On a real phone HDR clip (bright skies, skin) that is the risk §13 names. **`hdr_ok` stays `false`** (§15, A-2); a real clip is the founder's to read before HDR is accepted.
 
 ## HEVC in D1's Chrome (P171, G 1.3)
 

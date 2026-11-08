@@ -27,6 +27,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 26 | D-428's three analytics events (`long_source_accepted`, `source_stage_timing`, `source_paused`) are not built: `analytics.rs`' tests pin the event list and no existing test may change tonight. Build them, editing those pinned lists, before `long_video` goes on in production (V6.4); nothing is lost while it is off | Founder decides, V6.4 | Entry 30, D-428 |
 | 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
 | 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
+| 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
 
 ## Known issues for later prompts
 
@@ -1027,3 +1028,25 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 650 (649 + 1), `pnpm e2e` 57.
 
 **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 36 - 2026-11-09 - P181: experiments and the walk
+
+**How it was read.** A scratch Playwright spec (`zz-te.spec.ts`, deleted) drove the real flags-on build (`dist-flags/`) in Chrome, signed in through `fake-api.ts` (G Phase 11: no inbox at night). Files were chosen in the long page's own file field, so Chrome read them from the disk. Readings in `docs/v6.1/experiments.md`.
+
+**TE-17 (second read).** 45-minute 4K HEVC (1.48 GB) and 1080p H.264 (5.6 GB) read in place: probe 0.16 and 0.15 s, the audio step 22 and 55 s, peak page memory 34 and 37 MB; every pass line holds. **F-3's condition: 4K clip peak 883 MB: `high_res` may be turned on** (an 89 s 4K H.264 clip on `/app`, processed in 97 s and exported by Creator in 52 s; the founder's morning step).
+
+**TE-18 (second read).** 40 minutes through Groq by the product: 31 requests (30 × 200, one 429 that paused the job `busy`; Continue finished it), p50 0.72 s and p90 1.05 s a window, 33 s of windows when not limited. At the 29 seams (a second run at 01:57 with the words kept): 4,677 words, 96 edits against the first loop (2.1%), **5 within 2 s of a seam (2 lost, 3 changed, none doubled)**, the base rate of edits elsewhere; no word in room tone. §13's "no word lost or doubled at a seam" fails by 2 lost words: stop-and-ask, recorded as open item 27; it does not block a dark merge.
+
+**TE-20 (simulated).** A reload mid-run lost only the window in flight (10 requests for 9 windows; no kept window sent again). The hidden tab and a frozen page could not be simulated on the automated Chrome (it stayed `visible` minimised, and a visible page is not frozen): the real test is the founder's morning step.
+
+**TE-21.** On `rej_hdr_hlg.mov` only (A-2): Chrome maps the HLG frame into sRGB without washing it out (levels and highlights match ffmpeg's straight decode) but clips saturated colours to black (49% of channels at 0 against 32%). `hdr_ok` stays `false` in every committed build.
+
+**The scripted walk** (ON §5, P181 step 5): every row of §1.3's table captured into `~/v6.1-review/walk/` (outside git) and read with the Read tool: the `/app` link; the too-long panel with "Make shorts from it"; the gate signed out; cloud off; the line on what is sent; "Transcribing 3 of 30", "About 2 minutes left" and "55% - Offcut" in the tab; a 60 s file opened on `/app` with "This one is short, so it opens as a clip."; "Continue your video"; a pause with Continue; the transcript. Each says what is happening and what to do next.
+
+**Every real Groq call** (F-1, A-3; the reference clip's looped audio only; the key read alone from `.env.deploy`, never printed): (1) 23:51-00:21, stopped: its calls were not recorded, at most 2,690 s (experiments.md says what that means for A-3); (2) 00:54-00:56, 31 requests, 30 answered, **2,690 s**; (3) 01:57-01:59, 31 requests, 30 answered, **2,690 s**. Groq's own limit (7,200 s an hour) was never reached; the 25% stop never fired.
+
+**Found, not fixed.** `MAX_SOURCE_DURATION` is exact: `long_45min_4k_hevc.mov`, whose video track lasts 45:00.067, is refused as longer than 45 minutes. A phone's "45:00" recording can run a fraction of a second over; a tolerance (as the frame rate has) is the founder's call. `measureUserAgentSpecificMemory` counts the page and its workers, not Chrome's GPU process, so the decoders' own memory is not in these numbers; Chrome's task manager by hand is the founder's (R1).
+
+**Counts.** Rust 910 / 0 / 4 (the workspace, run in this prompt), Vitest 650, `pnpm e2e` 57; the full media run on `dist/` (P182's Tier 4, run here while Groq's hour refilled): **112 passed, 1 skipped**, 40.5 min, the floor exactly. No product code changed in P181.
+
+**Open:** **27 (new)**, the 2 words lost near seams; 19 and 24 stand, re-read.
