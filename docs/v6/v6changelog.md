@@ -974,3 +974,24 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4 (908 + 2), Vitest 649 (638 + 11), `pnpm e2e` 57 (not re-run).
 
 **Open:** nothing new. **Found, not fixed:** TS §43.6's `MAX_SENTENCE_MS` is not a rule of the code (above). The clip page's `REJECT_RESOLUTION` and `REJECT_FILE_SIZE` copy names V5's limits; with `high_res` on it must name 3,840 px and 16 GB (TS §43.2, "messages.ts picks by page and flag"): P179.
+
+## Entry 34 - 2026-11-08 - P179: the interface
+
+**Built.**
+
+- `routes.tsx` (D-422): `ROUTES.long = "/app/long"`, behind `CapabilityGate`, with `long_video` off an explicit `<Navigate to="/app" replace>`.
+- `ui/pages/LongPage.tsx` (§10.1): by `source-store`, the drop zone (with "Continue your video" when a reload left a source), the gate, the work, a refusal (`REJECT_DURATION` in the long page's words), a failure (Continue where it helps), the transcript; a short file goes to `/app`; a file handed over by "Make shorts from it" is taken on arrival; a cancelled source brings the drop zone back; a sign-in completed during the gate lets the gate ask again.
+- `ui/layout/LongLayout.tsx` (D-423): the editor's bar (mark and account link), one column, the dark theme and the polite live region; no clip store.
+- `ui/components/SourceGate.tsx` (§10.2), `SourceProgress.tsx` (§10.3: two stages with their bars, time left after 10%, "Keep this tab open", Cancel; paused, the reason and Continue, Sign in first when signed out; awaiting the file, a drop zone and "This is a different file"), `SourceTranscript.tsx` (§10.4); `ui/styles/long.module.css` (the editor's tokens only).
+- `DropZone.tsx` (D-424, additive): `kind: "clip" | "long"` (default `clip`) and `onFile`; the long zone has no sample clip and no transcription card; under the clip page's stage zone, with `long_video` on, the quiet link "Got a long video? Make shorts from it". `RejectionPanel.tsx` (DC-1): with `long_video` on, `REJECT_DURATION` gains "Make shorts from it", its words unchanged. `EditorPage.tsx`: a file handed over by the long page opens as a clip with the toast "This one is short, so it opens as a clip."
+- Copy: `copy/long.ts` gains the gate's "Sign in" (§1.3 names the button); `messages.ts` (678 of 700 lines) picks `REJECT_FILE_SIZE` (16 GB) and `REJECT_RESOLUTION` (3840) by `high_res` (TS §43.2), today's words with it off; `check-copy-codes.mjs` reads `copy/long.ts` and checks `SOURCE_REJECT_REASONS` and `SOURCE_ERROR_CODES`: 1 of 1, 2 of 2.
+
+**What differs from the plan.** `LongLayout` does not mount `TopBar`, whose controls all act on a clip; it draws the same bar from the same styles. No user Pause button: §10.5 has no word for it and D-410 no reason for it; Cancel and the automatic pauses are there. The summary's word and sentence counts are not shown (§10.5 has no words for them). **The captures, axe and the self-review (G 9.2-9.4) move to P180**, whose specs drive every state of the page on `dist-flags/`; taking them twice would cost an hour of the night for nothing.
+
+**Two fixes from the review before the commit.** (1) A file held by `import-clip` after a `REJECT_DURATION` was taken by the long page on any arrival: a person who chose Start over and later followed the link would have had that old file started on. "Make shorts from it" now navigates with `{ handOver: true }`, and the long page takes the handed file only then; any other is let go. (2) Waiting for the file had no way out: it gains Cancel (the machine's `awaiting_file → cancel`), so every working state has one.
+
+**Tier 2 on the flags-off `dist/`** (keyed, rebuilt; the bundle's `long_video` and `high_res` both `!1`): a quick check (a scratch spec, deleted) that `/app` has no long link, `/app/long` lands on `/app`, and `rej_too_long_91s.mp4`'s panel has no new button: passed. `pipeline-preview.spec.ts` and `rejections.spec.ts` whole, with `media-setup`: **32 passed, 1 skipped** (the existing skip), 4.5 min. `pnpm e2e` (with `landing.spec.ts`): **57 passed**. Their code unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 649, `pnpm e2e` 57.
+
+**Open:** nothing new. **Found, not fixed:** none.

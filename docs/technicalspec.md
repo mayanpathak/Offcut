@@ -848,6 +848,7 @@ offcut/
 │   │       ├── pages/
 │   │       │   ├── LandingPage.tsx
 │   │       │   ├── EditorPage.tsx
+│   │       │   ├── LongPage.tsx       (V6.1) /app/long: the drop zone, the gate, the work, the transcript (v6.1implementation §10.1)
 │   │       │   ├── UnsupportedPage.tsx
 │   │       │   ├── AuthCallbackPage.tsx
 │   │       │   ├── AccountPage.tsx
@@ -883,6 +884,7 @@ offcut/
 │   │       │   └── use-shortcuts.ts   the keyboard shortcuts (D-185)
 │   │       ├── layout/
 │   │       │   ├── EditorLayout.tsx   top bar, stage, side panel, live region (D-178)
+│   │       │   ├── LongLayout.tsx     (V6.1) the editor's bar and one column; reads no clip store (D-423)
 │   │       │   ├── TopBar.tsx         save state, undo, redo, Export or the export pill
 │   │       │   ├── Stage.tsx          the state's card or the player
 │   │       │   └── SidePanel.tsx      the four tabs (in place of a ReviewPanel)
@@ -919,6 +921,8 @@ offcut/
 │   │       │   ├── ShortcutsSheet.tsx     (D-185)
 │   │       │   ├── ToastHost.tsx
 │   │       │   ├── SourceProgress.tsx  (V6.1) the long job's stages, pause and continue
+│   │       │   ├── SourceGate.tsx     (V6.1) signed out, cloud checking or off, disk, then Start (§10.2)
+│   │       │   ├── SourceTranscript.tsx  (V6.1) the end screen: the sentences at their times (§10.4)
 │   │       │   ├── ShortCard.tsx      (V6.4) poster, title, length, reason, keep or delete
 │   │       │   ├── AssetBox.tsx       (V6.8)
 │   │       │   ├── ChatPanel.tsx      (V6.9)
@@ -939,6 +943,7 @@ offcut/
 │   │           ├── pages.module.css
 │   │           ├── components.module.css
 │   │           ├── editor.module.css      the editor layout (v4implementation §17.6)
+│   │           ├── long.module.css        (V6.1) the long page's column, steps and transcript list
 │   │           ├── panel.module.css       the side panel and its tabs
 │   │           ├── primitives.module.css  the primitives (D-181)
 │   │           ├── controls.module.css    the primitives that hold a value: Tabs, Switch, SegmentedControl, Slider (v4changelog Entry 19)

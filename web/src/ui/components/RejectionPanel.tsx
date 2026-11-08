@@ -4,6 +4,9 @@
 // tests (`data-reject`); no code, size or name of the file is shown. A card
 // in the stage's frame since V4 (v4implementation §17.2), V3's words unchanged.
 
+import { useNavigate } from "react-router";
+
+import { FEATURES } from "../../config/features";
 import { messages } from "../../copy/messages";
 import { useClipStore } from "../../state/clip-store";
 import { dismissClip } from "../../usecases/import-clip";
@@ -12,6 +15,7 @@ import { Button } from "../primitives/Button";
 import styles from "../styles/components.module.css";
 
 export function RejectionPanel() {
+  const navigate = useNavigate();
   const code = useClipStore((state) => state.reject);
   const copy = code === undefined ? undefined : messages.rejections[code];
   return (
@@ -27,6 +31,18 @@ export function RejectionPanel() {
         </>
       )}
       <div className={styles.cardActions}>
+        {FEATURES.long_video && code === "REJECT_DURATION" ? (
+          // V6.1 (DC-1): the same File, still in memory, goes to the long page (D-421).
+          <Button
+            variant="primary"
+            onClick={() => {
+              void navigate("/app/long", { state: { handOver: true } });
+            }}
+            data-testid="make-shorts"
+          >
+            {messages.long.makeShortsInstead}
+          </Button>
+        ) : null}
         <Button
           variant="secondary"
           onClick={() => {

@@ -233,6 +233,17 @@
   font-size: var(--fs-12);
 }
 
+/* V6.1 (DC-1): the quiet link to the long page, under the clip page's drop zone. */
+.dropLongLink {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  text-underline-offset: 3px;
+}
+
+.dropLongLink:hover {
+  color: var(--text);
+}
+
 /* --- The transcription card (cloudimplementation §9.1), under the drop target --- */
 
 .transcriptionChoice {

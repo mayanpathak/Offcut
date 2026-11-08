@@ -15,6 +15,8 @@ export const longCopy = {
   shortHandOver: "This one is short, so it opens as a clip.",
   gate: {
     signedOut: "A long video needs a free account, because its sound is transcribed in the cloud.",
+    /** The gate's button (§1.3: the gate "with Sign in"). */
+    signIn: "Sign in",
     checking: "Checking that transcription is available…",
     unavailable: "Transcription for long videos is off right now. Try again later.",
     sends: "Its sound is sent to be transcribed and is not kept. The video stays on your computer.",
