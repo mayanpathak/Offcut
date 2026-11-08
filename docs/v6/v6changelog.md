@@ -24,6 +24,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
 | 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
 | 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
+| 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
 | 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
 
 ## Known issues for later prompts
@@ -871,3 +872,26 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 900 / 0 / 4 (890 + 10; per crate), Vitest 571 (568 + 3), `pnpm e2e` 57 (not re-run: no page changed). Media: none run.
 
 **As read in the plan:** D-399, D-401, D-430. **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 29 - 2026-11-08 - P174: the media worker reads a file in place
+
+**Built.**
+
+- `workers/media/file-random-access.ts` (D-400): a `ByteReader` over the dropped `File` through `FileReaderSync`, 1 MiB aligned blocks, the last 8 kept; any failed read is `SourceReadError`. Test: 4 cases (within and across blocks, the cache and its eviction, `NotReadableError`, a file shorter than it said).
+- `workers/media/audio-region.ts` (§7.2): `decodeAudioRegion` (from the sample at or before `from − 100 ms` found by a binary search over `audio_sample_time_us`, `decodeTrack`'s batching and queue, mono, audio before 0 and from `to` on dropped, chunks of at most 10 s, the decoded rate reported with each) and `writeWholePcm16` (the file cut to the resume point, the part already written re-read into the level histogram, a `StreamResampler` per rate, silence for any gap and the tail, a flush and a checkpoint every 10 s, `round(duration × 16)` samples), `LevelHistogram` (0.1 dB bins; its 95th percentile within 0.1 dB of `cloud-audio.ts`'s sort). Test: 7 cases with a fake demuxer, decoder and resampler (placement, audio before 0 dropped, **a resume from 30 s equals the run from 0 bit for bit**, a rate change rebuilds the resampler and keeps the length, the level, cancel, a decoder failure).
+- `media.worker.ts` (additive; the handlers line is the one changed): `routeFile` (reads in place, asks `isConfigSupported` with the `avcC` or the `hvcC`, `routeProbe`), `importAndRoute` (the 16 GB rule with `high_res`, the V5 copy, `routeProbe` from the clip page), `extractSourcePcm16` (into `sources/<id>/pcm16.f32` through a sync handle). `protocol.ts` gains the three methods, `SourceId`, `Routed`, `SourceFailed` (additive). `opfs.ts` gains `sourcesRoot`, `sourceDir`, `sourcePcm16` (additive; §9.2's paths, wanted here first).
+
+**DECLARED CHANGE / REOPENED CONTRACT:** `protocol.ts`' additive members (D-387); `media.worker.ts`' handlers line. `import.ts`, `audio-decode.ts`, `rpc.ts`, `rpc-worker.ts`, `pool.ts` and the render worker are untouched (frozen check empty).
+
+**What differs from the plan (As read under D-403 and D-427).**
+
+- **E_SOURCE_* as values.** `rpc.ts` (frozen) turns any code that is not a V5 `ErrorCode` into `E_INTERNAL`, so the source handlers return `{ failed: "E_SOURCE_READ" | "E_SOURCE_AUDIO", detail }`. Storage failures still throw their V5 codes.
+- **The 16 kHz grid.** The scratch smoke found a resumed run 0.31 apart from the run from 0: a resampler started on a packet boundary is shifted by a fraction of a 16 kHz sample. A resampler now starts on an input sample on the 16 kHz grid (at most 2 samples skipped at 48 kHz, 440 at 44.1 kHz, inside the pre-roll).
+- **HEVC on the clip page.** Found: the render worker (frozen) configures its decoder with the `avcC` only, so an HEVC clip could be accepted and then fail in preview and export. `importAndRoute` refuses HEVC with `REJECT_HEVC` even with `high_res` (ON §6's "H.264 up to 4K only"); `high_res` on `/app` means 4K H.264 and 16 GB. The long page reads HEVC sources' sound. Open item 25.
+- `decodeAudioRegion` takes the opened demuxer, not a reader; the handler opens it. The checkpoint reaches the main thread as throttled progress (`stage: "import"`, milliseconds of flushed sound); a lagging checkpoint costs only re-decoding.
+
+**The scratch smoke (G Phase 4, Tier 0)** on `long_12min.mp4` through the real media worker under the Vite dev server (a `zz-` page, deleted): `routeFile` 412 ms (in place); `extractSourcePcm16` 5.4 s for 12 minutes; `pcm16.f32` **11,520,000 samples, exactly `round(720,000 × 16)`**; `levelP95` −20.3 dBFS; **peak page memory 14 MB** (no buffer of the file or the track). **Correlation with ffmpeg's own decode:** the first second is near-digital silence (RMS 1.1e-5), where the figure means nothing (0.93); a speech second gives 0.986 against ffmpeg's resampler and 0.986 against soxr, at lag 0. The rest is the decoder (Chrome's against ffmpeg's) and the placement `decodeTrack` shares, which V5's sync proofs cover; the guide's 0.99 is not met on this measure, recorded. **Resume in the browser:** from 300 s, the same length; equal to 1e-6 for 3.3 s, then within 0.0027 (−51 dBFS) where the FFT resampler's blocks fall elsewhere.
+
+**Counts.** Rust 900 / 0 / 4 (unchanged), Vitest 582 (571 + 11), `pnpm e2e` 57 (not re-run). Checks: `tsc` (both), eslint, file tree (564; rows for the four new files). Media: none run.
+
+**Open:** item 25 (new). **Found, not fixed:** the 0.986 above, recorded rather than chased: the long path's sound is the clip path's sound by construction.

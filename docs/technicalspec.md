@@ -808,7 +808,10 @@ offcut/
 │   │   │   ├── media.worker.ts
 │   │   │   ├── media/import.ts
 │   │   │   ├── media/audio-decode.ts
-│   │   │   ├── media/file-random-access.ts  (V6.1) probe a File before any copy
+│   │   │   ├── media/file-random-access.ts  (V6.1) a dropped File read in place: 1 MiB blocks, 8 kept (v6.1implementation D-400)
+│   │   │   ├── media/file-random-access.test.ts  (V6.1) reads across blocks, the cache, NotReadableError
+│   │   │   ├── media/audio-region.ts  (V6.1) decodeAudioRegion, writeWholePcm16, the level histogram (§7.2, D-402 to D-404)
+│   │   │   ├── media/audio-region.test.ts  (V6.1) placement, resume equals a run from 0, rate change, level, cancel
 │   │   │   ├── asr.worker.ts
 │   │   │   ├── asr/whisper-runtime.ts
 │   │   │   ├── asr/model-cache-adapter.ts   serves model files from OPFS; blocks remote loads

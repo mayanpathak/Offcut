@@ -41,6 +41,10 @@ export const paths = {
   modelDir: (modelId: string): string => `models/${modelId}`,
   modelPart: (modelId: string, name: string): string => `models/${modelId}/${modelName(name)}.part`,
   modelFile: (modelId: string, name: string): string => `models/${modelId}/${modelName(name)}`,
+  // V6.1 (v6.1implementation §9.2): one long source at a time (D-415). An id is a UUID.
+  sourcesRoot: (): string => "sources",
+  sourceDir: (id: string): string => `sources/${id}`,
+  sourcePcm16: (id: string): string => `sources/${id}/pcm16.f32`,
 };
 
 function isNamed(error: unknown, name: string): boolean {
