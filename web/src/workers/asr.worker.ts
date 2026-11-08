@@ -8,8 +8,8 @@ import { type Confidence, type DurMs, LIMITS, type TimeMs, type Transcript } fro
 import { loadCore } from "../wasm/load-core";
 import { dropSilentWords, encodeOpus } from "./asr/cloud-audio";
 import { loadModel, type RawWord, transcribe as hear, unloadModel } from "./asr/whisper-runtime";
-import { postProcess } from "./asr/word-timestamps";
-import type { AsrWorkerApi } from "./protocol";
+import { mergeWindows, postProcess } from "./asr/word-timestamps";
+import type { AsrWorkerApi, WindowWord } from "./protocol";
 import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The model that is loaded. It is also the transcript's `model_version` (D-50).
@@ -106,6 +106,52 @@ async function fromCloud(p: {
   return transcript.words.length < LIMITS.MIN_WORDS ? { rejected: "NoSpeech" } : { ok: transcript };
 }
 
-const handlers: Handlers<AsrWorkerApi> = { load, transcribe, unload, encodeForCloud, fromCloud };
+// --- V6.1: a long source's windows (v6.1implementation §8.2) -----------------
+// Neither handler touches the model session either.
+
+function cloudWindowWords(p: {
+  words: CloudWord[];
+  pcm16: Float32Array;
+  refLevel: number;
+}): Promise<{ words: WindowWord[]; lengthMs: number }> {
+  const spoken = dropSilentWords(p.words, p.pcm16, p.refLevel);
+  return Promise.resolve({
+    words: spoken.map((w) => ({ text: w.text, startMs: w.start_ms, endMs: w.end_ms, confidence: 1 })),
+    lengthMs: Math.round(p.pcm16.length / SAMPLES_PER_MS),
+  });
+}
+
+async function buildMasterTranscript(p: {
+  windows: { offsetMs: number; lengthMs: number; words: WindowWord[] }[];
+  durationMs: number;
+  modelVersion: string;
+}): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }> {
+  const windows = p.windows.map((w) => ({
+    offsetMs: w.offsetMs,
+    lengthMs: w.lengthMs,
+    words: w.words.map((word): RawWord => ({
+      text: word.text,
+      startMs: word.startMs as TimeMs,
+      endMs: word.endMs as TimeMs,
+      confidence: 1 as Confidence,
+    })),
+  }));
+  const raw = postProcess(mergeWindows(windows), p.durationMs as DurMs);
+  if (raw.length < LIMITS.MIN_WORDS) {
+    return { rejected: "NoSpeech" };
+  }
+  const transcript = (await loadCore()).normalizeTranscript(raw, p.modelVersion);
+  return transcript.words.length < LIMITS.MIN_WORDS ? { rejected: "NoSpeech" } : { ok: transcript };
+}
+
+const handlers: Handlers<AsrWorkerApi> = {
+  load,
+  transcribe,
+  unload,
+  encodeForCloud,
+  fromCloud,
+  cloudWindowWords,
+  buildMasterTranscript,
+};
 
 serveWorker(handlers, { stage: "asr", oneWay: [], duringPreview: [] });

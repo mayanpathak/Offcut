@@ -113,7 +113,21 @@ export interface AsrWorkerApi {
   encodeForCloud(p: { pcm16: Float32Array }): Promise<{ ogg: Uint8Array; durationMs: number } | { unsupported: true }>;
   /** The provider's words as a transcript, as `transcribe` builds one, after the silence guard (D-382). */
   fromCloud(p: { words: CloudWord[]; pcm16: Float32Array; modelVersion: string }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
+  /**
+   * V6.1 (D-406): one window's words through the silence guard, judged against the source's level
+   * (D-407), as words relative to the window: not merged, not post-processed.
+   */
+  cloudWindowWords(p: { words: CloudWord[]; pcm16: Float32Array; refLevel: number }): Promise<{ words: WindowWord[]; lengthMs: number }>;
+  /** V6.1 (D-408): the windows merged (`mergeWindows`), placed (`postProcess`) and normalized. */
+  buildMasterTranscript(p: {
+    windows: { offsetMs: number; lengthMs: number; words: WindowWord[] }[];
+    durationMs: number;
+    modelVersion: string;
+  }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
 }
+
+/** V6.1: a word as the recognizer gave it, times in whole ms from its window's start (`RawWord`). */
+export type WindowWord = { text: string; startMs: number; endMs: number; confidence: number };
 
 // The audio worker has no method that detects silence or plans a cut. Only
 // `assemble` applies a time map, and in V4 the only map is the identity.

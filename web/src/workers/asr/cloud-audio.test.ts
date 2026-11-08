@@ -151,3 +151,24 @@ describe("dropSilentWords", () => {
     expect(dropSilentWords(words, steady)).toEqual(words);
   });
 });
+
+// V6.1 (D-407): a window of a long source is judged against the source's level.
+describe("dropSilentWords with a reference level", () => {
+  // A window of near silence at -70 dBFS, as a pause or room tone between sentences.
+  const quiet = tone(2, -70);
+  const invented = [word("Thank", 200, 600), word("you.", 700, 1_100)];
+
+  it("keeps words over a quiet window judged against its own level, as before", () => {
+    expect(dropSilentWords(invented, quiet).map((w) => w.text)).toEqual(["Thank", "you."]);
+  });
+
+  it("drops them when judged against the source's louder level", () => {
+    expect(dropSilentWords(invented, quiet, -26)).toEqual([]);
+  });
+
+  it("keeps a real word as loud as the source", () => {
+    const window = join(tone(1, -26), tone(1, -70));
+    const words = [word("spoken", 100, 900), word("invented", 1_200, 1_800)];
+    expect(dropSilentWords(words, window, -26).map((w) => w.text)).toEqual(["spoken"]);
+  });
+});

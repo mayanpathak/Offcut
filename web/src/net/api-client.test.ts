@@ -412,4 +412,17 @@ describe("cloud transcription (cloudimplementation D-366, D-372, D-373)", () => 
     expect(Date.now()).toBeGreaterThanOrEqual(api.TRANSCRIBE_TIMEOUT_MS);
     expect(pathsOf("/transcribe")).toHaveLength(1);
   });
+
+  // V6.1 (D-413): a clip's request is today's, header for header; a window adds its one header.
+  it("transcribeAudio sends a clip exactly as before and a window with X-Offcut-Window", async () => {
+    const words = { words: [], duration_ms: 1_000, model: "groq:whisper-large-v3-turbo" };
+    answers.set("/transcribe", [{ status: 200, body: words }, { status: 200, body: words }]);
+    const ogg = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
+    await settled(api.transcribeAudio(ogg, new AbortController().signal));
+    await settled(api.transcribeAudio(ogg, new AbortController().signal, { index: 3, total: 34 }));
+    expect(pathsOf("/transcribe").map((call) => call.headers)).toEqual([
+      { "Content-Type": "audio/ogg", Authorization: "Bearer old-access" },
+      { "Content-Type": "audio/ogg", Authorization: "Bearer old-access", "X-Offcut-Window": "3/34" },
+    ]);
+  });
 });

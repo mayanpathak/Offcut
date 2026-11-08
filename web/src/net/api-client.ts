@@ -182,7 +182,11 @@ export const TRANSCRIBE_TIMEOUT_MS = 30_000;
  * `POST /transcribe`: one clip's compressed sound, its words back (D-372).
  * One attempt; a failure is the caller's to fall back from, never a retry.
  */
-export function transcribeAudio(ogg: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<HttpResult<TranscribeResponse>> {
+export function transcribeAudio(
+  ogg: Uint8Array<ArrayBuffer>,
+  signal: AbortSignal,
+  window?: { index: number; total: number },
+): Promise<HttpResult<TranscribeResponse>> {
   return authed<TranscribeResponse>({
     method: "POST",
     path: "/transcribe",
@@ -190,6 +194,8 @@ export function transcribeAudio(ogg: Uint8Array<ArrayBuffer>, signal: AbortSigna
     retry: "none",
     attemptTimeoutMs: TRANSCRIBE_TIMEOUT_MS,
     signal,
+    // V6.1 (D-413): a window of a long source says so; a clip's request is as before.
+    ...(window === undefined ? {} : { window }),
   });
 }
 

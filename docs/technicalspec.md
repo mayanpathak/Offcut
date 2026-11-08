@@ -735,6 +735,8 @@ offcut/
 │   │   │   ├── import-source.ts       (V6.1) probe, gate, quota check, copy
 │   │   │   ├── run-source-pipeline.ts (V6.1, V6.4, V6.5) the long job, resumable
 │   │   │   ├── run-source-pipeline.test.ts
+│   │   │   ├── transcribe-source.ts   (V6.1) a source's cloud windows to its master transcript; the second use-case that sends audio (v6.1implementation §8.1)
+│   │   │   ├── transcribe-source.test.ts
 │   │   │   ├── request-plan.ts        (V6.2) POST /plan and its fallbacks
 │   │   │   ├── prepare-short.ts       (V6.3, V6.4) one ShortSpec → a ready virtual clip (§45.7)
 │   │   │   ├── request-shorts.ts      (V6.4) POST /shorts and its fallback

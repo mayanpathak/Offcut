@@ -933,3 +933,20 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 908 / 0 / 4, Vitest 624 (582 + 42), `pnpm e2e` 57 (not re-run). Media: 2 cases on `dist/` (above).
 
 **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 32 - 2026-11-08 - P177: transcription in cloud windows
+
+**Push 1** (P176's commit `2cd61f2`): CI run `42447624770`, read at P182.
+
+**Built.**
+
+- **`cloud-audio.ts` (DECLARED, D-407):** `dropSilentWords(words, pcm16, refLevel?)`; absent, the window's own 95th percentile as before, so `fromCloud`'s call and every existing case are unchanged.
+- **`asr.worker.ts`** (handlers line and two import lines changed): `cloudWindowWords` (the guard against the source's level, words relative to the window, unmerged) and `buildMasterTranscript` (`mergeWindows`, `postProcess`, `normalizeTranscript`; fewer than `MIN_WORDS` is `NoSpeech`). Neither touches the model session. `protocol.ts` gains both and `WindowWord` (additive).
+- **`net/http.ts`** (additive): `HttpRequest.window` sends `X-Offcut-Window: <index>/<total>`. **`api-client.ts` (DECLARED, D-413):** `transcribeAudio(ogg, signal, window?)`.
+- **`usecases/transcribe-source.ts`** (§8.1): `windowCount` (10 s overlap: 9 windows for 12 minutes, 34 for 45), the missing windows in order, two in flight, each kept in `sourceTranscripts` before it counts; D-410's paths: 429 pauses `busy` at once; an `E_AUTH_*` (the session gone after `authed()`'s refresh) pauses `signed_out`; 503 `transcribe_unavailable` asks `/healthz`, off pauses `unavailable`, on is retried; a timeout, offline or other failure is retried after 1 s and 4 s, then pauses `offline` or `busy`; a pause aborts the other request in flight and keeps what answered before; then the master transcript is built and kept. No device fallback. An encoder this browser cannot use ends `{ failed: "encoder" }` (not in D-410; the caller fails the job with `E_SOURCE_AUDIO`).
+
+**Tests.** `transcribe-source.test.ts` 10 (counts and offsets; order and at most two in flight; resume sends only what is missing; 429; timeout twice then kept with waits 1 s and 4 s; offline and failures to their pauses; 503 with `/healthz` off and on; a lost session; a pause stopping the other lane; `NoSpeech`; the encoder). New cases in existing files (no existing case changed): `api-client.test.ts` 1 (**a clip's request has today's headers exactly; a window's adds only `X-Offcut-Window`**), `cloud-audio.test.ts` 3 (a quiet window's invented words kept against its own level, dropped against the source's; a real word kept).
+
+**Counts.** Rust 908 / 0 / 4, Vitest 638 (624 + 14), `pnpm e2e` 57 (not re-run). Media: none.
+
+**Open:** nothing new. **Found, not fixed:** none.
