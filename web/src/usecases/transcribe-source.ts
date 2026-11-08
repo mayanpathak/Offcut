@@ -60,11 +60,23 @@ export type TranscribeSourceDeps = {
   wait(ms: number): Promise<void>;
 };
 
+/**
+ * The asr worker takes one job at a time and refuses another as busy
+ * (`rpc-worker.ts`). The two lanes' calls to it wait their turn here, in the
+ * order they were made; the requests themselves stay two in flight (D-409).
+ */
+let asrTurn: Promise<unknown> = Promise.resolve();
+function onAsr<T>(call: () => Promise<T>): Promise<T> {
+  const turn = asrTurn.then(call, call);
+  asrTurn = turn.catch(() => undefined);
+  return turn;
+}
+
 const browserDeps: TranscribeSourceDeps = {
   readWindow: (id, k) => readPcm16Window(id, k),
   encode: async (pcm16) => {
     const copy = pcm16.slice();
-    const encoded = await pool.asr.encodeForCloud({ pcm16: copy }, { transfer: [copy.buffer] });
+    const encoded = await onAsr(() => pool.asr.encodeForCloud({ pcm16: copy }, { transfer: [copy.buffer] }));
     return typeof encoded === "object" && encoded !== null && "ogg" in encoded
       ? { ogg: encoded.ogg }
       : typeof encoded === "object" && encoded !== null && "unsupported" in encoded
@@ -74,11 +86,11 @@ const browserDeps: TranscribeSourceDeps = {
   send: (ogg, signal, window) => transcribeAudio(ogg, signal, window),
   windowWords: async (p) => {
     const copy = p.pcm16.slice();
-    const r = await pool.asr.cloudWindowWords({ words: p.words, pcm16: copy, refLevel: p.refLevel }, { transfer: [copy.buffer] });
+    const r = await onAsr(() => pool.asr.cloudWindowWords({ words: p.words, pcm16: copy, refLevel: p.refLevel }, { transfer: [copy.buffer] }));
     return typeof r === "object" && r !== null && "words" in r ? r : { cancelled: true };
   },
   buildMaster: async (p) => {
-    const r = await pool.asr.buildMasterTranscript(p);
+    const r = await onAsr(() => pool.asr.buildMasterTranscript(p));
     return typeof r === "object" && r !== null && ("ok" in r || "rejected" in r) ? r : { cancelled: true };
   },
   windows: (id) => sources.windows(id),
@@ -86,7 +98,8 @@ const browserDeps: TranscribeSourceDeps = {
   putMaster: (id, transcript) => sources.putMaster(id, transcript),
   cloudOn: async () => {
     const health = await checkHealth();
-    return health.ok ? health.data.cloud_transcribe : undefined;
+    // A body without the field is a server that does not transcribe (CT D-366: `serde(default)` reads it as false).
+    return health.ok ? health.data.cloud_transcribe === true : undefined;
   },
   wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };

@@ -2,6 +2,8 @@
 // with its length and its sentences at their times, on screen only. V6.4
 // replaces it with the list of shorts.
 
+import { useId } from "react";
+
 import { messages } from "../../copy/messages";
 import { useSourceStore } from "../../state/source-store";
 import { Button } from "../primitives/Button";
@@ -12,14 +14,18 @@ export function SourceTranscript() {
   const transcript = useSourceStore((state) => state.transcript);
   const info = useSourceStore((state) => state.info);
   const copy = messages.long.done;
+  const heading = useId();
   if (transcript === null) {
     return null;
   }
   return (
     <section className={styles.card} data-testid="source-transcript">
-      <h2 className={styles.cardTitle}>{copy.title}</h2>
+      <h2 id={heading} className={styles.cardTitle}>
+        {copy.title}
+      </h2>
       {info === null ? null : <span className={long.duration}>{messages.preview.clock(info.duration)}</span>}
-      <ol className={long.sentences} data-testid="source-sentences">
+      {/* It scrolls, so the keyboard can reach it: named by the heading. */}
+      <ol className={long.sentences} data-testid="source-sentences" tabIndex={0} aria-labelledby={heading}>
         {transcript.sentences.map((sentence) => (
           <li key={sentence.start_ms} className={long.sentence}>
             <span className={long.time}>{messages.preview.clock(sentence.start_ms)}</span>

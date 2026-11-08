@@ -117,7 +117,11 @@ async function transcribe(record: SourceRecord, signal: AbortSignal): Promise<vo
       title(50 + (done / all) * 50);
       void sources.update(record.sourceId, { windowsDone: done, windowsTotal: all }).catch(() => undefined);
     },
-  }).catch(() => ({ failed: "error" as const }));
+  }).catch(() =>
+    // A worker that could not start offline (its script is fetched at first use)
+    // is the network's fault, not Offcut's: a pause, with Continue (D-410).
+    navigator.onLine === false ? { paused: "offline" as const } : { failed: "error" as const },
+  );
   if (signal.aborted || "cancelled" in result) {
     return;
   }

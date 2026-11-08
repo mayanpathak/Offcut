@@ -10,6 +10,7 @@ import { useAuthStore } from "../../state/auth-store";
 import { type SourceProgress as Progress, useSourceStore } from "../../state/source-store";
 import { continueSource, dropSameFile } from "../../usecases/continue-source";
 import { cancelSource } from "../../usecases/run-source-pipeline";
+import { windowCount } from "../../usecases/transcribe-source";
 import { Button } from "../primitives/Button";
 import styles from "../styles/components.module.css";
 import long from "../styles/long.module.css";
@@ -52,6 +53,10 @@ export function SourceProgress({ onSignIn }: { onSignIn: () => void }) {
   const transcribing = status === "transcribing" || (status === "paused" && paused?.from === "transcribing");
   const audio = progress?.stage === "audio" ? progress : null;
   const windows = progress?.stage === "transcribe" ? progress : null;
+  // Before the windows start, their number is known from the duration (D-405): never "0 of 0".
+  const info = useSourceStore((state) => state.info);
+  const windowsTotal = windows?.total ?? (info === null ? 0 : windowCount(info.duration));
+  const transcribeLabel = copy.stage.transcribe(windows?.done ?? 0, windowsTotal);
   const left = secondsLeft(progress);
   const working = status === "extracting_audio" || status === "transcribing";
 
@@ -96,9 +101,9 @@ export function SourceProgress({ onSignIn }: { onSignIn: () => void }) {
       </div>
       <div className={long.step}>
         <p className={long.stepTitle}>
-          {copy.stage.transcribe(windows?.done ?? 0, windows?.total ?? 0)}
+          {transcribeLabel}
         </p>
-        <Meter percent={percentOf(windows)} label={copy.stage.transcribe(windows?.done ?? 0, windows?.total ?? 0)} />
+        <Meter percent={percentOf(windows)} label={transcribeLabel} />
       </div>
       {working && left !== undefined ? <p className={long.hint}>{messages.export.timeLeft(left)}</p> : null}
       {working ? <p className={long.hint}>{copy.keepOpen}</p> : null}

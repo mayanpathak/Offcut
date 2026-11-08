@@ -2,20 +2,25 @@
    one column in the middle of the stage. Nothing here is new to the design
    system: sizes, colours and radii are the tokens the editor uses. */
 
+/* The document scrolls, not a region inside it: a scrolling region with
+   nothing to focus in it cannot be reached by keyboard (axe). */
 .page {
   display: grid;
-  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
-  height: 100dvh;
-  overflow: hidden;
+  /* The editor's bar places itself in the area `top` (editor.module.css). */
+  grid-template-areas:
+    "top"
+    "main";
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
 }
 
 .main {
   display: flex;
+  grid-area: main;
   justify-content: center;
-  min-height: 0;
-  overflow-y: auto;
   padding: var(--sp-6) var(--sp-5);
 }
 
@@ -24,6 +29,14 @@
   flex-direction: column;
   gap: var(--sp-4);
   width: min(100%, 640px);
+}
+
+/* The editor's cards fill a stage of fixed height and scroll inside it; in
+   this column a card grows with what it says, and the page scrolls (axe:
+   a scrolling region with nothing to focus cannot be reached by keyboard). */
+.column > section {
+  flex: none;
+  overflow: visible;
 }
 
 .stageSlot {

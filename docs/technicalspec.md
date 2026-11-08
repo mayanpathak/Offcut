@@ -955,6 +955,7 @@ offcut/
 │       ├── tsconfig.json              Node types for the tests and the bench only (v2implementation D-63)
 │       ├── helpers/network-capture.ts
 │       ├── helpers/fake-api.ts
+│       ├── helpers/long-windows.ts    (V6.1) each window's answer from the cloud fixture (D-431); the long page's helpers
 │       ├── helpers/fixtures.ts
 │       ├── media.setup.ts             fills fixtures/.cache/ for the media suites and the bench (v2buildguide item 6b)
 │       ├── landing.spec.ts
@@ -978,8 +979,8 @@ offcut/
 │       ├── failure-recovery.spec.ts
 │       ├── api-cold-start.spec.ts
 │       ├── privacy-network.spec.ts
-│       ├── flags_identity.spec.ts     (V6.1) flags on, AI off equals flags off (INV-26)
-│       ├── route_long.spec.ts         (V6.1)
+│       ├── flags-identity.spec.ts     (V6.1, as built) one clip on both builds: the same records, render-cache key and export (INV-26)
+│       ├── route-long.spec.ts         (V6.1, as built) the two ways in, the gate, a 12-minute video through the fake windows, the refusals
 │       ├── high-res.spec.ts           (V6.1)
 │       ├── long-resume.spec.ts        (V6.1) tab killed, tab hidden, source evicted
 │       ├── cuts_applied.spec.ts       (V6.3)

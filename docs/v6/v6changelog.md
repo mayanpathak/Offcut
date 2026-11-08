@@ -995,3 +995,35 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 649, `pnpm e2e` 57.
 
 **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 35 - 2026-11-08 - P180: end to end, both builds, CI
+
+**Built.**
+
+- `tests-e2e/helpers/fake-api.ts` (D-431, additive): `transcribe.windows?: (index, total) => unknown` answers a request that carries `X-Offcut-Window`; without it every request gets `response`, as before. No other option and no default changed (CT G item 3).
+- `tests-e2e/helpers/long-windows.ts` (new): each window's answer of `long_12min.mp4` from `fixtures/cloud/speech_60s_portrait.json` shifted by `n × 79.517 s + 0.960 s` (D-431 as read); `openLong`, `openClipSignedIn` (Free or Creator, a large file through the zone's own file field), the source stores' readers, and `capture` (G 9.2, only with `V61_REVIEW_DIR` set; never in CI).
+- `playwright.config.ts` (D-394): `webServer` is two entries, `dist/` on 4173 and `dist-flags/` on 4174 (the second only where that build exists); the project `media-flags` runs `FLAG_SUITES` on 4174, one worker, after `media-setup`.
+- The four specs: `route-long.spec.ts` 9 cases (the `/app` link and DC-1's button carrying the file; the empty page; the gate checking, then ready; the gate off; `long_12min.mp4` read in place and transcribed: 9 windows, each once with `X-Offcut-Window` and an Ogg body under 1 MiB, all 1,143 words with none lost or doubled, the first sentence, no request carrying any of 20 pieces of 32 bytes of the video; a 60 s file handed to `/app` and processed; `REJECT_DURATION`, `REJECT_RESOLUTION`, `REJECT_HDR` in their words; axe on every state). `long-resume.spec.ts` 6 cases (a reload while transcribing sends no kept window again; a reload during the audio step asks for the file, refuses another, and goes on from the checkpoint; 503 with the switch off pauses `unavailable`; 429 pauses `busy`; offline pauses `offline`; a lost session pauses `signed_out` and Continue opens the sign-in dialog; Continue finishes each; the tab title). `high-res.spec.ts` 4 cases (`rej_4k.mp4` taken at import; HEVC refused on the clip page, D-427 as read; above 3840 refused in words that say 3840; a 4K speech clip, made in the test from the reference, processed and exported by Creator at 1080 × 1920 with all 11 checks). `flags-identity.spec.ts` 1 case (below).
+- CI (§12.1 as read): the `ci` job builds `web/dist-flags` (`OFFCUT_FEATURES_ON=long_video,high_res`, the same test key) and uploads it; `e2e-media` downloads it and runs `pnpm e2e:media:flags --grep @no-gpu` after `pnpm e2e:media --grep @no-gpu`; its timeout 30 → 45 minutes.
+
+**Found by the first browser run, and fixed (the long page had not run in a browser before P180).**
+
+1. **Every window failed with `E_INTERNAL`** (P177): the asr worker takes one job at a time and refused the second lane's call as `Busy`. `transcribe-source.ts` queues its calls to the asr worker; the requests stay two in flight (D-409 as read).
+2. **The gate asked again forever** (P179): its "a sign-in while waiting" effect ran on every return to `gated`. It now asks again only from `signed_out`.
+3. **A switched-off server paused as `busy`** (P177): a `/healthz` without `cloud_transcribe` is a server that does not transcribe (the type's `serde(default)`); the check reads `=== true` (D-410 as read).
+4. **Offline at the first window showed "Something went wrong in Offcut"** (P178): the asr worker's script is fetched at its first use. A window step that throws while offline now pauses `offline`; a `run-source-pipeline.test.ts` case added.
+5. **The long page's bar sat at the bottom right** (P179): the editor's bar places itself in a grid area `top` that `LongLayout`'s grid did not name. Named.
+6. **axe: scrolling regions with nothing to focus** (P179): the page scrolls instead of an inner region; the long column's cards grow with their content; the transcript's list, which does scroll, is focusable and named by its heading.
+7. **"Transcribing 0 of 0" before the windows start** (P179): the count is known from the duration and shown.
+
+**What differs from the plan.** `rejections.spec.ts` is **not edited at all**: DC-1's button is asserted by `route-long.spec.ts`' first case, and the three cases whose file the flags-on clip page takes (`rej_4k.mp4`'s refusal, DC-2; "start over", whose refused file is that 4K one; the 500 MB limit, DC-3) are left out of `media-flags` by its `grepInvert`, not by an edit. `flags-identity.spec.ts`: two exports of one build are not byte-identical (sizes 33,461,716 and 33,580,996 B; the same 1,800 frames; identical audio packets; video PSNR 50.8 dB average, 45.4 dB least), so the comparison is identical audio packets, the same frame count and size, and PSNR at least 40 dB, beside equal transcript, edit state and render-cache key; the flags-on build's database is at structure version 2 after start (D-419), the flags-off build's at 1 (D-394 as read). `high-res.spec.ts`' processed 4K clip is the reference scaled to 2160 × 3840 in the test (`rej_4k.mp4` has no speech). Large files go through the drop zone's file field (`setInputFiles`): `dropFile` sends the bytes in one DevTools message, which closes the page at about 80 MB. The gate's "checking" is held by delaying only the page's first `/healthz`, since the session's own waits for `/healthz` too.
+
+**P179's G 9.2-9.4, done here.** Every long-page state captured by the specs at 1280 × 800 and 1920 × 1080 into `~/v6.1-review/` (outside git), axe 0 serious or critical on every state the specs drive, and the self-review against ON §5's rubric: round 1 found the bar misplaced, the scrolling regions, "0 of 0" and, on the over-45-minutes card, its title said twice (the card now leaves out a body that only repeats the title); round 2 read every capture again: **self-review, rubric passed**.
+
+**DECLARED CHANGE** `fake-api.ts`' `windows` option (D-431): its two changed lines are the option's type, widened, and the answer, which takes `windows` only when given. **Tests:** no existing case edited.
+
+**Runs.** FLAG_SUITES on `dist-flags/`: run 1 **34 passed, 1 skipped** (the existing `rej_h264_444` fixme, D-78), 8.2 min; run 2 (after the last fix) **34 passed, 1 skipped**, 7.8 min. Tier 3: `pnpm check` ok; Vitest 650; `pnpm e2e --workers=4` 57 passed (rebuilt keyed `dist/`). The Rust workspace and `pnpm fixtures` have not changed since P178 and P173: P182's Tier 4 runs them. `cloud-transcribe.spec.ts` on `dist/` (it uses `fake-api.ts`' transcribe option): 8 passed with `media-setup`, 7.1 min, unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 650 (649 + 1), `pnpm e2e` 57.
+
+**Open:** nothing new. **Found, not fixed:** none.

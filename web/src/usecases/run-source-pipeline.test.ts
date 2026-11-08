@@ -57,7 +57,7 @@ vi.mock("./transcribe-source", () => ({
   windowCount: () => 9,
   transcribeSourceWindows: (p: { onWindow: (d: number, t: number) => void }) => {
     p.onWindow(9, 9);
-    return Promise.resolve(fake.transcribe);
+    return fake.transcribe instanceof Error ? Promise.reject(fake.transcribe) : Promise.resolve(fake.transcribe);
   },
 }));
 vi.mock("../platform/wake-lock", () => ({
@@ -151,6 +151,22 @@ describe("run-source-pipeline", () => {
     expect(state.paused).toEqual({ reason: "busy", from: "transcribing" });
     expect(fake.released).toBeGreaterThanOrEqual(1);
     expect(fake.titles.at(-1)).toBe("Offcut");
+  });
+
+  it("a window step that throws pauses as offline when the browser is offline, and fails otherwise", async () => {
+    // A worker whose script cannot be fetched offline (P180's walk).
+    fake.transcribe = new Error("worker did not start");
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    await runSourcePipeline(RECORD, file);
+    expect(useSourceStore.getState().status).toBe("paused");
+    expect(useSourceStore.getState().paused).toEqual({ reason: "offline", from: "transcribing" });
+
+    online.mockReturnValue(true);
+    useSourceStore.setState({ status: "extracting_audio", paused: null, failure: null });
+    await runSourcePipeline(RECORD, file);
+    expect(useSourceStore.getState().status).toBe("failed");
+    expect(useSourceStore.getState().failure?.code).toBe("E_INTERNAL");
+    online.mockRestore();
   });
 
   it("cancel removes the source", async () => {

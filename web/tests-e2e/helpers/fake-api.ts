@@ -50,7 +50,16 @@ export type FakeApiOptions = {
    * How `POST /transcribe` answers when it is not in `failures`: `response`
    * after `delayMs`. Without this option it answers 404, which no existing spec meets.
    */
-  transcribe?: { response: unknown; delayMs?: number };
+  transcribe?: {
+    response: unknown;
+    delayMs?: number;
+    /**
+     * V6.1 (v6.1implementation D-431): a request that carries
+     * `X-Offcut-Window: <index>/<total>` is answered with `windows(index, total)`
+     * in place of `response`. Absent: every request gets `response`, as before.
+     */
+    windows?: (index: number, total: number) => unknown;
+  };
   /** Signed in from the start. The default is nobody: `/auth/refresh` answers 401 (v6implementation §15.4). */
   session?: FakeSession;
   /** Another page's `api.account`, in place of a new one. */
@@ -242,7 +251,12 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
         await route.fulfill({ status: 401, contentType: JSON_TYPE, body: JSON.stringify({ code: "unauthorized", retry_after_secs: null }) });
       } else {
         await wait(options.transcribe.delayMs ?? 0);
-        await route.fulfill({ status: 200, contentType: JSON_TYPE, body: JSON.stringify(options.transcribe.response) }).catch(() => undefined);
+        const window = /^(\d+)\/(\d+)$/.exec(request.headers()["x-offcut-window"] ?? "");
+        const heard =
+          window !== null && options.transcribe.windows !== undefined
+            ? options.transcribe.windows(Number(window[1]), Number(window[2]))
+            : options.transcribe.response;
+        await route.fulfill({ status: 200, contentType: JSON_TYPE, body: JSON.stringify(heard) }).catch(() => undefined);
       }
     } else if (path === "/events") {
       await route.fulfill({ status: 204 });

@@ -45,7 +45,8 @@ function Problem({ card, code, retry }: { card: Card | undefined; code: string; 
       {card === undefined ? null : (
         <>
           <h2 className={styles.cardTitle}>{card.title}</h2>
-          {card.body === card.title ? null : <p className={styles.cardText}>{card.body}</p>}
+          {/* A body that only repeats the title, with its full stop, is not said twice. */}
+          {card.body.replace(/\.$/, "") === card.title ? null : <p className={styles.cardText}>{card.body}</p>}
           {card.action === "" ? null : <p className={styles.cardHint}>{card.action}</p>}
         </>
       )}
@@ -130,12 +131,15 @@ export function LongPage({ appPath, accountPath }: { appPath: string; accountPat
     }
   }, [status]);
 
-  // A sign-in that completes while the gate waits for it lets the gate ask again.
+  // A sign-in that completes while the gate waits for it lets the gate ask
+  // again: only from `signed_out`, whose answer is never `signed_out` again
+  // once signed in, so asking cannot repeat itself.
+  const waitsForSignIn = useSourceStore((state) => state.status === "gated" && state.gate?.reason === "signed_out");
   useEffect(() => {
-    if (signedIn && status === "gated") {
+    if (signedIn && waitsForSignIn) {
       void recheckGate();
     }
-  }, [signedIn, status]);
+  }, [signedIn, waitsForSignIn]);
 
   let content;
   if (status === "gated" || status === "probing") {
