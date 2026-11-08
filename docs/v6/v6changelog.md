@@ -913,3 +913,23 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 908 / 0 / 4 (900 + 8), Vitest 582, `pnpm e2e` 57 (not re-run; `check-headers` against `vite preview` ok). No migration; no new dependency.
 
 **Open:** item 26 (new). **Found, not fixed:** none.
+
+## Entry 31 - 2026-11-08 - P176: storage and state
+
+**Built.**
+
+- **`schema.ts`** (additive): `DB_STRUCTURE_VERSION = 2`; `SOURCE_STORES` (`sources`, `sourceTranscripts`, `masterTranscripts`), apart from `STORES`; `SourceId`, `SourceStage`, `SourceRecord`, `SourceWindowRecord`, `MasterTranscriptRecord`, `OffcutSourcesDb`. `DB_VERSION`, the records' `schemaVersion`, stays 1.
+- **`db.ts` (REOPENED CONTRACT, D-414).** Upgrade 2 creates the three stores; the upgrade loop runs only up to the version being opened (a fresh clip-path open at 1 never makes them); `open()` falls back to the database's own version on `VersionError`; `openSourcesDb()` opens version 2, only for `sources-repo.ts`. `openDb()` and its callers are unchanged.
+- **`opfs.ts`** (additive): `readPcm16Window(id, k)`, `[80k, 80k + 90)` seconds.
+- **`sources-repo.ts`**: put, get, update, newest, windows by `[sourceId, index]`, the master transcript, `removeSource` (rows, windows, transcript, `sources/<id>/`) and `removeAll` (D-415's sweep; clips untouched); the newer-`schemaVersion` rule; failures as `OpfsError`.
+- **`source-machine.ts`** (§9.4, D-417): 11 states, 20 events, 33 legal pairs, `transcribed` V6.1's end. **`source-store.ts`**: the status through the machine, the page's state (gate, pause, progress, transcript, resumable, a different file). **`blockers.ts`** (D-416, additive): `forImport()` answers `B_PIPELINE_BUSY` while a source job works; new `forSource()` answers it while a clip is busy or an export runs. Its both-ways test is P178's (`import-source.test.ts`, §11.3).
+
+**Tests.** `sources-repo.test.ts` 5 (a mocked database, as `receipt-outbox.test.ts` does: the project has no fake IndexedDB and gains no dependency); `source-machine.test.ts` 37 (every legal pair through `transition` and the store, every other pair refused, one or more per state, the pairs that must never happen). **The upgrade itself, read in Chrome** (a `zz-` page under the Vite dev server, deleted): the clip path writes version-1 records, the long path upgrades to 2, every version-1 record is byte for byte the same, the three stores exist, and the clip path reads its records afterwards through the `VersionError` fallback.
+
+**Tier 2 on the keyed `dist/`.** `pipeline-preview.spec.ts`' first case ("feed: …") and its storage case ("OPFS: …"): passed, with `media-setup` (2.3 min). No media spec reloads and restores a clip, so G Phase 6's "restore cases" are these two, which write through the changed `db.ts`.
+
+**What differs from the plan (As read under D-414).** `SOURCE_STORES` apart from `STORES`; `openSourcesDb()` in place of `openDb({ structure: 2 })`; the bounded upgrade loop; the `VersionError` rule is needed within this build, not only for a rollback.
+
+**Counts.** Rust 908 / 0 / 4, Vitest 624 (582 + 42), `pnpm e2e` 57 (not re-run). Media: 2 cases on `dist/` (above).
+
+**Open:** nothing new. **Found, not fixed:** none.

@@ -3,7 +3,7 @@
 // path (TS §23.1). A path is made of ids and fixed words; no path ever
 // contains a name the user supplied (TS §25.1 P-11).
 
-import type { Bytes, ClipId, ExportId } from "../gen/domain";
+import { type Bytes, type ClipId, type ExportId, SOURCE_LIMITS } from "../gen/domain";
 
 /** Why a storage operation failed: the disk is full, or anything else. */
 export class OpfsError extends Error {
@@ -251,4 +251,21 @@ export function readProgram(id: ClipId): Promise<Float32Array<ArrayBuffer>> {
 /** What `writeAudio` wrote (D-51). */
 export function readAudio(id: ClipId): Promise<Float32Array<ArrayBuffer>> {
   return guarded(async () => new Float32Array(await (await getFile(paths.clipOut48(id))).arrayBuffer()));
+}
+
+// --- V6.1: a long source's sound (v6.1implementation §9.2) -------------------
+
+/** `pcm16.f32` is 16 kHz mono float. */
+const PCM16_BYTES_PER_SECOND = 16_000 * 4;
+
+/**
+ * Window `k` of a source's `pcm16.f32`: `[step × k, step × k + 90)` seconds,
+ * where the step is the window less the overlap (80 s, D-405 as read). The
+ * last window is shorter: the file ends there.
+ */
+export function readPcm16Window(id: string, k: number): Promise<Float32Array<ArrayBuffer>> {
+  const step = SOURCE_LIMITS.CLOUD_WINDOW_S - SOURCE_LIMITS.CLOUD_OVERLAP_S;
+  const from = k * step * PCM16_BYTES_PER_SECOND;
+  const to = from + SOURCE_LIMITS.CLOUD_WINDOW_S * PCM16_BYTES_PER_SECOND;
+  return guarded(async () => new Float32Array(await (await getFile(paths.sourcePcm16(id))).slice(from, to).arrayBuffer()));
 }

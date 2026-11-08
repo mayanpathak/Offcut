@@ -789,6 +789,7 @@ offcut/
 │   │   │   ├── edits-repo.ts
 │   │   │   ├── plans-repo.ts          (V6.2) the plans store and its op log
 │   │   │   ├── sources-repo.ts        (V6.1) sources, checkpoints, master transcripts
+│   │   │   ├── sources-repo.test.ts   (V6.1) records, compound window keys, the newer-schemaVersion rule, removal and the sweep
 │   │   │   ├── shorts-repo.ts         (V6.4)
 │   │   │   ├── assets-repo.ts         (V6.8)
 │   │   │   ├── creator-memory-repo.ts (V6.10)

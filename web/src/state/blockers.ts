@@ -9,6 +9,8 @@ import { useEntitlementStore } from "./entitlement-store";
 import { useExportStore } from "./export-store";
 import type { ClipStatus } from "./machines/clip-machine";
 import type { ExportStatus } from "./machines/export-machine";
+import type { SourceStatus } from "./machines/source-machine";
+import { useSourceStore } from "./source-store";
 
 // Every blocker, in the order of TS §12.5. scripts/check-copy-codes.mjs reads
 // this list: one code on a line.
@@ -27,6 +29,8 @@ export type BlockerCode = (typeof BLOCKER_CODES)[number];
 
 const CLIP_BUSY: readonly ClipStatus[] = ["importing", "processing", "updating"];
 const EXPORT_RUNNING: readonly ExportStatus[] = ["gating", "rendering", "muxing", "saving"];
+/** V6.1 (D-416): a source job that holds the workers. Paused, transcribed or waiting for its file, it does not. */
+const SOURCE_WORKING: readonly SourceStatus[] = ["probing", "extracting_audio", "transcribing"];
 
 /** The first thing that stands in the way of importing a clip, or `null`. */
 export function forImport(): BlockerCode | null {
@@ -36,8 +40,25 @@ export function forImport(): BlockerCode | null {
   if (CLIP_BUSY.includes(useClipStore.getState().status)) {
     return "B_PIPELINE_BUSY";
   }
+  if (SOURCE_WORKING.includes(useSourceStore.getState().status)) {
+    return "B_PIPELINE_BUSY";
+  }
   if (EXPORT_RUNNING.includes(useExportStore.getState().status)) {
     return "B_EXPORT_IN_PROGRESS";
+  }
+  return null;
+}
+
+/**
+ * V6.1 (D-416): the first thing that stands in the way of starting or continuing a
+ * long source, or `null`. One worker pool serves both pages.
+ */
+export function forSource(): BlockerCode | null {
+  if (useCapabilityStore.getState().status !== "supported") {
+    return "B_UNSUPPORTED";
+  }
+  if (CLIP_BUSY.includes(useClipStore.getState().status) || EXPORT_RUNNING.includes(useExportStore.getState().status)) {
+    return "B_PIPELINE_BUSY";
   }
   return null;
 }

@@ -13,6 +13,7 @@ import type {
   ExportId,
   Plan,
   Prosody,
+  SourceInfo,
   Transcript,
   UserId,
 } from "../gen/domain";
@@ -85,4 +86,62 @@ export interface OffcutDb extends DBSchema {
   receiptOutbox: { key: ExportId; value: Versioned<ReceiptOutboxRecord> };
   /** The keys are those of `META_KEYS`. */
   meta: { key: string; value: Versioned<unknown> };
+}
+
+// --- V6.1: the long path (v6.1implementation §9.1, D-414) --------------------
+
+/**
+ * The database's structure version (what `openDB` is given), apart from
+ * `DB_VERSION`, which is the records' `schemaVersion` and stays 1 so every
+ * stored record reads as before. Version 2 adds the three source stores; only
+ * `sources-repo.ts` opens it, so a build with `long_video` off never upgrades
+ * anyone's database (D-414, §12.4).
+ */
+export const DB_STRUCTURE_VERSION = 2;
+
+/** The stores of structure version 2. Kept apart from `STORES`, which upgrade 1 creates. */
+export const SOURCE_STORES = {
+  sources: "sources",
+  sourceTranscripts: "sourceTranscripts",
+  masterTranscripts: "masterTranscripts",
+} as const;
+
+/** A long source's id (a UUID); `workers/protocol.ts` declares the same brand. */
+export type SourceId = string & { readonly __unit: "SourceId" };
+
+/** Where a source's work stands; `transcribed` is V6.1's end (D-417). */
+export type SourceStage = "extracting_audio" | "transcribing" | "transcribed";
+
+/** No file name and no path: the source is known by its id, its size and its hash prefix. */
+export type SourceRecord = {
+  sourceId: SourceId;
+  createdAt: number;
+  lastOpenedAt: number;
+  sourceInfo: SourceInfo;
+  sourceBytes: Bytes;
+  /** SHA-256, in hex, over the first 4 MiB of the file plus its length (D-81, D-419). */
+  sourceHashPrefix: string;
+  stage: SourceStage;
+  /** Whole seconds of `pcm16.f32` written and flushed (D-403). */
+  pcm16Seconds: number;
+  /** The source-wide 95th-percentile level in dBFS, once the sound is written (D-404). */
+  levelP95: number | null;
+  windowsDone: number;
+  windowsTotal: number;
+};
+
+/** One cloud window's words, relative to the window, not yet merged (D-406). */
+export type SourceWindowRecord = { words: RawWordRecord[]; lengthMs: number; modelVersion: string };
+
+/** A word as the recognizer gave it (`load-core.ts`' `RawWord`). */
+export type RawWordRecord = { text: string; startMs: number; endMs: number; confidence: number };
+
+export type MasterTranscriptRecord = { transcript: Transcript };
+
+/** The three stores of structure version 2, with their keys. */
+export interface OffcutSourcesDb extends OffcutDb {
+  sources: { key: SourceId; value: Versioned<SourceRecord> };
+  /** The key is `[sourceId, windowIndex]`. */
+  sourceTranscripts: { key: [SourceId, number]; value: Versioned<SourceWindowRecord> };
+  masterTranscripts: { key: SourceId; value: Versioned<MasterTranscriptRecord> };
 }
