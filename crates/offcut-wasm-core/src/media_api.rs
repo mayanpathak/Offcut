@@ -244,6 +244,24 @@ impl DemuxerHandle {
     }
 }
 
+/// V6.1 (additive): what the clip page asks with `high_res` on (D-398, D-427):
+/// HDR and the HEVC string, and the `hvcC` the decoder is configured with.
+#[wasm_bindgen]
+impl DemuxerHandle {
+    /// The `VideoDetail` (`is_hdr`, `hevc_codec_string`).
+    pub fn video_detail(&mut self) -> Result<JsValue, JsValue> {
+        to_js(&offcut_mp4::probe::video_detail(&mut self.demuxer))
+    }
+
+    /// The raw `hvcC` payload of an HEVC track; `undefined` for any other.
+    pub fn hevc_description(&mut self) -> Option<Vec<u8>> {
+        self.demuxer
+            .video_entry_boxes()
+            .ok()
+            .and_then(|boxes| boxes.hvcc)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

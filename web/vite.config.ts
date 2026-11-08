@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defaultClientConditions, defineConfig, type Plugin } from "vite";
 
+import { featureFlags } from "./src/config/features";
 import vercel from "./vercel.json" with { type: "json" };
 
 // `vite preview` serves the headers of the `/(.*)` rule of vercel.json, so the
@@ -92,18 +93,6 @@ function rendererVersion(): string {
   return hash.digest("hex").slice(0, 16);
 }
 
-/** The flags of config/features.ts: every one on, except those `off` names. */
-function featureFlags(off: string | undefined): { cloud_transcribe: boolean } {
-  const names = new Set((off ?? "").split(",").map((name) => name.trim()).filter((name) => name !== ""));
-  const known = ["cloud_transcribe"];
-  for (const name of names) {
-    if (!known.includes(name)) {
-      throw new Error(`OFFCUT_FEATURES_OFF names an unknown flag: ${name}`);
-    }
-  }
-  return { cloud_transcribe: !names.has("cloud_transcribe") };
-}
-
 export default defineConfig(({ mode }) => ({
   plugins: [react(), copyOrt()],
   define: {
@@ -111,9 +100,10 @@ export default defineConfig(({ mode }) => ({
     // the workers may not read `import.meta.env`, and a production build folds this to `false`.
     __OFFCUT_DEV_FAULTS__: JSON.stringify(mode !== "production"),
     __RENDERER_VERSION__: JSON.stringify(rendererVersion()),
-    // The feature flags of config/features.ts (TS §41.3.1): all on unless named
-    // in OFFCUT_FEATURES_OFF, a comma list (cloudimplementation D-365).
-    __OFFCUT_FEATURES__: JSON.stringify(featureFlags(process.env.OFFCUT_FEATURES_OFF)),
+    // The feature flags of config/features.ts (TS §41.3.1): each takes its
+    // default unless OFFCUT_FEATURES_ON or OFFCUT_FEATURES_OFF (comma lists)
+    // names it; the V6.x flags default off (v6.1implementation D-393).
+    __OFFCUT_FEATURES__: JSON.stringify(featureFlags(process.env.OFFCUT_FEATURES_ON, process.env.OFFCUT_FEATURES_OFF)),
   },
   resolve: {
     // ONNX Runtime has a build that holds no reference to its own `.wasm`

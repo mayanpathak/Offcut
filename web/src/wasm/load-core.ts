@@ -21,10 +21,15 @@ import {
   type Transcript,
   type Word,
 } from "../gen/domain";
+import type { Entry, RouteFlags, RouteReject, SourceInfo, VideoDetail } from "../gen/domain";
 import initCore, {
   assemble,
   core_version,
   type DemuxerHandle,
+  open_demuxer_reader,
+  route_probe,
+  type SourceDemuxerHandle,
+  StreamResampler,
   measure_prosody,
   normalize_transcript,
   open_demuxer,
@@ -54,7 +59,38 @@ export type CoreDemuxer = {
   audioSampleCount(): number;
   readAudioSample(index: number): AudioSample;
   free(): void;
+  /** V6.1 (D-398): HDR and the HEVC string, for the clip page with `high_res`. */
+  videoDetail(): VideoDetail;
+  /** V6.1: the raw `hvcC` payload of an HEVC track. */
+  hevcDescription(): Uint8Array | undefined;
 };
+
+/** V6.1 (D-399, D-400): what the demuxer reads a dropped `File` through, in place. */
+export type ByteReader = { size(): number; readAt(offset: number, length: number): Uint8Array };
+
+/** V6.1: a long source the demuxer opened in place. `free()` gives its memory back. */
+export type CoreSourceDemuxer = {
+  probe(fileSize: Bytes): ProbeInfo;
+  videoDetail(): VideoDetail;
+  hevcDescription(): Uint8Array | undefined;
+  videoDescription(): Uint8Array | undefined;
+  audioDescription(): Uint8Array | undefined;
+  audioSampleCount(): number;
+  /** When sample `index` is presented, in microseconds; `undefined` past the end. */
+  audioSampleTimeUs(index: number): number | undefined;
+  readAudioSample(index: number): AudioSample;
+  free(): void;
+};
+
+/** V6.1 (D-401): `resample_mono` in pieces. After `finish` the object is spent. */
+export type CoreStreamResampler = {
+  push(input: Float32Array): Float32Array;
+  finish(totalInput: number): Float32Array;
+  free(): void;
+};
+
+/** V6.1: which path a file takes, or why it is refused. */
+export type Routed = { clip: ClipInfo } | { long: SourceInfo } | { rejected: RouteReject };
 
 /**
  * What the module offers. A rejection is a value; a failure is thrown as the
@@ -86,6 +122,12 @@ export type CoreApi = {
     timeMap: TimeMap,
     speech: readonly OutSpan[],
   ): { prog48: Float32Array<ArrayBuffer>; loudness: Lufs };
+  /** V6.1: opens a dropped file through `reader`, copying nothing (D-399). */
+  openDemuxerReader(reader: ByteReader): CoreSourceDemuxer | { rejected: RejectReason };
+  /** V6.1: `route_probe` (TS §43.1) over a probe and a detail from either demuxer. */
+  routeProbe(probe: ProbeInfo, detail: VideoDetail, decodeSupported: boolean, entry: Entry, flags: RouteFlags): Routed;
+  /** V6.1: a resampler fed in pieces. Throws `E_SOURCE_AUDIO` for a rate of 0. */
+  newStreamResampler(from: Hz, to: Hz): CoreStreamResampler;
 };
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -131,9 +173,45 @@ function wrapDemuxer(handle: DemuxerHandle): CoreDemuxer {
       handles.delete(demuxer);
       handle.free();
     },
+    videoDetail: () => handle.video_detail() as VideoDetail,
+    hevcDescription: () => handle.hevc_description(),
   };
   handles.set(demuxer, handle);
   return demuxer;
+}
+
+function wrapSource(handle: SourceDemuxerHandle): CoreSourceDemuxer {
+  return {
+    probe: (fileSize) => handle.probe(fileSize) as ProbeInfo,
+    videoDetail: () => handle.video_detail() as VideoDetail,
+    hevcDescription: () => handle.hevc_description(),
+    videoDescription: () => handle.video_description(),
+    audioDescription: () => handle.audio_description(),
+    audioSampleCount: () => handle.audio_sample_count(),
+    audioSampleTimeUs: (index) => handle.audio_sample_time_us(index),
+    readAudioSample: (index) => handle.read_audio_sample(index) as AudioSample,
+    free: () => {
+      handle.free();
+    },
+  };
+}
+
+function wrapResampler(resampler: StreamResampler): CoreStreamResampler {
+  let spent = false;
+  return {
+    push: (input) => resampler.push(input),
+    finish: (totalInput) => {
+      // The module frees the resampler when it hands the tail over.
+      spent = true;
+      return resampler.finish(totalInput);
+    },
+    free: () => {
+      if (!spent) {
+        spent = true;
+        resampler.free();
+      }
+    },
+  };
 }
 
 const api: CoreApi = {
@@ -173,6 +251,19 @@ const api: CoreApi = {
   measureProsody: (out48, words, sentences) => measure_prosody(out48, words, sentences) as Prosody,
   assemble: (out48, timeMap, speech) =>
     assemble(out48, timeMap, [...speech]) as { prog48: Float32Array<ArrayBuffer>; loudness: Lufs },
+  openDemuxerReader(reader) {
+    try {
+      return wrapSource(open_demuxer_reader(reader));
+    } catch (thrown) {
+      if (isRejection(thrown)) {
+        return thrown;
+      }
+      throw thrown;
+    }
+  },
+  routeProbe: (probe, detail, decodeSupported, entry, flags) =>
+    route_probe(probe, detail, decodeSupported, entry, flags) as Routed,
+  newStreamResampler: (from, to) => wrapResampler(new StreamResampler(from, to)),
 };
 
 /**

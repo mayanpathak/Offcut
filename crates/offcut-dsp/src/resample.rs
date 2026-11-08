@@ -39,6 +39,140 @@ fn resampled(input: &[f32], from: usize, to: usize) -> Option<Vec<f32>> {
     Some(output.take_data())
 }
 
+// --- V6.1: the same resampler, fed in pieces (v6.1implementation D-401) ------
+
+use rubato::Indexing;
+use rubato::audioadapter_buffers::direct::InterleavedSlice as Frames;
+use rubato::audioadapter_buffers::owned::InterleavedOwned;
+
+/// `resample_mono` for audio that arrives in pieces: the long path cannot hold
+/// a whole 45-minute track at its own rate (about 520 MB at 48 kHz). The
+/// concatenation of every `push` and the `finish` is `resample_mono` of the
+/// concatenated input, sample for sample: the same `Fft`, the same chunks, the
+/// same delay trimmed from the head and the same length rule at the end.
+pub struct StreamResampler {
+    /// `None` when the two rates are equal: the input passes through, as in `resample_mono`.
+    inner: Option<Fft<f32>>,
+    from: usize,
+    to: usize,
+    /// Input not yet given to the resampler: at most one chunk.
+    pending: Vec<f32>,
+    /// Output frames still to drop from the head (the resampler's delay).
+    to_drop: usize,
+    /// Output frames the resampler has made, before the drop.
+    made: usize,
+    /// Output frames handed out so far.
+    given: usize,
+}
+
+impl StreamResampler {
+    /// `None` for a rate of 0, as `resample_mono` gives nothing for one.
+    pub fn new(from: Hz, to: Hz) -> Option<StreamResampler> {
+        let (from, to) = (from.get() as usize, to.get() as usize);
+        if from == 0 || to == 0 {
+            return None;
+        }
+        let inner = if from == to {
+            None
+        } else {
+            Some(Fft::<f32>::new(from, to, CHUNK_FRAMES, 1, FixedSync::Input).ok()?)
+        };
+        let to_drop = inner.as_ref().map_or(0, |r| r.output_delay());
+        Some(StreamResampler {
+            inner,
+            from,
+            to,
+            pending: Vec::new(),
+            to_drop,
+            made: 0,
+            given: 0,
+        })
+    }
+
+    /// The output that `input` completes. Whole chunks only, and never the last
+    /// one: as `process_all`, a final chunk is handled by `finish`.
+    pub fn push(&mut self, input: &[f32]) -> Vec<f32> {
+        let mut out = Vec::new();
+        let Some(inner) = self.inner.as_mut() else {
+            self.given += input.len();
+            return input.to_vec();
+        };
+        self.pending.extend_from_slice(input);
+        let mut used = 0;
+        while self.pending.len() - used > inner.input_frames_next() {
+            let n = inner.input_frames_next();
+            let piece = self.pending.get(used..used + n).unwrap_or_default();
+            let made = run(inner, piece, None);
+            used += n;
+            Self::keep(&mut self.to_drop, &mut self.made, &made, &mut out);
+        }
+        self.pending.drain(..used);
+        self.given += out.len();
+        out
+    }
+
+    /// The rest, after every sample of the source has been pushed:
+    /// `total_input` is their count, so the whole output has
+    /// `round(total_input × to ÷ from)` samples, as `resample_mono`'s.
+    pub fn finish(mut self, total_input: usize) -> Vec<f32> {
+        let wanted =
+            (total_input as u128 * self.to as u128 + self.from as u128 / 2) / self.from as u128;
+        let wanted = usize::try_from(wanted).unwrap_or(usize::MAX);
+        if total_input == 0 {
+            return Vec::new();
+        }
+        let mut tail = Vec::new();
+        if let Some(inner) = self.inner.as_mut() {
+            let expected = (inner.resample_ratio() * total_input as f64).ceil() as usize;
+            if !self.pending.is_empty() {
+                let made = run(inner, &self.pending, Some(self.pending.len()));
+                Self::keep(&mut self.to_drop, &mut self.made, &made, &mut tail);
+            }
+            let delay = inner.output_delay();
+            // Silence until the output is long enough once the delay is dropped.
+            while self.made < expected + delay {
+                let made = run(inner, &[], Some(0));
+                if made.is_empty() {
+                    break;
+                }
+                Self::keep(&mut self.to_drop, &mut self.made, &made, &mut tail);
+            }
+            // `process_all` keeps `expected` frames; `resample_mono` then fits them to `wanted`.
+            tail.truncate(expected.saturating_sub(self.given));
+        }
+        tail.resize(wanted.saturating_sub(self.given), 0.0);
+        tail
+    }
+
+    /// Counts what the resampler made and keeps it, less the delay still to drop.
+    fn keep(to_drop: &mut usize, made_total: &mut usize, made: &[f32], out: &mut Vec<f32>) {
+        *made_total += made.len();
+        let drop = (*to_drop).min(made.len());
+        *to_drop -= drop;
+        out.extend_from_slice(made.get(drop..).unwrap_or_default());
+    }
+}
+
+/// One call of the resampler on `piece`; `partial` as `process_all` passes it.
+fn run(inner: &mut Fft<f32>, piece: &[f32], partial: Option<usize>) -> Vec<f32> {
+    let Ok(frames) = Frames::new(piece, 1, piece.len()) else {
+        return Vec::new();
+    };
+    let mut out = InterleavedOwned::<f32>::new(0.0, 1, inner.output_frames_max());
+    let indexing = Indexing {
+        partial_len: partial,
+        ..Indexing::default()
+    };
+    match inner.process_into_buffer(&frames, &mut out, Some(&indexing)) {
+        Ok((_, made)) => {
+            let mut data = out.take_data();
+            data.truncate(made);
+            data
+        }
+        Err(_) => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;

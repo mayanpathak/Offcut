@@ -8,6 +8,8 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${OFFCUT_FIXTURES_DIR:-$ROOT/fixtures/.gen}
 MANIFEST=$ROOT/fixtures/manifest.json
+# V6.1: the long-path fixtures, in a manifest of their own (manifest-long.json says why).
+LONG_MANIFEST=$ROOT/fixtures/manifest-long.json
 SCRIPT=$ROOT/fixtures/gen_fixtures.sh
 hash() { sha256sum "$1" | cut -d' ' -f1; }
 
@@ -50,12 +52,14 @@ esac
 
 # Step 3: up to date?
 names() { node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); for (const f of m.fixtures) if (process.argv[2]!=="pcm"||f.pcm===true) console.log(f.name);' "$MANIFEST" "${1:-all}"; }
-COUNT=$(names | wc -l | tr -d ' ')
-STAMP_TEXT="{ \"ffmpeg\": \"$FFMPEG_VERSION\", \"script_sha256\": \"$(hash "$SCRIPT")\", \"manifest_sha256\": \"$(hash "$MANIFEST")\", \"reference_sha256\": \"$REF_SHA\", \"generated\": $COUNT }"
+long_names() { node -e 'for (const f of JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).fixtures) console.log(f.name);' "$LONG_MANIFEST"; }
+COUNT=$(($(names | wc -l | tr -d ' ') + $(long_names | wc -l | tr -d ' ')))
+STAMP_TEXT="{ \"ffmpeg\": \"$FFMPEG_VERSION\", \"script_sha256\": \"$(hash "$SCRIPT")\", \"manifest_sha256\": \"$(hash "$MANIFEST")\", \"long_manifest_sha256\": \"$(hash "$LONG_MANIFEST")\", \"reference_sha256\": \"$REF_SHA\", \"generated\": $COUNT }"
 if [ -f "$OUT/STAMP" ] && [ "$(cat "$OUT/STAMP")" = "$STAMP_TEXT" ]; then
   complete=yes
   for n in $(names); do [ -f "$OUT/$n" ] || complete=no; done
   for n in $(names pcm); do [ -f "$OUT/$n.pcm48.f32" ] || complete=no; done
+  for n in $(long_names); do [ -f "$OUT/$n" ] || complete=no; done
   if [ "$complete" = yes ]; then echo "fixtures are up to date"; exit 0; fi
 fi
 
@@ -169,13 +173,34 @@ FC="$FC[t0][p0][t1][p1][t2][p2][t3][p3][t4][p4][t5]concat=n=11:v=0:a=1[a]"
 enc speech_30s_sparse $GLOBAL -i "$REF" -f lavfi -i "$ROOM" $OUTF -filter_complex "$FC" -map "[v]" -map "[a]" \
   $H264 $FAST $AAC $FS "$OUT/speech/speech_30s_sparse.mp4"
 
+# Step 5c: V6.1's long-path fixtures (v6.1implementation D-430, §11.6; manifest-long.json).
+# Twelve minutes: one loop is REF's whole sound then 5 s of room tone, nine times, then room
+# tone to 12:00, under a small test pattern. The others are tiny, so CI stays fast (G item 19).
+LROOM="anoisesrc=color=pink:amplitude=0.001:sample_rate=48000:seed=7"
+enc long_12min $GLOBAL -i "$REF" -f lavfi -i "$LROOM:duration=5" $OUTF \
+  -filter_complex "[0:a]$AF[r];[1:a]$AF[t];[r][t]concat=n=2:v=0:a=1[a]" -map "[a]" -c:a pcm_s16le "$TMP/period.wav"
+enc long_12min $GLOBAL $(video 320 180 30 720) -stream_loop 8 -i "$TMP/period.wav" -f lavfi -i "$LROOM:duration=10" $OUTF \
+  -filter_complex "[1:a]$AF[p];[2:a]$AF[t];[p][t]concat=n=2:v=0:a=1,atrim=duration=720[a]" -map 0:v -map "[a]" \
+  $H264 $FAST $AAC $FS "$OUT/long_12min.mp4"
+# Its room tone at 16 kHz: 46 minutes at 48 kHz take 27 s to make, at 16 kHz 6 s (P173).
+enc rej_too_long_46min $GLOBAL $(video 160 90 1 2760) \
+  -f lavfi -i "anoisesrc=color=pink:amplitude=0.001:sample_rate=16000:seed=7:duration=2760" $OUTF \
+  $H264 -preset ultrafast -c:a aac -b:a 16k -ar 16000 -ac 1 $FS "$OUT/rej_too_long_46min.mp4"
+enc rej_8k $GLOBAL $(src 7680 4320 1 1) $OUTF $H264 -preset ultrafast $AAC $FS "$OUT/rej_8k.mp4"
+# HLG must be set on the frames for x265 to signal it; the MOV muxer writes colr (nclc) when asked.
+enc rej_hdr_hlg $GLOBAL $(src 640 360 30 1) $OUTF \
+  -vf "setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc" \
+  -c:v libx265 -tag:v hvc1 -g 30 -pix_fmt yuv420p10le -x265-params log-level=error $AAC \
+  -movflags +faststart+write_colr "$OUT/rej_hdr_hlg.mov"
+
 # Step 7: PCM of the speech fixtures, for the Rust DSP tests (Rust has no AAC decoder, D-77).
 for n in $(names pcm); do
   enc "$n.pcm48.f32" $GLOBAL -i "$OUT/$n" -map 0:a:0 -ac 1 -ar 48000 -f f32le "$OUT/$n.pcm48.f32"
 done
 rm -rf "$TMP"
 
-# Step 8: every probe field of the manifest, as ffprobe reports it.
+# Step 8: every probe field of both manifests, as ffprobe reports it.
+probe_check() {
 node -e '
 const { execFileSync } = require("child_process");
 const fs = require("fs");
@@ -203,7 +228,10 @@ for (const f of JSON.parse(fs.readFileSync(manifestPath, "utf8")).fixtures) {
 }
 for (const line of bad) console.error(line);
 process.exitCode = bad.length === 0 ? 0 : 5;
-' "$MANIFEST" "$OUT" || exit 5
+' "$1" "$OUT" || exit 5
+}
+probe_check "$MANIFEST"
+probe_check "$LONG_MANIFEST"
 
 # Step 9: the stamp, last, so that an interrupted run leaves none (§17.4).
 printf '%s\n' "$STAMP_TEXT" > "$OUT/STAMP.part"

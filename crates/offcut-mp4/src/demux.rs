@@ -274,6 +274,162 @@ impl<R: RandomAccess> Demuxer<R> {
     }
 }
 
+/// The most samples `open_source` expands in one track (V6.1). 45 minutes of
+/// video at 60.5 fps is 163,350 samples and of 96 kHz AAC 253,125; a sample
+/// costs about 40 bytes, so a track holds at most about 16 MB.
+pub const MAX_SOURCE_SAMPLES: u32 = 400_000;
+
+impl<R: RandomAccess> Demuxer<R> {
+    /// V6.1 (additive): `open` for a long source. The same steps, the same
+    /// choice of tracks and the same timeline, but each chosen track is
+    /// expanded up to `MAX_SOURCE_SAMPLES` instead of 20,000, so 45 minutes of
+    /// audio can be read. `open` and the clip path keep their limit (D-60).
+    pub fn open_source(mut reader: R) -> Result<Demuxer<R>, ContainerError> {
+        let len = reader.len();
+        let (brand, moov) = find_moov(&mut reader, len)?;
+        let in_moov = boxes::children(&mut reader, &moov)?;
+        if in_moov.iter().any(|h| &h.kind == b"mvex") {
+            return Err(ContainerError::Fragmented);
+        }
+        let mvhd = find(&in_moov, b"mvhd").ok_or(ContainerError::Malformed("mvhd"))?;
+        let movie_timescale = boxes::read_mvhd(&mut reader, &mvhd)?.timescale;
+
+        // As `open`: the first enabled video track, or the first one; the first audio track.
+        let mut chosen_video: Option<(BoxHeader, bool)> = None;
+        let mut chosen_audio: Option<BoxHeader> = None;
+        let (mut video_tracks, mut audio_tracks) = (0u32, 0u32);
+        for trak in in_moov.iter().filter(|h| &h.kind == b"trak") {
+            let Some(hdlr) = boxes::descend(&mut reader, trak, &[*b"mdia", *b"hdlr"])? else {
+                continue;
+            };
+            match &boxes::read_hdlr(&mut reader, &hdlr)? {
+                b"vide" => {
+                    video_tracks = video_tracks.saturating_add(1);
+                    let enabled = read_tkhd(&mut reader, trak)?.flags & 1 == 1;
+                    if chosen_video.is_none_or(|(_, was_enabled)| enabled && !was_enabled) {
+                        chosen_video = Some((*trak, enabled));
+                    }
+                }
+                b"soun" => {
+                    audio_tracks = audio_tracks.saturating_add(1);
+                    chosen_audio = chosen_audio.or(Some(*trak));
+                }
+                _ => {}
+            }
+        }
+        let mut track = |trak: &BoxHeader, handler: &[u8; 4]| {
+            read_track_up_to(
+                &mut reader,
+                trak,
+                handler,
+                movie_timescale,
+                len,
+                MAX_SOURCE_SAMPLES,
+            )
+        };
+        let video = match chosen_video {
+            Some((trak, _)) => Some(track(&trak, b"vide")?),
+            None => None,
+        };
+        let audio = match chosen_audio {
+            Some(trak) => Some(track(&trak, b"soun")?),
+            None => None,
+        };
+        let t0 = video
+            .as_ref()
+            .and_then(|v| {
+                v.table
+                    .samples
+                    .iter()
+                    .map(|s| s.pts.saturating_sub(v.table.edit_offset))
+                    .min()
+            })
+            .unwrap_or(0);
+        Ok(Demuxer {
+            reader,
+            brand,
+            video,
+            audio,
+            video_tracks,
+            audio_tracks,
+            t0,
+        })
+    }
+
+    /// V6.1 (additive): an audio sample's times without reading its bytes, so
+    /// a region's first sample can be found by a binary search (D-402).
+    pub fn audio_sample_meta(&self, index: u32) -> Option<SampleMeta> {
+        let track = self.audio.as_ref().filter(|t| t.table.resolved)?;
+        let sample = track.table.samples.get(usize::try_from(index).ok()?)?;
+        Some(meta(sample, &track.table, self.time_base()))
+    }
+}
+
+/// `read_track` with the expansion limit given (V6.1, `open_source`).
+fn read_track_up_to<R: RandomAccess>(
+    r: &mut R,
+    trak: &BoxHeader,
+    handler: &[u8; 4],
+    movie_timescale: u32,
+    file_len: Bytes,
+    max_samples: u32,
+) -> Result<Track, ContainerError> {
+    let tkhd = read_tkhd(r, trak)?;
+    let mdhd =
+        boxes::descend(r, trak, &[*b"mdia", *b"mdhd"])?.ok_or(ContainerError::Malformed("mdhd"))?;
+    let timescale = boxes::read_mdhd(r, &mdhd)?.timescale;
+    if timescale == 0 {
+        return Err(ContainerError::Malformed("mdhd"));
+    }
+    let stbl = boxes::descend(r, trak, &[*b"mdia", *b"minf", *b"stbl"])?
+        .ok_or(ContainerError::Malformed("stbl"))?;
+    let in_stbl = boxes::children(r, &stbl)?;
+    let need = |kind: &[u8; 4], name| find(&in_stbl, kind).ok_or(ContainerError::Malformed(name));
+
+    let entry = boxes::read_stsd(r, &need(b"stsd", "stsd")?, handler)?;
+    let stts = tables::read_stts(r, &need(b"stts", "stts")?)?;
+    let stsz = tables::read_stsz(r, &need(b"stsz", "stsz")?, max_samples)?;
+    let expand = stsz.sample_count <= max_samples;
+    let mut raw = RawTables {
+        timescale,
+        movie_timescale,
+        file_len,
+        stts,
+        ctts: Vec::new(),
+        stsc: Vec::new(),
+        stsz,
+        chunk_offsets: Vec::new(),
+        stss: None,
+        elst: Vec::new(),
+    };
+    if expand {
+        if let Some(ctts) = find(&in_stbl, b"ctts") {
+            raw.ctts = tables::read_ctts(r, &ctts)?;
+        }
+        if let Some(stsc) = find(&in_stbl, b"stsc") {
+            raw.stsc = tables::read_stsc(r, &stsc)?;
+        }
+        if let Some(stco) = find(&in_stbl, b"stco") {
+            raw.chunk_offsets = tables::read_stco(r, &stco)?;
+        } else if let Some(co64) = find(&in_stbl, b"co64") {
+            raw.chunk_offsets = tables::read_co64(r, &co64)?;
+        }
+        if let Some(stss) = find(&in_stbl, b"stss") {
+            raw.stss = Some(tables::read_stss(r, &stss)?);
+        }
+    }
+    if let Some(elst) = boxes::descend(r, trak, &[*b"edts", *b"elst"])? {
+        raw.elst = tables::read_elst(r, &elst)?;
+    }
+    let table = tables::resolve_up_to(&raw, max_samples)?;
+    Ok(Track {
+        entry,
+        tkhd,
+        stts: raw.stts,
+        table,
+    })
+}
+
 fn find(headers: &[BoxHeader], kind: &[u8; 4]) -> Option<BoxHeader> {
     headers.iter().find(|h| &h.kind == kind).copied()
 }
@@ -605,6 +761,31 @@ mod tests {
     use super::fixture::{audio, boxed, file, video};
     use super::*;
     use crate::reader::MemReader;
+
+    #[test]
+    fn open_source_reads_what_open_reads() {
+        // The long tracks are read by demux_fixtures.rs on long_12min.mp4: this
+        // builder gives no bytes to a track over 20,000 samples.
+        let bytes = file(&[video(90), audio(b"mp4a", 3)]);
+        let mut short = Demuxer::open(MemReader(bytes.clone())).unwrap();
+        let mut long = Demuxer::open_source(MemReader(bytes)).unwrap();
+        assert_eq!(long.track_counts(), short.track_counts());
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        for i in 0..90 {
+            assert_eq!(
+                long.read_video_sample(i, &mut a),
+                short.read_video_sample(i, &mut b)
+            );
+            assert_eq!(a, b);
+        }
+        for i in 0..3 {
+            let read = long.read_audio_sample(i, &mut a).unwrap();
+            assert_eq!(Ok(read), short.read_audio_sample(i, &mut b));
+            assert_eq!(a, b);
+            assert_eq!(long.audio_sample_meta(i), Some(read));
+        }
+        assert_eq!(long.audio_sample_meta(3), None);
+    }
 
     #[test]
     fn read_video_sample_on_an_unresolved_track_is_malformed_samples() {

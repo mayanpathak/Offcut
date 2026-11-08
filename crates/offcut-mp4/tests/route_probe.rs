@@ -442,3 +442,74 @@ fn exactly_45_minutes_is_long_and_one_ms_more_is_refused() {
         LONG
     )));
 }
+
+/// V6.1's own fixtures (`fixtures/manifest-long.json`): what V5 says (the clip
+/// page, flags off), what the long page says with both flags on, and what the
+/// clip page says with `high_res` on.
+#[test]
+fn the_long_fixtures_route_as_their_manifest_says() {
+    let text = std::fs::read_to_string(root().join("fixtures/manifest-long.json")).unwrap();
+    let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let fixtures = manifest["fixtures"].as_array().unwrap();
+    assert_eq!(fixtures.len(), 4);
+    let outcome = |r: Result<Route, RouteReject>| -> String {
+        match r {
+            Ok(Route::Clip(_)) => "clip".to_owned(),
+            Ok(Route::Long(_)) => "long".to_owned(),
+            Err(reject) => serde_json::to_value(reject)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        }
+    };
+    for f in fixtures {
+        let name = f["name"].as_str().unwrap();
+        let expect = &f["expect"];
+        let (p, detail) = probed(name).unwrap_or_else(|| panic!("{name} does not open"));
+        let v5 = outcome(route_probe(&p, &detail, true, Entry::Clip, OFF));
+        let long = outcome(route_probe(&p, &detail, true, Entry::Long, BOTH));
+        let high = outcome(route_probe(&p, &detail, true, Entry::Clip, HIGH));
+        assert_eq!(v5, expect["v5"].as_str().unwrap(), "{name}: v5");
+        assert_eq!(long, expect["long"].as_str().unwrap(), "{name}: long");
+        assert_eq!(
+            high,
+            expect["high_res"].as_str().unwrap(),
+            "{name}: high_res"
+        );
+    }
+}
+
+#[test]
+fn the_hlg_fixture_is_hdr_main_10_and_the_others_are_not() {
+    let (_, detail) = probed("rej_hdr_hlg.mov").unwrap();
+    assert!(detail.is_hdr);
+    let codec = detail.hevc_codec_string.unwrap();
+    assert!(codec.starts_with("hvc1.2.4.L"), "{codec}");
+    for name in ["long_12min.mp4", "rej_8k.mp4", "rej_too_long_46min.mp4"] {
+        assert_eq!(probed(name).unwrap().1, VideoDetail::default(), "{name}");
+    }
+}
+
+#[test]
+fn long_12min_is_a_twelve_minute_long_source() {
+    let (p, detail) = probed("long_12min.mp4").unwrap();
+    let Ok(Route::Long(info)) = route_probe(&p, &detail, true, Entry::Long, LONG) else {
+        panic!("long_12min.mp4 is not long");
+    };
+    assert!(
+        info.duration.get().abs_diff(720_000) <= 50,
+        "{:?}",
+        info.duration
+    );
+    assert_eq!(
+        (info.display_width.get(), info.display_height.get()),
+        (320, 180)
+    );
+    assert_eq!(info.audio_codec_string, "mp4a.40.2");
+    assert_eq!(
+        (info.audio_sample_rate.get(), info.audio_channels),
+        (48_000, 2)
+    );
+    assert_eq!(offcut_types::window_count(info.duration), 9);
+}

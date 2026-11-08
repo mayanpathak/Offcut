@@ -79,6 +79,31 @@ pub fn resolve(t: &RawTables) -> Result<TrackTable, ContainerError> {
     })
 }
 
+/// V6.1 (additive): `resolve`, with the expansion limit given instead of
+/// `MAX_RESOLVED_SAMPLES`, for a long source's tracks (`Demuxer::open_source`).
+/// The clip path keeps `resolve` and its limit (v2implementation D-60).
+pub fn resolve_up_to(t: &RawTables, max_samples: u32) -> Result<TrackTable, ContainerError> {
+    let sample_count = t.stsz.sample_count;
+    let resolved = sample_count <= max_samples;
+    let mut samples = Vec::new();
+    if resolved {
+        samples = timed_samples(t)?;
+        place(t, &mut samples)?;
+        if let Some(sync) = &t.stss {
+            mark_keyframes(sync, &mut samples);
+        }
+    }
+    let (edit_offset, presented) = edits(t)?;
+    Ok(TrackTable {
+        timescale: t.timescale,
+        sample_count,
+        resolved,
+        samples,
+        edit_offset,
+        presented,
+    })
+}
+
 /// Steps 1 and 2: a duration, a decode time and a presentation time per sample.
 fn timed_samples(t: &RawTables) -> Result<Vec<Sample>, ContainerError> {
     let count = t.stsz.sample_count;

@@ -38,3 +38,6 @@ corpus/.results/
 
 # Long local fixtures, D1 only (v6.1implementation D-430); never committed.
 fixtures/.gen-local/
+
+# The e2e build with the V6.x flags on (v6.1implementation D-394). Never committed, never deployed.
+web/dist-flags/

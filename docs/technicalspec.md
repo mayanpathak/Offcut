@@ -393,6 +393,7 @@ offcut/
 │   │       ├── loudness_target.rs
 │   │       ├── chain_no_clicks.rs
 │   │       ├── duration_preserved.rs
+│   │       ├── stream_resample.rs     (V6.1) StreamResampler in pieces equals resample_mono, sample for sample (v6.1implementation D-401)
 │   │       ├── prosody.rs
 │   │       └── program_identity.rs    the program audio equals the cleaned voice (S-6)
 │   ├── offcut-vision/                 (V6.5) pure: shot boundaries, kinds, face tracking; depends only on offcut-types (§46)
@@ -523,6 +524,7 @@ offcut/
 │   │   └── src/
 │   │       ├── lib.rs                 panic hook, init
 │   │       ├── media_api.rs           open_demuxer, probe_and_validate, resample; the DemuxerHandle probe and audio-sample methods, validate (v2implementation D-53)
+│   │       ├── source_api.rs          (V6.1) open_demuxer_reader (a File read in place), route_probe, the StreamResampler class (v6.1implementation D-399)
 │   │       ├── text_api.rs            normalize_transcript
 │   │       ├── audio_api.rs           run_chain, measure_prosody
 │   │       └── hash_api.rs            Sha256Stream
@@ -661,7 +663,8 @@ offcut/
 │   │   │   ├── pricing.ts             [ONLY] display prices (PS §11)
 │   │   │   ├── model-manifest.json    model files: path, size, sha256
 │   │   │   ├── models/                (V6.5, V6.11) one manifest per extra model: face, person; the ASR manifest stays above (DC-4)
-│   │   │   ├── features.ts            [ONLY] FeatureFlags from a Vite define (§41.3); built by the cloud transcription release with `cloud_transcribe`, V6.1 adds its own
+│   │   │   ├── features.ts            [ONLY] FeatureFlags from a Vite define (§41.3): three flags, each with a default; `featureFlags(on, off)` for vite.config.ts (v6.1implementation D-393)
+│   │   │   ├── features.test.ts       (V6.1) the defaults, OFFCUT_FEATURES_ON and _OFF, an unknown name and a name in both lists
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
 │   │   │   ├── messages.ts            [ONLY] all user-facing copy keyed by code, with the files it imports (INV-15)
@@ -984,6 +987,7 @@ offcut/
 ├── fixtures/
 │   ├── gen_fixtures.sh                generates the synthetic and derived fixtures with the ffmpeg CLI into .gen/ (dev and CI tool)
 │   ├── manifest.json                  fixture name -> recipe kind, expected outcome, probe properties, tests (26 fixtures)
+│   ├── manifest-long.json             (V6.1) the four long-path fixtures, apart from manifest.json (v6.1implementation D-430)
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
@@ -997,6 +1001,7 @@ offcut/
 │   └── results/                       committed runs, <device>-<date>-<clip>.json (v3implementation §19.19); .gitkeep
 ├── scripts/
 │   ├── build-wasm.sh
+│   ├── gen-long-fixture.sh            (V6.1) the 45-minute local fixtures into fixtures/.gen-local/, D1 only (v6.1implementation D-430)
 │   ├── gen-types.sh
 │   ├── check-gen-clean.sh
 │   ├── check-file-tree.mjs            fails if a source file is absent from this section
