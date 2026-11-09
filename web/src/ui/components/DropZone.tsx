@@ -7,13 +7,16 @@
 // else (TS §25.1 P-11).
 
 import { type DragEvent, useRef, useState } from "react";
+import { Link } from "react-router";
 
+import { FEATURES } from "../../config/features";
 import { messages } from "../../copy/messages";
 import { LIMITS } from "../../gen/domain";
-import { type BlockerCode, forImport } from "../../state/blockers";
+import { type BlockerCode, forImport, forSource } from "../../state/blockers";
 import { useCapabilityStore } from "../../state/capability-store";
 import { useClipStore } from "../../state/clip-store";
 import { useExportStore } from "../../state/export-store";
+import { useSourceStore } from "../../state/source-store";
 import { importClip, importSampleClip } from "../../usecases/import-clip";
 import { ArrowUp } from "../icons";
 import { Button } from "../primitives/Button";
@@ -38,9 +41,20 @@ export type DropZoneProps = {
    * drop, outlined in the brand colour while a file is over it.
    */
   variant?: "landing" | "stage";
+  /**
+   * V6.1 (D-424): `clip`, as every caller had it; `long`, the long page's zone:
+   * no sample clip and no transcription card, its own words, and the file
+   * handed to `onFile`.
+   */
+  kind?: "clip" | "long";
+  onFile?: (file: File) => void;
 };
 
-export function DropZone({ variant = "landing" }: DropZoneProps) {
+/** The long page's path (D-422); `routes.tsx` names it as `ROUTES.long`. */
+const LONG_PATH = "/app/long";
+
+export function DropZone({ variant = "landing", kind = "clip", onFile }: DropZoneProps) {
+  const long = kind === "long";
   // A blocker is said once a clip was offered, not before: while the browser
   // is still being checked, nothing has been refused.
   const [offered, setOffered] = useState(false);
@@ -51,11 +65,16 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
   useCapabilityStore((state) => state.status);
   useClipStore((state) => state.status);
   useExportStore((state) => state.status);
-  const blocker = forImport();
+  useSourceStore((state) => state.status);
+  const blocker = long ? forSource() : forImport();
   const stage = variant === "stage";
 
   const offer = (file: File | undefined): void => {
     setOffered(true);
+    if (file !== undefined && long) {
+      onFile?.(file);
+      return;
+    }
     if (file !== undefined && forImport() === null) {
       void importClip(file, "user");
     }
@@ -121,7 +140,7 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
           <ArrowUp />
         </span>
       ) : null}
-      {messages.dropZone.prompt(LIMITS)}
+      {long ? messages.long.dropTitle : messages.dropZone.prompt(LIMITS)}
     </div>
   );
   const input = (
@@ -139,6 +158,19 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
     />
   );
 
+  if (stage && long) {
+    return (
+      <div className={over ? styles.dropStageOver : styles.dropStage} {...dropHandlers} data-kind="long">
+        {target}
+        {input}
+        <p className={styles.dropBrowsers}>{messages.long.dropHint}</p>
+        <p className={styles.dropLine} role="status">
+          {line}
+        </p>
+      </div>
+    );
+  }
+
   if (stage) {
     return (
       <div className={over ? styles.dropStageOver : styles.dropStage} {...dropHandlers}>
@@ -150,6 +182,11 @@ export function DropZone({ variant = "landing" }: DropZoneProps) {
         </Button>
         <TranscriptionChoice />
         <p className={styles.dropBrowsers}>{messages.landing.supportedBrowsers}</p>
+        {FEATURES.long_video ? (
+          <Link className={styles.dropLongLink} to={LONG_PATH} data-testid="long-link">
+            {messages.long.linkFromClip}
+          </Link>
+        ) : null}
         <p className={styles.dropLine} role="status">
           {line}
         </p>

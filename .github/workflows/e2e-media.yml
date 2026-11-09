@@ -54,7 +54,8 @@ jobs:
   media:
     runs-on: windows-latest
     # The eight cases took about five minutes on the runner, and its tools three.
-    timeout-minutes: 30
+    # V6.1 adds the flags-on build's @no-gpu cases (about as many again).
+    timeout-minutes: 45
 
     # The default shell of a Windows runner is PowerShell; every step here is
     # written for bash, as in ci.yml.
@@ -144,11 +145,25 @@ jobs:
           name: web-dist
           path: web/dist
 
+      # V6.1 (v6.1implementation §12.1): the flags-on build, served on a
+      # second port for the media-flags project.
+      - name: Take the flags-on build of the ci job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: web-dist-flags
+          path: web/dist-flags
+
       # --- 10.4 The cases a runner can run, against `vite preview` ------------
       # The setup project runs first, whatever is selected: it stops the step
       # at once, with the reason, if Chrome here cannot run the app.
       - name: Playwright, the media cases that need no graphics card
         run: pnpm e2e:media --grep @no-gpu
+
+      # V6.1: the same, against the flags-on build: the long page read in
+      # place and transcribed through the fake windows, its resumes and
+      # pauses, and the clip page with high_res (FLAG_SUITES, §11.4).
+      - name: Playwright, the flags-on cases that need no graphics card
+        run: pnpm e2e:media:flags --grep @no-gpu
 
       # --- 10.5 What is kept of a failed run ---------------------------------
       # The report: the names of the cases and what failed. Not

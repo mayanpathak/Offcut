@@ -19,6 +19,8 @@ const DOMAIN = "web/src/gen/domain.ts";
 // The blocker codes are in no generated list: this file is their source (v2implementation D-20).
 const BLOCKERS = "web/src/state/blockers.ts";
 const MESSAGES = resolve(ROOT, "web/src/copy/messages.ts");
+// V6.1 (v6.1implementation D-426): the long path's words, which messages.ts imports.
+const LONG = resolve(ROOT, "web/src/copy/long.ts");
 
 /**
  * Codes whose copy belongs to a flow that does not exist yet. An entry is
@@ -35,6 +37,9 @@ const LISTS = [
   { name: "REJECT_REASONS", file: DOMAIN },
   { name: "UNSUPPORTED_REASONS", file: DOMAIN },
   { name: "BLOCKER_CODES", file: BLOCKERS },
+  // V6.1: REJECT_HDR and the two E_SOURCE_* (offcut-types/src/source.rs).
+  { name: "SOURCE_REJECT_REASONS", file: DOMAIN },
+  { name: "SOURCE_ERROR_CODES", file: DOMAIN },
 ];
 /** A list none of whose codes may be pending: its copy is needed now. */
 const NEVER_PENDING = ["UNSUPPORTED_REASONS"];
@@ -55,7 +60,7 @@ function readCodes(file, list) {
   });
 }
 
-const messages = readFileSync(MESSAGES, "utf8");
+const messages = `${readFileSync(MESSAGES, "utf8")}\n${readFileSync(LONG, "utf8")}`;
 
 /** The codes that appear in messages.ts as the key of an entry. */
 const withCopy = new Set([...messages.matchAll(/^\s*((?:E|REJECT|UNSUPPORTED|B)_[A-Z0-9_]+):/gm)].map((match) => match[1]));

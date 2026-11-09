@@ -413,3 +413,91 @@ fn nothing_under_transcribe_writes_to_the_database() {
         end_ms: 0,
     };
 }
+
+// --- V6.1: windows of a long source (v6.1implementation D-411, §11.2) --------
+
+/// `post` with an `X-Offcut-Window` header.
+async fn post_window(
+    app: &TestApp,
+    bearer: Option<&str>,
+    window: &str,
+    ip: &str,
+) -> reqwest::Response {
+    let mut request = app
+        .client
+        .post(format!("{}/transcribe", app.base_url))
+        .header("content-type", "audio/ogg")
+        .header("x-forwarded-for", ip)
+        .header("x-offcut-window", window)
+        .body(TONE.to_vec());
+    if let Some(token) = bearer {
+        request = request.bearer_auth(token);
+    }
+    request.send().await.unwrap()
+}
+
+#[tokio::test]
+async fn a_window_of_a_long_source_is_answered_as_a_clip_is() {
+    let app = TestApp::spawn().await;
+    let token = signed_in(&app, "w1@example.com").await;
+    for window in ["0/34", "33/34", "34/35"] {
+        let response = post_window(&app, Some(&token), window, "192.0.2.10").await;
+        assert_eq!(response.status(), StatusCode::OK, "{window}");
+        let body: TranscribeResponse = response.json().await.unwrap();
+        assert!(body.duration_ms > 0);
+    }
+    assert_eq!(app.transcriber.received.lock().unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn a_malformed_window_header_is_400_before_the_bearer_and_the_body() {
+    let app = TestApp::spawn().await;
+    let token = signed_in(&app, "w2@example.com").await;
+    for bad in ["34/34", "0/36", "a/b", "-1/3", "3", "1/"] {
+        let response = post_window(&app, Some(&token), bad, "192.0.2.11").await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{bad}");
+        assert_eq!(code(response).await, ApiErrorCode::BadRequest, "{bad}");
+        // Without a bearer the header is still what refuses it.
+        let response = post_window(&app, None, bad, "192.0.2.11").await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{bad}");
+    }
+    assert!(app.transcriber.received.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn the_121st_window_of_a_user_in_a_day_is_429_while_their_clips_still_pass() {
+    let app = TestApp::spawn().await;
+    let token = signed_in(&app, "w3@example.com").await;
+    for n in 0..120 {
+        let response = post_window(&app, Some(&token), "0/34", "192.0.2.12").await;
+        assert_eq!(response.status(), StatusCode::OK, "window {n}");
+    }
+    let refused = post_window(&app, Some(&token), "1/34", "192.0.2.12").await;
+    assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(code(refused).await, ApiErrorCode::RateLimited);
+    // The person's clips have their own bucket.
+    let clip = post(&app, Some(&token), "audio/ogg", TONE.to_vec(), "192.0.2.13").await;
+    assert_eq!(clip.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn windows_and_clips_take_an_address_s_tokens_from_their_own_buckets() {
+    let app = TestApp::spawn().await;
+    // The clips' 60 an hour, spent by unauthenticated requests, as before V6.1.
+    for n in 0..60 {
+        let response = post(&app, None, "audio/ogg", TONE.to_vec(), "192.0.2.14").await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "clip {n}");
+    }
+    let clip = post(&app, None, "audio/ogg", TONE.to_vec(), "192.0.2.14").await;
+    assert_eq!(clip.status(), StatusCode::TOO_MANY_REQUESTS);
+    // A window from the same address is not refused by the clips' bucket: it reaches the bearer.
+    let window = post_window(&app, None, "0/34", "192.0.2.14").await;
+    assert_eq!(window.status(), StatusCode::UNAUTHORIZED);
+    // The windows' own bucket: 200 an hour.
+    for n in 1..200 {
+        let response = post_window(&app, None, "0/34", "192.0.2.14").await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "window {n}");
+    }
+    let window = post_window(&app, None, "0/34", "192.0.2.14").await;
+    assert_eq!(window.status(), StatusCode::TOO_MANY_REQUESTS);
+}

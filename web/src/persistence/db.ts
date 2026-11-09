@@ -2,9 +2,18 @@
 
 import { type IDBPDatabase, openDB } from "idb";
 
-import { DB_NAME, DB_VERSION, type OffcutDb, STORES, type Versioned } from "./schema";
+import {
+  DB_NAME,
+  DB_STRUCTURE_VERSION,
+  DB_VERSION,
+  type OffcutDb,
+  type OffcutSourcesDb,
+  SOURCE_STORES,
+  STORES,
+  type Versioned,
+} from "./schema";
 
-type Upgrade = (db: IDBPDatabase<OffcutDb>) => void;
+type Upgrade = (db: IDBPDatabase<OffcutSourcesDb>) => void;
 
 /**
  * The upgrade to version `n` is entry `n - 1`. Opening the database runs, in
@@ -17,7 +26,24 @@ const UPGRADES: readonly Upgrade[] = [
       db.createObjectStore(store);
     }
   },
+  // 2 (V6.1, D-414): the three source stores, made only when the long path first opens them.
+  (db) => {
+    for (const store of Object.values(SOURCE_STORES)) {
+      db.createObjectStore(store);
+    }
+  },
 ];
+
+/** The upgrades from `oldVersion` up to the version being opened, and no further. */
+function runUpgrades(db: IDBPDatabase<OffcutSourcesDb>, oldVersion: number, newVersion: number | null): void {
+  for (const upgrade of UPGRADES.slice(oldVersion, newVersion ?? DB_VERSION)) {
+    upgrade(db);
+  }
+}
+
+function isVersionError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "VersionError";
+}
 
 let opened: Promise<IDBPDatabase<OffcutDb>> | undefined;
 
@@ -30,12 +56,24 @@ export function openDb(): Promise<IDBPDatabase<OffcutDb>> {
   return opened;
 }
 
-function open(): Promise<IDBPDatabase<OffcutDb>> {
-  return openDB<OffcutDb>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      for (const upgrade of UPGRADES.slice(oldVersion)) {
-        upgrade(db);
-      }
+async function open(): Promise<IDBPDatabase<OffcutDb>> {
+  try {
+    return await openAt(DB_VERSION);
+  } catch (error) {
+    // V6.1 (D-414, §12.4): the database is newer than this path asks for (the long
+    // path upgraded it, or a later build did). Open it as it is; this path uses only
+    // the stores it knows, which every later version keeps.
+    if (isVersionError(error)) {
+      return openAt(undefined);
+    }
+    throw error;
+  }
+}
+
+function openAt(version: number | undefined): Promise<IDBPDatabase<OffcutDb>> {
+  return openDB<OffcutDb>(DB_NAME, version, {
+    upgrade(db, oldVersion, newVersion) {
+      runUpgrades(db as unknown as IDBPDatabase<OffcutSourcesDb>, oldVersion, newVersion);
     },
     // A newer build in another tab wants to upgrade: let it.
     blocking(_currentVersion, _blockedVersion, event) {
@@ -46,6 +84,46 @@ function open(): Promise<IDBPDatabase<OffcutDb>> {
       opened = undefined;
     },
   });
+}
+
+let openedSources: Promise<IDBPDatabase<OffcutSourcesDb>> | undefined;
+
+/**
+ * V6.1 (D-414): the database at structure version 2, with the source stores,
+ * upgraded on first use. Only `sources-repo.ts` calls this, so a build with
+ * `long_video` off never upgrades anyone's database. A connection the clip
+ * path holds at version 1 closes itself when asked (`blocking`).
+ */
+export function openSourcesDb(): Promise<IDBPDatabase<OffcutSourcesDb>> {
+  openedSources ??= openSources().catch((error: unknown) => {
+    openedSources = undefined;
+    throw error;
+  });
+  return openedSources;
+}
+
+async function openSources(): Promise<IDBPDatabase<OffcutSourcesDb>> {
+  const at = (version: number | undefined) =>
+    openDB<OffcutSourcesDb>(DB_NAME, version, {
+      upgrade(db, oldVersion, newVersion) {
+        runUpgrades(db, oldVersion, newVersion);
+      },
+      blocking(_currentVersion, _blockedVersion, event) {
+        (event.target as IDBDatabase).close();
+        openedSources = undefined;
+      },
+      terminated() {
+        openedSources = undefined;
+      },
+    });
+  try {
+    return await at(DB_STRUCTURE_VERSION);
+  } catch (error) {
+    if (isVersionError(error)) {
+      return at(undefined);
+    }
+    throw error;
+  }
 }
 
 /** The value stored under `key`, or `undefined` if there is none. */

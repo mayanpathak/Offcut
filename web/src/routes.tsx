@@ -2,12 +2,14 @@
 
 import { createBrowserRouter, generatePath, Navigate } from "react-router";
 
+import { FEATURES } from "./config/features";
 import { CapabilityGate } from "./ui/components/CapabilityGate";
 import { AccountPage } from "./ui/pages/AccountPage";
 import { AuthCallbackPage } from "./ui/pages/AuthCallbackPage";
 import { EditorPage } from "./ui/pages/EditorPage";
 import { LandingPage } from "./ui/pages/LandingPage";
 import { LegalPage } from "./ui/pages/LegalPage";
+import { LongPage } from "./ui/pages/LongPage";
 import { SettingsPage } from "./ui/pages/SettingsPage";
 
 export const ROUTES = {
@@ -17,6 +19,8 @@ export const ROUTES = {
   account: "/account",
   settings: "/settings",
   legal: "/legal/:doc",
+  /** V6.1 (D-422): "Make shorts from a long video"; with `long_video` off it leads to `/app`. */
+  long: "/app/long",
 } as const;
 
 export const router = createBrowserRouter([
@@ -27,6 +31,16 @@ export const router = createBrowserRouter([
       <CapabilityGate>
         <EditorPage accountPath={ROUTES.account} />
       </CapabilityGate>
+    ),
+  },
+  {
+    path: ROUTES.long,
+    element: FEATURES.long_video ? (
+      <CapabilityGate>
+        <LongPage appPath={ROUTES.app} accountPath={ROUTES.account} />
+      </CapabilityGate>
+    ) : (
+      <Navigate to={ROUTES.app} replace />
     ),
   },
   { path: ROUTES.authCallback, element: <AuthCallbackPage appPath={ROUTES.app} /> },

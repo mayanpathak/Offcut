@@ -33,9 +33,17 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // V6.1 (D-412): the global transcription budget, optional, from its two variables.
+    let budget = match offcut_api::config::transcribe_budget(|name| std::env::var(name).ok()) {
+        Ok(budget) => budget,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
     log::init(config.log_level);
 
-    match serve(config).await {
+    match serve(config, budget).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "the server stopped");
@@ -63,7 +71,7 @@ enum ServeError {
     Io(#[from] std::io::Error),
 }
 
-async fn serve(config: Config) -> Result<(), ServeError> {
+async fn serve(config: Config, (hour_s, day_s): (u32, u32)) -> Result<(), ServeError> {
     let pool = db::connect(&config.database_url)
         .await
         .map_err(|error| ServeError::Connect(offcut_api::error::db_error_kind(&error)))?;
@@ -89,7 +97,7 @@ async fn serve(config: Config) -> Result<(), ServeError> {
         billing,
         fair_use: Arc::default(),
         transcriber,
-        transcribe_budget: Arc::default(),
+        transcribe_budget: Arc::new(offcut_api::transcribe::budget::Budget::new(hour_s, day_s)),
     };
     // The rate limiter needs the peer address of each connection.
     let app = router::build(state).into_make_service_with_connect_info::<SocketAddr>();

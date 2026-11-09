@@ -6,6 +6,7 @@
 // §25.1 P-11).
 
 import { track } from "../analytics/client";
+import { FEATURES } from "../config/features";
 import type { ClipSource, DurationBucket } from "../gen/api";
 import type { ClipId, DurMs } from "../gen/domain";
 import { fetchAsset, SAMPLE_CLIP_PATH } from "../net/asset-fetch";
@@ -20,6 +21,7 @@ import * as exportStore from "../state/export-store";
 import { pool, WorkerCallError, whenReleased } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { signalFor } from "./cancel-job";
+import { handOff } from "./import-source";
 import { runPipeline, startTimer } from "./run-pipeline";
 
 // Where a clip's length falls, for `clip_accepted`.
@@ -164,9 +166,18 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
 
   // 7. A cancel stops the copy (D-152); a media worker restarted because the
   //    copy did not stop in time fails the call as a crash, which is the cancel too.
-  let probed: Awaited<ReturnType<typeof pool.media.importAndProbe>>;
+  let probed: Awaited<ReturnType<typeof pool.media.importAndProbe | typeof pool.media.importAndRoute>>;
   try {
-    probed = await pool.media.importAndProbe({ clipId, file });
+    if (FEATURES.high_res) {
+      // V6.1 (D-427, DC-2, DC-3): 4K H.264 and the 16 GB limit, through `route_probe`.
+      probed = await pool.media.importAndRoute({
+        clipId,
+        file,
+        flags: { long_video: FEATURES.long_video, high_res: true, hdr_ok: false },
+      });
+    } else {
+      probed = await pool.media.importAndProbe({ clipId, file });
+    }
   } catch (error) {
     if (signal.aborted) {
       await importCancelled(clipId);
@@ -192,7 +203,14 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
   // 8. A clip that cannot be used is not an error (TS §11.3). Its code alone is sent (D-97, INV-18).
   if ("rejected" in probed) {
     clipStore.rejected(probed.rejected);
-    track({ name: "clip_rejected", props: { reject_reason: probed.rejected } });
+    // V6.1: REJECT_HDR is not an analytics value yet (open item 26); every V5 code is sent as before.
+    if (probed.rejected !== "REJECT_HDR") {
+      track({ name: "clip_rejected", props: { reject_reason: probed.rejected } });
+    }
+    // V6.1 (DC-1, D-421): a long file may go to the long page, the File still in memory.
+    if (FEATURES.long_video && probed.rejected === "REJECT_DURATION") {
+      handOff(file, "long");
+    }
     await opfs.remove(opfs.paths.clipDir(clipId)).catch(() => undefined);
     return;
   }

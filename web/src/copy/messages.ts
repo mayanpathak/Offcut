@@ -6,8 +6,10 @@
 // the video is not uploaded. Legal and certification terms are not used.
 
 import type { AnalyticsEvent, BillingInterval, Wanted } from "../gen/api";
-import { type ErrorCode, type EventKind, LIMITS, type RejectReason, type UnsupportedReason } from "../gen/domain";
+import { FEATURES } from "../config/features";
+import { type ErrorCode, type EventKind, LIMITS, type RouteReject, SOURCE_LIMITS, type UnsupportedReason } from "../gen/domain";
 import { landingCopy, pricingCopy } from "./landing";
+import { longCopy, longRejections } from "./long";
 import { transcriptionCopy } from "./transcription";
 
 type EventName = AnalyticsEvent["name"];
@@ -90,6 +92,8 @@ export const messages = {
 
   // Cloud transcription's card, line and toasts: copy/transcription.ts (cloudimplementation D-380).
   transcription: transcriptionCopy,
+  // The long page (V6.1): copy/long.ts (v6.1implementation D-426).
+  long: longCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
@@ -596,7 +600,10 @@ export const messages = {
   rejections: {
     REJECT_FILE_SIZE: {
       title: "This file is too large",
-      body: `Offcut takes files up to ${String(LIMITS.MAX_FILE_SIZE / BYTES_PER_MB)} MB.`,
+      // V6.1 (DC-3, TS §43.2): with `high_res` on, the clip page takes 16 GB.
+      body: FEATURES.high_res
+        ? `Offcut takes files up to ${String(SOURCE_LIMITS.MAX_FILE_SIZE_HIGH_RES / BYTES_PER_MB / 1000)} GB.`
+        : `Offcut takes files up to ${String(LIMITS.MAX_FILE_SIZE / BYTES_PER_MB)} MB.`,
       action: "Trim the clip or export it at a lower resolution, then drop it again.",
     },
     REJECT_CONTAINER: {
@@ -646,7 +653,8 @@ export const messages = {
     },
     REJECT_RESOLUTION: {
       title: "This video is larger than Offcut handles",
-      body: `Offcut handles video up to ${String(LIMITS.MAX_LONG_SIDE)} pixels on its long side.`,
+      // V6.1 (DC-2): with `high_res` on, 3840.
+      body: `Offcut handles video up to ${String(FEATURES.high_res ? SOURCE_LIMITS.MAX_INPUT_LONG_SIDE : LIMITS.MAX_LONG_SIDE)} pixels on its long side.`,
       action: "Record or export at a lower resolution, then drop it again.",
     },
     REJECT_FRAME_RATE: {
@@ -664,5 +672,7 @@ export const messages = {
       body: "Offcut could not hear enough English words in this clip to write captions.",
       action: "Drop a clip of you talking in English.",
     },
-  } satisfies Record<RejectReason, ErrorCopy>,
+    // V6.1 (TS §43.1): REJECT_HDR, from copy/long.ts.
+    ...longRejections,
+  } satisfies Record<RouteReject, ErrorCopy>,
 };

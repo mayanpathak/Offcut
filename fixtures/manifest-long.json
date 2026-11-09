@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "note": "V6.1's long-path fixtures (v6.1implementation D-430, §11.6), made by gen_fixtures.sh step 5c and probe-checked by its step 8, apart from manifest.json: V5's tests require every rej_* entry there to be one of their twelve cases. expect.v5 is what validate_probe says (the clip page, flags off); expect.long is what route_probe says from the long page with long_video and high_res on; expect.high_res from the clip page with high_res on.",
+  "fixtures": [
+    {
+      "name": "long_12min.mp4",
+      "kind": "long",
+      "source": "The reference clip's whole sound (74.517 s), then 5 s of room tone, nine times, then room tone to 12:00; 320x180 testsrc2 at 30 fps",
+      "expect": { "v5": "REJECT_DURATION", "long": "long", "high_res": "REJECT_DURATION" },
+      "probe": { "video_codec": "h264", "audio_codec": "aac", "width": 320, "height": 180, "frames": 21600, "duration_ms": 720000 },
+      "tests": ["route_probe.rs", "demux_fixtures.rs", "route-long.spec.ts", "long-resume.spec.ts"]
+    },
+    {
+      "name": "rej_too_long_46min.mp4",
+      "kind": "synthetic",
+      "source": "46:00 of 160x90 testsrc2 at 1 fps, room tone as AAC at 16 kbps, 16 kHz mono",
+      "expect": { "v5": "REJECT_DURATION", "long": "REJECT_DURATION", "high_res": "REJECT_DURATION" },
+      "probe": { "video_codec": "h264", "audio_codec": "aac", "width": 160, "height": 90, "frames": 2760, "duration_ms": 2760000 },
+      "tests": ["route_probe.rs", "route-long.spec.ts"]
+    },
+    {
+      "name": "rej_8k.mp4",
+      "kind": "synthetic",
+      "source": "1 s of 7680x4320 testsrc2 at 1 fps",
+      "expect": { "v5": "REJECT_RESOLUTION", "long": "REJECT_RESOLUTION", "high_res": "REJECT_RESOLUTION" },
+      "probe": { "video_codec": "h264", "audio_codec": "aac", "width": 7680, "height": 4320, "frames": 1 },
+      "tests": ["route_probe.rs", "route-long.spec.ts", "high-res.spec.ts"]
+    },
+    {
+      "name": "rej_hdr_hlg.mov",
+      "kind": "synthetic",
+      "source": "1 s of 640x360 HEVC Main 10, BT.2020 primaries and matrix, HLG transfer, colr written (QuickTime nclc)",
+      "expect": { "v5": "REJECT_HEVC", "long": "REJECT_HDR", "high_res": "REJECT_HDR" },
+      "probe": { "video_codec": "hevc", "audio_codec": "aac", "width": 640, "height": 360, "frames": 30 },
+      "tests": ["route_probe.rs", "demux_fixtures.rs", "route-long.spec.ts"]
+    }
+  ]
+}

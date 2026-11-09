@@ -30,6 +30,7 @@ import type {
   Word,
   WordIdx,
 } from "../gen/domain";
+import type { Entry, RouteFlags, RouteReject, SourceErrorCode, SourceInfo } from "../gen/domain";
 
 export type { FailureStage } from "../gen/domain";
 
@@ -76,7 +77,33 @@ export interface MediaWorkerApi {
   importAndProbe(p: { clipId: ClipId; file: File }): Promise<{ ok: ClipInfo } | { rejected: RejectReason }>;
   /** Both arrays are transferred. */
   extractAudio(p: { clipId: ClipId }): Promise<{ pcm48: Float32Array; pcm16: Float32Array }>;
+  /** V6.1 (§6.4): which path a dropped file takes, read in place; nothing is copied. */
+  routeFile(p: { file: File; entry: Entry; flags: RouteFlags }): Promise<Routed | SourceFailed>;
+  /** V6.1 (D-427): `importAndProbe` for the clip page with `high_res` on: copy, then `route_probe`. */
+  importAndRoute(p: { clipId: ClipId; file: File; flags: RouteFlags }): Promise<{ ok: ClipInfo } | { rejected: RouteReject }>;
+  /**
+   * V6.1 (§7.2): the source's sound as `sources/<id>/pcm16.f32`, from `fromSeconds` on. Progress is
+   * `{ stage: "import", done, total }` in milliseconds of sound; `done` is flushed to disk.
+   */
+  extractSourcePcm16(p: {
+    sourceId: SourceId;
+    file: File;
+    info: SourceInfo;
+    fromSeconds: number;
+  }): Promise<{ done: true; levelP95: number } | SourceFailed>;
 }
+
+/** V6.1: a long source's id (a UUID); `persistence/schema.ts` declares the same brand. */
+export type SourceId = string & { readonly __unit: "SourceId" };
+
+/** V6.1: which path a file takes, or why it is refused. */
+export type Routed = { clip: ClipInfo } | { long: SourceInfo } | { rejected: RouteReject };
+
+/**
+ * V6.1: a source file that cannot be read (`E_SOURCE_READ`) or whose sound cannot be decoded
+ * (`E_SOURCE_AUDIO`), returned as a value: `rpc.ts` carries only V5's `ErrorCode`s as failures.
+ */
+export type SourceFailed = { failed: SourceErrorCode; detail: string };
 
 export interface AsrWorkerApi {
   load(p: { modelId: string; backend: "webgpu" | "wasm" }): Promise<{ backend: "webgpu" | "wasm" }>;
@@ -86,7 +113,21 @@ export interface AsrWorkerApi {
   encodeForCloud(p: { pcm16: Float32Array }): Promise<{ ogg: Uint8Array; durationMs: number } | { unsupported: true }>;
   /** The provider's words as a transcript, as `transcribe` builds one, after the silence guard (D-382). */
   fromCloud(p: { words: CloudWord[]; pcm16: Float32Array; modelVersion: string }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
+  /**
+   * V6.1 (D-406): one window's words through the silence guard, judged against the source's level
+   * (D-407), as words relative to the window: not merged, not post-processed.
+   */
+  cloudWindowWords(p: { words: CloudWord[]; pcm16: Float32Array; refLevel: number }): Promise<{ words: WindowWord[]; lengthMs: number }>;
+  /** V6.1 (D-408): the windows merged (`mergeWindows`), placed (`postProcess`) and normalized. */
+  buildMasterTranscript(p: {
+    windows: { offsetMs: number; lengthMs: number; words: WindowWord[] }[];
+    durationMs: number;
+    modelVersion: string;
+  }): Promise<{ ok: Transcript } | { rejected: "NoSpeech" }>;
 }
+
+/** V6.1: a word as the recognizer gave it, times in whole ms from its window's start (`RawWord`). */
+export type WindowWord = { text: string; startMs: number; endMs: number; confidence: number };
 
 // The audio worker has no method that detects silence or plans a cut. Only
 // `assemble` applies a time map, and in V4 the only map is the identity.

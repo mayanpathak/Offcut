@@ -28,6 +28,8 @@ export type HttpRequest = {
    * audio file of `POST /transcribe` (cloudimplementation D-373).
    */
   rawBody?: { bytes: Uint8Array<ArrayBuffer>; contentType: "audio/ogg" };
+  /** V6.1 (D-411, D-413): a window of a long source, sent as `X-Offcut-Window: <index>/<total>`. */
+  window?: { index: number; total: number };
   /** How long one attempt may take. The default is `API_TIMEOUT_MS`. */
   attemptTimeoutMs?: number;
   /** `"cold-start"` keeps trying while the API may be waking; `"none"` makes one attempt. */
@@ -199,6 +201,9 @@ export function createHttp(deps: HttpDeps): { request<T>(req: HttpRequest): Prom
     }
     if (req.csrf === true) {
       headers["X-Offcut-Csrf"] = "1";
+    }
+    if (req.window !== undefined) {
+      headers["X-Offcut-Window"] = `${req.window.index}/${req.window.total}`;
     }
     if (Object.keys(headers).length > 0) {
       init.headers = headers;

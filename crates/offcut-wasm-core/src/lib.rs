@@ -7,6 +7,7 @@
 mod audio_api;
 mod hash_api;
 mod media_api;
+mod source_api;
 mod text_api;
 
 use std::panic::{self, PanicHookInfo};

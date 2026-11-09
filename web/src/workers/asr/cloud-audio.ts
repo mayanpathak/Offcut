@@ -152,8 +152,9 @@ function rmsDb(pcm16: Float32Array, from: number, to: number): number {
  * more than `SILENCE_BELOW_DB` below the clip's loud level: Whisper invents
  * a closing "Thank you." in the silence after the last sentence (TE-C2).
  */
-export function dropSilentWords(words: readonly CloudWord[], pcm16: Float32Array): CloudWord[] {
-  const loud = loudLevelDb(pcm16);
+export function dropSilentWords(words: readonly CloudWord[], pcm16: Float32Array, refLevel?: number): CloudWord[] {
+  // V6.1 (D-407): a long source's window is judged against the source's level, not its own.
+  const loud = refLevel ?? loudLevelDb(pcm16);
   if (loud <= FLOOR_DB) {
     return [];
   }

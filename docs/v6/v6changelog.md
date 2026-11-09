@@ -11,13 +11,23 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 3 | Whether to run E-12 (optional, recommended) | Founder | PS §19 |
 | 4 | Reorder or drop any of V6.8-V6.11 after the alpha | Founder | BP §8A.0 |
 | 5 | Each person-mask effect after TE-25 | Founder | TS §51.4 |
-| 6 | A 10-minute cap, if TE-18 or TE-20 fails on real laptops | Founder | PS §20.2A |
+| 6 | ~~A 10-minute cap, if TE-18 or TE-20 fails on real laptops~~ No longer applies: long sources are transcribed in the cloud (Entry 21, decision 6). TE-20 (hidden tab, sleep) still stands | Founder | PS §20.2A |
 | 7 | The launch date, when V6.11 closes | Founder | PS A-2 |
 | 8 | The long-path fixtures and labelled set of at least 10 real long videos | Founder, by V6.4 | BP §8A.4 |
 | 10 | Dodo Payments' verification. **Read 2026-11-04:** identity and bank approved; the product review is on hold because the live landing page reads as a waitlist ("Offcut is not open yet", no way into the app), with a resubmission allowed once the site is public. Not V6's: live mode is the founding release's (D-285, D-303). The founder decides after V6 | Founder, after P150 | Entry 0.1, Entry 18 |
 | 14 | Tell Dodo the pricing and legal pages are live, and check its product form's description against them | Founder | Entry 3 |
 | 16 | Delete the webhook logger service on Render and its endpoint in Dodo's test mode (keep the `offcut-api` endpoint, registered 2026-11-04); remove `MAIL_API_KEY` from Render, as the V6 deploy is healthy | Founder | Entry 13, Entry 20 |
 | 17 | V6 went live with P148's legal and pricing words and with the account page's two offers, which lead to Dodo's test mode while the pages say Creator is not on sale (D-285). Keep the offers or hide them until the founding release; decide with open item 10's resubmission | Founder, after V6 | Entry 17, Entry 20 |
+| 18 | Spec revision v1.4 (TS §43, §45, §48; PS §12.9-§12.15; BP §8A) from Entry 21's decisions, before V6.1's plan. **Done 2026-11-08 (Entry 22);** the founder reads it | Agent, founder approves | Entry 21, Entry 22 |
+| 23 | ~~Confirm or change the agent's 15 design choices of Entry 22~~ **Confirmed by the founder, 2026-11-08** | Founder | Entry 22, Entry 23 |
+| 19 | Groq's Dev tier before the private alpha (45-minute sources are about 30 windows each) | Founder | Entry 21, D-342 |
+| 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
+| 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
+| 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
+| 26 | D-428's three analytics events (`long_source_accepted`, `source_stage_timing`, `source_paused`) are not built: `analytics.rs`' tests pin the event list and no existing test may change tonight. Build them, editing those pinned lists, before `long_video` goes on in production (V6.4); nothing is lost while it is off | Founder decides, V6.4 | Entry 30, D-428 |
+| 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
+| 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
+| 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
 
 ## Known issues for later prompts
 
@@ -650,3 +660,427 @@ So the order held: the old API and the old site stayed together while the new AP
 **Open after V6.** Open item 10: Dodo's product review, on hold as the live site read as a waitlist; with V6 live, the site now has free accounts and exports. Items 16 and 17 above. Then V6.1 opens its own branch from `main` (BP §8A.0).
 
 **Final counts.** Rust 812 / 0 / 4; Vitest 522; `pnpm e2e` 45; verifier self-test 16; media 106 passed, 1 skipped, on D1. Every box of v6implementation §20 is ticked, each with its evidence.
+
+## Entry 21 - 2026-11-08 - Founder's decisions for spec v1.4: two paths, 45-minute sources, stock B-roll (outside a prompt)
+
+A brainstorming session after the cloud release closed (`cloudchangelog.md` Entry 12). Nothing in the code changed. The specs are not yet revised: these decisions are the input to the v1.4 revision, which comes before V6.1's plan is written. Where a line below contradicts TS v1.3, PS v1.3 or BP v1.3, this entry wins until v1.4 copies it in.
+
+**Founder's decisions.**
+
+| # | Decision | Replaces |
+|---|---|---|
+| 1 | **Two separate entry points and pages:** "Make shorts from a long video" and "Edit my clip". The person chooses the path; a file's duration no longer chooses it. Both paths open the same editor | TS §43.1's model line ("a file longer than 90 seconds is a source") |
+| 2 | **One flow for both paths:** the transcript and a base prompt describing everything the editor can do go to the LLM; the plan is validated; **our editor applies it automatically**. The person sees a finished short and can switch any item off or undo. There is no approve-each-step screen. On the long path the LLM first returns the parts to cut and stitch (the Director), then one edit plan per short, exactly as for a clip | As designed (TS §40, §45); the "apply, then review" behaviour is now explicit |
+| 3 | **The build order stays as BP §8A.0 sets it** (V6.1 first). Quality is inspected and improved after all features work, against a Submagic benchmark | BP §8A.0 confirmed; the "core first" reorder offered in the session was declined |
+| 4 | **B-roll from two sources:** the person's own clips (for example a diagram or a lecture clip on "black hole", which stock cannot give) and **Pixabay stock**. The person can place B-roll on a specific word by hand ("Add B-roll here"); the plan also places it. Own clips need a choose-the-part trim | TS §48's model line (stock rejected, 2026-11-02) and its "Placement by the user" row (chat only, from V6.9). V6.8 keeps the feature |
+| 5 | **Long sources up to 45 minutes**, and **no copy of the whole file**: the dropped file is read in place for the session, its audio is extracted and transcribed, the Director picks the parts, and only those ranges (from the keyframe before each part) are copied into OPFS | TS §43.2's 20-minute and 16 GB limits; §43.4's whole-file copy |
+| 6 | **A long video requires cloud transcription.** If Groq fails, the job pauses with "Continue"; it does not fall back to the device (about 50-60 minutes for 45 minutes of speech on D1, derived). Clips keep the device fallback (D-348) | TS §43.6's on-device windows, its time budget and the two-pass seam |
+| 7 | **Limits by duration and resolution only;** no file-size cap on the long path | TS §43.2's 16 GB |
+| 8 | **Submagic-style auto zoom and visual editing** (zooms on key words, emoji, highlights, cards, sound cues, transitions) so a short is visual and engaging. Quality bar: Submagic and the founder's caption references | Extends V6.2's `PunchIn` and V6.6 part C |
+| 9 | **Tooscut is the main study source for the editing engine:** read how it solves each problem, then design and write Offcut's own version, customised to shorts. Same rule as Entry 0: no copying or line-by-line translation of code, shaders, structs or constants; each idea learned is named in the changelog (TS §54) | Entry 0's rule, confirmed with more weight |
+
+**What the decisions imply (the agent's reading, for v1.4).**
+
+- **V6.1 gets smaller:** no 16 GB copy, no quota eviction for sources, no device transcription of a source, no two-pass seam. Range copying moves to where the parts are known (V6.3, V6.4). A tab closed before the parts are copied resumes by dropping the same file again (`sourceHashPrefix`, TS §43.7).
+- **45 minutes is about 30 cloud windows of 90 s.** Groq's free tier (7,200 audio-seconds per rolling hour, 2,000 requests per day, read in TE-C1) carries about 2-3 such videos an hour, shared with every clip: the Dev tier is needed before the alpha, not at launch (D-342).
+- **The Director's request grows** to about 7,000 words of transcript: the 64 kB request bound (BP §8A.4) and the body limit of `POST /shorts` rise to about 160 kB.
+- **Pixabay** (terms read 2026-10-29, to be re-read before building): a free key, 100 requests per 60 s, searches cached 24 h, "from Pixabay" shown wherever results appear, commercial use without credit, `cdn.pixabay.com` sends `Access-Control-Allow-Origin: *`. A server search route keeps the key off the client and holds the cache. Search terms are transcript words that leave the device: the "What leaves" table, P-rules and `privacy-network.spec.ts` must name them. The plan proposes a search term at a word; the person can swap the result.
+- **Own-clip B-roll** adds a Terms line: the person is responsible for the rights to clips they add.
+- **The founder's caption references** (`sh2clips/documents/`, outside the repo; read by the agent as frame sheets) show three families beyond today's word-by-word captions: (a) **typographic lockups**: words of mixed size and weight stacked into one block, one accent colour, a rotated side word, the camera pushing through the block as it grows; (b) **mixed-font pairs** placed beside the speaker's head ("THIS" bold sans with "Style" in an italic serif), which needs a serif italic in the font registry and the face position of V6.5; (c) **glass cards** with icons, numbers and a soft glow, with the background blurred behind them. V6.6 part C and parts A/E are where these are weighed.
+
+**Benchmark (founder).** A few Submagic-made shorts downloaded from YouTube, kept outside git (the repository is public), as the bar to beat in the final quality pass.
+
+**Open items added:** 18 to 22 in the table at the top. Open item 6 (a 10-minute cap if TE-18 fails) no longer applies: long sources are transcribed in the cloud (decision 6).
+
+## Entry 22 - 2026-11-08 - Spec revision v1.4: the core documents rewritten for Entry 21 (outside a prompt)
+
+The founder asked for every core document to carry Entry 21's decisions, carefully. `technicalspec.md`, `product.md` and `buildplan.md` are now v1.4. Each change is marked "v1.4" where it sits, and v1.3's wording is kept beside it where a reader needs the history. No code changed. Uncommitted on the working tree; V6.1's setup commits it with this entry.
+
+**Where each decision landed.**
+
+| Entry 21 decision | TS | PS | BP |
+|---|---|---|---|
+| 1 Two pages | §43.1 (`Entry`, `route_probe` rules 11-15, `/app/long`), DC-1 rewritten | Positioning, §3, J2, L0, §9.4 | §0, §8A.1 |
+| 2 One flow; the editor applies the plan | §40 unchanged (it already worked so) | §12.8 "applies the plan automatically", L6 | §8A.0 goal |
+| 3 Order kept; quality pass at the end | §47.2 "The bar" | §9.5 row, E-15 in §19 | Table row, §8A.0, new §8A.12 |
+| 4 Own and Pixabay B-roll, placed by hand | §48 model line, §48.5, new §48.6, §49.1-§49.2, P-17, INV-32, TE-26, §24.1 host 4, §24.3 CSP, §22.1 route, §22.8 key | §9.2, §9.5, §12.7, §12.8, §12.12, §17, §20.1, §21 item 14 | §8A.8, §8A.9, appendices |
+| 5 45 minutes, read in place, parts copied | §43 rewritten, new §44.8 (`remux_range`, `SourceMedia`), §45.2, DC-15, §46, §50.3, §52, §53.3 | §9.1, §9.4, §12.9, §20.2A | §8A.1, §8A.3, §8A.4, §8A.5 |
+| 6 Long path cloud only, pause on failure | §43.6, §43.7, §43.8, §16, §22.1 window budget, P-1, P-5, INV-3, INV-28, TE-18 | Principle 4, §9.2, §12.6, §12.7, L1, L3, L4, §17, §18 | §1.1, §8A.1 |
+| 7 Duration and resolution limits only | §43.2, DC-3 | §9.4 | §8A.1 |
+| 8 Auto zoom, Submagic-class look | §40.2, §47 table, new §47.2 | §9.5, §12.8 | §8A.2, §8A.6 part C |
+| 9 Tooscut as main study source | §53.4 | §18 licences row | §0 paragraph |
+
+**The agent's design choices, for the founder to confirm or change.** Entry 21 gave the decisions; these are the ways the specs now carry them, chosen by the agent:
+
+1. **Pages.** `/app` stays the clip page, exactly as today (so every protected suite sees the page it knows), with one link to the new `/app/long`. A file of 90 s or less dropped on the long page opens as a clip. The clip page's "too long" panel gains a "Make shorts from it" button, with its words unchanged (DC-1).
+2. **Clip-page file size** follows `high_res` instead of `long_video`: 16 GB with 4K input on, 500 MB off (DC-3).
+3. **The sound is still written to OPFS** as `pcm16.f32` (about 173 MB for 45 minutes), so transcription, the Director and preparing shorts resume after a reload without the file. Only the audio step, the coarse vision pass and the part copies need the file again.
+4. **Part copies** are one small MP4 per part, remuxed without re-encoding, with a 1 s handle each side (`PART_COPY_HANDLE`, assumption), built in V6.3 and called in V6.4 (TS §44.8). Adding a part later through chat asks for the original file.
+5. **Cloud windows:** 90 s with 5 s overlap (32 windows for 45 minutes), 2 in flight, 2 retries, then a pause for one of four reasons (unavailable, busy, signed out, offline).
+6. **Server limits for windows** (the founder sets the values): a window header on `POST /transcribe`, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per day instead of the 20 clips, 200 an hour per IP, and the global budget read from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` so the Dev tier raises it without code.
+7. **`POST /shorts` takes 160 kB** (DC-15): a 45-minute request is about 115 kB.
+8. **The coarse vision pass runs before transcription,** while the file is surely in hand.
+9. **Auto zoom** is `PunchIn`'s new `motion: Snap | Push`, scales 1.12 and 1.25, one per sentence at most, never over a jump-cut zoom (all assumptions, E-11).
+10. **Stock search** is `POST /api/v1/broll/search`, signed-in only, 20 a minute per person and 90 a minute for the server (under Pixabay's 100), cached 24 h by the query's hash so the words are never stored; the browser downloads the clip from `cdn.pixabay.com` through a new `net/stock-fetch.ts`. The plan writes a search term; `resolve-stock.ts` turns it into a local asset before validation, so the renderer only sees local files.
+11. **The stock switch is on by default while the AI plan is on.** This is the founder's call at V6.8.
+12. **Placing B-roll by hand** goes through `plan_ops` (`PlaceAsset`, `RemoveAsset`), built in V6.8 instead of V6.9, so it is one undo step and passes the same validator. The part picker (a window dragged along a clip's frames) is written into principle 3 as the one direct control besides the crop offset.
+13. **The caption references** become three named candidates for V6.6 part C (typographic lockup, mixed-font pair beside the head, glass cards with a blurred background), each a cost check by name, not a commitment.
+14. **The quality pass** is a step of its own after V6.11 (BP §8A.12, PS E-15): tuning inside the existing contracts; a new kind is a stop-and-ask.
+15. **Estimates:** V6.1 12 prompts (was 14), V6.3 16 (was 14), V6.8 19 (was 16); about 150 in all with V6.
+
+**Older errors fixed while editing.**
+- PS principle 4 still said "Video and audio never leave", which has been untrue for clips since the cloud release. It now says what leaves.
+- Two references in TS pointed at a "§54" that does not exist; they now point at §53.4, where the Tooscut table is.
+
+**Checked.** Every "20 minutes", "16 GB", "64 kB", "copy" and "stock" in the three files was read after the edits; the remaining ones are history marked v1.3, the clip path's own import, or unrelated (CI runner times). Two table rows that an edit had joined were split again.
+
+**Open items.** 18 is done, pending the founder's read of the choices above. New: 23 (the agent's choices 1-15 above, founder to confirm). Open items 19-22 stand.
+
+## Entry 23 - 2026-11-08 - The founder confirms v1.4; V6.1's implementation plan (outside a prompt)
+
+**Founder's confirmation.** On 2026-11-08 the founder answered "yes i confirm" to the agent's fifteen design choices of Entry 22. Open item 23 is closed; open item 18 is done.
+
+**V6.1's plan written:** `docs/v6.1/v6.1implementation.md` (decisions D-383 to D-432; declared changes DC-1 to DC-4 only; prompts P171 to P182 after a Setup), modelled on `cloudimplementation.md` and V6's plan, after reading the code at `afb82bf`. TS §5 has its row. The build guide, the prompts file and `docs/v6.1/experiments.md` come next. This changelog stays V6.1's (BP §8A.0 step 1; D-384).
+
+**What reading the code changed against the specs** (each copied back in P182, plan §18):
+
+- **IndexedDB is at version 1 today,** not the "version 3" TS §43.4 assumed. V6.1 adds a structure version 2 opened only by the long path, keeps the records' `schemaVersion` at 1, and adds a `VersionError` rule so a later rollback can still open the database (D-414, plan §12.4).
+- **The demuxer opens only an OPFS sync handle** (a web-sys type), so reading a `File` in place needs a new additive entry point in `offcut-wasm-core` with a structural reader (D-399).
+- **The clip path decodes a whole track into one buffer** (about 520 MB for 45 minutes at 48 kHz), so the long path resamples in a stream: a new `StreamResampler` beside `resample_mono`, proved equal to it sample for sample (D-401).
+- **HEVC is recognised by its four letters only;** `hvcC` parsing, the codec string and HDR from `colr` are new (D-396, D-397).
+- **Feature flags all default to on** (cloud release, D-365). A V6.1 flag that did would ship at the merge, so flags get defaults and the V6.x flags default to off, turned on by `OFFCUT_FEATURES_ON` (D-393), with a second e2e build for the flag suites (D-394).
+- **`POST /transcribe`'s IP limit is a route layer,** which cannot see a header, so the window header's rate groups move the IP check into the handler (D-411).
+- **A clip import wipes `clips/` and every clip store** until V7's eviction, so sources live apart, and V6.1 keeps one source (D-415). `quota.ts` (BP §8A.1) moves to V7.
+- **D-382's silence guard judges a word against the clip's own level;** a long source's quiet windows need the source's level, measured during the audio step (D-404, D-407).
+
+**Open for the founder:** F-1 (45 minutes of the looped reference clip to Groq for TE-18), F-2 (a phone HDR clip for TE-21, or HDR stays rejected), F-3 (`high_res` on in production after V6.1), F-4 (`long_video` off in production until V6.4's alpha), F-5 (the copy of plan §10.5).
+
+## Entry 24 - 2026-11-08 - The founder's answers; V6.1's guide, prompts and overnight run (outside a prompt)
+
+**The founder's answers,** 2026-11-08, word for word: "yes to all". Read as (plan §15):
+
+| # | Answer |
+|---|---|
+| F-1 | Yes: the looped reference clip's audio may go to Groq in P171 and P181 (about 5,400 s in all) |
+| F-2 | Yes, the founder has a phone HDR clip. It is used locally only if placed at `sh2clips/testclips_private/hdr/` before the run, never committed or sent. **V6.1 ships with `hdr_ok = false` whatever TE-21 reads**: an unattended night does not widen what is accepted (the agent's reading, recorded in the plan) |
+| F-3 | Yes: `high_res` on in production after V6.1 if TE-17's 4K memory read passes. It is the founder's morning step (a Vercel variable, then a re-run of `deploy-web`), not the night's |
+| F-4 | Yes: `long_video` stays off in production until V6.4's alpha |
+| F-5 | Yes: the copy of plan §10.5 as drafted |
+
+**The founder's instruction for the build:** one unattended overnight session; "when I wake up tomorrow the feature must be implemented and merged, strictly without breaking, and do everything carefully". The agent is authorised to merge and tag under `overnight-run.md` §3 and §7, and never to change a production setting.
+
+**Written:** `docs/v6.1/v6.1buildguide.md` (phases 0-12, the frozen and additive checks, tiers, 22 "bites"), `docs/v6.1/coding-promptsv6.1.md` (the SAB, Setup and Prompts 171-182, each with a "think first" rule and an overnight path for every stop), `docs/v6.1/overnight-run.md` (the master prompt: the founder's pre-sleep checklist, authorisations, safe paths, merge gates with a 06:30 cut-off, live checks, rollback, morning steps, report). Modelled on the cloud release's guide and prompts and the design release's overnight run. TS §5 has their rows; `check-file-tree.mjs` passes.
+
+**Found while writing them** (each now in the guide):
+
+- **An unattended session cannot sign in to a local API:** the magic link goes by the real relay (STARTTLS only) to an inbox nobody reads at night. P181 drives the real product build signed in through the e2e fake API, and real Groq calls go through a scratch proxy that calls Groq as `groq.rs` does (G Phase 11).
+- **`.env.deploy` must never be sourced whole:** it holds the real mail relay and billing settings beside the Groq key. Scripts read `TRANSCRIBE_API_KEY` alone.
+- **`fixtures/.gen-local/` and `web/dist-flags/` are not git-ignored at `afb82bf`;** P171 and P173 add them.
+- **pnpm runs scripts through `cmd.exe` on Windows,** so `build:e2e:flags` wraps its environment prefix in `sh -c`, as `dev` does.
+- **CI builds the keyed `web/dist` in the `ci` job and hands it to `e2e-media`;** the flags build follows the same path (plan §12.1, as read).
+- **Production's flags come from the Vercel project's variables** (`vercel pull` in `deploy-web`), so turning a flag on is the founder's dashboard step plus a re-run of `deploy-web`, never the Redeploy button.
+
+## Entry 25 - 2026-11-08 - V6.1 Setup: the branch, the documents, the floor
+
+Built in one unattended session under `docs/v6.1/overnight-run.md`, started at 04:46 IST.
+
+**Branch.** `v6.1-build` from `origin/main` at `2568a6e` (checked). Cherry-picked `429d8aa` and `afb82bf` (the cloud release's closing entries) as `1f71eca` and `277b0d6`; they change `docs/cloud_transcription/cloudchangelog.md` only. This commit holds the v1.4 specs (`technicalspec.md`, `product.md`, `buildplan.md`), Entries 21-25 of this changelog, and `docs/v6.1/` (plan, guide, prompts, overnight run, and the new `experiments.md` with one heading per experiment, "Not read yet"). TS §5 gains `experiments.md`'s row; `check-file-tree.mjs`: ok, 551 files.
+
+**The founder's answers** are Entry 24's ("yes to all", F-1 to F-5). **Before sleeping, the founder also answered the run's own questions** (2026-11-08, 04:50 IST), recorded in `overnight-run.md` §12 (A-1 to A-7), which wins over its §7.2:
+
+- A-1: the run began too late for §7.2's "merge before 06:30". The merge may start **whenever every §7.2 gate is green, never after 22:00 IST**; the work continues after the founder wakes.
+- A-2: no HDR clip. TE-21 is read on `rej_hdr_hlg.mov` only; `hdr_ok` stays `false`.
+- A-3: the real Groq calls go through production's key as planned (about 5,400 s, at most 3,000 s an hour), stopping if Groq's remaining hourly or daily audio falls under 25%.
+- A-4: if free disk falls under 15 GB, the whole `target/` may be deleted (66 GB free at the start).
+- A-5: narrow local allow rules for the pushes, the pull request and the merge, in a git-excluded `.claude/settings.local.json`; pushes to `main`, force-pushes and deletes are denied. Removed at the close.
+- A-6: phone notifications at key moments only. A-7: building goes on while the founder uses the laptop; a media case failing only under load is re-run once.
+
+**The floor (V6.1's baseline, BP §8A.0 step 1),** read on D1:
+
+| Suite | Read | D-386 floor |
+|---|---|---|
+| Rust (`cargo test --workspace`) | 863 / 0 / 4 | 863 / 0 / 4 |
+| Vitest | 568 (24 files) | 568 |
+| `pnpm e2e --workers=4` (after `pnpm build`, `check-hosts.mjs` ok) | 57 passed | 57 |
+| Media | not run (D-385); floor 112 passed, 1 skipped (CT CL Entry 11) | |
+
+**Checks.** `git diff --name-only origin/main` lists docs only. No product code changed.
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 26 - 2026-11-08 - P171: the probes
+
+No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.md`; the scripts stayed in the scratchpad.
+
+- **`.gitignore`** gains `fixtures/.gen-local/` before anything was written there (G item 18); `git check-ignore` confirms it.
+- **Local long files** (D1 only, never staged): `long_45min_4k_hevc.mov` (1.48 GB), `long_45min_1080p_h264.mp4` (5.61 GB, past 4 GiB on purpose), `hevc_main10_2s.mov`, from the reference clip's sound looped with 5 s of room tone, made in about 2 minutes by encoding a 10 s video segment and copying it in a loop.
+- **TE-17, first read:** `FileReaderSync` in a worker reads 1 MiB blocks in 3-7 ms p50 (warm cache), reads `moov` (3 MB) in under 9 ms, and **reads blocks past 4 GiB correctly** (7 of 7 hashes equal to Node's); page memory stays near 1 MB. D-400 stands.
+- **HEVC:** D1's Chrome decodes Main and Main 10 through hardware only (strings from real `hvcC`: `hvc1.1.6.L150.90`, `hvc1.2.4.L120.90`, `hvc1.1.6.L93.90`). P171's "no HEVC" stop does not fire.
+- **Long AAC:** 45 minutes through one `AudioDecoder` in 5.3 s, 48 kHz on every output, 9.7 MB peak. HE-AAC could not be made on D1 (no encoder); it stays a unit-test case and TE-12's.
+- **Audio track:** `demux.rs` reads the first audio track in file order already; D-402 needs no new demuxer code.
+- **TE-18, first read (F-1), the decision of the night so far.** 32 windows of the looped reference sound to Groq: 2.8 s p50, 5.9 s p90 per window, about 80 s for all 32 two at a time. Merged as `mergeWindows` merges, **3 of 31 seams lost or doubled a word** (1 lost, 2 doubled), and 25 of 32 windows had words at their edges: TE-18's seam line fails and P171's stop condition fires. **ON §6's safe path: `CLOUD_OVERLAP_S = 10`** (step 80 s, 34 windows for 45 minutes, `MAX_SOURCE_WINDOWS = 35`), written as "As read" under D-405 and D-411. P181 re-reads it through the product.
+- **Found: Groq's free tier limits requests per minute.** A 429 (`retry-after: 3`) came after 27 requests in about 66 s while 4,872 of the hour's 7,200 audio seconds were left. D-409's two in flight (confirmed by the founder, Entry 23) is kept; open item 24 asks the founder to choose the Dev tier or one in flight before `long_video` goes on.
+
+**As read in the plan:** D-398 (HEVC answers), D-402 (the audio track), D-405 (10 s overlap), D-409 (latency and the per-minute limit), D-411 (`MAX_SOURCE_WINDOWS = 35`).
+
+**Real Groq calls (F-1, `overnight-run.md` §12 A-3).** The looped reference clip's sound only, through production's `TRANSCRIBE_API_KEY` read alone by the script's process.
+
+| When (IST) | Windows | Audio sent | Statuses |
+|---|---|---|---|
+| 05:06:36-05:07:46 | 0-28 (two in flight) | 28 × 90 s answered | 28 × 200, 1 × 429 (window 27) |
+| 05:08:43-05:08:56 | 27, 29, 30, 31 | 3 × 90 s + 65 s | 4 × 200 |
+| **Total** | 32 windows, 33 requests | **2,855 s** (under the hour's 3,000 s) | Groq's hour: 4,597 of 7,200 s left at the end |
+
+**Counts:** unchanged from Entry 25 (no code): Rust 863 / 0 / 4, Vitest 568, `pnpm e2e` 57.
+
+**Open:** item 24 (new). **Found, not fixed:** the per-minute limit above (a founder decision, not a code fix).
+
+## Entry 27 - 2026-11-08 - P172: types, HEVC, colr and `route_probe`
+
+**Built.**
+
+- `offcut-types/src/source.rs` (new): `Entry`, `RouteFlags`, `VideoDetail`, `SourceInfo` (with `is_hdr`, `avg_fps`, `video_codec`, `audio_track` 0, `audio_tracks`), `Route`, `SourceReject` (`REJECT_HDR`), `RouteReject` (untagged: a V5 `RejectReason` or a `SourceReject`), `SourceErrorCode` (`E_SOURCE_READ`, `E_SOURCE_AUDIO`), the constants `MAX_SOURCE_DURATION` (45 min), `MAX_INPUT_LONG_SIDE` (3840), `MAX_FILE_SIZE_HIGH_RES` (16 GB, DC-3), `CLOUD_WINDOW_S` 90, `CLOUD_OVERLAP_S` **10** (P171), `MAX_SOURCE_WINDOWS` 35, and `window_count()`. `lib.rs` adds the module and, in its generator, the eight types after every V5 type, `SOURCE_LIMITS`, `SOURCE_REJECT_REASONS` and `SOURCE_ERROR_CODES`.
+- `offcut-mp4`: `hevc.rs` (`parse_hvcc`, `codec_string` per Annex E), `colr.rs` (`parse_colr`, `is_hdr`), `route.rs` (`route_probe`, §6.2's 17 rules; rule 1 returns `validate_probe`'s answer as it is; a private `clip_info` builds the `ClipInfo` as `validate_probe` does), `demux.rs` gains `VideoEntryBoxes` and `Demuxer::video_entry_boxes()` (a second walk to the track `open` chose, for `hvcC` and `colr`), `probe.rs` gains `video_detail()`, `validate.rs` gains the one line `pub use crate::route::route_probe;`.
+- `pnpm gen:types`: `web/src/gen/domain.ts` gains 83 lines, removes none.
+
+**DECLARED CHANGE / REOPENED CONTRACT.** Additions only in `offcut-types` and `offcut-mp4` (D-387): G 0.4's additive check prints nothing for `validate.rs`, `media.rs`, `error.rs`, `limits.rs`, `demux.rs`, `probe.rs`, both `lib.rs` and `demux_fixtures.rs`. No existing function body changed; `validate_probe`, `probe`, `read_stsd` and `video_decoder_description` are as they were.
+
+**What differs from the plan (As read under D-395 and D-397).** V5's tests pin `RejectReason` and `ErrorCode` (exhaustive matches and the TypeScript unions' exact counts), `limits.rs` (21 constants) and every `VideoTrackInfo` literal; adding a member, a constant or a field would have meant editing those cases, which ON §3 forbids. So the codes and the rules are the plan's, but `REJECT_HDR` and the two `E_SOURCE_*` codes live in their own enums, the constants in `source.rs`, and `is_hdr` with the HEVC string in a `VideoDetail` passed beside the `ProbeInfo`. `colr.rs` reads `nclc` as well as `nclx` (ffmpeg writes `nclc` in a `.mov`). `SourceId` is left to TypeScript (P176). The copy check learns the two new code arrays in P179, with their copy.
+
+**Tests (all new; no existing case touched).** `source.rs` 6 (window counts for a 10 s overlap, the limits' order, the codes' serialization); `lib.rs` 1 (the generated long-path types and arrays); `hevc.rs` 4 (three real `hvcC` headers give `hvc1.1.6.L93.90`, `hvc1.1.6.L150.90`, `hvc1.2.4.L120.90`; Annex E's space, tier and inner zero bytes; malformed); `colr.rs` 5; `demux_fixtures.rs` 1 (`rej_hevc.mov`'s `hvcC` and codec string, H.264 clips have none); `route_probe.rs` 10: with both flags off `route_probe` equals `validate_probe` on all 24 fixtures the demuxer opens, with decode yes and no, from both pages; with `high_res` on every fixture V5 accepts is the same `ClipInfo` (and opens as that clip from the long page); `rej_4k.mp4` and `rej_hevc.mov` accepted with `high_res`; every rule alone from the long page; resolution, rotation and HEVC with `high_res`; the clip page keeps V5's duration and track rules; the earlier of two failing rules wins; the long page with its flag off is the clip page; a two-track source reads track 0; 45:00 is long, 45:00.001 is refused.
+
+**Counts.** Rust 890 / 0 / 4 (863 + 27; `cargo test -p offcut-types -p offcut-mp4`, the workspace is P182's), Vitest 568, `pnpm e2e` 57 (no web code changed). `pnpm check`: fmt, clippy, deny, eslint, both `tsc`, file tree (556 files: rows for `colr.rs`, `route.rs`, `route_probe.rs`), gen clean, copy codes: ok. Frozen check empty.
+
+**Carried to P173.** The fixtures' manifest entries must name the code V5 gives (`rej_hdr_hlg.mov` is HEVC, so `REJECT_HEVC` for `validate_probe`), since `probe_rejections.rs` and `demux_fixtures.rs` read the manifest with `deny_unknown_fields` and expect `validate_probe`'s reason; `REJECT_HDR` is asserted in `route_probe.rs`. The HLG fixture's `colr` case joins `demux_fixtures.rs` then.
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 28 - 2026-11-08 - P173: the stream resampler, the WASM entries, the flags, the fixtures
+
+**Built.**
+
+- **`StreamResampler`** (`offcut-dsp/src/resample.rs`, below `resample_mono`, additive): `push` and `finish`, the same `rubato` `Fft` calls `process_all` makes, the start-up delay dropped from the head, the same zero pump and length rule. **It equals `resample_mono` bit for bit** (no fallback needed): `stream_resample.rs` (new, 4 cases) at 48 and 44.1 kHz in random pieces of 1 sample to 10 s, around every chunk edge, equal rates, and a rate change mid-stream. The long case runs 2 minutes of noise, not the plan's 7, which took 128 s in a debug build.
+- **A demuxer for 45 minutes.** Found: `Demuxer::open` expands no track over 20,000 samples (V2 D-60), so it cannot read a long source's audio (45 minutes of AAC is about 126,600 samples). Added, without touching `open`: `sample_table::resolve_up_to` and `Demuxer::open_source` (the same steps with `MAX_SOURCE_SAMPLES = 400,000`, about 16 MB a track at most), and `Demuxer::audio_sample_meta` (a sample's times without its bytes, for the region search). A unit test proves `open_source` reads what `open` reads; `demux_fixtures.rs` reads `long_12min.mp4` (33,750 audio, 21,600 video samples) to its last sample, where `open` cannot.
+- **WASM** (`offcut-wasm-core/src/source_api.rs`, new): `JsByteReader` (any object with `size()` and `readAt()`), `open_demuxer_reader` with a `SourceDemuxerHandle` (probe, `video_detail`, `hevc_description`, the descriptions, `audio_sample_time_us`, `read_audio_sample`), `route_probe` (one pure export over a `ProbeInfo` and a `VideoDetail`), the `StreamResampler` class. A file that cannot be read is `E_SOURCE_READ`, a broken sample `E_SOURCE_AUDIO`. `media_api.rs` gains, additively, `video_detail` and `hevc_description` on `DemuxerHandle` (the clip page with `high_res`). `load-core.ts` gains `openDemuxerReader`, `routeProbe`, `newStreamResampler` and the two `CoreDemuxer` methods. `pnpm build:wasm` builds.
+- **Flags (D-393, REOPENED CONTRACT `features.ts` and `vite.config.ts`).** `FeatureFlags` has `long_video` and `high_res`; `DEFAULTS = { cloud_transcribe: true, long_video: false, high_res: false }`; `featureFlags(on, off)` moved from `vite.config.ts` into `features.ts` (exported, so a test reaches it), reading `OFFCUT_FEATURES_ON` beside `OFFCUT_FEATURES_OFF`; an unknown name or a name in both stops the build. `features.test.ts` (new, 3 cases). `cloud_transcribe`'s behaviour is unchanged.
+- **Two builds (D-394).** `package.json`: `build:e2e:flags` (through `sh -c`, G 3.3; run on D1) and `e2e:media:flags` (its project comes in P180). `web/dist-flags/` is git-ignored. **Read:** `pnpm build`'s bundle holds `cloud_transcribe: true`, `long_video: false`, `high_res: false`; `dist-flags/` holds both V6.x flags `true` (the define over the `false` defaults).
+- **Fixtures (D-430).** `gen_fixtures.sh` step 5c makes `long_12min.mp4`, `rej_too_long_46min.mp4`, `rej_8k.mp4`, `rej_hdr_hlg.mov`; **they are listed in `fixtures/manifest-long.json`, not `manifest.json`**, because V5's `probe_rejections.rs` requires every `rej_*` entry of `manifest.json` to be one of its twelve cases. The script checks, probes and stamps both manifests (the stamp gains `long_manifest_sha256`). HLG needed `setparams` and `-movflags +write_colr`; the file carries `colr` `nclc` 9/18/9 (P172's `nclc` reading confirmed). **Time:** the four add about 30 s to `pnpm fixtures` on D1 (23.1 s, 6.1 s, 0.4 s, 0.6 s; the 46-minute room tone at 16 kHz cut it from 27 s); the whole run is 114 s on D1. Under G item 19's 60 s.
+- `scripts/gen-long-fixture.sh` (new, D1 only): P171's 45-minute files, refusing to run unless `fixtures/.gen-local/` is git-ignored.
+
+**New tests.** `stream_resample.rs` 4; `demux.rs` 1 (`open_source` equals `open`); `route_probe.rs` 3 (the four fixtures route as `manifest-long.json` says from all three entries; the HLG file is HDR Main 10; `long_12min.mp4` is a 12-minute source of 9 windows); `demux_fixtures.rs` 1 (`long_12min.mp4` to its end, the HLG `colr`); `source_api.rs` 1; `features.test.ts` 3. No existing case changed; `manifest.json` is unchanged.
+
+**Checks.** `pnpm check` ok (560 files; TS §5 rows for `source_api.rs`, `stream_resample.rs`, `features.test.ts`, `manifest-long.json`, `gen-long-fixture.sh`). Frozen check empty; additive check: no line removed from `validate.rs`, `resample.rs`, `media_api.rs`, `demux.rs`, `sample_table.rs`, `load-core.ts`, `demux_fixtures.rs` or `manifest.json`.
+
+**Counts.** Rust 900 / 0 / 4 (890 + 10; per crate), Vitest 571 (568 + 3), `pnpm e2e` 57 (not re-run: no page changed). Media: none run.
+
+**As read in the plan:** D-399, D-401, D-430. **Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 29 - 2026-11-08 - P174: the media worker reads a file in place
+
+**Built.**
+
+- `workers/media/file-random-access.ts` (D-400): a `ByteReader` over the dropped `File` through `FileReaderSync`, 1 MiB aligned blocks, the last 8 kept; any failed read is `SourceReadError`. Test: 4 cases (within and across blocks, the cache and its eviction, `NotReadableError`, a file shorter than it said).
+- `workers/media/audio-region.ts` (§7.2): `decodeAudioRegion` (from the sample at or before `from − 100 ms` found by a binary search over `audio_sample_time_us`, `decodeTrack`'s batching and queue, mono, audio before 0 and from `to` on dropped, chunks of at most 10 s, the decoded rate reported with each) and `writeWholePcm16` (the file cut to the resume point, the part already written re-read into the level histogram, a `StreamResampler` per rate, silence for any gap and the tail, a flush and a checkpoint every 10 s, `round(duration × 16)` samples), `LevelHistogram` (0.1 dB bins; its 95th percentile within 0.1 dB of `cloud-audio.ts`'s sort). Test: 7 cases with a fake demuxer, decoder and resampler (placement, audio before 0 dropped, **a resume from 30 s equals the run from 0 bit for bit**, a rate change rebuilds the resampler and keeps the length, the level, cancel, a decoder failure).
+- `media.worker.ts` (additive; the handlers line is the one changed): `routeFile` (reads in place, asks `isConfigSupported` with the `avcC` or the `hvcC`, `routeProbe`), `importAndRoute` (the 16 GB rule with `high_res`, the V5 copy, `routeProbe` from the clip page), `extractSourcePcm16` (into `sources/<id>/pcm16.f32` through a sync handle). `protocol.ts` gains the three methods, `SourceId`, `Routed`, `SourceFailed` (additive). `opfs.ts` gains `sourcesRoot`, `sourceDir`, `sourcePcm16` (additive; §9.2's paths, wanted here first).
+
+**DECLARED CHANGE / REOPENED CONTRACT:** `protocol.ts`' additive members (D-387); `media.worker.ts`' handlers line. `import.ts`, `audio-decode.ts`, `rpc.ts`, `rpc-worker.ts`, `pool.ts` and the render worker are untouched (frozen check empty).
+
+**What differs from the plan (As read under D-403 and D-427).**
+
+- **E_SOURCE_* as values.** `rpc.ts` (frozen) turns any code that is not a V5 `ErrorCode` into `E_INTERNAL`, so the source handlers return `{ failed: "E_SOURCE_READ" | "E_SOURCE_AUDIO", detail }`. Storage failures still throw their V5 codes.
+- **The 16 kHz grid.** The scratch smoke found a resumed run 0.31 apart from the run from 0: a resampler started on a packet boundary is shifted by a fraction of a 16 kHz sample. A resampler now starts on an input sample on the 16 kHz grid (at most 2 samples skipped at 48 kHz, 440 at 44.1 kHz, inside the pre-roll).
+- **HEVC on the clip page.** Found: the render worker (frozen) configures its decoder with the `avcC` only, so an HEVC clip could be accepted and then fail in preview and export. `importAndRoute` refuses HEVC with `REJECT_HEVC` even with `high_res` (ON §6's "H.264 up to 4K only"); `high_res` on `/app` means 4K H.264 and 16 GB. The long page reads HEVC sources' sound. Open item 25.
+- `decodeAudioRegion` takes the opened demuxer, not a reader; the handler opens it. The checkpoint reaches the main thread as throttled progress (`stage: "import"`, milliseconds of flushed sound); a lagging checkpoint costs only re-decoding.
+
+**The scratch smoke (G Phase 4, Tier 0)** on `long_12min.mp4` through the real media worker under the Vite dev server (a `zz-` page, deleted): `routeFile` 412 ms (in place); `extractSourcePcm16` 5.4 s for 12 minutes; `pcm16.f32` **11,520,000 samples, exactly `round(720,000 × 16)`**; `levelP95` −20.3 dBFS; **peak page memory 14 MB** (no buffer of the file or the track). **Correlation with ffmpeg's own decode:** the first second is near-digital silence (RMS 1.1e-5), where the figure means nothing (0.93); a speech second gives 0.986 against ffmpeg's resampler and 0.986 against soxr, at lag 0. The rest is the decoder (Chrome's against ffmpeg's) and the placement `decodeTrack` shares, which V5's sync proofs cover; the guide's 0.99 is not met on this measure, recorded. **Resume in the browser:** from 300 s, the same length; equal to 1e-6 for 3.3 s, then within 0.0027 (−51 dBFS) where the FFT resampler's blocks fall elsewhere.
+
+**Counts.** Rust 900 / 0 / 4 (unchanged), Vitest 582 (571 + 11), `pnpm e2e` 57 (not re-run). Checks: `tsc` (both), eslint, file tree (564; rows for the four new files). Media: none run.
+
+**Open:** item 25 (new). **Found, not fixed:** the 0.986 above, recorded rather than chased: the long path's sound is the clip path's sound by construction.
+
+## Entry 30 - 2026-11-08 - P175: the server, windows, budget, events, no-store
+
+**Built.**
+
+- **The window header (D-411, REOPENED CONTRACT CT D-363).** `transcribe/route.rs`: `window_of()` parses `X-Offcut-Window: <index>/<total>` (`0 ≤ index < total ≤ MAX_SOURCE_WINDOWS = 35`, digits only); absent is a clip, as before. The handler now runs: the header (malformed is 400, logged `bad_window`); **the address's bucket** (`TranscribeWindowIp` or `TranscribeIp`, from `client_ip` as the layer had it); **the bearer**, extracted by hand after the address's bucket so an unauthenticated request still takes its tokens; the person's bucket (`TranscribeWindowUser` or `TranscribeUser`); then steps 3-8 unchanged. `router.rs` drops the route's `ip(…)` layer and keeps `body(MAX_AUDIO_BYTES)`. The log line gains `window: true/false`, never the index. `rate_limit.rs`: `TranscribeWindowUser` 120 a day, `TranscribeWindowIp` 200 an hour (members at the end).
+- **The budget from configuration (D-412).** `config::transcribe_budget()` reads `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S` (optional; unset or empty keeps 7,000 and 27,000; anything else but a whole number above 0 stops the boot with its name); `main.rs` builds the `Budget` from them. `budget.rs` is unchanged. `render.yaml` lists both, `sync: false`, unset.
+- **No-store reaches the browser (D-429).** `web/vercel.json`'s no-cache rule is `/((?!assets/|ort/|api/).*)`. `check-headers.mjs` gains a static assertion that no no-cache rule covers `/api/v1/*` (it fails on the old rule; read) and passes against `vite preview`.
+- **D-428's three analytics events: not built.** `analytics.rs`' tests pin the list (20 samples zipped with the docs, the union's count); adding events means editing them, which ON §3 forbids. `long_video` is off in production until V6.4, so nothing would be sent before then. Open item 26; As read under D-428.
+
+**What differs from the plan (As read under D-411, D-412, D-428).** `Config` gains no field: four test files build it as a literal. The log check is a new binary, `server/tests/transcribe_window_log.rs` (TS §5 row): in `transcribe_route.rs` it raced the other tests over tracing's process-wide callsite state (it passed alone, failed in parallel), as `log_redaction.rs`' own note warns.
+
+**Tests.** Every existing case of the server's test files passes **with no change to its code** (`git diff $BASE -- server/tests/` adds cases and one file only). New: `transcribe_route.rs` 4 (windows answered as clips; malformed headers 400 before bearer and body; the 121st window of a person in a day is 429 while their clips pass; an address's clip and window buckets are apart, 60 and 200); `transcribe_window_log.rs` 1; `route.rs` 1 (the header's grammar); `config.rs` 1; `rate_limit.rs` 1.
+
+**Counts.** Rust 908 / 0 / 4 (900 + 8), Vitest 582, `pnpm e2e` 57 (not re-run; `check-headers` against `vite preview` ok). No migration; no new dependency.
+
+**Open:** item 26 (new). **Found, not fixed:** none.
+
+## Entry 31 - 2026-11-08 - P176: storage and state
+
+**Built.**
+
+- **`schema.ts`** (additive): `DB_STRUCTURE_VERSION = 2`; `SOURCE_STORES` (`sources`, `sourceTranscripts`, `masterTranscripts`), apart from `STORES`; `SourceId`, `SourceStage`, `SourceRecord`, `SourceWindowRecord`, `MasterTranscriptRecord`, `OffcutSourcesDb`. `DB_VERSION`, the records' `schemaVersion`, stays 1.
+- **`db.ts` (REOPENED CONTRACT, D-414).** Upgrade 2 creates the three stores; the upgrade loop runs only up to the version being opened (a fresh clip-path open at 1 never makes them); `open()` falls back to the database's own version on `VersionError`; `openSourcesDb()` opens version 2, only for `sources-repo.ts`. `openDb()` and its callers are unchanged.
+- **`opfs.ts`** (additive): `readPcm16Window(id, k)`, `[80k, 80k + 90)` seconds.
+- **`sources-repo.ts`**: put, get, update, newest, windows by `[sourceId, index]`, the master transcript, `removeSource` (rows, windows, transcript, `sources/<id>/`) and `removeAll` (D-415's sweep; clips untouched); the newer-`schemaVersion` rule; failures as `OpfsError`.
+- **`source-machine.ts`** (§9.4, D-417): 11 states, 20 events, 33 legal pairs, `transcribed` V6.1's end. **`source-store.ts`**: the status through the machine, the page's state (gate, pause, progress, transcript, resumable, a different file). **`blockers.ts`** (D-416, additive): `forImport()` answers `B_PIPELINE_BUSY` while a source job works; new `forSource()` answers it while a clip is busy or an export runs. Its both-ways test is P178's (`import-source.test.ts`, §11.3).
+
+**Tests.** `sources-repo.test.ts` 5 (a mocked database, as `receipt-outbox.test.ts` does: the project has no fake IndexedDB and gains no dependency); `source-machine.test.ts` 37 (every legal pair through `transition` and the store, every other pair refused, one or more per state, the pairs that must never happen). **The upgrade itself, read in Chrome** (a `zz-` page under the Vite dev server, deleted): the clip path writes version-1 records, the long path upgrades to 2, every version-1 record is byte for byte the same, the three stores exist, and the clip path reads its records afterwards through the `VersionError` fallback.
+
+**Tier 2 on the keyed `dist/`.** `pipeline-preview.spec.ts`' first case ("feed: …") and its storage case ("OPFS: …"): passed, with `media-setup` (2.3 min). No media spec reloads and restores a clip, so G Phase 6's "restore cases" are these two, which write through the changed `db.ts`.
+
+**What differs from the plan (As read under D-414).** `SOURCE_STORES` apart from `STORES`; `openSourcesDb()` in place of `openDb({ structure: 2 })`; the bounded upgrade loop; the `VersionError` rule is needed within this build, not only for a rollback.
+
+**Counts.** Rust 908 / 0 / 4, Vitest 624 (582 + 42), `pnpm e2e` 57 (not re-run). Media: 2 cases on `dist/` (above).
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 32 - 2026-11-08 - P177: transcription in cloud windows
+
+**Push 1** (P176's commit `2cd61f2`): CI run `42447624770`, read at P182.
+
+**Built.**
+
+- **`cloud-audio.ts` (DECLARED, D-407):** `dropSilentWords(words, pcm16, refLevel?)`; absent, the window's own 95th percentile as before, so `fromCloud`'s call and every existing case are unchanged.
+- **`asr.worker.ts`** (handlers line and two import lines changed): `cloudWindowWords` (the guard against the source's level, words relative to the window, unmerged) and `buildMasterTranscript` (`mergeWindows`, `postProcess`, `normalizeTranscript`; fewer than `MIN_WORDS` is `NoSpeech`). Neither touches the model session. `protocol.ts` gains both and `WindowWord` (additive).
+- **`net/http.ts`** (additive): `HttpRequest.window` sends `X-Offcut-Window: <index>/<total>`. **`api-client.ts` (DECLARED, D-413):** `transcribeAudio(ogg, signal, window?)`.
+- **`usecases/transcribe-source.ts`** (§8.1): `windowCount` (10 s overlap: 9 windows for 12 minutes, 34 for 45), the missing windows in order, two in flight, each kept in `sourceTranscripts` before it counts; D-410's paths: 429 pauses `busy` at once; an `E_AUTH_*` (the session gone after `authed()`'s refresh) pauses `signed_out`; 503 `transcribe_unavailable` asks `/healthz`, off pauses `unavailable`, on is retried; a timeout, offline or other failure is retried after 1 s and 4 s, then pauses `offline` or `busy`; a pause aborts the other request in flight and keeps what answered before; then the master transcript is built and kept. No device fallback. An encoder this browser cannot use ends `{ failed: "encoder" }` (not in D-410; the caller fails the job with `E_SOURCE_AUDIO`).
+
+**Tests.** `transcribe-source.test.ts` 10 (counts and offsets; order and at most two in flight; resume sends only what is missing; 429; timeout twice then kept with waits 1 s and 4 s; offline and failures to their pauses; 503 with `/healthz` off and on; a lost session; a pause stopping the other lane; `NoSpeech`; the encoder). New cases in existing files (no existing case changed): `api-client.test.ts` 1 (**a clip's request has today's headers exactly; a window's adds only `X-Offcut-Window`**), `cloud-audio.test.ts` 3 (a quiet window's invented words kept against its own level, dropped against the source's; a real word kept).
+
+**Counts.** Rust 908 / 0 / 4, Vitest 638 (624 + 14), `pnpm e2e` 57 (not re-run). Media: none.
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 33 - 2026-11-08 - P178: the job, import, run, resume, hand-over
+
+**Built.**
+
+- `platform/wake-lock.ts` (D-418): `holdAwake(onLost)` takes the screen lock, takes it again when the tab is shown, reports once a lock lost while visible that cannot be taken again; `showProgressInTitle` ("42% - Offcut", then the page's title back).
+- `usecases/import-source.ts` (§9.3): `dropSource` (blockers, the hash prefix, `routeFile` in place; a refusal, a failure, or a short file handed to `/app` through `handOff`/`takeHandOff`, memory only, read once), the gate in order (signed in; cloud, waiting up to 45 s; room on the disk, `round(D × 16) × 4 B + 2 GB`; then `ready`, the line on what is sent and Start), `recheckGate`, `startSource` (the previous source swept, D-415; the record made at `extracting_audio`; the job run).
+- `usecases/run-source-pipeline.ts` (§9.5): extraction with the file (checkpoints every 10 s of flushed sound, D-403; the level and `windowsTotal` kept), then the windows; pause, failure and the end let go of the wake lock and the title; `cancelSource` removes the source; the file stays in hand for Continue while the page lives.
+- `usecases/continue-source.ts` (D-419): `restoreSource` (at start, `long_video` on only: the newest source offered as "Continue your video", or its transcript shown), `resumeSource` (transcription goes on at once, extraction waits for the file), `dropSameFile` (size and hash prefix both match, or "This is a different file"), `continueSource` (after a pause or a failure, back to the stage it left; a pause during extraction with the file gone asks for it).
+- `start-app.ts` (step 9, D-419): `restoreSource()` only when `FEATURES.long_video`, so production never opens the source stores.
+- `import-clip.ts` (D-427, D-421): with `high_res` on, `importAndRoute`; otherwise today's `importAndProbe`, unmoved in the `else` (`git diff -w` shows only `probed`'s type widened); `REJECT_HDR` is shown but not sent as `clip_rejected` (open item 26); with `long_video` on, `REJECT_DURATION` hands the `File` to the long page ("Make shorts from it").
+- `clip-store.ts`: `reject` is a `RouteReject` (V5's codes and `REJECT_HDR`). `copy/long.ts` (new): §10.5's strings as approved, `REJECT_HDR`, `E_SOURCE_READ`, `E_SOURCE_AUDIO`; `messages.ts` gains `long` and spreads `REJECT_HDR` into `rejections` (`satisfies Record<RouteReject, …>`); 673 of 700 lines.
+- `eslint.config.js`: §4.1's edges (`run-source-pipeline → transcribe-source`; `import-source`, `continue-source → run-source-pipeline`; `import-clip → import-source`) and `start-app → continue-source`.
+- `crates/offcut-text/tests/sentences_long.rs` (new): 45 minutes of Script A's words looped with room tone: every word in one sentence, in order; none over 40 words; none across a loop's pause; a stretch written without stops split at its 400 ms pauses; every sentence of this corpus within TS §43.6's 25 s.
+
+**What differs from the plan.** The job's cancel is its own controller in `run-source-pipeline.ts` with `pool.cancel("media")`, not a `"source"` scope of `cancel-job.ts`. The gate ends in `ready` with Start (§10.2's last line), so nothing is written before Start. `sentences_long.rs` builds its corpus from Script A, since the fake windows that write the 12-minute master transcript are P180's. TS §43.6 names `MAX_SENTENCE_MS = 25 s`; `offcut-text` splits by 40 words and may not change (D-387): the test holds 25 s over this corpus, and the rule itself is for the release that may reopen `sentences.rs` (Found, not fixed).
+
+**Tests.** `import-source.test.ts` 6 (each gate in order, Start with the sweep, the hand-over once, a refusal and a failure, the blockers both ways); `run-source-pipeline.test.ts` 5 (stages in order with the checkpoint, the wake lock and the title; a resume without the file; no file asks for it; a worker's failure; a pause; cancel). `sentences_long.rs` 2. Existing cases: none changed.
+
+**Tier 2 on the keyed `dist/`** (rebuilt): `pipeline-preview.spec.ts` and `rejections.spec.ts` whole, with `media-setup`: **32 passed, 1 skipped** (the existing skip), 4.4 min. Their code unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (908 + 2), Vitest 649 (638 + 11), `pnpm e2e` 57 (not re-run).
+
+**Open:** nothing new. **Found, not fixed:** TS §43.6's `MAX_SENTENCE_MS` is not a rule of the code (above). The clip page's `REJECT_RESOLUTION` and `REJECT_FILE_SIZE` copy names V5's limits; with `high_res` on it must name 3,840 px and 16 GB (TS §43.2, "messages.ts picks by page and flag"): P179.
+
+## Entry 34 - 2026-11-08 - P179: the interface
+
+**Built.**
+
+- `routes.tsx` (D-422): `ROUTES.long = "/app/long"`, behind `CapabilityGate`, with `long_video` off an explicit `<Navigate to="/app" replace>`.
+- `ui/pages/LongPage.tsx` (§10.1): by `source-store`, the drop zone (with "Continue your video" when a reload left a source), the gate, the work, a refusal (`REJECT_DURATION` in the long page's words), a failure (Continue where it helps), the transcript; a short file goes to `/app`; a file handed over by "Make shorts from it" is taken on arrival; a cancelled source brings the drop zone back; a sign-in completed during the gate lets the gate ask again.
+- `ui/layout/LongLayout.tsx` (D-423): the editor's bar (mark and account link), one column, the dark theme and the polite live region; no clip store.
+- `ui/components/SourceGate.tsx` (§10.2), `SourceProgress.tsx` (§10.3: two stages with their bars, time left after 10%, "Keep this tab open", Cancel; paused, the reason and Continue, Sign in first when signed out; awaiting the file, a drop zone and "This is a different file"), `SourceTranscript.tsx` (§10.4); `ui/styles/long.module.css` (the editor's tokens only).
+- `DropZone.tsx` (D-424, additive): `kind: "clip" | "long"` (default `clip`) and `onFile`; the long zone has no sample clip and no transcription card; under the clip page's stage zone, with `long_video` on, the quiet link "Got a long video? Make shorts from it". `RejectionPanel.tsx` (DC-1): with `long_video` on, `REJECT_DURATION` gains "Make shorts from it", its words unchanged. `EditorPage.tsx`: a file handed over by the long page opens as a clip with the toast "This one is short, so it opens as a clip."
+- Copy: `copy/long.ts` gains the gate's "Sign in" (§1.3 names the button); `messages.ts` (678 of 700 lines) picks `REJECT_FILE_SIZE` (16 GB) and `REJECT_RESOLUTION` (3840) by `high_res` (TS §43.2), today's words with it off; `check-copy-codes.mjs` reads `copy/long.ts` and checks `SOURCE_REJECT_REASONS` and `SOURCE_ERROR_CODES`: 1 of 1, 2 of 2.
+
+**What differs from the plan.** `LongLayout` does not mount `TopBar`, whose controls all act on a clip; it draws the same bar from the same styles. No user Pause button: §10.5 has no word for it and D-410 no reason for it; Cancel and the automatic pauses are there. The summary's word and sentence counts are not shown (§10.5 has no words for them). **The captures, axe and the self-review (G 9.2-9.4) move to P180**, whose specs drive every state of the page on `dist-flags/`; taking them twice would cost an hour of the night for nothing.
+
+**Two fixes from the review before the commit.** (1) A file held by `import-clip` after a `REJECT_DURATION` was taken by the long page on any arrival: a person who chose Start over and later followed the link would have had that old file started on. "Make shorts from it" now navigates with `{ handOver: true }`, and the long page takes the handed file only then; any other is let go. (2) Waiting for the file had no way out: it gains Cancel (the machine's `awaiting_file → cancel`), so every working state has one.
+
+**Tier 2 on the flags-off `dist/`** (keyed, rebuilt; the bundle's `long_video` and `high_res` both `!1`): a quick check (a scratch spec, deleted) that `/app` has no long link, `/app/long` lands on `/app`, and `rej_too_long_91s.mp4`'s panel has no new button: passed. `pipeline-preview.spec.ts` and `rejections.spec.ts` whole, with `media-setup`: **32 passed, 1 skipped** (the existing skip), 4.5 min. `pnpm e2e` (with `landing.spec.ts`): **57 passed**. Their code unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 649, `pnpm e2e` 57.
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 35 - 2026-11-08 - P180: end to end, both builds, CI
+
+**Built.**
+
+- `tests-e2e/helpers/fake-api.ts` (D-431, additive): `transcribe.windows?: (index, total) => unknown` answers a request that carries `X-Offcut-Window`; without it every request gets `response`, as before. No other option and no default changed (CT G item 3).
+- `tests-e2e/helpers/long-windows.ts` (new): each window's answer of `long_12min.mp4` from `fixtures/cloud/speech_60s_portrait.json` shifted by `n × 79.517 s + 0.960 s` (D-431 as read); `openLong`, `openClipSignedIn` (Free or Creator, a large file through the zone's own file field), the source stores' readers, and `capture` (G 9.2, only with `V61_REVIEW_DIR` set; never in CI).
+- `playwright.config.ts` (D-394): `webServer` is two entries, `dist/` on 4173 and `dist-flags/` on 4174 (the second only where that build exists); the project `media-flags` runs `FLAG_SUITES` on 4174, one worker, after `media-setup`.
+- The four specs: `route-long.spec.ts` 9 cases (the `/app` link and DC-1's button carrying the file; the empty page; the gate checking, then ready; the gate off; `long_12min.mp4` read in place and transcribed: 9 windows, each once with `X-Offcut-Window` and an Ogg body under 1 MiB, all 1,143 words with none lost or doubled, the first sentence, no request carrying any of 20 pieces of 32 bytes of the video; a 60 s file handed to `/app` and processed; `REJECT_DURATION`, `REJECT_RESOLUTION`, `REJECT_HDR` in their words; axe on every state). `long-resume.spec.ts` 6 cases (a reload while transcribing sends no kept window again; a reload during the audio step asks for the file, refuses another, and goes on from the checkpoint; 503 with the switch off pauses `unavailable`; 429 pauses `busy`; offline pauses `offline`; a lost session pauses `signed_out` and Continue opens the sign-in dialog; Continue finishes each; the tab title). `high-res.spec.ts` 4 cases (`rej_4k.mp4` taken at import; HEVC refused on the clip page, D-427 as read; above 3840 refused in words that say 3840; a 4K speech clip, made in the test from the reference, processed and exported by Creator at 1080 × 1920 with all 11 checks). `flags-identity.spec.ts` 1 case (below).
+- CI (§12.1 as read): the `ci` job builds `web/dist-flags` (`OFFCUT_FEATURES_ON=long_video,high_res`, the same test key) and uploads it; `e2e-media` downloads it and runs `pnpm e2e:media:flags --grep @no-gpu` after `pnpm e2e:media --grep @no-gpu`; its timeout 30 → 45 minutes.
+
+**Found by the first browser run, and fixed (the long page had not run in a browser before P180).**
+
+1. **Every window failed with `E_INTERNAL`** (P177): the asr worker takes one job at a time and refused the second lane's call as `Busy`. `transcribe-source.ts` queues its calls to the asr worker; the requests stay two in flight (D-409 as read).
+2. **The gate asked again forever** (P179): its "a sign-in while waiting" effect ran on every return to `gated`. It now asks again only from `signed_out`.
+3. **A switched-off server paused as `busy`** (P177): a `/healthz` without `cloud_transcribe` is a server that does not transcribe (the type's `serde(default)`); the check reads `=== true` (D-410 as read).
+4. **Offline at the first window showed "Something went wrong in Offcut"** (P178): the asr worker's script is fetched at its first use. A window step that throws while offline now pauses `offline`; a `run-source-pipeline.test.ts` case added.
+5. **The long page's bar sat at the bottom right** (P179): the editor's bar places itself in a grid area `top` that `LongLayout`'s grid did not name. Named.
+6. **axe: scrolling regions with nothing to focus** (P179): the page scrolls instead of an inner region; the long column's cards grow with their content; the transcript's list, which does scroll, is focusable and named by its heading.
+7. **"Transcribing 0 of 0" before the windows start** (P179): the count is known from the duration and shown.
+
+**What differs from the plan.** `rejections.spec.ts` is **not edited at all**: DC-1's button is asserted by `route-long.spec.ts`' first case, and the three cases whose file the flags-on clip page takes (`rej_4k.mp4`'s refusal, DC-2; "start over", whose refused file is that 4K one; the 500 MB limit, DC-3) are left out of `media-flags` by its `grepInvert`, not by an edit. `flags-identity.spec.ts`: two exports of one build are not byte-identical (sizes 33,461,716 and 33,580,996 B; the same 1,800 frames; identical audio packets; video PSNR 50.8 dB average, 45.4 dB least), so the comparison is identical audio packets, the same frame count and size, and PSNR at least 40 dB, beside equal transcript, edit state and render-cache key; the flags-on build's database is at structure version 2 after start (D-419), the flags-off build's at 1 (D-394 as read). `high-res.spec.ts`' processed 4K clip is the reference scaled to 2160 × 3840 in the test (`rej_4k.mp4` has no speech). Large files go through the drop zone's file field (`setInputFiles`): `dropFile` sends the bytes in one DevTools message, which closes the page at about 80 MB. The gate's "checking" is held by delaying only the page's first `/healthz`, since the session's own waits for `/healthz` too.
+
+**P179's G 9.2-9.4, done here.** Every long-page state captured by the specs at 1280 × 800 and 1920 × 1080 into `~/v6.1-review/` (outside git), axe 0 serious or critical on every state the specs drive, and the self-review against ON §5's rubric: round 1 found the bar misplaced, the scrolling regions, "0 of 0" and, on the over-45-minutes card, its title said twice (the card now leaves out a body that only repeats the title); round 2 read every capture again: **self-review, rubric passed**.
+
+**DECLARED CHANGE** `fake-api.ts`' `windows` option (D-431): its two changed lines are the option's type, widened, and the answer, which takes `windows` only when given. **Tests:** no existing case edited.
+
+**Runs.** FLAG_SUITES on `dist-flags/`: run 1 **34 passed, 1 skipped** (the existing `rej_h264_444` fixme, D-78), 8.2 min; run 2 (after the last fix) **34 passed, 1 skipped**, 7.8 min. Tier 3: `pnpm check` ok; Vitest 650; `pnpm e2e --workers=4` 57 passed (rebuilt keyed `dist/`). The Rust workspace and `pnpm fixtures` have not changed since P178 and P173: P182's Tier 4 runs them. `cloud-transcribe.spec.ts` on `dist/` (it uses `fake-api.ts`' transcribe option): 8 passed with `media-setup`, 7.1 min, unchanged.
+
+**Counts.** Rust 910 / 0 / 4 (no Rust change), Vitest 650 (649 + 1), `pnpm e2e` 57.
+
+**Open:** nothing new. **Found, not fixed:** none.
+
+## Entry 36 - 2026-11-09 - P181: experiments and the walk
+
+**How it was read.** A scratch Playwright spec (`zz-te.spec.ts`, deleted) drove the real flags-on build (`dist-flags/`) in Chrome, signed in through `fake-api.ts` (G Phase 11: no inbox at night). Files were chosen in the long page's own file field, so Chrome read them from the disk. Readings in `docs/v6.1/experiments.md`.
+
+**TE-17 (second read).** 45-minute 4K HEVC (1.48 GB) and 1080p H.264 (5.6 GB) read in place: probe 0.16 and 0.15 s, the audio step 22 and 55 s, peak page memory 34 and 37 MB; every pass line holds. **F-3's condition: 4K clip peak 883 MB: `high_res` may be turned on** (an 89 s 4K H.264 clip on `/app`, processed in 97 s and exported by Creator in 52 s; the founder's morning step).
+
+**TE-18 (second read).** 40 minutes through Groq by the product: 31 requests (30 × 200, one 429 that paused the job `busy`; Continue finished it), p50 0.72 s and p90 1.05 s a window, 33 s of windows when not limited. At the 29 seams (a second run at 01:57 with the words kept): 4,677 words, 96 edits against the first loop (2.1%), **5 within 2 s of a seam (2 lost, 3 changed, none doubled)**, the base rate of edits elsewhere; no word in room tone. §13's "no word lost or doubled at a seam" fails by 2 lost words: stop-and-ask, recorded as open item 27; it does not block a dark merge.
+
+**TE-20 (simulated).** A reload mid-run lost only the window in flight (10 requests for 9 windows; no kept window sent again). The hidden tab and a frozen page could not be simulated on the automated Chrome (it stayed `visible` minimised, and a visible page is not frozen): the real test is the founder's morning step.
+
+**TE-21.** On `rej_hdr_hlg.mov` only (A-2): Chrome maps the HLG frame into sRGB without washing it out (levels and highlights match ffmpeg's straight decode) but clips saturated colours to black (49% of channels at 0 against 32%). `hdr_ok` stays `false` in every committed build.
+
+**The scripted walk** (ON §5, P181 step 5): every row of §1.3's table captured into `~/v6.1-review/walk/` (outside git) and read with the Read tool: the `/app` link; the too-long panel with "Make shorts from it"; the gate signed out; cloud off; the line on what is sent; "Transcribing 3 of 30", "About 2 minutes left" and "55% - Offcut" in the tab; a 60 s file opened on `/app` with "This one is short, so it opens as a clip."; "Continue your video"; a pause with Continue; the transcript. Each says what is happening and what to do next.
+
+**Every real Groq call** (F-1, A-3; the reference clip's looped audio only; the key read alone from `.env.deploy`, never printed): (1) 23:51-00:21, stopped: its calls were not recorded, at most 2,690 s (experiments.md says what that means for A-3); (2) 00:54-00:56, 31 requests, 30 answered, **2,690 s**; (3) 01:57-01:59, 31 requests, 30 answered, **2,690 s**. Groq's own limit (7,200 s an hour) was never reached; the 25% stop never fired.
+
+**Found, not fixed.** `MAX_SOURCE_DURATION` is exact: `long_45min_4k_hevc.mov`, whose video track lasts 45:00.067, is refused as longer than 45 minutes. A phone's "45:00" recording can run a fraction of a second over; a tolerance (as the frame rate has) is the founder's call. `measureUserAgentSpecificMemory` counts the page and its workers, not Chrome's GPU process, so the decoders' own memory is not in these numbers; Chrome's task manager by hand is the founder's (R1).
+
+**Counts.** Rust 910 / 0 / 4 (the workspace, run in this prompt), Vitest 650, `pnpm e2e` 57; the full media run on `dist/` (P182's Tier 4, run here while Groq's hour refilled): **112 passed, 1 skipped**, 40.5 min, the floor exactly. No product code changed in P181.
+
+**Open:** **27 (new)**, the 2 words lost near seams; 19 and 24 stand, re-read.
+
+## Entry 37 - 2026-11-09 - P182: copy-back, the two runs, ready to merge
+
+**The founder merges** (their instruction of 2026-11-08: "do everything and tell me to merge, don't merge yourself"). So this prompt ends at a green, ready pull request; the merge, the `main` run and the tag follow when the founder merges, then §12.2's live checks and the closing entry.
+
+**Copy-back (§18), each marked "(V6.1, as built)".**
+
+- TS §5 (rows as files came; `flags-identity` and `route-long` with hyphens), §7 (V6.1's lint edges; `transcribe-source.ts` the second use-case that sends audio; the P-1 row), §22.1 and §24.5 (the window header, the two groups, the IP check in the handler, the log field), §22.8 (the two budget variables), §23.3 (structure version and record version; the `VersionError` rule), §39.3 (item 34: the long path's assumptions as measured), §41.3 (flag defaults, `OFFCUT_FEATURES_ON`, the two builds), §43.1-§43.9 (the rules in their real order; the types beside V5's pinned ones; `SOURCE_LIMITS`; reading in place; storage version 2; `audio-region.ts`; the windows at 10 s overlap, 34 for 45 minutes; the failure rules as built; the machine as built; the copy in `copy/long.ts`), §53.1 (TE-17, TE-18, TE-20, TE-21 read), §53.5 (the three events: not built, open item 26).
+- PS §10.1 (L0-L4 as built, dark), §20.2A (the budgets read). BP §0 (V6.1's line), §8A.1 (as built; `quota.ts` eviction to V7, REOPENED BP §8A.1).
+- The plan's §17 exit checklist ticked, the founder's boxes named.
+
+**Tier 4 (the two runs and the rest), on the final code.** Rust workspace **910 / 0 / 4**; Vitest **650**; `pnpm e2e` **57**; the full media run on `dist/` **112 passed, 1 skipped** (40.5 min; the protected path as production runs it); `FLAG_SUITES` on `dist-flags/` **34 passed, 1 skipped** (P180's second run, after the last code change); `pnpm fixtures` up to date with both manifests. No product code changed after those runs: P181 and P182 changed documents only.
+
+**ON §7.2's gates, with their evidence.**
+
+- [x] Locally: `pnpm check` ok; Rust, Vitest, `pnpm e2e` as above; `pnpm build` ok with `check-hosts.mjs` ok (one host, the asset host, as in the CSP) and the bundle's `long_video:!1, high_res:!1`; counts at or above Setup's baseline (863 / 0 / 4, 568, 57).
+- [x] The full `pnpm e2e:media` on `dist/` passed once: 112 passed with the one existing skip, the floor.
+- [x] `FLAG_SUITES` on `dist-flags/` passed (`route-long`, `high-res`, `long-resume`, `flags-identity`, `rejections`), twice.
+- [x] G 0.4's frozen check prints nothing; the additive check prints only its named lines (the handlers lines; `db.ts`' `open()` body, D-414; `transcribeAudio`'s signature, D-413; `dropSilentWords`' signature and level line, D-407; `route.rs`' moved steps, D-411; and two import lines of `asr.worker.ts`, P177).
+- [x] `git diff --name-only $BASE...v6.1-build -- web/tests-e2e/`: the four new specs, `long-windows.ts` and `fake-api.ts` (its one option); `rejections.spec.ts` unchanged (no edit was needed); `server/tests/` adds cases only (0 removed lines).
+- [x] `git diff --stat $BASE...v6.1-build`: 104 files, the plan's §4 files, their tests, docs, the fixtures scripts and the two workflows.
+- [x] Goldens and snapshots: `git diff --name-only $BASE -- '*.snap' '*.png'` empty.
+- [ ] The CI run on the pull request's head: push 3 below; read before the founder is told to merge.
+- [x] The self-review rubric passed (P180).
+- [x] `git grep -nE "gsk_[A-Za-z0-9]{20}"` empty; nothing private staged (no `.env*`, `testclips*`, `fixtures/.gen*`, `web/dist*`, no `zz-` file).
+- **Time (A-1):** the founder merges when they choose; the deploy is watched by the agent after it.
+
+**After the founder merges (the agent, ON §7.3):** the `main` run (`ci`, `e2e-media`, `deploy-api`, `deploy-web` with its smoke); `/healthz` with the merge's version and `cloud_transcribe: true`; `/api/v1/me` 401 with `Cache-Control: no-store` (D-429); an unauthenticated `POST /transcribe` with `X-Offcut-Window: 0/2` 401; `@smoke` against the live site; `/app` with no long link and `/app/long` redirecting to `/app`; then the tag `v6.1` on the merge commit (the founder's, or the agent's at their word), and the closing entry.
+
+**For the founder, in the morning (ON §8).** (1) F-3: `high_res` may go on (TE-17's 4K clip read 883 MB); Vercel's `OFFCUT_FEATURES_ON=high_res` (Production), then re-run the `main` run's `deploy-web` job; never the Redeploy button. (2) TE-20's real test: a long video on `dist-flags/` through a five-minute sleep and a background tab. (3) Open items 19, 24 (Groq's Dev tier, or one window in flight, before `long_video` goes on), 25, 26, 27 (2 words lost near seams). (4) Found, not fixed: `MAX_SOURCE_DURATION` has no tolerance (a 45:00.067 file is refused). (5) `long_video` stays off until V6.4's alpha (F-4).
+
+**Counts.** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
+
+**Open:** 27 (P181). **Found, not fixed:** as above.

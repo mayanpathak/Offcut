@@ -129,6 +129,26 @@ impl Config {
     }
 }
 
+/// V6.1 (v6.1implementation D-412): the global transcription budget, in audio
+/// seconds per UTC hour and per UTC day, from `TRANSCRIBE_BUDGET_HOUR_S` and
+/// `TRANSCRIBE_BUDGET_DAY_S`. Both are optional: unset or empty is the
+/// free-tier default of `budget.rs`; a value that is not a whole number above
+/// 0 stops the boot with its name. Read apart from `Config` so that no
+/// existing construction of `Config` changes.
+pub fn transcribe_budget(get: impl Fn(&str) -> Option<String>) -> Result<(u32, u32), ConfigError> {
+    use crate::transcribe::budget::{DAY_SECONDS, HOUR_SECONDS};
+    let read = |name: &'static str, default: u32| -> Result<u32, ConfigError> {
+        match get(name).filter(|value| !value.is_empty()) {
+            None => Ok(default),
+            Some(value) => parsed(name, value.parse::<u32>().ok().filter(|n| *n > 0)),
+        }
+    };
+    Ok((
+        read("TRANSCRIBE_BUDGET_HOUR_S", HOUR_SECONDS)?,
+        read("TRANSCRIBE_BUDGET_DAY_S", DAY_SECONDS)?,
+    ))
+}
+
 /// A value that did not parse is malformed.
 fn parsed<T>(name: &'static str, value: Option<T>) -> Result<T, ConfigError> {
     value.ok_or(ConfigError::Malformed(name))
@@ -506,5 +526,33 @@ mod tests {
         assert!(!debug.contains("[0, 1, 2, 3") && !debug.to_lowercase().contains("00010203"));
         assert_eq!(debug.matches("<redacted>").count(), 8);
         assert!(debug.contains("https://offcut.example.com") && debug.contains("8080"));
+    }
+
+    #[test]
+    fn the_transcribe_budget_is_optional_and_a_malformed_one_names_itself() {
+        use crate::transcribe::budget::{DAY_SECONDS, HOUR_SECONDS};
+        let none = |_: &str| None;
+        assert_eq!(transcribe_budget(none), Ok((HOUR_SECONDS, DAY_SECONDS)));
+        let set = |name: &str| match name {
+            "TRANSCRIBE_BUDGET_HOUR_S" => Some("30000".to_owned()),
+            "TRANSCRIBE_BUDGET_DAY_S" => Some("200000".to_owned()),
+            _ => None,
+        };
+        assert_eq!(transcribe_budget(set), Ok((30_000, 200_000)));
+        let empty = |_: &str| Some(String::new());
+        assert_eq!(transcribe_budget(empty), Ok((HOUR_SECONDS, DAY_SECONDS)));
+        for (name, bad) in [
+            ("TRANSCRIBE_BUDGET_HOUR_S", "0"),
+            ("TRANSCRIBE_BUDGET_HOUR_S", "-5"),
+            ("TRANSCRIBE_BUDGET_DAY_S", "1e5"),
+            ("TRANSCRIBE_BUDGET_DAY_S", "lots"),
+        ] {
+            let get = |n: &str| (n == name).then(|| bad.to_owned());
+            assert_eq!(
+                transcribe_budget(get),
+                Err(ConfigError::Malformed(name)),
+                "{name}={bad}"
+            );
+        }
     }
 }

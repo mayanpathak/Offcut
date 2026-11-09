@@ -353,6 +353,71 @@ export type UnsupportedReason = "UNSUPPORTED_MOBILE" | "UNSUPPORTED_WEBCODECS" |
  */
 export type FailureStage = "probe_audio" | "asr" | "audio_chain" | "detect_scene" | "render_encode" | "mux" | "import" | "model" | "preview" | "storage" | "api";
 
+/**
+ * The page a file was dropped on (v1.4).
+ */
+export type Entry = "clip" | "long";
+
+/**
+ * The build's flags that change routing (`features.ts`); `hdr_ok` stays false in V6.1.
+ */
+export type RouteFlags = { long_video: boolean, high_res: boolean, hdr_ok: boolean, };
+
+/**
+ * What the video's sample entry says beyond `ProbeInfo` (D-396, D-397).
+ */
+export type VideoDetail = {
+/**
+ * From `colr`: `nclx` with transfer characteristics 16 (PQ) or 18 (HLG).
+ */
+is_hdr: boolean,
+/**
+ * The WebCodecs string built from `hvcC` (e.g. "hvc1.1.6.L150.90"); none for other codecs.
+ */
+hevc_codec_string: string | null, };
+
+/**
+ * A long source; constructed only by `route_probe`.
+ */
+export type SourceInfo = { duration: DurMs,
+/**
+ * After rotation.
+ */
+display_width: Px,
+/**
+ * After rotation.
+ */
+display_height: Px, rotation: Rotation, orientation: Orientation, is_vfr: boolean, is_hdr: boolean, avg_fps: FpsMilli, video_codec: VideoCodec, video_codec_string: string, audio_codec_string: string, audio_sample_rate: Hz, audio_channels: number,
+/**
+ * The track the long path reads: the first audio track in file order (P171).
+ */
+audio_track: number,
+/**
+ * Every audio track; the long path accepts more than one.
+ */
+audio_tracks: number, };
+
+/**
+ * Which path a file takes.
+ */
+export type Route = { "clip": ClipInfo } | { "long": SourceInfo };
+
+/**
+ * The reasons V6.1 adds to the V5 list, serialized as their `REJECT_*` codes.
+ */
+export type SourceReject = "REJECT_HDR";
+
+/**
+ * Why `route_probe` refuses a file: one V5 reason, or one V6.1 adds. It
+ * serializes as the bare code, so the two sets read as one list.
+ */
+export type RouteReject = RejectReason | SourceReject;
+
+/**
+ * The error codes the long path adds (TS §43.9), serialized as their `E_*` codes.
+ */
+export type SourceErrorCode = "E_SOURCE_READ" | "E_SOURCE_AUDIO";
+
 export const LIMITS = {
   MAX_CLIP_DURATION: 90000 as DurMs,
   MAX_FILE_SIZE: 500000000 as Bytes,
@@ -441,4 +506,22 @@ export const UNSUPPORTED_REASONS = [
   "UNSUPPORTED_H264_ENCODE",
   "UNSUPPORTED_AAC_DECODE",
   "UNSUPPORTED_AAC_ENCODE",
+] as const;
+
+export const SOURCE_LIMITS = {
+  MAX_SOURCE_DURATION: 2700000 as DurMs,
+  MAX_INPUT_LONG_SIDE: 3840 as Px,
+  MAX_FILE_SIZE_HIGH_RES: 16000000000 as Bytes,
+  CLOUD_WINDOW_S: 90,
+  CLOUD_OVERLAP_S: 10,
+  MAX_SOURCE_WINDOWS: 35,
+} as const;
+
+export const SOURCE_REJECT_REASONS = [
+  "REJECT_HDR",
+] as const;
+
+export const SOURCE_ERROR_CODES = [
+  "E_SOURCE_READ",
+  "E_SOURCE_AUDIO",
 ] as const;

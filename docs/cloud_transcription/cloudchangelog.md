@@ -7,7 +7,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | # | Item | Owner | Where |
 |---|---|---|---|
 | 1 | ~~F-1~~: **answered yes** 2026-11-06 (Entry 1) | Founder | plan §15 |
-| 2 | F-2: answered yes 2026-11-06. **To confirm at G 10.3** that Zero Data Retention shows as on in Groq's console, before the merge; the Privacy Policy's sentence depends on it | Founder | plan §15 |
+| 2 | ~~F-2~~: answered yes 2026-11-06; **confirmed by the founder**: Zero Data Retention is on in Groq's console (Entry 12), so the Privacy Policy's sentence holds | Founder | plan §15 |
 | 3 | ~~F-3~~: **answered (a)**, "Your video is never uploaded." | Founder | plan §15 |
 | 4 | F-4: answered yes. The approval itself is G 6.6 (P166); a lawyer's review stays on the launch checklist | Founder | plan §15 |
 | 5 | ~~F-5~~: **answered yes** (switch off at the merge) | Founder | plan §12.2 |
@@ -638,3 +638,31 @@ All fourteen captures are in `~/cloud-review/` (1-14).
 - CI for push 3 (run 42223029927): `ci` and `e2e-media` green, no re-run needed.
 
 **Open for the founder** (G 10.2 onwards): the wording approval (G 6.6), Zero Data Retention seen on (F-2), the Render variables with the switch off, the merge, the switch on, the live journey, the tag.
+
+## Entry 12 - 2026-11-07 - Cloud closed: merged, switched on, tagged
+
+**Merge.** The founder merged pull request 15 as `2568a6e` on 2026-11-06 at 18:31 UTC, with the tree of `b17a12c`. The `main` run, 42271514499, was green on its first attempt (30 min 23 s), with no re-run of known issues 1 or 2. Tagged `cloud` on `2568a6e` and pushed by the agent, at the founder's request.
+
+**Switch off first (F-5, G 10.4).** The founder added `TRANSCRIBE_ENABLED=false`, `TRANSCRIBE_API_KEY` and `TRANSCRIBE_API_BASE_URL` on Render before the merge. After the deploy, `/api/v1/healthz` through the site read `{"ok":true,"version":"2568a6e…","cloud_transcribe":false}`: the new server started, and the client offered no cloud. `POST /api/v1/transcribe` without a session gave 401 `unauthorized`.
+
+**Switch on (G 10.5).** The founder set `TRANSCRIBE_ENABLED=true`. Read by the agent on 2026-11-07:
+
+| Check | Read |
+|---|---|
+| `/api/v1/healthz` | `cloud_transcribe: true`, version `2568a6e` |
+| `POST /api/v1/transcribe`, no session, through Vercel | 401 `{"code":"unauthorized"}`: the request reaches Render through the site and is refused without a session |
+| `/api/v1/me`, no session | 401 |
+| `/`, `/app`, `/account`, `/legal/privacy` | 200 |
+| Live bundle (`index-Ds7yJ_7C.js`) | holds "Cloud · fast", "On device · private" and "never uploaded" |
+
+**The live journey (G 10.6).** Done by the founder on the deployed site: signed in, dropped a clip, and the captions arrived from the cloud. The founder reported that it works; no timings or files were passed to the agent, so none are recorded here.
+
+**Open after the release.**
+- None from the founder: open item 2 (Zero Data Retention on in Groq's console) was confirmed by the founder on 2026-11-07.
+- Known issues 1 to 3, carried to V6.1.
+- From V6, still open: `web/vercel.json`'s `no-cache` over the API's `no-store`.
+- Groq's free tier daily cap: when it bites, the server answers 503 and the clip finishes on the device (D-348, D-359); move to the Dev tier then (D-342).
+
+**Rollback** stays as built: `TRANSCRIBE_ENABLED=false` on Render turns cloud off within about a minute, with no code change, and the build flag `cloud_transcribe` in `OFFCUT_FEATURES_OFF` removes it from the client.
+
+**Final counts** (Entry 11): Rust 863 / 0 / 4; Vitest 568; `pnpm e2e` 57; media 112 passed, 1 skipped, on D1. V6.1 opens its own branch from `main` next.

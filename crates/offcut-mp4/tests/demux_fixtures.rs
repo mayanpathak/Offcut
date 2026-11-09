@@ -414,3 +414,61 @@ fn no_derived_clip_carries_the_reference_clips_metadata() {
         assert!(found.is_empty(), "{name}: {found:?}");
     }
 }
+
+/// V6.1 (D-396, D-397): the HEVC fixture's `hvcC` gives the codec string D1's
+/// Chrome was asked about in P171, and no `colr` means SDR; an H.264 clip has no
+/// `hvcC`. The HDR fixture's `colr` case joins when P173 generates it.
+#[test]
+fn rej_hevc_gives_its_hvcc_codec_string_and_h264_clips_give_none() {
+    let mut d = open("rej_hevc.mov");
+    let boxes = d.video_entry_boxes().unwrap();
+    assert_eq!(boxes.fourcc, Some(*b"hvc1"));
+    let hvcc = boxes.hvcc.expect("rej_hevc.mov has an hvcC");
+    assert!(hvcc.len() > offcut_mp4::hevc::HVCC_HEADER_LEN);
+    let detail = offcut_mp4::probe::video_detail(&mut d);
+    assert_eq!(detail.hevc_codec_string.as_deref(), Some("hvc1.1.6.L93.90"));
+    assert!(!detail.is_hdr);
+
+    for name in ["ok_60fps.mp4", "speech/speech_60s_portrait.mp4"] {
+        let mut d = open(name);
+        let boxes = d.video_entry_boxes().unwrap();
+        assert_eq!(boxes.fourcc, Some(*b"avc1"), "{name}");
+        assert!(boxes.hvcc.is_none(), "{name}");
+        let detail = offcut_mp4::probe::video_detail(&mut d);
+        assert_eq!(detail, offcut_types::VideoDetail::default(), "{name}");
+    }
+}
+
+/// V6.1: `open_source` reads all twelve minutes of `long_12min.mp4`, whose
+/// 33,750 audio and 21,600 video samples are past `open`'s 20,000; and the
+/// HLG fixture's `colr` says HDR.
+#[test]
+fn long_12min_reads_to_its_end_through_open_source_and_hlg_is_hdr() {
+    let bytes = fixture("long_12min.mp4");
+    let mut short = Demuxer::open(MemReader(bytes.clone())).unwrap();
+    let mut out = Vec::new();
+    assert!(short.read_audio_sample(0, &mut out).is_err());
+
+    let mut long = Demuxer::open_source(MemReader(bytes)).unwrap();
+    let count = long.audio_sample_count();
+    assert!(count > 20_000, "{count}");
+    let last = long.read_audio_sample(count - 1, &mut out).unwrap();
+    assert!(!out.is_empty());
+    assert!(
+        (719_000_000..=720_100_000).contains(&last.pts.get()),
+        "{:?}",
+        last.pts
+    );
+    assert_eq!(long.audio_sample_meta(count - 1), Some(last));
+    let first = long.audio_sample_meta(0).unwrap();
+    assert!(first.pts.get() <= 0);
+    let frames = long.video_sample_count();
+    assert_eq!(frames, 21_600);
+    long.read_video_sample(frames - 1, &mut out).unwrap();
+
+    let mut d = open("rej_hdr_hlg.mov");
+    let boxes = d.video_entry_boxes().unwrap();
+    assert_eq!(boxes.fourcc, Some(*b"hvc1"));
+    assert!(boxes.colr.is_some());
+    assert!(offcut_mp4::probe::video_detail(&mut d).is_hdr);
+}
