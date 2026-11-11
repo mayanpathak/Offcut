@@ -80,6 +80,43 @@ Concurrency limits are 2,500 (Flash) and 500 (Pro) per account. "Product prices 
 
 Recorded, redacted shapes for P190 (each request with message texts cut to their lengths and the schema named, not copied; each response with `id` and `system_fingerprint` redacted; response headers without ids, cookies or tracing) are in the session's scratchpad (`p183ds/*.record.json`); P190 rebuilds them as `server/tests/fixtures/deepseek/` with no key or account identifier.
 
+### The full read (P188, 2026-11-11 23:15-23:18 UTC, d1; the founder cut it to 30 plans)
+
+**What was sent.** The 15 transcripts of D-493 (`a01`, `w01`-`w14`, all written scripts in the repository; never `a02`), each once to `deepseek-flash` and once to `deepseek-v4-pro`: 30 plans, **33 calls** (3 retries, below). D-500's request exactly: the `@v2` system prompt, then "Answer with one JSON object that matches this JSON Schema exactly:" and the compact `@v2` output schema (15,194 characters, identical for every transcript); the `@v2` user message, built from each file as `validate_rules_plans.rs` builds it (stressed words at 2.0); `thinking: {"type": "disabled"}`, `json_object`, temperature 0.2, `max_tokens` 8000. Each answer was given `format`, `catalog` and `source` as the server will, parsed into `EditPlan` and validated with the file's edits and `PlanConfig::default()` by a scratch tool built on the repository's crates (not committed). Off-peak; the account's balance went from $1.93 to $1.89.
+
+| | `deepseek-flash` | `deepseek-v4-pro` | Pass line |
+|---|---|---|---|
+| Parse, first try / after one retry | 13 / 15, **15 / 15** | 14 / 15, **15 / 15** | ≥ 98% after one retry: **both pass** |
+| Items written / kept | 128 / 104 | 116 / 69 | |
+| Items per plan, median (kept) | 8 (7) | 7 (5) | |
+| **Item drop rate, median (mean)** | **16.7%** (17.8%) | **28.6%** (36.2%) | ≤ 10%: **both fail** |
+| Latency p50 / p90 / max | 2.8 / **3.3** / 6.0 s | 4.2 / **6.1** / 7.4 s | p90 ≤ 10 s: **both pass** |
+| Tokens in (cache hit) / out, median | 5,151 (3,840) / 549 | 5,148 (3,968) / 813 | |
+| Thinking tokens | 0 | 0 | |
+| Cost per plan at peak, median (no cache) | $0.0011 ($0.0022) | $0.0050 ($0.0100) | recorded |
+| Hook / caption / hashtags written | 15 / 15 / median 5 | 15 / 15 / median 8 | |
+| Hook titles kept / written | 1 / 1 | 7 / 10 | |
+
+**Drops by kind and reason.**
+
+- **Flash** (24 items): `punch_in` too close 7, anchor rule 5; `icon_pop` zone taken 4; `number_reveal` number unresolved 3, anchor rule 1; `emoji` density 2; `from_to` too close 1, number unresolved 1. One hook was too long.
+- **Pro** (47 items): `emphasis` anchor rule 14; `punch_in` too close 9, anchor rule 5; `number_reveal` anchor rule 7, number unresolved 1; `icon_pop` anchor rule 3; `emoji` anchor rule 2, density 1; `hook_title` params mismatch 2, hook missing 1; `from_to` too close 1, number unresolved 1. Three hooks were too long.
+
+**What the plans show** (all 30 annotated in `~/v6.2-review/plans/`, outside git; ten to read first named in its README):
+
+- **Pro anchors every item to its whole sentence.** An emphasis or icon meant for one word comes with a 9-word range, and a number with 11 words, so `AnchorRule` takes most of its items. Its choices inside those sentences are sensible.
+- **Flash follows the anchor rules, but zooms on almost every sentence** (56 zooms in 15 short scripts, usually `push` across the whole sentence). Zooms in back-to-back sentences then break the kind's 1.5 s gap. It also puts icons on top of numbers in the event zone.
+- **Each parse failure was one name outside the 72** (the emoji `cat`, `lock` used as an emoji, the icon `cloud`). Serde refuses the whole plan for one unknown name; the one retry rescued each of the three plans.
+- **A number range that is not exactly the number** (`NumberUnresolved`, 5 in all), as in P183b.
+- Both models wrote a hook, a post caption and hashtags every time. No hashtag was dropped. Four hooks were dropped as too long (over 48 characters or 9 words).
+
+**Recommendation for CP 1 (D-498):** `deepseek-flash`, thinking off. It is clearly better here, not just cheaper: 104 of 128 items kept against Pro's 69 of 116, p90 3.3 s against 6.1 s, and a fifth of the cost. Both miss the 10% drop line, and the causes are in the prompt, not the model. Offered at CP 1:
+
+1. **One prompt revision, then TE-15 on Flash again** (15 calls, about $0.02; a new `@v2` read, since nothing ships on it yet). It would say how to write a one-word anchor (`{"start": w, "end": w + 1}`), that a zoom covers only its own words and not every sentence needs one, and that an icon never shares the event zone with a number. **Recommended.**
+2. **Item-level parsing in P190:** the adapter parses each item alone, so an unknown name drops that item (`ParamsMismatch`) rather than the plan. This saves a retry, about 7% of calls here. **Recommended,** as P190's design, with the founder's yes.
+3. Accept Flash as it is: `validate` is the gate, and drops cost nothing but a fuller plan.
+4. Pro: not recommended.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 Not read yet (P197).

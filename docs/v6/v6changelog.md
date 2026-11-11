@@ -37,6 +37,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 34 | **Closed 2026-11-11 (Entry 43): moot, Gemini is not used (D-500).** Was: ~~Gemini 3.8 Flash's price doubles on 2027-01-01~~ (0.75 / 3.75 → 1.50 / 7.50 USD per 1M tokens): set `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK` on Render again that day, or the spend cap counts low | Founder, 2027-01-01 | Entry 42, v6.2implementation D-463 |
 | 35 | **The privacy page and the settings table name DeepSeek before `ai_plan` goes on in production.** The privacy page promises "We will update this page before any new kind of data leaves your computer"; its "Cloud captions" style section, its "Who handles it" list and the settings "What leaves your device" table gain a row: the words of the transcript and their timings go to DeepSeek, in China, to plan the edit; never the audio or video. They cannot say "not kept" or "never used to train" (DeepSeek's terms state neither; D-492's note). The landing page does not change (the founder). Optional: write to DeepSeek to opt the account out of training, a right its privacy policy names | Founder (wording at CP 3) | Entry 43, v6.2implementation D-492, D-500 |
 | 36 | **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
+| 37 | **Checkpoint 1 (P188): choose the model, confirm the prices, and say yes or no to the prompt revision and item-level parsing.** Read `~/v6.2-review/plans/README.md`'s ten plans first, then `docs/v6.2/experiments.md` TE-15's full read. Recommended: `deepseek-flash`, thinking off; one prompt revision and Flash re-read (15 calls, about $0.02); item-level parsing in P190. P189 was built with `deepseek-flash` as the default model (the founder, 2026-11-12) | Founder, before P190 | Entry 47 |
 
 ## Known issues for later prompts
 
@@ -1332,3 +1333,24 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Found, not fixed.** `offcut-api`'s `no_media_routes.rs` `every_post_route_refuses_a_body_over_the_limit` failed once in a full parallel workspace run and passed alone and on the re-run: load-sensitive, not a change of this prompt.
 
 **Open.** 35, 36. Next: P188 (TE-15 on DeepSeek, 30 calls, then CP 1).
+
+## Entry 47 - 2026-11-12 - P188: TE-15 on DeepSeek; checkpoint 1 waits for the founder
+
+**No product code changed.** TE-15's full read is in `docs/v6.2/experiments.md`, the 30 annotated plans in `~/v6.2-review/plans/` (outside git) with a README naming the ten to read first. The scratch caller and validating tool were built on the repository's crates and are not committed. A redacted record of one exchange per model is in `~/v6.2-review/records/` for P190's fixtures.
+
+**Every real call (F-9, D-500; the founder cut TE-15 to 30 plans: each model once).** 2026-11-11 23:15:55-23:17:56 UTC, off-peak. Sent: the `@v2` system prompt with the `@v2` schema as text, and the `@v2` user message of `a01` and `w01`-`w14` (written scripts in the repository); never `a02`, audio or a frame. 33 calls, all HTTP 200, all `finish_reason: stop`, no thinking tokens:
+- `deepseek-flash`, 17 calls: one per transcript, plus a second for `w03` and `w10` (first answers named emoji outside the 72). Per plan: 4,823-6,989 tokens in (3,840-5,120 cache hits), 460-906 out, 2.4-6.0 s.
+- `deepseek-v4-pro`, 16 calls: one per transcript, plus a second for `w05` (its first answer named the icon `cloud`). Per plan: 4,820-6,986 in, 551-1,591 out, 3.1-7.4 s.
+- The account's balance went from $1.93 to $1.89: about $0.04 for the 33 calls (off-peak, half the peak prices). Plus one free balance read with no content.
+
+**Against TE-15's lines.** Parse after one retry 15/15 for each model (pass). p90 latency 3.3 s (Flash) and 6.1 s (Pro) (pass). **Median item drop rate 16.7% (Flash) and 28.6% (Pro): both over the 10% line.** Cost per plan at peak: $0.0011 (Flash), $0.0050 (Pro). The terms line ("paid-tier data does not train models") cannot pass for DeepSeek, whose terms say neither; the founder accepted that in D-500 and D-492.
+
+**Why the drops.** Pro anchors every item to its whole sentence, so `AnchorRule` takes 14 of its 30 emphasis marks, 7 of its 12 numbers and most of its icons and emoji. Flash keeps the anchor rules but zooms on almost every sentence (56 zooms in 15 short scripts), losing 12 to the 1.5 s gap and V-3; it also lays icons over numbers (4 `ZoneTaken`). Every parse failure was a single name outside the closed sets, which fails the whole plan under serde.
+
+**Recommendation (open item 37, CP 1).** `deepseek-flash`, thinking off: more items kept, half the latency, a fifth of the cost. Then one prompt revision (one-word anchors written as `{"start": w, "end": w + 1}`; a zoom only where it earns it; no icon over a number) and a 15-call re-read on Flash, about $0.02; and item-level parsing in P190 so an unknown name drops one item, not the plan. Prices to confirm: Flash 0.006 / 0.30 / 1.20, Pro 0.044 / 1.32 / 3.96 USD per 1M tokens (cache hit / miss / output), peak; off-peak half.
+
+**Stop at CP 1, as the prompt says.** P188's acceptance "the founder's choice in the entry" waits for the morning; the choice will be recorded in the commit that applies it. P189 runs tonight, as the founder allowed, with `deepseek-flash` as the configuration's default.
+
+**Counts.** Unchanged (no product code): Rust 939 / 0 / 7, Vitest 650.
+
+**Open.** 35, 36 (done in P189), **37 (CP 1)**. Next: P189.
