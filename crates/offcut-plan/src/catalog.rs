@@ -44,6 +44,10 @@ pub enum ParamTy {
     },
     Enum(&'static [&'static str]),
     Bool,
+    /// V6.2 (D-448): a whole number from 0 to `max`, both included (the hook's accent word).
+    Index {
+        max: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

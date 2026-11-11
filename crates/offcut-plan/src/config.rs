@@ -41,7 +41,11 @@ fn limits(row: &crate::catalog::ItemSpec) -> KindLimits {
             ParamTy::ListPoints {
                 label_chars: chars, ..
             } => label_chars = label_chars.max(chars),
-            ParamTy::QuantityRef | ParamTy::WordIdx | ParamTy::Enum(_) | ParamTy::Bool => {}
+            ParamTy::QuantityRef
+            | ParamTy::WordIdx
+            | ParamTy::Enum(_)
+            | ParamTy::Bool
+            | ParamTy::Index { .. } => {}
         }
     }
     KindLimits {

@@ -16,5 +16,5 @@ pub use catalog::{AnchorRule, CATALOG_VERSION, ItemSpec, ParamSpec, ParamTy, Pro
 pub use config::PlanConfig;
 pub use from_rules::from_rules;
 pub use validate::{
-    DropReason, Dropped, PlanRejected, RejectReason, ValidItem, ValidPlan, validate,
+    DropReason, Dropped, PlanRejected, RejectReason, ValidExtras, ValidItem, ValidPlan, validate,
 };

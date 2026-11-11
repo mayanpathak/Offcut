@@ -87,6 +87,9 @@ ADDITIVE=(
 ALLOW=(
   # P184 (D-446): EventParams gains five arms; the test that pinned four tagged kinds now pins nine.
   'crates/offcut-types/src/events.rs|^ +assert_eq!\(ts\.matches\(r#""kind": "#\)\.count\(\), 4, "\{ts\}"\);$'
+  # P185 (D-454, D-440 (2)): a valid hook is kept now; the test's "not applied" example becomes the music cue.
+  'crates/offcut-wasm-render/src/scene_api.rs|^ +let hook = input\(\|v\| v\["plan"\]\["extras"\]\["hook"\] = json!\("Watch this"\)\);$'
+  'crates/offcut-wasm-render/src/scene_api.rs|^ +let \(_, dropped\) = scene_of\(hook, &clip\(\)\)\.unwrap\(\);$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

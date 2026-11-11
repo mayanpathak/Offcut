@@ -435,6 +435,7 @@ offcut/
 │   │   └── tests/
 │   │       ├── catalog_snapshot.rs    the prompt and the schema, version-named snapshots
 │   │       ├── validate.rs            one case per rule
+│   │       ├── validate_v62.rs        (V6.2) the five kinds, the extras, V-3, V-9, D-452, D-453, DC-7 (v6.2implementation §13.1)
 │   │       ├── plan_from_rules.rs
 │   │       ├── shorts.rs              one case per rule S-1 to S-10
 │   │       ├── shorts_prompt_snapshot.rs

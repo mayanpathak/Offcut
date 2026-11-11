@@ -1283,3 +1283,23 @@ No product code changed: two temporary probes ran and were removed, and two rend
 **Found, not fixed.** The list's draft names give "Emphasis" to both `keyword_pop` (V4) and `emphasis` (§12): one to rename at CP 3. TS §52 says the closed sets live "next to their drawing code"; D-447 puts them in `offcut-types`, as built.
 
 **Open.** 35, 36 (36 answered yes; the rename is done in P189). Next: P185.
+
+## Entry 45 - 2026-11-12 - P185: validation pieces
+
+**What changed (`offcut-plan`).** `ParamTy::Index { max }` (0 to `max`), with its arms in `config.rs`, `validate_params.rs` and `prompt.rs` (text "a whole number from 0 to N", schema integer 0..N); no row uses it yet, so the `@v1` snapshots are unchanged. **DC-7 (D-449):** V-1 refuses only a catalog newer than `CATALOG_VERSION`. **`ValidPlan.extras`** (`ValidExtras { hook, post_caption, hashtags }`, accessor `extras()`, exported) holds the extras that pass D-454; cuts, chapters and music stay `NotInThisBuild` (D-455). Per item: the five kinds resolve (the four word pointers copy through; `HookTitle` takes the valid hook's text, `HookMissing` without one, its accent below the hook's word count and within the row's `Index`, else `ParamsMismatch`, D-453); `ClipWide` anchors are exactly `0..word count`; a `PunchIn` spans 1-3 words (`Snap`) or 2-40 (`Push`) inside one sentence, else `AnchorRule` (D-450). After V-6, three passes in anchor order: the zoom rule (two `PunchIn`s never overlap, one a sentence: `TooClose`), the punch words (6 s from the last punch's end: `TooClose`; 4 a clip: `OverLimit`, D-452), and for a model's plan V-9 (one visual start in any 2.5 s: `Density`, D-451). `hold_ms`: `IconPop` holds the event zone as V4's visuals do, the other four hold none. The kinds still have no catalog row, so `validate` drops them at V-2 until P186.
+
+**DECLARED CHANGE (D-440 (2)), each assertion before and after.**
+- `tests/validate.rs` `case_20_not_in_this_build_each_non_item_field`: before, the hook, the post caption and `["editing"]` each gave one `NotInThisBuild`; after, each is kept with no drop (`extras().hook == "I almost quit"`, the caption, `hashtags == ["#editing"]`: a hashtag now needs its `#`). The five cuts, the chapter and the music keep their assertion.
+- `tests/validate.rs` `the_non_item_fields_are_dropped_and_the_items_kept`: before `dropped.len() == 6`; after `3` (cut, chapter, music) and `extras().hashtags == ["#editing"]` (the input's hashtag gains its `#`).
+- `validate.rs`' inline `every_non_item_field_is_dropped_in_v4`: before `8`; after `4`, with the hook, the caption and `["#editing", "#video"]` kept.
+- **Beyond the plan's list:** `offcut-wasm-render`'s `a_field_v4_does_not_apply_is_dropped_and_reported` used the hook as its example of a field not applied; it now uses the music cue, with its assertion unchanged (the gate's allow list names the two removed lines). And `offcut-plan/tests/ui/valid_plan_private.stderr` (trybuild) was regenerated, as its driver says to: building a `ValidPlan` outside the crate still fails on private fields, and the message now names `extras` too.
+
+**As read** (notes under D-453 and D-454, and D-440's (12)): a hashtag without `#`, empty or with another character is `ParamsMismatch`; a ninth hashtag `OverLimit`; a hook outside 2-9 words `LabelTooLong`. A gap is measured from the last kept item's end, as V-6's `min_gap` is; the density window from start to start.
+
+**Tests.** New: `tests/validate_v62.rs` (5: the hook, the caption, the hashtags, a rules plan without extras, DC-7), inline `validate.rs` (4: the zoom rule, the punch words, V-9, DC-7, each on `ValidItem`s directly), inline `validate_params.rs` (2: the hook's checks, the zoom's span rule). `validate_rules_plans.rs` and `plan_from_rules.rs` unchanged and passing, so every rules plan of the labelled set still validates whole.
+
+**Counts.** Rust **932 / 0 / 4**; Vitest **650**; no golden or snapshot touched. `cargo test -p offcut-plan`: 65.
+
+**Found, not fixed.** `validate.rs`' inline `v1_another_format_or_catalog_refuses_the_plan` refuses `empty_rules(2)` as a catalog too new; with `CATALOG_VERSION = 2` in P186 it will be read. P186 must handle it (it is not on D-440's list).
+
+**Open.** 35, 36. Next: P186.

@@ -403,8 +403,9 @@ mod tests {
 
     #[test]
     fn a_field_v4_does_not_apply_is_dropped_and_reported() {
-        let hook = input(|v| v["plan"]["extras"]["hook"] = json!("Watch this"));
-        let (_, dropped) = scene_of(hook, &clip()).unwrap();
+        // V6.2 keeps a valid hook (D-454, D-440 (2)); the music cue is still not applied (D-455).
+        let music = input(|v| v["plan"]["music"] = json!({ "fits": true, "energy": "calm" }));
+        let (_, dropped) = scene_of(music, &clip()).unwrap();
         let report = serde_json::to_value(SceneReport {
             dropped,
             chunks: Vec::new(),

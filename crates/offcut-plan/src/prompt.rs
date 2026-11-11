@@ -66,6 +66,7 @@ fn param_text(param: &ParamSpec) -> String {
         ),
         ParamTy::Enum(values) => format!("one of {}", values.join(", ")),
         ParamTy::Bool => "true or false".to_owned(),
+        ParamTy::Index { max } => format!("a whole number from 0 to {max}"),
     };
     let need = if param.required {
         "required"
@@ -145,6 +146,7 @@ fn param_schema(ty: ParamTy) -> Value {
         }),
         ParamTy::Enum(values) => json!({ "enum": values }),
         ParamTy::Bool => json!({ "type": "boolean" }),
+        ParamTy::Index { max } => json!({ "type": "integer", "minimum": 0, "maximum": max }),
     }
 }
 
