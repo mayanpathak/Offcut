@@ -130,6 +130,30 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ---
 
+## Prompt 183b — The Gemini reads left by P183 (added in P183)
+
+**Effort: Medium.**
+
+**Objective.** The Gemini readings P183 could not take because the key's project was on Google's free tier: the Pro-class answer, and Flash with less thinking. Due before P188; P184 to P187 do not wait for it.
+
+**Read first.** `experiments.md` TE-15's first read; D-457, D-459, D-463 and their "As read (P183)" notes; the scratchpad probe (`gemini-probe.mjs`, rebuild it from experiments.md if the session's scratchpad is gone).
+
+**Before anything:** the founder confirms that the key's Google project has billing on (AI Studio shows the project's tier as paid, not "Free tier"). **No call is made until then.**
+
+**Do.**
+
+1. `gemini-3.1-pro-preview` with call 1's request: status (a 200 is the proof that billing took effect; a 429 naming `free_tier` metrics stops the prompt), latency, usage, parse, `validate` (a `zz_` test, as in P183, deleted after).
+2. `gemini-3.8-flash` with thinking lowered (the `generationConfig` field P183's record shows for thinking: a level or a budget; read Google's docs for the exact name): latency, thinking tokens, parse, `validate`, and whether its items differ from call 1's.
+3. Optional, if the founder asks: `gemini-4-argon` the same way.
+4. `experiments.md`: the readings; D-459's `PLAN_THINKING` value proposed for CP 1.
+
+**Acceptance.**
+
+- [ ] Billing confirmed by the founder before the first call; every call listed (model, tokens, status, ms); `a01` only.
+- [ ] Commit `V6.2 P183b: the Gemini reads left by P183`.
+
+---
+
 ## Prompt 184 — The types
 
 **Effort: High.**

@@ -33,6 +33,8 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 31 | TE-29's side-by-side panel: 20 shots, graded and ungraded, unlabelled | Founder, at V6.6a | Entry 38, TS §47.4 |
 | 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
 | 32 | ~~V6.2's founder questions F-1 to F-9~~ **Answered 2026-11-11:** yes to all; billing already on; 15 transcripts for TE-15; AI plans for signed-in people only (v6.2implementation D-493, D-494) | Founder | Entry 40 |
+| 33 | **The Gemini key's Google project is on the free tier** (P183: a 429 naming only `free_tier` quotas, Pro's at 0), although billing was thought on. Link the key's project to an active Cloud Billing account (or make a key in the billed project and put it in `.env` and `.env.deploy` as `PLAN_API_KEY`); AI Studio shows the tier. **No Gemini call until then (P183b).** Also recommended: turn off the developer logs in AI Studio's Logs and Datasets page (on by default for projects made on or after 2026-10-26, kept up to 55 days) | Founder, before P183b and P188 | Entry 42 |
+| 34 | Gemini 3.8 Flash's price doubles on 2027-01-01 (0.75 / 3.75 → 1.50 / 7.50 USD per 1M tokens): set `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK` on Render again that day, or the spend cap counts low | Founder, 2027-01-01 | Entry 42, v6.2implementation D-463 |
 
 ## Known issues for later prompts
 
@@ -1215,3 +1217,25 @@ A planning session after V6.1's merge. Nothing in the code changed. The founder'
 **The floor, with the new settings (D-438; V6.2's baseline, BP §8A.0 step 1).** Rust **910 / 0 / 4** (421 s); Vitest **650**; `pnpm e2e` **57**. Media 112 + 1 skipped and `FLAG_SUITES` 34 + 1 stand from V6.1 (not re-run: D-437).
 
 **Open.** Nothing new. Next: P183, read before building.
+
+## Entry 42 - 2026-11-11 - P183: read before building
+
+No product code changed: two temporary probes ran and were removed, and two renderer files patched for a probe were restored byte for byte. Readings are in `docs/v6.2/experiments.md`; the plan gains "As read (P183)" notes under D-457, D-459, D-460, D-463, D-470, D-471, D-472, D-492 and §10.1, TE-31's pass line, and a row P183b.
+
+**Gemini (TE-15 first read).** The key sees 62 models; the candidates are `gemini-3.8-flash` and `gemini-3.1-pro-preview`, with `gemini-4-argon` a third for CP 1. Prices and terms read from Google's pages: paid-tier prompts are not used to improve products, are kept 55 days for abuse checks with possible review by Google staff; developer logs are on by default in new projects and can be turned off.
+
+**Real calls (F-9: `a01` only).** (1) `gemini-3.8-flash`, the `@v1` texts and schema: 200 in 22.7 s; 4,782 in, 937 out, 1,557 thinking tokens; about 1.3 cents. Gemini accepted the canonical schema but ignored `const` (`format` and `catalog` came back as `{}`); with the server setting both, the plan parsed and `validate` kept all 7 items. (2) `gemini-3.1-pro-preview`: **429, free-tier quotas only**. Plus Setup's and P183's two free model-list calls.
+
+**Stop and ask (open item 33): the key's project is on the free tier.** On it Google may train on what is sent and humans may read it, so no further call is made until the founder confirms billing. P183b takes the remaining reads (Pro-class, Flash with less thinking) before P188; P184 to P187 do not need them.
+
+**Decisions changed by the readings.** The server sets `format`, `catalog` and `source`; the model never writes them (D-457, D-460). Thinking is on by default and makes the call slow: `PLAN_THINKING` from configuration (D-459). Prices change on 2027-01-01 (open item 34). Straight alpha needs no premultiplying (D-472).
+
+**Vello's images (TE-30 first read, WARP).** `Scene::draw_image` with peniko's `ImageBrush` (straight alpha, bilinear, an opacity multiplier) through the real `render_to_image`: exact colours at 0.5×, 1× and 1.5×, the exact half-opacity blend, no dark fringe, soft edges, clean clipping.
+
+**Licences.** Fluent Emoji: MIT, notice only, pinned at `1ffb34c`; 3D PNGs are 256 px RGBA (about 550 kB for the bundle at 160 px, under D-471's 600 kB). Lucide: ISC, already in `web/LICENSES.md`; icons rasterised with Playwright's Chromium (no new package).
+
+**Drift (TE-31 first look).** A linear 1.00 → 1.05 drift through the real video pass moved a shape 0.021-0.039 output px every frame (0.030 expected), never zero then a jump: no snapping, so the pass line becomes "no stepping", not a speed limit.
+
+**Counts.** Unchanged (no product code): Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57 (Entry 41).
+
+**Open.** 33 (billing, logs), 34 (prices on 2027-01-01). Next: P184 (the types, CP 2a); P183b once billing is confirmed.
