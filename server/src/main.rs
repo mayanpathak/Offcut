@@ -41,6 +41,15 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // V6.2 (D-465): the AI plan's settings. Off by default; on without its key,
+    // cap or prices, the boot stops naming the variable. P191 hands them to the route.
+    let _plan = match offcut_api::config::plan_settings(|name| std::env::var(name).ok()) {
+        Ok(plan) => plan,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
     log::init(config.log_level);
 
     match serve(config, budget).await {

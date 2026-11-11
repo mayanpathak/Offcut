@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT micro_usd FROM ai_spend WHERE month = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "micro_usd",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ai_spend",
+            "name": "micro_usd"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8495bef64643e596e2fe0351f2935dd693058cbdd2d38e81dbe44e4b1d33c4aa"
+}

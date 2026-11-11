@@ -11,10 +11,12 @@ mod common;
 
 use common::TestApp;
 use offcut_api::db::USER_TABLES;
+use offcut_api::db::ai_usage::{self, AiKind};
 use offcut_api_types::{AccountExport, BillingInterval, SubscriptionStatus};
-use offcut_types::Plan;
+use offcut_types::{Plan, UserId};
 use reqwest::{Response, StatusCode};
 use serde_json::{Value, json};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 const EMAIL: &str = "someone@example.com";
@@ -142,6 +144,8 @@ async fn a_row_of_every_listed_table_appears_in_the_export() {
     let (access, _) = signed_in(&app, EMAIL).await;
     subscribe(&app, EMAIL).await;
     receipt(&app, EMAIL, Uuid::now_v7(), "1 hour", "free").await;
+    // V6.2 (D-440 (6), S-10): an AI plan counted and a long-video grant.
+    ai_rows(&app, EMAIL).await;
 
     let export: Value = get_export(&app, &access).await.json().await.unwrap();
     for table in USER_TABLES {
@@ -151,6 +155,12 @@ async fn a_row_of_every_listed_table_appears_in_the_export() {
                 .is_some_and(|rows| !rows.is_empty()),
             "subscriptions" => export["subscription"].is_object(),
             "usage_receipts" => export["usage_receipts"]
+                .as_array()
+                .is_some_and(|rows| !rows.is_empty()),
+            "ai_usage" => export["ai_usage"]
+                .as_array()
+                .is_some_and(|rows| !rows.is_empty()),
+            "ai_shorts_grants" => export["ai_shorts_grant_months"]
                 .as_array()
                 .is_some_and(|rows| !rows.is_empty()),
             other => panic!("the export does not know the table {other}"),
@@ -195,4 +205,69 @@ async fn the_export_needs_a_session_and_a_user() {
         get_export(&app, &access).await.status(),
         StatusCode::UNAUTHORIZED
     );
+}
+
+/// V6.2: two plans counted through `db::ai_usage`, and one grant.
+async fn ai_rows(app: &TestApp, email: &str) {
+    let id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE email_normalized = $1")
+        .bind(email)
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    let user = UserId::new(id);
+    let month = ai_usage::month_of(OffsetDateTime::now_utc());
+    for expected in [1, 2] {
+        let count = ai_usage::increment(&app.pool, user, month, AiKind::Plan).await;
+        assert_eq!(count.unwrap(), expected);
+    }
+    assert_eq!(
+        ai_usage::count(&app.pool, user, month, AiKind::Plan)
+            .await
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        ai_usage::count(&app.pool, user, month, AiKind::Chat)
+            .await
+            .unwrap(),
+        0
+    );
+    sqlx::query("INSERT INTO ai_shorts_grants (user_id, month, prefix_hash) VALUES ($1, $2, $3)")
+        .bind(id)
+        .bind(month)
+        .bind(vec![0xAB_u8, 0xCD])
+        .execute(&app.pool)
+        .await
+        .unwrap();
+}
+
+/// V6.2 (TS §52, S-10): the AI rows reach the export by month, the grant
+/// without its hash; an account that never used the AI plan exports
+/// exactly V6.1's fields.
+#[tokio::test]
+async fn the_ai_rows_are_exported_by_month_and_never_the_grants_hash() {
+    let app = TestApp::spawn().await;
+    let (access, _) = signed_in(&app, EMAIL).await;
+    let before: Value = get_export(&app, &access).await.json().await.unwrap();
+    let keys: Vec<&String> = before.as_object().unwrap().keys().collect();
+    assert_eq!(
+        keys,
+        ["sessions", "subscription", "usage_receipts", "user"],
+        "{before}"
+    );
+
+    ai_rows(&app, EMAIL).await;
+    let text = get_export(&app, &access).await.text().await.unwrap();
+    assert!(!text.contains("hash") && !text.contains("abcd"), "{text}");
+    let export: Value = serde_json::from_str(&text).unwrap();
+    let month = OffsetDateTime::now_utc();
+    let month = format!("{:04}-{:02}", month.year(), u8::from(month.month()));
+    assert_eq!(
+        export["ai_usage"],
+        serde_json::json!([{ "month": month, "kind": "plan", "count": 2 }])
+    );
+    assert_eq!(export["ai_shorts_grant_months"], serde_json::json!([month]));
+    // The V6 fields still read as `AccountExport`.
+    let typed: AccountExport = serde_json::from_str(&text).unwrap();
+    assert_eq!(typed.user.email, EMAIL);
 }

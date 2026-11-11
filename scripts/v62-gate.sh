@@ -32,7 +32,7 @@ zz=$(git status --porcelain --untracked-files=all | grep -cE '(^|/| )zz[-_]')
 git grep -qE 'AIza[0-9A-Za-z_-]{35}' && fail "a Google API key pattern is in the tree"
 git grep -qE 'gsk_[A-Za-z0-9]{20}' && fail "a Groq key pattern is in the tree"
 git grep -qE '(^|[^A-Za-z0-9])sk-[0-9a-f]{32}' && fail "a DeepSeek key pattern is in the tree"
-# PLAN_API_KEY2 is DeepSeek's key until it is renamed PLAN_API_KEY (D-500, D-465).
+# PLAN_API_KEY is DeepSeek's key since P189 (D-500, D-465); PLAN_API_KEY2, its old name, is kept in the list in case a file still has it.
 for name in PLAN_API_KEY PLAN_API_KEY2 TRANSCRIBE_API_KEY; do
   value=$(grep "^$name=" .env 2>/dev/null | head -n 1 | cut -d= -f2-)
   if [ "${#value}" -ge 20 ] && git grep -qF --untracked -e "$value" -- . ':!.env' ':!.env.deploy'; then

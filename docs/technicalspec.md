@@ -620,6 +620,8 @@ offcut/
 │   │       ├── webhook_events.rs
 │   │       ├── usage_receipts.rs
 │   │       ├── analytics_events.rs
+│   │       ├── ai_usage.rs            (V6.2) ai_usage: a success counted, the month read; the export's AI rows (§52, D-461)
+│   │       ├── ai_spend.rs            (V6.2) ai_spend: add a call's cost, read the month's total (§52, D-463)
 │   │       └── platform_waitlist.rs
 │   └── tests/
 │       ├── common/mod.rs              test app, fake Mailer, fake BillingProvider

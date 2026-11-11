@@ -4,6 +4,8 @@ use sqlx::PgPool;
 use sqlx::migrate::MigrateError;
 use sqlx::postgres::PgPoolOptions;
 
+pub mod ai_spend;
+pub mod ai_usage;
 pub mod analytics_events;
 pub mod magic_links;
 pub mod platform_waitlist;
@@ -15,7 +17,14 @@ pub mod webhook_events;
 
 /// Every table with a row per user (v6implementation D-270, S-10). Deletion and
 /// export each have a test that fails on a table left out: a new one goes here.
-pub const USER_TABLES: &[&str] = &["sessions", "subscriptions", "usage_receipts"];
+pub const USER_TABLES: &[&str] = &[
+    "sessions",
+    "subscriptions",
+    "usage_receipts",
+    // V6.2 (TS §52, D-462): the AI plan's counts and the long path's grants.
+    "ai_usage",
+    "ai_shorts_grants",
+];
 
 /// The free database tier allows few connections (TS §22.9).
 const MAX_CONNECTIONS: u32 = 5;
