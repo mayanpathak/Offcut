@@ -1,6 +1,6 @@
 # technicalspec.md - Offcut Technical Specification (v1.4)
 
-**Status:** v1.4. Implements `product.md` "Offcut Product Spec v1.4". Changes since v1 are listed in Section 0. **v1.2 added §40 (Edit Plan Architecture). v1.3 adds §41-§53 (the compatibility contract, the version map, long videos, shorts, vision, layers, chat, brand and memory, person mask, AI cost). v1.4 revises them in place, each change marked "v1.4" (two entry pages, 45-minute sources read in place and transcribed in the cloud, part copies, stock B-roll, B-roll placed by hand, auto zoom). Later sections win over any older section they contradict**; older sections describe the clip path with every flag off unless they were rewritten. **§41 is binding on every release: read it first.**
+**Status:** v1.5. Implements `product.md` "Offcut Product Spec v1.5". Changes since v1 are listed in Section 0. **v1.2 added §40 (Edit Plan Architecture). v1.3 adds §41-§53 (the compatibility contract, the version map, long videos, shorts, vision, layers, chat, brand and memory, person mask, AI cost). v1.4 revises them in place, each change marked "v1.4" (two entry pages, 45-minute sources read in place and transcribed in the cloud, part copies, stock B-roll, B-roll placed by hand, auto zoom). v1.5 (the founder's decisions of 2026-11-09, the Submagic benchmark) adds the finished-look work, each change marked "v1.5": motion by rules, caption polish and fonts, following the speaker, an automatic picture grade, synthesized sound effects, voice tuning, the Enhance switches and a quality check (§46.6, §47.1-§47.6, DC-16 to DC-19). Later sections win over any older section they contradict**; older sections describe the clip path with every flag off unless they were rewritten. **§41 is binding on every release: read it first.**
 
 **Precedence.** The product spec (PS) wins on scope, priority, pricing and success numbers. This document only adds technical precision. It adds no feature, changes no priority and restates no product number differently. Labels P0/P1/P2, M0-M4, E-1 to E-10, H1-H4, A-1 to A-12 and reason codes (a)-(f) keep their PS meaning.
 
@@ -33,6 +33,13 @@
 ---
 
 ## 0. Changes From v1
+
+**v1.5 (founder decisions of 2026-11-09, `docs/v6/v6changelog.md` Entry 38) makes the Submagic benchmark a set of rules, and adds what an engine on the computer can do that a server tool does not.**
+
+- **Added.** Motion by rules on every talking-head shot and bezier easing curves (§47.2, flag `motion`); caption glow, punch words, emoji under the keyword and the hook lockup in V6.2, then four display fonts, six presets and word pages in V6.6b (§47.3, TE-28); following the speaker in two-person shots, with a split when unsure (§46.6, DC-17, TE-27, flag `speaker_framing`); the blur pass and an automatic per-shot grade with camera matching, face light and vignette (§47.4, DC-18, TE-29, flag `picture`); synthesized sound effects placed by rules and voice tuning by measured need (§47.1, DC-19, flag `voice_tune`); the Enhance panel, with a switch per enhancement and `Enhance::v5()` as the identity (§47.5, DC-16, INV-33); the quality check with rules fixes (§47.6); `ZoomIn` and `ZoomOut` join transitions (§48.3).
+- **Changed.** V6.6 is built as V6.6a "Picture" and V6.6b "Graphics" (§42); `HookTitle` moves to V6.2; DC-8's widening starts in V6.5; the founding release moves to after V6.8; §46 no longer rejects all speaker detection.
+- **Closed.** TE-16 (music is the person's own track; sound effects need no licence) and TE-21 (HDR stays rejected with advice).
+- **Unchanged.** The clip path with flags off, the compatibility contract (§41), the release numbers, and the Tooscut rule (§53.4): ideas only, in our own code.
 
 **v1.4 (founder decisions of 2026-11-08, `docs/v6/v6changelog.md` Entries 21 and 22) reshapes the long path before any of it is built.**
 
@@ -220,7 +227,7 @@ Version strategy for every row: exact versions pinned in `pnpm-lock.yaml` / `Car
 | Managed Postgres, free tier. Candidates: Neon, Supabase | Server state | TE-6 decides |
 | Object storage with free egress. Candidates: Cloudflare R2, Hugging Face Hub | Model files, demo video, sample clip | TE-7 decides |
 | Transactional email, free tier: **Brevo's SMTP relay**, port 2525, as Render's free services block 25, 465 and 587 (V6, D-252) | Magic links; 300 a day | TE-8 (cut down by the founder, `docs/v6/experiments.md`) |
-| Merchant of record: **Dodo Payments** (PS A-4; founder, 2026-11-02) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 (test mode read in V6; live approval belongs to the founding release, BP §8A.6) |
+| Merchant of record: **Dodo Payments** (PS A-4; founder, 2026-11-02) | Checkout, tax, subscriptions; per-transaction fee only (PS A-9), no fixed fee | TE-9 (test mode read in V6; live approval belongs to the founding release, BP §8A.8) |
 | Free uptime monitor (candidate: UptimeRobot) | PS §20.1 uptime monitor; keeps the API warm | TE-11 |
 | GitHub Actions + GHCR | CI, image registry | TE-10 |
 
@@ -2294,7 +2301,7 @@ Each message is specific and actionable and lives in `messages.ts`; each fires `
 - VFR: `is_vfr = true` when sample durations differ by more than 1 ms; accepted; the frame-rate rule uses the average.
 - Fragmented MP4 (`moof`): rejected as `REJECT_CONTAINER` at MVP (assumption, TE-12 measures how many corpus clips need it).
 - `moov` at end of file: supported (random access).
-- Non-speech, non-English, multi-speaker clips: not detected at import. Non-English speech usually yields `REJECT_NO_SPEECH` or poor captions; multi-speaker clips are processed as one speaker. The drop zone states both constraints (PS §10 J2). Listed as open in §39.
+- Non-speech, non-English, multi-speaker clips: not detected at import. Non-English speech usually yields `REJECT_NO_SPEECH` or poor captions; multi-speaker clips are processed as one speaker (v1.5: from V6.5, two people on screen at once are framed by who is speaking, §46.6; the transcript is still one stream). The drop zone states both constraints (PS §10 J2). Listed as open in §39.
 - Sample clip ("Try with a sample clip"): fetched from the asset CDN by `asset-fetch.ts` and passed to `importClip` with `source = "sample"`.
 
 **Acceptance.** Probe + audio extraction at most 3 s for the reference clip on R1 (PS §20.2). Corpus: at least 90% of 40+ clips export; the rest are rejected with a specific code; none crash (PS §20.1); `corpus/run_corpus.ts`.
@@ -3559,15 +3566,16 @@ Uses only the `ffprobe`/`ffmpeg` command-line tools and NumPy. It imports nothin
 | M1.7 | Backend: auth, entitlement, receipts, account; client sign-in and gate | M0.1 | `auth_flow.rs`, `entitlement_rules.rs`, `usage_receipts.rs`, `account_delete.rs`, `account_export.rs`, `rate_limit.rs`, `log_redaction.rs`, `no_media_routes.rs`, `token_roundtrip.rs`, `profile.rs`, `auth-machine.test.ts`, `entitlement.test.ts`, `http.test.ts`, `signin.spec.ts`, `export-free.spec.ts` | TE-8 |
 | M1.8 | Billing | M1.7 | `webhook_idempotency.rs`, `billing_events.rs`, `checkout.spec.ts`; provider test-mode purchase updates `subscriptions` | TE-9. **M1 gate: all P0 working on dev machines (PS §9.9)** |
 | M1.16 | (v1.3, V6.1; v1.4) Long source: the long page, `route_probe` with `Entry`, HEVC and 4K, reading in place, windowed audio, cloud transcription in checkpointed windows, source machine, flags | M1.8 | `route_probe.rs`, `audio_region.rs`, `transcribe-source.test.ts`, `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` | TE-17, TE-18, TE-20, TE-21 |
-| M1.9 | (V6.2) Edit plan: `/plan`, provider adapter, spend cap, quotas, `plans` store, settings switch, catalog kinds, text extras | M1.8 | `validate.rs`, `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `ai_cap.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (fallbacks), `privacy-network.spec.ts` (plan on/off) | TE-15; E-11 instrumentation |
+| M1.9 | (V6.2) Edit plan: `/plan`, provider adapter, spend cap, quotas, `plans` store, settings switch, catalog kinds, text extras; (v1.5) hook lockup, glow, punch words, motion by rules, easing, the Enhance panel | M1.8 | `validate.rs`, `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `ai_cap.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (fallbacks), `privacy-network.spec.ts` (plan on/off); (v1.5) `motion.rs`, `easing.rs`, `lockup.rs`, `enhance.rs`, `flags_identity.spec.ts` (DC-16) | TE-15; E-11 instrumentation |
 | M1.10 | (V6.3) Cuts and `Assembly`: `timemap::build`, `assemble` splices, jump-cut zoom, cuts review, regions, rebase; part copies (v1.4) | M1.9 | `timemap_build.rs`, `program_splice.rs`, `cuts_applied.spec.ts`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `remux.rs`, `source_media.rs`, `stitched.spec.ts` | TE-22, TE-17 (copies) |
 | M1.17 | (V6.4) Director: `/shorts`, `validate_shorts`, rules producer, list page, batch export | M1.16, M1.10 | `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs`, `ai_quota.rs`, `run-source-pipeline.test.ts`, `long-to-shorts.spec.ts` | TE-19; E-13 instrumentation |
-| M1.18 | (V6.5) Vision and framing | M1.17 | `shots.rs`, `tracking.rs`, `framing.rs`, `vision-pass.spec.ts` | TE-23 |
-| M1.12 | (V6.6, parts A and B) Structure visuals | M1.9 | Goldens per kind and style; V-5 cases; V-9 | none |
-| M1.13 | (V6.6, parts C and D) Kinetic presets, video masks, shape transitions | M1.12 | Goldens; `frame_at` budget at the heaviest preset; `composite.rs` simple-path identity | none |
-| M1.14 | (V6.6, part E) Hook title, progress bar, end card `Hold` | M1.13 | Goldens; end-card export duration test | none |
-| M1.11 | (V6.7) Music, ducking, sound cues | M1.10 | `mix_ducking.rs`, `music-import.spec.ts`, `sound_cues.rs`; verifier check 7 on a music export | TE-16 |
-| M1.19 | (V6.8) Layers, B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions, split layout | M1.13, M1.18 | `layers_goldens`, `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`, `plan_ops.rs` (`PlaceAsset`, `RemoveAsset`), `broll_search_route.rs`, `resolve-stock.test.ts`, `stock-broll.spec.ts`; verifier 11/11 | TE-14 re-read, TE-26 |
+| M1.18 | (V6.5) Vision and framing; (v1.5) following the speaker | M1.17 | `shots.rs`, `tracking.rs`, `framing.rs`, `vision-pass.spec.ts`; `speaker.rs`, `speaker-framing.spec.ts` | TE-23, TE-27 |
+| M1.23 | (v1.5, V6.6a) Picture: the blur pass, the automatic grade, camera matching, face light | M1.18 | `blur.rs`, `grade.rs`, goldens with a grade, `composite.rs` simple-path identity | TE-29 |
+| M1.12 | (V6.6b, parts A and B) Structure visuals | M1.23 | Goldens per kind and style; V-5 cases; V-9 | none |
+| M1.13 | (V6.6b, parts C and D) Kinetic presets, (v1.5) display fonts, six presets, word pages, video masks, shape transitions | M1.12 | Goldens; `frame_at` budget at the heaviest preset; `composite.rs` simple-path identity | TE-28 |
+| M1.14 | (V6.6b, part E) Progress bar, end card `Hold` (v1.5: the hook title is M1.9's) | M1.13 | Goldens; end-card export duration test | none |
+| M1.11 | (V6.7) Music (the person's own track, v1.5), ducking, sound cues; (v1.5) synthesized sounds placed by rules, voice tuning | M1.10 | `mix_ducking.rs`, `music-import.spec.ts`, `sound_cues.rs`, `sfx.rs`, `voice_tune.rs`; verifier check 7 on a music export | none (v1.5: TE-16 closed) |
+| M1.19 | (V6.8) Layers, B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions (v1.5: zooms), split layout; (v1.5) the quality check | M1.13, M1.18 | `layers_goldens`, `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts`, `plan_ops.rs` (`PlaceAsset`, `RemoveAsset`, `AddItem`), `quality.rs`, `quality_corpus.rs`, `broll_search_route.rs`, `resolve-stock.test.ts`, `stock-broll.spec.ts`; verifier 11/11 | TE-14 re-read, TE-26 |
 | M1.20 | (V6.9) Chat editing | M1.19 | `plan_ops.rs`, `chat_prompt_snapshot.rs`, `chat_route.rs`, `chat-edit.spec.ts`, `privacy-network.spec.ts` (chat) | E-14 instrumentation |
 | M1.15 | (V6.10) Brand kit | M1.14 | Golden matrix under a test kit; `profile.rs` brand-kit cases (INV-9) | none |
 | M1.21 | (V6.10) Creator memory, queue | M1.17 | `creator_memory.rs`, `queue.spec.ts` | none |
@@ -3748,7 +3756,7 @@ First, on every event, the job `changes`: the secret scan, and whether code chan
 - **Deploy order.** Server first, then web. The server rejects unknown request fields, so a new client must never reach an old server. Additive response fields are safe (the client ignores unknown fields).
 - **Version skew in open tabs.** A tab loaded before a deploy may request a hashed worker or WASM file that the new deployment no longer serves. `pool.ts` therefore preloads all four worker scripts and both WASM bundles into the HTTP cache at app start (immutable caching makes later instantiation offline-safe).
 - **Stateless API.** Render may restart or sleep the instance at any time; nothing but rate-limit buckets is lost.
-- **Test-mode production (V6, D-285, D-303).** From V6's merge until the founding release after V6.6, production runs Dodo's test-mode keys, with `BILLING_API_BASE_URL=https://test.dodopayments.com` and a test-mode webhook endpoint: a test card buys Creator and no money moves. The founding release switches four variables and registers a live endpoint, then wipes any test-mode `subscriptions` row.
+- **Test-mode production (V6, D-285, D-303).** From V6's merge until the founding release after V6.8 (v1.5; v1.3: after V6.6), production runs Dodo's test-mode keys, with `BILLING_API_BASE_URL=https://test.dodopayments.com` and a test-mode webhook endpoint: a test card buys Creator and no money moves. The founding release switches four variables and registers a live endpoint, then wipes any test-mode `subscriptions` row.
 - **Mail from Render (V6, D-252).** Render's free web services block outbound 25, 465 and 587; the relay is reached on 2525 with STARTTLS.
 - **Model updates.** A new `modelId` is a new CDN path; old files stay until no deployed manifest references them.
 - **Domain.** The system works on the hosts' default domains. A custom domain is not required by the architecture but is likely required by the email provider for sender verification (TE-8); its registration fee is outside the 0 USD infrastructure target.
@@ -3902,7 +3910,7 @@ Definition of done: the three test files pass; clippy clean; file under 700 line
 | A plug-in system for item kinds; an item kind without drawing code and a golden | §40.3: a kind is a catalog entry plus its layout and draw files (INV-23) |
 | User-inserted plan items through any control other than chat | PS §12.4 (e); the user toggles what the plan proposed, and from V6.9 asks in words, through the same validator (§49) |
 | Generated B-roll, avatars, scheduling, public API, native app, teams | PS §9.2 (d)(c). The user's own B-roll and Pixabay stock (v1.4) are built in V6.8 (§48) |
-| Sending frames to any server, a local caption model, diarization | §46: the founder's decision of 2026-11-02 |
+| Sending frames to any server, a local caption model, an audio speaker model | §46: the founder's decision of 2026-11-02 (v1.5: two people on screen are followed by matching faces to speech, §46.6) |
 | YouTube-link import, a server that fetches or holds video | INV-4 and the platform's terms |
 | A virality score | §45: unverifiable; the reason is shown instead |
 | Copying or translating Tooscut's code, or adding that folder to this repository | §53.4 |
@@ -3957,14 +3965,14 @@ PS experiments (`E-n`) keep their PS pass criteria; the "Method" column states t
 | TE-6 | Which free Postgres provider persists beyond 30 days, accepts 5 connections, and fits the data estimate? | Read current terms; run migrations; idle for a week; measure reconnect time | No expiry; reconnect under 2 s; storage quota at least 5x the §23.3 estimate | M0.1 | Other candidate; then any other free Postgres provider (no paid tier, PS A-10) |
 | TE-7 | Which asset host gives free egress, HTTP Range, CORS that works under COEP, and files of 150 MB? | Upload a 150 MB file; ranged fetch from the deployed shell | 206 responses; CORS readable; no egress charge in terms | M0.1-M0.2 | Other candidate; then split the model into parts under the host's limit |
 | TE-8 | Which email provider delivers magic links within its free quota, and does it require a verified sender domain? | Send 50 links to major mailbox providers; read quota terms | At least 95% inbox delivery within 30 s; quota at least 100 emails/day | M1.7 | Other candidate; prefer one that verifies a single sender address without a custom domain, because a domain registration is a cost outside PS A-10. **Read in V6 (`docs/v6/experiments.md`):** Brevo over SMTP on 2525, one verified Gmail sender, 300 a day. Cut down by the founder on 2026-11-02 to two Gmail mailboxes, every mail in the inbox; Outlook and Yahoo unproven, and Brevo calls a free-mail sender "not recommended". A real send from Render worked |
-| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed; a timed-out webhook is retried; a test purchase turns the next token Creator. **v1.3 (V6): live approval moves to the founding release (BP §8A.6)** | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18). **Read in V6, test mode (`docs/v6/experiments.md`): Dodo Payments; all six kinds and `PlanChanged` observed from real deliveries; a failed delivery retried after about 6 s with the same `webhook-id`; a test purchase on D1 turned the next token Creator. On 2026-11-04 Dodo approved the identity and bank and held the product review until the live site is public** |
+| TE-9 | Which merchant of record onboards an India-based seller, supports hosted redirect checkout with passthrough data, a customer portal, and retries webhooks? | Start onboarding in week 1 (PS §18); test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed; a timed-out webhook is retried; a test purchase turns the next token Creator. **v1.3 (V6): live approval moves to the founding release (BP §8A.8)** | M0.1 (start), M1.8 | Second provider behind `BillingProvider` (PS §18). **Read in V6, test mode (`docs/v6/experiments.md`): Dodo Payments; all six kinds and `PlanChanged` observed from real deliveries; a failed delivery retried after about 6 s with the same `webhook-id`; a test purchase on D1 turned the next token Creator. On 2026-11-04 Dodo approved the identity and bank and held the product review until the live site is public** |
 | TE-10 | Can CI run the media suites (WebGPU + H.264 + AAC encode) on a hosted Windows runner within free minutes? | Run `e2e-media.yml` | Suites pass headless; monthly minutes within the free allowance | M0.4 | Run on `main` and pre-release only; `pnpm e2e:device` locally |
 | TE-11 | Does the API fit the Render free instance: memory, cold-start time, instance hours with keep-warm, image deploy, log retention? | Deploy; measure RSS, cold start over 10 sleeps, monthly hour use | RSS under 400 MB; cold start under 70 s; one always-on service fits the monthly hours | M0.1, M2.4 | Another free container host for the same image (§22.9) |
 | TE-12 | Does `offcut-mp4` demux the real-clip corpus (edit lists, rotation, VFR, phone encoders)? | `corpus/run_corpus.ts` | At least 90% of clips demux and export; "inconclusive" with fewer than 10 corpus clips (V3: 2 clips, inconclusive, v3implementation D-88) | M1.1, re-checked at V9 and M2.3 | JS demuxer behind the same interface (§15) |
 | TE-13 | Does the denoiser fit the audio budget in WASM on R1? | `bench/device-bench.ts`, stage `audio_chain` | Chain at most 4 s for the reference clip | M1.2 | `ChainConfig.denoise = false` (PS §20.4) |
 | TE-14 | Is peak memory within budget on R1 for a 90 s, 1080p, 60 fps input? | Memory measurement per phase (§31) | Peak under 1.5 GB; no tab crash in 10 runs | M0.4, M2.4 | Smaller queues; preview at 360x640; smaller model |
 | TE-15 | (v1.2) Which AI provider gives a free tier that fits the plan quotas, structured JSON output, a latency we can wait for, and data terms we can state? | Read current terms (free-tier request and token limits per minute and per day; whether free-tier data is used for training or retained); run the 31 labeled transcripts through two candidates with the generated prompt and schema; measure parse rate, V-rule drop rate, p50/p90 latency through the Render proxy | Parse rate at least 98% after one retry; median V-rule drops at most 10% of items; p90 latency at most 20 s; daily free capacity at least the launch-month estimate (anonymous + Free + Creator quotas x expected users); terms recorded in `docs/` and summarised on the settings page | V6.2 (before the route ships); re-verified by `check-external-facts.mjs` before launch | Second candidate; lower quotas; if no free tier fits or the terms say free-tier data trains models, the founder decides between a paid tier (A-3), accepting and disclosing the terms, or making the AI plan opt-in |
-| TE-16 | (v1.2) Is there a music source whose licence allows bundling tracks inside a paid app, with no attribution the export cannot carry? | Read licences of candidate libraries; check redistribution and "in an app" clauses | A written licence that allows it; otherwise none | V6.7 | Ship user-supplied music only |
+| TE-16 | (v1.2) Is there a music source whose licence allows bundling tracks inside a paid app, with no attribution the export cannot carry? | Read licences of candidate libraries; check redistribution and "in an app" clauses | A written licence that allows it; otherwise none | V6.7 | Ship user-supplied music only. **Closed (v1.5, founder 2026-11-09): music is the person's own track only, and sound effects are synthesized in code (§47.1), so no licence is read** |
 | E-11 | (v1.2, PS §19) Is the AI plan better than the rules? | `plan_result`, `export_done` (`items_kept`, `items_disabled`, `cuts_restored`), `post_export_answer` split by plan source | PS §19 E-11 targets | V6.2 → M3 | PS §19 E-11 action |
 
 **v1.3 experiments:** TE-17 to TE-25 are in §53.1, and from v1.4 TE-26; TE-17 and TE-18 were rewritten in v1.4. E-12, E-13, E-14 are PS §19's.
@@ -4273,10 +4281,10 @@ pub struct MusicCue { pub fits: bool, pub energy: MusicEnergy }   // MusicEnergy
 | Release | Kinds (params in brief) |
 |---|---|
 | V4 | `NumberReveal { value: QuantityRef, label }`, `ListReveal { header: Label, items: [{ at: WordIdx, label: Label }] }`, `FromTo { from: QuantityRef, to: QuantityRef, label }`, `KeywordPop { word }` |
-| V6.2 (v1.3: launch list in §47) | `Emphasis { word, treatment: Colour | Underline | Highlight }`, `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong, motion: Snap | Push }` (v1.4: the auto zoom of §47.2), `Emoji { word, emoji: EmojiId }` |
+| V6.2 (v1.3: launch list in §47) | `Emphasis { word, treatment: Colour | Underline | Highlight, size: Normal | Punch }` (v1.5: `size`, §47.3), `IconPop { word, icon: IconId }`, `PunchIn { scale: Mild | Strong, motion: Snap | Push }` (v1.4: the auto zoom of §47.2), `Emoji { word, emoji: EmojiId, place: Beside | Under }` (v1.5: `place`), `HookTitle { accent: WordIdx }` (v1.5: moved from V6.6; its text is `extras.hook`, §47.3) |
 | V6.6 | `ListBuilder`, `NumberMoment { value: QuantityRef, form: Count | Bar }`, `QuoteCard { quote: WordRange }`, `DefinitionCard { term: Label, gloss: Label }`, `Versus { left: Label, right: Label, values: Option<(QuantityRef, QuantityRef)> }`, `StepTracker { steps: [{ at, label }] }`, `Timeline { points: [{ at, label }] }`, `Checklist { items: [{ at, label }] }` |
 | V6.6 | `ShapeFrame { shape: ShapeId }` (video inside a shape), `Transition { at: WordIdx, kind: TransitionId }` |
-| V6.6 | `HookTitle`, `ProgressBar`, `EndCard { cta: Label }`; `LowerThird` and `ChapterMarker` moved post-launch (§42) (adds a `Hold` segment of `END_CARD_DUR = 2.5 s`, assumption) |
+| V6.6 | `ProgressBar`, `EndCard { cta: Label }` (v1.5: `HookTitle` moved to V6.2); `LowerThird` and `ChapterMarker` moved post-launch (§42) (adds a `Hold` segment of `END_CARD_DUR = 2.5 s`, assumption) |
 
 The rules producer (`offcut-plan::from_rules(&[DetectedEvent], &Transcript) -> EditPlan`) emits the four V4 kinds, converting each `Quantity` of a `DetectedEvent` into a `QuantityRef` to the `NormalizedSpan` it came from (the n-th span inside the event's anchors). `DetectedEvent`, `offcut-detect` and its tests are unchanged. From V6.6 the rules producer may map its kinds onto `ListBuilder` and `NumberMoment`; codes 0-3 stay reserved.
 
@@ -4454,13 +4462,14 @@ v1.3 reorders them; §42 maps the old numbers. Each row's detail is in the secti
 | Release | Builds | Section | Done when |
 |---|---|---|---|
 | V6.1 Long source | The long page, `route_probe` with `Entry`, 4K and HEVC input, reading in place, windowed audio, cloud transcription in checkpointed windows, source machine, flags, multi-manifest (v1.4) | §43 | A 45-minute file reaches a resumable master transcript; flags off equals V5 |
-| V6.2 Edit plan | `/plan`, provider adapter, spend cap, quotas, `ai_usage`; `request-plan.ts`, `plans` store, settings switch; `Emphasis`, `IconPop`, `PunchIn`, `Emoji`; `DrawCmd::Image`; text extras panel | §40.7, §40.8, §47, §52 | AI plans validate and render on the reference clip; fallback works with the API down; `privacy-network.spec.ts` revised; E-11 instrumentation; TE-15 recorded |
+| V6.2 Edit plan | `/plan`, provider adapter, spend cap, quotas, `ai_usage`; `request-plan.ts`, `plans` store, settings switch; `Emphasis`, `IconPop`, `PunchIn`, `Emoji`; `DrawCmd::Image`; text extras panel; (v1.5) `HookTitle` with its lockup, caption glow, punch words, emoji under the keyword, motion by rules, easing curves, the Enhance panel with Voice cleanup and Motion | §40.7, §40.8, §47, §52 | AI plans validate and render on the reference clip; fallback works with the API down; `privacy-network.spec.ts` revised; E-11 instrumentation; TE-15 recorded; `Enhance::v5()` equals V5 (DC-16) |
 | V6.3 Cuts and Assembly | `Cut` arms, `timemap::build`, `assemble` splices, jump-cut alternation (`JUMP_ZOOM = 1.08`, assumption), cuts list, filler switch; `Assembly`, regions, rebase | §40.1, §40.6, §44 | `cuts_applied.spec.ts`; `stitched.spec.ts`: out-of-order parts export correctly |
 | V6.4 Director | `/shorts`, `validate_shorts`, rules producer, shorts list, batch export | §45 | A long fixture gives 5 exported shorts passing 11 checks, with the API up or down |
-| V6.5 Vision and framing | Coarse and fine passes, `ShotSummary`, `FramePath` | §46 | A moving speaker stays framed; the Director reads shot lines; `FramePath::none` equals V5 |
-| V6.6 Finished look | Parts A-E of §47: cards, number moments, kinetic presets, masks and shape transitions, hook title, progress bar, end card | §47, §40.5 | Goldens per kind and style; heaviest preset within budget; simple lists unchanged |
-| V6.7 Music and sound | Music import, ducking, mix loudness, music cue, sound cues | §40.6, §47.1 | `mix_ducking.rs`; verifier check 7 on a music export |
-| V6.8 Layers | `VideoSlot`, multi-run compositor, asset box, B-roll (own and Pixabay stock, placed by the plan or by hand on a word, v1.4), join transitions, split and full layouts | §48 | Verifier 11/11 with B-roll and transitions; simple lists unchanged |
+| V6.5 Vision and framing | Coarse and fine passes, `ShotSummary`, `FramePath`; (v1.5) following the speaker, the split of two faces | §46 | A moving speaker stays framed; (v1.5) in a two-person shot the person speaking is on screen (TE-27); the Director reads shot lines; `FramePath::none` equals V5 |
+| V6.6a Picture (v1.5) | The blur pass; automatic exposure, white balance and contrast per shot; camera matching; face light and vignette; the Colour & light switch | §47.4 | Goldens with a grade; `grade: None` lists unchanged; TE-29's panel |
+| V6.6b Graphics (v1.5; v1.3's V6.6) | Parts A-E of §47: cards, number moments, kinetic presets, masks and shape transitions, progress bar, end card; (v1.5) four display fonts, six presets, word pages | §47, §47.3, §40.5 | Goldens per kind and style; heaviest preset within budget; simple lists unchanged |
+| V6.7 Music and sound | Music import (the person's own track only, v1.5), ducking, mix loudness, music cue, sound cues; (v1.5) synthesized sound effects placed by rules, voice tuning | §40.6, §47.1 | `mix_ducking.rs`, `sfx.rs`, `voice_tune.rs`; verifier check 7 on a music export |
+| V6.8 Layers | `VideoSlot`, multi-run compositor, asset box, B-roll (own and Pixabay stock, placed by the plan or by hand on a word, v1.4), join transitions (v1.5: zoom in and out), split and full layouts; (v1.5) the quality check | §48, §47.6 | Verifier 11/11 with B-roll and transitions; simple lists unchanged; the quality check over the corpus |
 | V6.9 Chat | `PlanOp`, `effective_plan`, `/chat-edit`, `ChatPanel` | §49 | Each op applies, refuses and undoes; privacy test covers chat; non-part ops within the edit budget |
 | V6.10 Brand, memory, queue | `BrandKit`, `CreatorMemory`, queue | §50 | Golden matrix under a kit; memory changes the next prompt; a queue of three finishes around a failure |
 | V6.11 Person mask | Matte pass, `Video.matte`, text behind, background | §51 | TE-25's gate, per effect; verifier 11/11 |
@@ -4514,7 +4523,7 @@ A protected behaviour changes only here. Each row names what changes, when, what
 | DC-5 | V6.3 | `set_scene` stops refusing a non-identity `TimeMap`, and refuses only a map whose duration disagrees with the program audio | Identity behaviour | `scene_api.rs`, `cuts_applied.spec.ts` |
 | DC-6 | V6.3 | §36's "no reorder" and "no removing a whole sentence" apply to `Cut`s only. Selecting and ordering whole sentences belongs to the `Assembly` (§44). `TimeMap` keeps refusing out-of-order segments | `TimeMap`, its deserializer and `Cut` are unchanged | `timemap_identity.rs`, `assembly.rs` |
 | DC-7 | V6.2 | Rule V-1 reads `catalog <= CATALOG_VERSION` for a stored plan, so a deploy that bumps the catalog does not throw away users' plans. A new response must still equal `CATALOG_VERSION` | `PLAN_FORMAT = 1` | `validate.rs` |
-| DC-8 | V6.6, V6.8 | The renderer's support rule (D-133) widens: `Image`, then masks, then several `Video` commands | **A list that meets the old rule takes the old code path, byte for byte.** Goldens unchanged | `golden_frames.rs`, `composite.rs` tests |
+| DC-8 | V6.5, V6.6, V6.8 (v1.5; v1.3: V6.6, V6.8) | The renderer's support rule (D-133) widens: `Image`, then several `Video { Main }` commands from one decoded frame (V6.5, the split of DC-17), then the blur pass and masks (V6.6), then other slots (V6.8) | **A list that meets the old rule takes the old code path, byte for byte.** Goldens unchanged | `golden_frames.rs`, `composite.rs` tests |
 | DC-9 | V6.5 | `Video.src` may change per frame through a `FramePath` | With no `FramePath`, `framing.rs` gives V5's crop | `framing.rs` |
 | DC-10 | V6.1, V6.5, V6.11 | `asr.worker` hosts every inference session (TDR-3 widens from one file to `workers/asr/*-runtime.ts`). INV-12 reads "no inference session and the render session coexist" | Worker count stays four; `whisper-runtime.ts`'s interface is unchanged | `run-pipeline.test.ts` |
 | DC-11 | V6 | Comment-only cleanup of the old V6.x numbers (§42), including regenerated `web/src/gen/domain.ts` comments | No token changes outside comments | `check-gen-clean.sh`; an empty diff with comments stripped |
@@ -4522,10 +4531,14 @@ A protected behaviour changes only here. Each row names what changes, when, what
 | DC-13 | Design release | Caption lines below the middle of the band are lowered in the caption block instead of centred: by a share of the room under centred lines (to the block's bottom less the style's vertical decoration, `StyleSpec::decoration_height`: Clean 6.5 lp, Bold 9, Mono 32) that rises evenly from 0 at the band's middle to `BOTTOM_LINE_DROP` = 0.5 at Bottom (`placement::line_drop`). At Bottom a one-line caption moves 36-45 lp lower (Clean 45, Bold 40, Mono 36), a two-line one 15-23 lp, and the Middle snap (0.55) about 4 lp. Clips saved at Bottom render their captions lower on reopening. Goldens and display-list snapshots of placements below the middle are regenerated; their diffs are only glyph runs', pills' and panels' `y`. The e2e helper `dragCaptions` takes the block at its centre on `data-hit` "captions" or "word" (it named "block", a kind the page never reports, so it matched only a word). Founder's choice, 2026-11-05: option A's mechanism, but "a little bit low", as the apps draw their own UI at the bottom (designchangelog Entry 16) | The block, event zone, safe area, watermark, hit regions, `CaptionPlacement` values and their storage; every frame at placements 0 to 0.5, bit for bit; the export's 11 checks | `layout_safe_area.rs`, `display_list_snapshots.rs` (40 files, every diff a `y`), `golden_frames.rs` (14 of 16 regenerated), `export-*.spec.ts`, `preview-sync.spec.ts`, `review-edit.spec.ts`, `pipeline-preview.spec.ts` |
 | DC-14 | Cloud transcription | `media_guard` admits exactly `POST /api/v1/transcribe` with `audio/ogg`; that route's body limit is 1 MiB. `no_media_routes.rs` names it as the one exception (`AUDIO_BODY`): its other media types get 415, `audio/ogg` passes the guard (401 without a bearer, 413 over 1 MiB with one). `/healthz`'s body gains `cloud_transcribe` (`notify_me.rs`'s exact-body assertion gains the field). Founder's decision of 2026-11-06 | Every other route: 415 for every media type, no body over 64 kB, the same assertions. The device path, its frames, samples, transcripts and exports: with the fake's `/healthz` (no field) every protected suite runs on the device | `no_media_routes.rs`, `router.rs`'s unit tests, `transcribe_route.rs`, `cloud-transcribe.spec.ts` (identity); every §41.1 proof unchanged |
 | DC-15 | V6.4 (v1.4) | `POST /shorts` takes a JSON body of up to `SHORTS_BODY_LIMIT = 160 kB`, for a 45-minute source (§45.2). `no_media_routes.rs` names it as the second exception to "no body above 64 kB", for size only: it still answers 415 to every media type. Founder's decision of 2026-11-08 (45-minute sources) | Every other route's 64 kB and 415s; DC-14's exception | `no_media_routes.rs`, `shorts_route.rs` |
+| DC-16 | V6.2, flag `motion`; each later field of `Enhance` (v1.5) | **The Enhance settings (§47.5).** A new clip's `EditState.enhance` takes `Enhance::defaults(flags)`, the person's remembered choice if any. With `motion` on, a talking-head frame's `Video` command takes the motion track's scale (§47.2), so its display list differs from V5's in `Video.src` only. `flags_identity.spec.ts` sets `Enhance::v5()` through the dev hook and keeps its assertion (flags on, AI plan off and `v5()` give V5's frames and samples); a second case reads the defaults and asserts that the lists differ only in `Video.src` (V6.6a adds `Video.grade`; V6.7 adds the sound cues in `prog48`). A stored clip without the field reads `Enhance::v5()`, so it reopens as it was saved | Every frame and sample under `Enhance::v5()`; every stored clip; goldens | `flags_identity.spec.ts`, `enhance.rs`, `motion.rs` |
+| DC-17 | V6.5, flag `speaker_framing` (v1.5) | `FrameKey` gains `layout: FrameLayout { Single, Split { top_cx, bottom_cx } }` (`#[serde(default)]`: `Single`). A `Split` key puts two `Video { Main }` commands in the list, the two faces stacked, from one decoded frame; `composite.rs` gets its second path here (DC-8) | `FramePath::none()` gives V5's crop; a shot with one face gives §46.4's path, unchanged; `is_simple_list` lists take the old path, byte for byte | `framing.rs`, `speaker.rs`, `composite.rs` (simple path identical) |
+| DC-18 | V6.6a, flag `picture` (v1.5) | `DrawCmd::Video` gains `grade: Option<Grade>` (`#[serde(default)]`: `None`). `None` takes the existing video pipeline, byte for byte; `Some` draws through a graded variant of the same pass: one pass, one uniform per frame (§47.4) | Every list with `grade: None`; goldens; `is_simple_list` (a graded `Video` is still simple: no second path) | `golden_frames.rs`, `grade.rs` |
+| DC-19 | V6.7, flag `voice_tune` (v1.5) | Inside "Voice cleanup", the chain gains a measured-need step: the denoiser's wet share set from the measured noise floor, and a bounded three-band voice EQ (§47.1). `out48` changes for clips prepared with it | `Enhance::v5()` runs V5's chain exactly; `program_identity.rs` (`assemble` over any `out48`) | `voice_tune.rs`, `program_identity.rs`, `flags_identity.spec.ts` |
 
 ### 41.3 How each release is made safe
 
-1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `cuts`, `assembly`, `director`, `vision`, `framing`, `finished_look`, `music`, `layers`, `stock_broll` (v1.4, §48.6), `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`. **(V6.1, as built: D-393, D-394.)** Each flag has a default, and the V6.x flags default to off: `DEFAULTS = { cloud_transcribe: true, long_video: false, high_res: false }`; a build turns flags on with `OFFCUT_FEATURES_ON` (a comma list) beside `OFFCUT_FEATURES_OFF`, and an unknown name, or a name in both, stops the build. So "every flag is on unless the build names it" (the cloud release) becomes "every flag takes its default unless the build names it". Two e2e builds: `pnpm build:e2e` (production's flags) into `dist/`, and `pnpm build:e2e:flags` (`long_video,high_res` on) into `dist-flags/`, served on a second port to the Playwright project `media-flags`, which runs `FLAG_SUITES`; CI builds and runs both. Production sets `OFFCUT_FEATURES_ON` in Vercel only to turn a flag on, after the release (the V6.1 plan's §12.3).
+1. **Flag first.** New behaviour sits behind a flag in `web/src/config/features.ts` (`FeatureFlags`, read from a Vite `define`, never from the network). Flags: `cloud_transcribe` (built in the cloud transcription release, with `features.ts`; `OFFCUT_FEATURES_OFF` names the flags a build turns off), `high_res`, `long_video`, `ai_plan`, `motion` (v1.5, §47.2), `cuts`, `assembly`, `director`, `vision`, `framing`, `speaker_framing` (v1.5, §46.6), `picture` (v1.5, §47.4), `finished_look`, `music`, `voice_tune` (v1.5, §47.1), `layers`, `stock_broll` (v1.4, §48.6), `chat`, `brand_kit`, `creator_memory`, `queue`, `person_mask`. Production turns a flag on only after that release's proofs pass on `main`. **(V6.1, as built: D-393, D-394.)** Each flag has a default, and the V6.x flags default to off: `DEFAULTS = { cloud_transcribe: true, long_video: false, high_res: false }`; a build turns flags on with `OFFCUT_FEATURES_ON` (a comma list) beside `OFFCUT_FEATURES_OFF`, and an unknown name, or a name in both, stops the build. So "every flag is on unless the build names it" (the cloud release) becomes "every flag takes its default unless the build names it". Two e2e builds: `pnpm build:e2e` (production's flags) into `dist/`, and `pnpm build:e2e:flags` (`long_video,high_res` on) into `dist-flags/`, served on a second port to the Playwright project `media-flags`, which runs `FLAG_SUITES`; CI builds and runs both. Production sets `OFFCUT_FEATURES_ON` in Vercel only to turn a flag on, after the release (the V6.1 plan's §12.3).
 2. **Baseline read first.** Before a release's first code commit, read the protected proofs and record them in its changelog.
 3. **Additive data.** A new field on a stored or sent type has `#[serde(default)]` and a default that means "the V5 behaviour". A new IndexedDB store comes through a numbered migration. A server migration stays compatible with the previously deployed binary (§23.3). The plan's wire format stays `PLAN_FORMAT = 1`; new kinds take new codes (§40.2).
 4. **Old callers keep their function.** `transcribe`, `decodeAudio`, `importClip`, `run-pipeline.ts` and `validate_probe` keep their signatures. New paths call new functions, which call shared stages.
@@ -4554,13 +4567,14 @@ The implementer stops, writes the question into the changelog's "Open items" and
 | V6 | Accounts, entitlement token, `ai_usage`-ready account lists (S-10) | V6.2 quotas, V6.4 long-video grant, V6.10 brand gating |
 | Cloud transcription | `Transcriber`, `POST /transcribe`, `encodeForCloud`, `fromCloud`, `ogg-opus.ts`, `transcribe-cloud.ts`, the availability gate, `features.ts` | V6.1 windows of long sources, at most 90 s each |
 | V6.1 | `route_probe` with `Entry`, `SourceInfo`, the long page, reading in place, `pcm16` in `sources/`, cloud windows with checkpoints and pauses, the source machine, multi-manifest model manager | V6.4, V6.5, V6.10 queue, V6.11 |
-| V6.2 | `/plan`, provider trait, spend cap, plan store, catalog growth rule, `DrawCmd::Image` | Every release that adds a kind; V6.4 and V6.9 routes share the provider |
+| V6.2 | `/plan`, provider trait, spend cap, plan store, catalog growth rule, `DrawCmd::Image`; (v1.5) `Enhance` and the Enhance panel, `MotionTrack`, `easing.rs`, the lockup layout of `HookTitle`, caption glow | Every release that adds a kind; V6.4 and V6.9 routes share the provider; every release that adds an Enhance row |
 | V6.3 | Non-identity `TimeMap`, `Assembly`, `SourcePos`, region audio, rebased transcripts, join handling; `remux_range` and `SourceMedia` (v1.4) | V6.4 shorts and their part copies, V6.8 transitions at joins |
 | V6.4 | Virtual clips, shorts list, batch export, `shorts_from_rules` | V6.5 framing per short, V6.9 chat over a short, V6.10 queue |
-| V6.5 | `ShotSummary`, `FramePath`, sampled-frame hand-off | V6.8 split layout, V6.11 mask pass |
-| V6.6 | Mask path in the renderer, kinds and cards, kinetic motion rows | V6.8 layers, V6.10 brand theme coverage, V6.11 matte |
-| V6.7 | Multi-source `assemble`, sound items | V6.8 B-roll audio, V6.9 chat music ops |
-| V6.8 | `VideoSlot`, multi-run compositor, asset store, `SceneAssets`; `plan_ops` with `PlaceAsset` and `RemoveAsset`, the stock search route (v1.4) | V6.9's other ops and chat, V6.11 background and matte |
+| V6.5 | `ShotSummary`, `FramePath`, sampled-frame hand-off; (v1.5) face tracks, the speaker decision, `FrameLayout::Split`, `composite.rs`'s second path for several `Video { Main }` | V6.6a grade and face light, V6.8 split layout, V6.11 mask pass |
+| V6.6a (v1.5) | The blur pass, `Grade` and its graded video pass, per-shot colour statistics, camera matching | V6.6b glass cards, V6.8 blurred fill and `Whip`, V6.11 blurred background |
+| V6.6b (v1.5; v1.3's V6.6) | Mask path in the renderer, kinds and cards, kinetic motion rows; (v1.5) display fonts, presets, word pages | V6.8 layers, V6.10 brand theme coverage, V6.11 matte |
+| V6.7 | Multi-source `assemble`, sound items; (v1.5) `sfx.rs` and the rules cues, `voice_tune` | V6.8 B-roll audio and its cues, V6.9 chat music ops |
+| V6.8 | `VideoSlot`, multi-run compositor, asset store, `SceneAssets`; `plan_ops` with `PlaceAsset` and `RemoveAsset`, the stock search route (v1.4); (v1.5) `AddItem` for quality fixes, the quality check | V6.9's other ops and chat, V6.11 background and matte; the founding release |
 | V6.9 | `PlanOp` log, `effective_plan`, op validation | V6.10 memory reads ops |
 | V6.10 | Theme from kit, `CreatorMemory`, queue | Launch |
 | V6.11 | Person matte, background layer | Launch; catalog additions after it |
@@ -4584,6 +4598,8 @@ On 2026-11-02 the founder set the order: **V6 first, then V6.1-V6.11, then V7-V1
 | none | Chat editing | **V6.9** | M1.20 |
 | V6.7 | Brand kit; now also creator memory and the back-catalogue queue | **V6.10** | M1.15, M1.21 |
 | none | Person mask: text behind the speaker, background change | **V6.11** | M1.22 |
+
+**v1.5 (founder, 2026-11-09): the numbers stay.** Each addition of the Submagic benchmark goes into the release that already holds what it needs, and V6.6 is built as two releases, **V6.6a "Picture"** (blur, automatic colour and light) and **V6.6b "Graphics"** (v1.3's V6.6 parts A-E without the hook title, plus fonts and presets), tagged `v6.6a` and `v6.6b`. Code comments that say "V6.6" mean V6.6b unless they name colour or blur.
 
 **Moved to post-launch (founder, 2026-11-02):** chapter markers and the lower third (PS §21 item 15). `Chapter` stays in the plan's wire format, always empty, so `PLAN_FORMAT` does not change.
 
@@ -5066,7 +5082,7 @@ usecases/prepare-short.ts (one short)
 
 ## 46. Vision: Local Signals and Face-Tracked Framing (V6.5)
 
-**Model: small local models give the LLM and the framing code facts as text and numbers. No frame leaves the device. Rejected: sending frames to the provider (the founder's decision of 2026-11-02; it changes the privacy promise, kept as a possible later opt-in only if E-13 shows clip choice needs it), a local caption model (a large download and unmeasured speed for little gain on talking-head footage), speaker diarization (one speaker at launch).**
+**Model: small local models give the LLM and the framing code facts as text and numbers. No frame leaves the device. Rejected: sending frames to the provider (the founder's decision of 2026-11-02; it changes the privacy promise, kept as a possible later opt-in only if E-13 shows clip choice needs it), a local caption model (a large download and unmeasured speed for little gain on talking-head footage), an audio speaker model (v1.5: a large download whose voices would still have to be matched to faces; the speaker is found by matching each face's mouth movement to the speech instead, §46.6; v1.3 rejected any speaker detection, "one speaker at launch", and the founder reversed that on 2026-11-09).**
 
 ### 46.1 Two passes
 
@@ -5076,6 +5092,8 @@ usecases/prepare-short.ts (one short)
 | **Fine**, per short | In `prepare-short.ts` | Decoded frames at `FACE_FPS = 5` (assumption, TE-23) over the short's part files (§44.8) | `FramePath` |
 
 **Frame hand-off.** `media.worker` decodes and scales to at most 320 px on the long side, and transfers `ImageBitmap`s through the main hub to `asr.worker` (no worker-to-worker channel, §36).
+
+**v1.5: the fine pass gives more from the same frames.** No extra decode: from the frames it already samples, the fine pass also gives face tracks with a mouth-activity series (§46.6) and, from V6.6a, per-shot colour statistics (§47.4): a 64-bin luma histogram, the mean chroma of near-neutral pixels and the mean luma of the face box. All are numbers that stay on the device.
 
 ### 46.2 Models
 
@@ -5116,25 +5134,55 @@ impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub 
 
 **A 4K source helps here.** A vertical crop of 3840 × 2160 is 1215 px wide before scaling to 1080, so face-tracked 4K stays sharp; a 1080p crop is upscaled from 607 px. The review shows a one-time note: "Filmed in 4K? Use the 4K file for a sharper short."
 
-**Acceptance (V6.5).** `shots.rs`, `tracking.rs` (table of paths: still face, walking face, cut, lost face), `vision_summary_prompt.rs` (the lines reach the prompt within budget), `framing.rs` (none equals V5), `vision-pass.spec.ts`. Reads: coarse pass at most 0.15× the source's duration (about 7 minutes on a 45-minute file; v1.3 read 3 minutes on 20); fine pass under 20 s per 60 s short on D1 (assumptions, TE-23). TE-23 recorded.
+**Acceptance (V6.5).** `shots.rs`, `tracking.rs` (table of paths: still face, walking face, cut, lost face), `vision_summary_prompt.rs` (the lines reach the prompt within budget), `framing.rs` (none equals V5), `vision-pass.spec.ts`; (v1.5) `speaker.rs` and `speaker-framing.spec.ts` (§46.6). Reads: coarse pass at most 0.15× the source's duration (about 7 minutes on a 45-minute file; v1.3 read 3 minutes on 20); fine pass under 20 s per 60 s short on D1 (assumptions, TE-23), with the speaker work inside it. TE-23 and TE-27 recorded.
+
+### 46.6 Following the speaker (v1.5, flag `speaker_framing`; the founder's decision of 2026-11-09)
+
+**Model: in a shot that shows two or more people, the crop goes to whoever is speaking, found by matching each face's mouth movement to the speech; when that is unclear, the frame shows both. Rejected: an audio speaker model (above), panning between speakers (it reads as a tracking error; a switch is a cut, as an editor would make it), a split screen all the time (it halves every face, and Submagic's outputs switch).**
+
+**Where it applies.** Only to shots with at least two face tracks. A multi-camera source that already cuts to each person gives one face per shot, and §46.4 frames it as before. A shot of one person never runs any of this.
+
+| Step | How (all values assumptions, TE-27) |
+|---|---|
+| Face tracks | Face boxes at `FACE_FPS` are joined into tracks by box overlap (IoU at least 0.3) from sample to sample; at most `MAX_FACE_TRACKS = 3` per shot, the largest kept |
+| Mouth activity | Per track and sample: the mean absolute difference of the mouth region (the lower third of the box, aligned on the box) from the previous sample, divided by the same measure over the whole box, so head movement cancels out |
+| Speech activity | The transcript's word spans in recording time, and the 10 ms RMS of `out48` already computed for silences |
+| Who speaks | Over a sliding `SPEAKER_WINDOW = 1.5 s`, each track's score is the correlation of its mouth activity with the speech activity. The speaker is the best track when it beats the next by `SPEAKER_MARGIN`; otherwise the window is "unsure" |
+| When it switches | Only at a sentence start or a pause of at least 300 ms, and only when the new speaker holds for at least `MIN_TURN = 1.5 s`. A switch is a hard cut to the new face, like a shot change: §46.4's reset applies, and the motion track restarts (§47.2) |
+| Unsure or both | Two people speaking at once, or unsure for longer than `MIN_TURN`: a `Split` key. The two faces are stacked, each in a 1080 × 960 half (left person on top), with a 4 px divider in the theme's `panel` colour. Captions keep their placement |
+
+```rust
+// offcut-vision/src/speaker.rs  [ONLY]
+pub struct FaceTrack { pub id: u8, pub samples: Vec<FaceSample>, pub mouth: Vec<f32> }
+pub fn speaker_path(tracks: &[FaceTrack], speech: &SpeechActivity, sentences: &[Span], shots: &[Shot],
+                    joins: &[TimeMs], choice: SpeakerChoice) -> FramePath;   // pure, deterministic
+pub enum SpeakerChoice { Follow, Both, One { left: bool } }                 // EditState.speaker, #[serde(default)]: Follow
+```
+
+- **The person stays in control.** The Framing panel offers "Follow the speaker" (default), "Show both" (a split for every two-person shot) and "Show one person" (left or right). Dragging still shifts the crop. Nothing leaves the device; the Director's `ShotLine` gains `people: One | Two | More`, an enum (INV-28).
+- **Rendering.** A `Split` key makes two `Video { Main }` commands from the same decoded frame, which is `composite.rs`'s second path (DC-8, DC-17). Every single-face list stays on the simple path.
+- **Acceptance.** `speaker.rs` (a table: two faces taking turns; both speaking gives a split; a turn shorter than `MIN_TURN` does not switch; a head turning without speech does not switch; one face changes nothing); `speaker-framing.spec.ts` (a generated two-person fixture switches at the sentence the transcript gives, and "Show both" splits); `composite.rs` (simple path identical). **TE-27:** on 10 real two-person podcast shorts, the person speaking is on screen (alone or in a split) for at least 90% of speech time, and no switch lands inside a sentence. If it fails, ask (§41.4): the fallback is "Show both" as the default for two-person shots.
 
 ---
 
-## 47. The Catalog at Launch (V6.2, V6.6, V6.7, V6.8, V6.11)
+## 47. The Catalog at Launch and the Finished Look (V6.2, V6.6a, V6.6b, V6.7, V6.8, V6.11)
+
+**v1.5: the quality bar is now written down (the founder's decisions of 2026-11-09).** Offcut survives only if its shorts match or beat Submagic's. The founder's benchmark (Submagic-made shorts read frame by frame on 2026-11-09, kept outside git) showed that the gap is not the captions but motion, sound, B-roll and following the speaker: something changes about every 2 s, every shot moves, whooshes and pops land on each visual entry, punch words jump in size, and the crop follows whoever talks. §47.1-§47.6 make each of these a rule rather than a model's choice, so the worst short is good, not only the best one; each has a switch in the Enhance panel (§47.5).
 
 `CATALOG_VERSION` bumps with each release's kinds. Codes stay in catalog order (§40.2). Every kind has a draw function, at least one golden per style, and `catalog_complete.rs` proves it. `EventKind` in `events.rs` is the code's name for the §40.2 `ItemKind`.
 
 | Release | Kinds | Notes |
 |---|---|---|
 | V4 | `NumberReveal`, `ListReveal`, `FromTo`, `KeywordPop` | Built |
-| V6.2 | `Emphasis`, `IconPop`, `PunchIn`, `Emoji` | `DrawCmd::Image` first used here, for raster emoji and icons from a closed bundled set (licence recorded). `PunchIn` is the auto zoom (§47.2, v1.4) |
+| V6.2 | `Emphasis`, `IconPop`, `PunchIn`, `Emoji`, `HookTitle` (v1.5: moved from part E) | `DrawCmd::Image` first used here, for raster emoji and icons from a closed bundled set (licence recorded). `PunchIn` is the auto zoom (§47.2, v1.4). v1.5: `Emphasis.size: Punch`, `Emoji.place: Under`, the hook lockup and caption glow (§47.3) |
+| V6.6a (v1.5) | No new kind | The picture grade (§47.4) is a property of the `Video` command, not a plan item |
 | V6.6, part A | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus` | The cards shorts use most, first |
 | V6.6, part B | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Kept by the founder |
-| V6.6, part C | Kinetic `CaptionMotion` rows, per-glyph animation | Data in `StyleSpec` plus `MotionPreset` arms. v1.4 candidates from the founder's references (§47.2): a typographic lockup, a mixed-font pair beside the head, and a glass treatment for part A's cards |
+| V6.6, part C | Kinetic `CaptionMotion` rows, per-glyph animation; (v1.5) display fonts, six presets, word pages (§47.3) | Data in `StyleSpec` plus `MotionPreset` arms. v1.4 candidates from the founder's references (§47.2): a typographic lockup (v1.5: built for the hook in V6.2), a mixed-font pair beside the head, and a glass treatment for part A's cards (v1.5: the blur arrives in V6.6a) |
 | V6.6, part D | `ShapeFrame`, `Transition` (shape wipes at topic shifts) | First use of `Video.mask`; kept by the founder. §41.4's cost trigger applies here by name |
-| V6.6, part E | `HookTitle`, `ProgressBar`, `EndCard` | `EndCard` adds a `Hold` |
-| V6.7 | `SoundCue { at: WordIdx, sound: SoundId }` | A closed bundled set if TE-16 passes |
-| V6.8 | `Broll { anchors, source: BrollSource, fit: Cover \| Contain \| Pip, keep_audio: bool }` with `BrollSource = Asset(AssetRef) \| Stock { query: Label }` (v1.4; a `Stock` source is resolved to an asset before validation, §48.6), `JoinTransition { after_part, kind: Dissolve \| Whip \| SlideUp }`, `Layout { from_word, kind: FollowFace \| ScreenAndFace \| Full }` | Non-text assets only from the asset box |
+| V6.6, part E | `ProgressBar`, `EndCard` (v1.5: `HookTitle` moved to V6.2) | `EndCard` adds a `Hold` |
+| V6.7 | `SoundCue { at: WordIdx, sound: SoundId }` | v1.5: `SoundId` names a closed set of sounds synthesized in code (§47.1), so no licence is needed. Most cues are placed by rules, not by the plan |
+| V6.8 | `Broll { anchors, source: BrollSource, fit: Cover \| Contain \| Pip, keep_audio: bool }` with `BrollSource = Asset(AssetRef) \| Stock { query: Label }` (v1.4; a `Stock` source is resolved to an asset before validation, §48.6), `JoinTransition { after_part, kind: Dissolve \| Whip \| SlideUp \| ZoomIn \| ZoomOut }` (v1.5: the zooms), `Layout { from_word, kind: FollowFace \| ScreenAndFace \| Full }` | Non-text assets only from the asset box |
 | V6.11 | `TextBehind { anchors, text: Label }`, `Background { from_word, background: BackgroundRef }` | Gated by TE-25 |
 | Post-launch | `ChapterMarker`, `LowerThird` | PS §21 item 15 |
 
@@ -5144,7 +5192,28 @@ impl FramePath { pub fn none() -> FramePath; pub fn is_none(&self) -> bool; pub 
 
 ### 47.1 Sound (V6.7)
 
-Music, ducking and bed values are §40.6, unchanged. Sound cues are short bundled sounds mixed in `assemble` after ducking at `SFX_LEVEL = -18 dB` (assumption, E-2). `assemble`'s `MusicInput` becomes part of a `MixInput { music, sounds, broll_audio }`, and `MixInput::none()` is the identity (`program_identity.rs` unchanged).
+Music, ducking and bed values are §40.6, unchanged. Sound cues are short sounds mixed in `assemble` after ducking at `SFX_LEVEL = -18 dB` (assumption, E-2). `assemble`'s `MusicInput` becomes part of a `MixInput { music, sounds, broll_audio }`, and `MixInput::none()` is the identity (`program_identity.rs` unchanged).
+
+**Music (v1.5, founder 2026-11-09): the person's own track only.** No bundled library at launch; TE-16 is closed for music (PS §21 item 23 keeps a library as a later candidate). The plan's `MusicCue` still says whether music fits and its energy, and the review suggests adding a track when it does.
+
+**Sound effects are synthesized (v1.5, founder 2026-11-09).** `offcut-dsp/src/sfx.rs` renders each `SoundId` from fixed parameters at 48 kHz: deterministic, no files, no download, no licence. TE-16 is closed for sound too.
+
+| `SoundId` | How it is made (parameters are assumptions, tuned in the quality pass) | Used for |
+|---|---|---|
+| `Whoosh` | White noise through a band-pass whose centre sweeps 400 Hz → 4 kHz over 280 ms, a raised-cosine envelope, slight stereo widening | B-roll, a card or a lockup coming in; a join transition |
+| `Swipe` | As `Whoosh`, 160 ms, sweep down | A card or B-roll leaving |
+| `Pop` | A sine burst at 900 Hz falling to 300 Hz in 60 ms, with a 2 ms noise click | Emoji, icon pop, a punch word |
+| `Click` | A 3 ms filtered noise transient | A list item, a step, a number counting |
+| `Impact` | A sine at 60 Hz falling to 40 Hz over 250 ms plus a short noise burst, gently clipped | A snap zoom on the strongest word |
+| `Riser` | Noise and a rising sine, 600 ms, ending on the next visual's entry | Before the hook title |
+
+**Placed by rules.** `sfx::cues_for(entries: &[VisualEntry], cfg) -> Vec<Cue>` reads the scene's visual entries (B-roll, cards, lockups, emoji, icon pops, punch words, snap zooms, join transitions) and gives each its sound from the table. At most one cue per `SFX_MIN_GAP = 0.8 s` (the stronger entry wins) and at most `SFX_MAX = 12` per short (assumptions). The plan's `SoundCue` items are added on top, within the same limits. Rules cues are not plan items: they follow the entries, so switching an item off removes its sound, and the Enhance panel's "Sound effects" switch removes them all (§47.5).
+
+**Voice tuning (v1.5, flag `voice_tune`, DC-19).** Two steps join "Voice cleanup", each set by a measurement so a good microphone gets little or nothing:
+
+- **Denoise by need.** The noise floor is measured in the pauses (10th percentile of the 10 ms RMS); the denoiser's wet share runs from 0.25 at a floor below -65 dBFS to 1.0 above -50 dBFS (assumptions).
+- **A three-band voice EQ.** A low shelf at 120 Hz, a peak at 250 Hz and a high shelf at 5 kHz, each set by comparing the voice's long-term spectrum with a reference voice curve and bounded to ±3 dB: muddiness is cut, and presence is lifted only if missing. Learned from Tooscut's `audio-engine` EQ (a low shelf, a peak and a high shelf as biquads); ours is set automatically, written in `offcut-dsp`, and runs offline in the chain before the loudness stage.
+- **Rejected:** a noise gate (it chops breaths and room tone, and the cuts already shorten pauses), reverb, a de-esser (no measured need yet; the quality pass may add one).
 
 ### 47.2 Auto zoom and the quality bar (v1.4)
 
@@ -5158,11 +5227,114 @@ The founder's decision of 2026-11-08: shorts should move and look like those mad
 - **Scales:** `Mild = 1.12`, `Strong = 1.25` (assumptions, E-11). With a `FramePath` (V6.5) the zoom centres on the face; without one, on the crop's centre. The crop never leaves the source (§46.4's clamp).
 - **Rules (V-3):** two `PunchIn`s never overlap; a `PunchIn` never overlaps a cut's jump zoom (§44.6), which wins; at most one `PunchIn` per sentence (assumption, E-11). V-9's density rule does not count `PunchIn`, which adds nothing to the frame.
 - **Prompt addition:** zoom on the claim, the number or the punchline, never on filler; `Snap` on one strong word, `Push` across a sentence that builds.
+
+**Motion by rules (v1.5, flag `motion`, founder 2026-11-09).** The plan's zooms are moments; the benchmark's shots are never still. So every talking-head shot also drifts slowly, by rules, whatever the plan says:
+
+```rust
+// offcut-scene/src/motion.rs  [ONLY]
+pub struct MotionTrack { segs: Vec<MotionSeg> }          // private; made by build() or MotionTrack::none()
+pub struct MotionSeg { pub start: OutMs, pub end: OutMs, pub from: f32, pub to: f32 }
+pub fn build(changes: &[OutMs], shots: &[ShotSpan], sentences: &[Span]) -> MotionTrack;   // pure
+impl MotionTrack { pub fn none() -> MotionTrack; pub fn scale_at(&self, t: OutMs) -> f32; }
+```
+
+- **Segments** start at every visual change: a shot change, a join, a cut, a speaker switch (§46.6), a B-roll entry or exit. A segment longer than `MOTION_MAX_SEG = 4 s` is split at the sentence start nearest its middle.
+- **Each segment drifts** by `MOTION_DRIFT = 0.05` (from 1.00 to 1.05, or back), alternating in and out from one segment to the next, on the `Standard` easing curve below. A segment shorter than 0.8 s holds still (assumptions, tuned in the quality pass).
+- **Where.** On `TalkingHead` and `ScreenWithFace` shots, and on a clip with no shot information. Never on `Screen` shots, where text must stay readable, and never under a full-frame card.
+- **With the other zooms.** Scales multiply: motion × the plan's `PunchIn` × the cut's jump zoom (§44.6), capped at `MAX_TOTAL_ZOOM = 1.35`. The centre is the face (`FramePath`), else the crop's centre; §46.4's clamp keeps the crop inside the source.
+- **B-roll** (V6.8) takes the same alternating drift, so a still stock shot moves too.
+- **Switch.** The Enhance panel's "Motion" (§47.5). Off, or `Enhance::v5()`, gives `MotionTrack::none()` and V5's frames (DC-16).
+
+**Easing curves (v1.5).** `offcut-scene/src/easing.rs`: `CubicBezier { x1, y1, x2, y2 }` evaluated in pure Rust (Newton's method with a bisection fallback), with named curves `Standard` (0.4, 0, 0.2, 1), `Out` (0, 0, 0.2, 1) and `InOut` (0.65, 0, 0.35, 1) (assumptions). Zooms, pans, the motion track and caption entries use them in place of the fixed `ease_in_out`; existing styles keep their curves, so goldens do not move. Learned from Tooscut's keyframe evaluator (bezier interpolation per keyframe); ours is a function of time inside `frame_at`, with no keyframe store.
 - **The bar.** Quality is judged in the quality pass after V6.11 (`buildplan.md` §8A.12) against the founder's benchmark: Submagic-made shorts and caption references, kept outside git (the repository is public). The references point at three caption families that V6.6 part C weighs: **typographic lockups** (words of mixed size and weight stacked into one block, one accent colour, the camera pushing through the block as it grows); **mixed-font pairs beside the speaker's head** (a bold sans with an italic serif, which needs an OFL serif italic in the font registry and the face position of V6.5); and **glass cards** with the video blurred behind them (§48.4's reduced-resolution blur, brought forward to V6.6 if kept). Each is a §41.4 cost check by name, as part D is.
 
----
+### 47.3 Captions (v1.5: V6.2 and V6.6b)
 
-## 48. Layers: B-roll, Asset Box, Transitions, Split Layout (V6.8)
+The benchmark's captions are plainer than expected: one word, or two to four, in a heavy white sans with a soft glow; the keyword coloured, glowing, with an emoji under it; punch words about twice the size in capitals; hard swaps rather than bounces. Bold (Inter 800, yellow keyword) is already near that; these close the rest.
+
+| Part | Release | Contract |
+|---|---|---|
+| **Glow** | V6.2 | `StyleSpec.glow: Option<Glow { role: ThemeRole, layers: u8, spread: f32, alpha: f32 }>`. Drawn as `layers` (4) strokes behind the glyph run, each wider by `spread` and fainter, in Vello: no blur and no second path. Clean, Bold and Mono keep `glow: None`, so their goldens do not move |
+| **Punch words** | V6.2 | `Emphasis { size: Punch }` sets the word alone on its page in capitals at `PUNCH_SCALE = 1.9` of the style's size (assumption). At most one per 6 s (its `min_gap`). The model picks it in the plan; the rules producer does not |
+| **Emoji under the keyword** | V6.2 | `Emoji { place: Under }` draws the emoji below the caption block, centred on its word, at 1.6 × the cap height, with a `Pop` entry (scale 0.6 → 1.0 over 120 ms). Large emoji also stand in for the benchmark's object stickers |
+| **Hook title** | V6.2 | `HookTitle` draws `extras.hook` over the first `HOOK_DUR = 2.0 s` as a lockup (`offcut-scene/src/lockup.rs`): two or three lines of mixed size that fill the width, the `accent` word at 2× in the accent colour, entering with a scale of 0.9 → 1.0 over 150 ms. Captions are hidden under it. With no hook, or a first sentence that already hooks, the plan omits it (§47) |
+| **Word pages** | V6.6b | `StyleSpec.paging: Lines(u8) \| Words { max: u8 }` (`#[serde(default)]`: the style's lines). `Words { max: 1 }` and `Words { max: 3 }` break at punctuation and at pauses of at least 250 ms and keep §17's reading floor; words swap hard, with no transition unless the preset names one |
+| **Display fonts** | V6.6b | Four OFL fonts join the registry, subset to Latin (at most 400 kB together, assumption): a heavy geometric sans (Montserrat Black class), a condensed (Anton or Bebas Neue class), a comic display (Bangers class), and an italic serif for mixed pairs. TE-28 picks each and records its licence |
+| **Presets** | V6.6b | Six new presets, beside Clean, Bold and Mono: rows of `StyleSpec` data on the four fonts, glow, paging and the kinetic rows of part C. **Named by us,** never after a creator. The benchmark sets which is the default for new clips (the quality pass) |
+
+### 47.4 Picture: the blur, colour and light (v1.5, V6.6a, flag `picture`)
+
+**Model: each shot gets one automatic grade, computed from the frames the fine pass already samples and applied by the video pass. A grade only corrects what was measured, within bounds, so a well-lit, well-balanced shot gets the identity grade. Rejected: looks and LUTs at launch (PS §21 item 16), log colour spaces, a colour UI of wheels, curves or HSL (PS §8 principle 3), HDR tone mapping (the founder's decision of 2026-11-09: HDR stays rejected with advice, `REJECT_HDR`; TE-21 is closed).**
+
+**The blur.** `offcut-render/src/blur.rs`: one pass at reduced resolution (downsample to a quarter, a dual-filter blur of two or three levels, upsample), never a per-pixel 169-sample loop (§53.4). Its users: the blurred fill of the `Full` layout and of contained B-roll (V6.8), the glass treatment of cards (V6.6b), `Whip` (V6.8) and the blurred background of V6.11. A list that uses it takes `composite.rs`'s second path (DC-8).
+
+```rust
+// offcut-types/src/grade.rs
+pub struct Grade { pub exposure_ev: f32, pub temp: f32, pub tint: f32, pub contrast: f32, pub saturation: f32,
+                   pub lift: [f32; 3], pub gamma: [f32; 3], pub gain: [f32; 3],
+                   pub face_light: Option<FaceLight>, pub vignette: f32 }
+pub struct FaceLight { pub cx: f32, pub cy: f32, pub radius: f32, pub gain_ev: f32 }   // in output space
+// offcut-vision/src/grade.rs  [ONLY]
+pub fn shot_grades(stats: &[ShotColour], reference: usize, faces: &FramePath) -> Vec<Option<Grade>>;   // pure
+```
+
+| Step | Rule (bounds are assumptions, TE-29) |
+|---|---|
+| Exposure | Brings the face box's mean luma (else the frame's median) toward `FACE_LUMA = 0.48`, within ±0.5 EV |
+| White balance | Moves the mean chroma of near-neutral pixels toward neutral, at most `WB_MAX` in temperature and tint; skin is never the reference |
+| Contrast and saturation | A gentle S-curve when the histogram is flat (at most +8%); saturation +5%, weighted to low-saturation pixels so skin does not go orange |
+| Camera matching | In a short whose shots come from different cameras (cut boundaries plus a distance between the shots' colour statistics), each shot's lift, gamma and gain move its means and spread toward the reference shot, the one with the most speech time; bounded like the rest |
+| Face light | A soft radial lift on the face from `FramePath`, at most +0.3 EV, falling off over 1.5 face widths |
+| Vignette | At most 12% darker at the corners |
+| Do no harm | A step below its threshold is zero; a shot with every step zero gets `None` and stays on the old pipeline. A grade changes only at a shot boundary, with the cut, and never drifts within a shot |
+
+- **Drawing (DC-18).** The video pass gains a graded variant: the same draw, one uniform per frame holding the shot's `Grade`. It is still one pass, so a graded list stays simple. Budget: at most 1 ms more per frame at 1080 × 1920 on D1 (TE-29).
+- **Learned from Tooscut's colour grading** (`color_grading_uniforms.rs`: lift, gamma and gain wheels, slope, offset and power): the grading model. Ours fills the values automatically from measurements, has no user controls, and is written in Offcut's types.
+- **Switch.** The Enhance panel's "Colour & light" (§47.5). When every shot is `None`, the panel says the picture already looks right.
+
+### 47.5 The Enhance panel: every enhancement measured, and each one switchable (v1.5, from V6.2)
+
+The founder's request of 2026-11-09: a creator with a good microphone or good lighting can switch off what they do not need, while reviewing. Each enhancement first measures the need and does only that much; the switch removes it completely.
+
+```rust
+// offcut-types/src/enhance.rs
+pub struct Enhance { pub voice: VoiceMode, pub motion: bool, pub picture: bool, pub sfx: bool }   // in EditState, #[serde(default)]: v5()
+pub enum VoiceMode { Clean, Level }        // Level: loudness normalisation and the limiter only
+impl Enhance {
+    pub fn v5() -> Enhance;                // Clean with V5's chain, motion, picture and sfx off: V5's frames and samples
+    pub fn defaults(flags: &FeatureFlags) -> Enhance;   // every shipped enhancement on
+}
+pub struct EnhanceReport { pub noise_floor: DbBucket, pub voice_tuned: bool, pub shots_graded: u16, pub shots: u16 }
+```
+
+| Row in the panel | Release | Off means | What it says when there is little to do |
+|---|---|---|---|
+| Voice cleanup | V6.2 (V6.7 adds the tuning) | `VoiceMode::Level`: the original sound, levelled to -14 LUFS and limited, with no denoise, high-pass, compression or EQ | "Your audio is already clean: light touch" |
+| Motion | V6.2 | `MotionTrack::none()`; the plan's own zooms stay, as items | |
+| Colour & light | V6.6a | Every `grade` is `None` | "Your picture already looks right" |
+| Sound effects | V6.7 | No rules cues; the plan's `SoundCue` items stay, as items | |
+| Music | V6.7 | `MusicChoice` none (the existing control, shown in the panel) | |
+
+- **Instant in the preview.** Both voices are made when a clip is prepared: `out48` (Clean) and `lvl48` (Level, the cheap path), side by side in OPFS. Switching voice re-runs `assemble` only; motion, colour and sound go through the existing `review-update` path. Every switch is one undo step within the 150 ms edit budget.
+- **Remembered.** The panel's last state is stored in this browser (IndexedDB `meta`, key `enhanceDefault`) and becomes the start of the next clip; settings has "Back to recommended". Nothing is sent.
+- **Kept honest.** The export reads `EditState.enhance`, which joins the render-cache key (S-9) as part of `EditState`. `export_done` gains `enhance_off`, a list of the rows switched off (an enum list, INV-18), for E-11.
+
+### 47.6 The quality check (v1.5, V6.8)
+
+**Model: the benchmark becomes a check that every prepared short runs before the person sees it. Rules fix what they can; nothing blocks an export; CI runs the same check over the corpus so a release that makes shorts worse fails.**
+
+`offcut-scene/src/quality.rs`: `check(scene: &Scene, speech: &SpeechActivity) -> QualityReport`, pure.
+
+| # | Rule (values are assumptions, tuned in the quality pass) | Fixed by rules in `prepare-short.ts` |
+|---|---|---|
+| Q-1 | Something changes at least every `Q_MAX_STILL = 2.5 s`: a shot or join, a cut, an item's entry, B-roll, a speaker switch, a motion segment's start | A `PunchIn { Snap }` on the strongest word of the stretch by prosody, else an `Emoji` from the rules set, within V-9's density |
+| Q-2 | No talking-head stretch longer than 3 s without motion | Covered by §47.2 while Motion is on; reported when it is off |
+| Q-3 | Every visual entry has a sound while Sound effects is on | `sfx::cues_for` already does; the check proves it |
+| Q-4 | In a two-person shot, the person speaking is on screen for at least 90% of speech time | Reported; the person can choose "Show both" |
+| Q-5 | No caption, card or item in the platforms' UI zones | Guaranteed by `safe_area.rs`; the check proves it |
+
+- **Fixes are ordinary items.** A rules fix is written as `PlanOp::AddItem` with `origin: QualityFix` in `EditState.plan_ops` (V6.8 builds `AddItem` beside `PlaceAsset` and `RemoveAsset`, §49.2), so it shows in the review, can be switched off and undoes like any item, and passes `validate`.
+- **CI.** `quality_corpus.rs` prepares the corpus's reference shorts (rules plans, and fixed model plans stored as fixtures) and fails if any rule's failure count rises above the last release's recorded count.: B-roll, Asset Box, Transitions, Split Layout (V6.8)
 
 **Model: a frame's display list may hold several `Video` commands from several sources, drawn in list order with Vello runs between them. Assets are the person's own files stored locally and labelled by them, or (v1.4) stock clips from Pixabay downloaded into the same local store. The plan places them by pointing at words; the person can place one by hand on a word (v1.4), and from V6.9 chat can. Rejected: a timeline for placing them (PS §8 principle 3), a second compositor (one list, one renderer), other stock providers at launch (read 2026-10-29: Pexels had paused new keys, Coverr's free API is non-commercial, Mixkit has no API), generated B-roll. v1.3 rejected stock too (the founder's decision of 2026-11-02); the founder reversed that on 2026-11-08, and §48.6 answers its three reasons: the licence, a server search route, a new browser host.**
 
@@ -5203,11 +5375,11 @@ Masks (V6.6 part D) and mattes (V6.11) use the same path. `golden_frames.rs` add
 pub struct Part { pub src: SourceSpan, pub role: PartRole, pub handle: DurMs }   // #[serde(default)]: zero
 ```
 
-A handle is frames available past `src.end`, at most `MAX_HANDLE = 500 ms`, read only for a transition. The audio keeps `JOIN_XFADE` regardless. Kinds: `Dissolve`, `Whip` (a blur and slide), `SlideUp`. **Text and captions never slide with the video**; they are laid out in program time, above it. Tooscut's transitions move only media, and for us that is correct.
+A handle is frames available past `src.end`, at most `MAX_HANDLE = 500 ms`, read only for a transition. The audio keeps `JOIN_XFADE` regardless. Kinds: `Dissolve`, `Whip` (a blur and slide, with §47.4's blur), `SlideUp`, and (v1.5) `ZoomIn` and `ZoomOut` (the outgoing side scales up, or the incoming side scales down to 1.0, over the overlap; learned from Tooscut's `ZoomIn`/`ZoomOut` transition types). Each join transition gets a `Whoosh` while Sound effects is on (§47.1). **Text and captions never slide with the video**; they are laid out in program time, above it. Tooscut's transitions move only media, and for us that is correct.
 
 ### 48.4 Layouts
 
-`Layout` (see §47) changes `Video` commands, not modes: `ScreenAndFace` puts two `Video { Main }` commands in the list with different `src` and `dst`, from the same decoded frame; the top shows the screen region, the bottom the face crop. The regions come from `Shot` and `FramePath`. `Full` shows the whole landscape frame fitted over a blurred copy of itself, for footage shots. The blur is a pass at reduced resolution, never a per-pixel 169-sample loop.
+`Layout` (see §47) changes `Video` commands, not modes: `ScreenAndFace` puts two `Video { Main }` commands in the list with different `src` and `dst`, from the same decoded frame; the top shows the screen region, the bottom the face crop. The regions come from `Shot` and `FramePath`. `Full` shows the whole landscape frame fitted over a blurred copy of itself, for footage shots. The blur is §47.4's pass at reduced resolution (v1.5: built in V6.6a), never a per-pixel 169-sample loop. (v1.5) The two-face split of §46.6 already puts two `Video { Main }` commands in one list; `ScreenAndFace` reuses that path.
 
 ### 48.5 Asset box
 
@@ -5304,7 +5476,7 @@ pub fn effective_plan(base: &EditPlan, ops: &[PlanOp]) -> EditPlan;     // pure
 pub fn validate_ops(ops: &[PlanOp], ctx: &OpContext) -> Vec<OpVerdict>;  // each op: applied or refused with a reason enum
 ```
 
-- The stored plan never changes. `EditState` gains `plan_ops: Vec<PlanOp>` (`#[serde(default)]`), so the existing history (`history.ts`, 50 steps) gives chat undo at no extra cost: one chat message is one undo step. **v1.4:** V6.8 builds `plan_ops`, `effective_plan` and `validate_ops` with `PlaceAsset` and `RemoveAsset` only, for B-roll placed by hand (§48.5); V6.9 adds the other operations and the chat route.
+- The stored plan never changes. `EditState` gains `plan_ops: Vec<PlanOp>` (`#[serde(default)]`), so the existing history (`history.ts`, 50 steps) gives chat undo at no extra cost: one chat message is one undo step. **v1.4:** V6.8 builds `plan_ops`, `effective_plan` and `validate_ops` with `PlaceAsset` and `RemoveAsset` only, for B-roll placed by hand (§48.5); V6.9 adds the other operations and the chat route. **v1.5:** V6.8 also builds `AddItem`, for the quality check's fixes (§47.6); `AddItem` gains `origin: OpOrigin { Person, Chat, QualityFix }` (`#[serde(default)]`: `Person`), an enum that analytics may count.
 - `AddSentences` needs media the short does not hold: it asks for the original file, copies the new part (§44.8), then rebuilds.
 - Everything downstream reads `validate(effective_plan(base, ops), ...)`. INV-21 holds: **chat cannot put anything on screen that the validator has not returned.**
 - An op that changes parts (`RemovePart`, `AddSentences`, `MovePart`) rebuilds the `Assembly` and re-runs `prepare-short.ts` from the audio step; the UI says "Rebuilding this short" for those only. Every other op reaches the preview through the existing `review-update` path, within the existing 150 ms budget.
@@ -5489,7 +5661,7 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | TE-18 | (v1.4) Cloud transcription of a long source: time, limits, quality at the seams | A 45-minute fixture through `transcribe-source.ts` on Groq; then the labelled long set | To the master transcript at most 6 min p90 on D1 after the audio step; no word lost or doubled at window seams on the labelled set; the per-user and global budgets hold (assumptions) | V6.1, V9 | A larger overlap; a lower concurrency; the Dev tier; ask (§41.4) |
 | TE-19 | Director quality with sentences only | The labelled long set (E-13's) through two candidates | At least 60% of the model's shorts rated postable by the panel | V6.4 | Tune prompt; stronger model; more shot lines |
 | TE-20 | Do long jobs survive a hidden tab, Memory Saver and sleep? | Run a 45-min job hidden; with Memory Saver on; with a sleep mid-job | Progress continues hidden, at most 2× slower; after discard or sleep it resumes with at most the windows in flight lost, and asks for the file only in the stages of §43.7 | V6.1 | Copy tells the user to keep the tab visible; ask (§41.4) |
-| TE-21 | HDR (HLG, PQ) from phones and cameras | Decode through `importExternalTexture`; compare with an SDR render on `verify_mp4.py` | No washed or clipped frames on 5 clips | V6.1 | `REJECT_HDR`; with advice |
+| TE-21 | HDR (HLG, PQ) from phones and cameras | Decode through `importExternalTexture`; compare with an SDR render on `verify_mp4.py` | No washed or clipped frames on 5 clips | V6.1 | `REJECT_HDR`; with advice. **Closed (v1.5, founder 2026-11-09): HDR stays rejected with advice; no tone mapping is built (PS §21 item 22)** |
 | TE-22 | Preview across a join on long-GOP 4K | `preview-sync.spec.ts` join case at 4K | Late frames within budget | V6.3 | Lower the lead's resolution; a longer `JOIN_LEAD` |
 | TE-23 | Which face detector: speed, accuracy, licence | Three candidates on 20 corpus shorts | Under 15 ms a frame on D1; at least 95% of faces found on frontal shots; a licence that allows bundling in a paid product | V6.5 | Next candidate; a coarser `FACE_FPS` |
 | TE-24 | Which person-matte model: speed, size, licence | MODNet-class, RVM-class and others | At most 2× duration on D1; at most 30 MB; licence recorded and acceptable (a GPL model is not) | V6.11 | Next; then ask |
@@ -5499,6 +5671,9 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 | TE-C3 | The same visual events, cloud and device | the same | Every event on six clips, plus the 3-item list the device misses | Cloud transcription | Stop and ask |
 | TE-C4 | Drop to ready, cloud and device | the same | 13-14× faster on a minute of speech, model cached | Cloud transcription | Recorded |
 | TE-C5 | Vercel's rewrite carries the body; a live request's time | the same, at the merge | (P170) | Cloud transcription | Lower the limit or the bitrate |
+| TE-27 | (v1.5) Following the speaker: is the right person on screen? | 10 real two-person podcast shorts (wide two-shots), with the speaker marked by hand per sentence; `speaker_path` with `Follow` | The person speaking on screen (alone or in a split) for at least 90% of speech time; no switch inside a sentence; the fine pass still under 20 s per 60 s short on D1 (assumptions) | V6.5 | Tune `SPEAKER_MARGIN` and `SPEAKER_WINDOW`; then "Show both" as the default for two-person shots, and ask (§41.4) |
+| TE-28 | (v1.5) The four display fonts: licence, coverage, size | Read each candidate's licence (OFL or Apache only); render the caption corpus' words, digits, punctuation and the emoji fallback; measure the Latin subset | Licence recorded; no missing glyph on the corpus; at most 400 kB together | V6.6b | The next candidate in the class |
+| TE-29 | (v1.5) Does the automatic grade do no harm? | 20 shots from the corpus and the labelled long set (dark, mixed light, two cameras, already good); the founder compares graded and ungraded side by side, unlabelled | Graded judged better or equal on at least 18 of 20, worse on at most 1; every already-good shot gets `None` or near it; at most 1 ms more per frame on D1 (assumptions) | V6.6a | Narrower bounds; then camera matching only; then ask (§41.4) |
 | TE-26 | (v1.4) Stock B-roll from Pixabay: terms, relevance, the browser fetch | Re-read Pixabay's API terms and content licence; 20 plan-written queries from the labelled set; a fetch from `cdn.pixabay.com` under the app's COEP and CSP; rendition sizes | Terms as §48.6 states them; at least 12 of 20 queries give a clip the founder would use; the fetch works with no proxy (assumptions) | V6.8 | Stock by hand only (no plan-written queries); ask (§41.4) if the terms changed |
 
 **(V6.1, read on D1, 2026-11-08/09; `docs/v6.1/experiments.md`.)** **TE-17:** read in place, a 45-minute 4K HEVC file (1.48 GB) and a 45-minute 1080p H.264 file (5.6 GB): probe 0.15 s, the audio step 22 s and 55 s, peak page memory 34 and 37 MB; the clip page's 4K read with `high_res` (an 89 s 4K H.264 clip, processed and exported): 883 MB, so F-3's condition holds. Cold reads and USB drives are R1's and R2's. **TE-18:** 40 minutes through Groq by the product (2,690 s of audio, 10 s overlap, two in flight): p50 0.72 s and p90 1.05 s a window, 33 s of windows after the audio step, one 429 (Groq's free tier, about 20 requests a minute) paused the job `busy` and Continue finished it; at the 29 seams, 5 of the 96 word edits against the first loop fall within 2 s of a seam (2 lost, 3 changed, none doubled), the rate of edits elsewhere (the seams' 4 s are 5% of the time), and no word lands in room tone; the plan's "no word lost at a seam" fails by 2 words, recorded for the founder (V6 CL open item 27). **TE-20:** a reload mid-run loses only the windows in flight; the hidden tab and a frozen page could not be simulated on the automated Chrome, so the real sleep test is the founder's. **TE-21:** read on the generated HLG file only (no phone clip): Chrome maps it into sRGB without washing it out but clips saturated colours to black; `hdr_ok` stays `false`.
@@ -5519,6 +5694,7 @@ E-12 and E-13 are PS §19's. Their instrument is §45.9's analytics plus `script
 | INV-30 | AI spend never passes `AI_MONTHLY_CAP_USD` by more than one in-flight call per worker | `ai_cap.rs` |
 | INV-31 | `CreatorMemory` holds no text | Type-level test: no `String` reachable from it |
 | INV-32 | (v1.4) The renderer reads only local media: a `Stock` B-roll item reaches `validate` only after `resolve-stock.ts` has downloaded it into the asset store; a stock search query is neither stored nor logged on the server | `resolve-stock.test.ts`; `broll_search_route.rs`; `log_redaction.rs` |
+| INV-33 | (v1.5) Each Enhance switch, off, removes every effect of its stage, and `Enhance::v5()` gives V5's frames and samples. No measurement behind an enhancement (noise floor, colour statistics, face tracks, mouth activity) leaves the device | `enhance.rs` (each switch off equals the result with that stage absent); `flags_identity.spec.ts` (DC-16); `privacy-network.spec.ts` |
 
 **INV-5 is reread:** every removed span of **a clip's recording** is a validated, unrestored `Cut`; a short's parts are a validated `Assembly`; nothing inside a clip's recording is reordered (`TimeMap` ascending). **INV-12 is reread** per DC-10. **INV-2 and P-1 add:** the chat message, its short history, and asset labels and notes, each only in the AI request bodies, only with the AI switch on.
 
@@ -5556,7 +5732,11 @@ Clip budgets of §30 do not change. A 4K source is read separately and has no bu
 | Generic keyframes with bezier easing | §46.4, zooms | Evaluated in pure Rust inside `frame_at` |
 | Sample-rate mismatch correction for HE-AAC | §43.5 | Region decoder |
 | 3D LUT colour looks | Post-launch candidate, PS §21 item 16 | |
-| Not adopted | Text drawn last above all layers; slides on media only as a general rule; a 13×13 blur sample per pixel; preview and export through different decoders; a uniform buffer per layer per frame | Each would cost us something we already have |
+| (v1.5, read 2026-11-09) Colour grading as lift, gamma and gain wheels, and slope, offset and power | §47.4, the automatic grade | Values computed per shot from measurements; no user controls; one uniform in the video pass |
+| (v1.5) Bezier easing per keyframe | §47.2 easing curves, the motion track | A function of time in `frame_at`; no keyframe store |
+| (v1.5) `ZoomIn` and `ZoomOut` transitions | §48.3 | At joins only, on media; text stays above |
+| (v1.5) A three-band EQ of shelves and a peak, as biquads | §47.1 voice tuning | Set automatically against a reference voice curve, bounded to ±3 dB, offline in the chain |
+| Not adopted | Text drawn last above all layers; slides on media only as a general rule; a 13×13 blur sample per pixel; preview and export through different decoders; a uniform buffer per layer per frame. (v1.5) Log colour spaces, tone mapping, HSL and power-window controls, rotate, flip and wipe transitions, reverb, a noise gate, speed changes | Each would cost us something we already have, or the founder's decisions of 2026-11-09 exclude it |
 
 ### 53.5 Analytics and the crate graph
 
@@ -5573,7 +5753,7 @@ Clip budgets of §30 do not change. A 4K source is read separately and has no bu
 | `vision_result` | V6.5 | `shots_bucket`, `face_share_bucket`, `backend` |
 | `chat_edit` | V6.9 | `ops`, `refused`, `outcome`, `changed_parts: bool` |
 | `queue_result` | V6.10 | `done`, `failed`, `cancelled` |
-| `export_done` gains | V6.2-V6.11 | `from_short`, `items_kept`, `items_disabled`, `cuts_kept`, `cuts_restored`, `music_on`, `brand_kit_on`, `broll_items`, `framed: bool`, `chat_ops` |
+| `export_done` gains | V6.2-V6.11 | `from_short`, `items_kept`, `items_disabled`, `cuts_kept`, `cuts_restored`, `music_on`, `brand_kit_on`, `broll_items`, `framed: bool`, `chat_ops`; (v1.5) `enhance_off` (a list of `EnhanceRow`), `speaker: SpeakerChoice`, `quality_fixes` (a count) |
 
 No property holds text. The settings page's list is generated, so it stays exact (P-4).
 
@@ -5594,3 +5774,7 @@ Each (assumption) of §41-§52 is measured by the experiment or release named be
 9. (v1.4) Groq's Dev tier before the private alpha, and the audio budgets it allows (§22.1, §52).
 10. (v1.4) The per-user audio budget for long sources, `LONG_AUDIO_PER_USER_DAY` (§22.1), and the stock switch's default (§48.6).
 11. (v1.4) Which of the caption families of §47.2 V6.6 part C keeps.
+12. (v1.5) If TE-27 fails: "Show both" as the default for two-person shots, or more work on the speaker decision.
+13. (v1.5) If TE-29 fails: a narrower automatic grade, camera matching only, or none.
+14. (v1.5) E-16's blind test before the founding release (PS §19): what to fix first if Offcut loses.
+15. (v1.5) The agent's design choices of v6changelog Entry 38, for the founder to confirm or change before V6.2's plan.

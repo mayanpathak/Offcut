@@ -22,11 +22,15 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 23 | ~~Confirm or change the agent's 15 design choices of Entry 22~~ **Confirmed by the founder, 2026-11-08** | Founder | Entry 22, Entry 23 |
 | 19 | Groq's Dev tier before the private alpha (45-minute sources are about 30 windows each) | Founder | Entry 21, D-342 |
 | 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
-| 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
+| 21 | ~~The Submagic benchmark shorts and the caption references, outside git~~ **Done:** six Submagic promos in `sh2clips/documents/submagic_clips/`, read 2026-11-09 (Entry 38) | Founder | Entry 21, Entry 38 |
 | 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
 | 26 | D-428's three analytics events (`long_source_accepted`, `source_stage_timing`, `source_paused`) are not built: `analytics.rs`' tests pin the event list and no existing test may change tonight. Build them, editing those pinned lists, before `long_video` goes on in production (V6.4); nothing is lost while it is off | Founder decides, V6.4 | Entry 30, D-428 |
 | 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
 | 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
+| 28 | ~~Confirm or change the agent's 15 design choices of Entry 38 (v1.5) before V6.2's plan is written~~ **Confirmed by the founder, 2026-11-11** | Founder | Entry 38, Entry 39 |
+| 29 | E-16, the blind test against Submagic: 3 source videos, 20 viewers, after V6.8 and before the founding release | Founder, after V6.8 | Entry 38, PS §19 |
+| 30 | At least 10 two-person podcast videos (wide two-shots) with the speaker marked per sentence, outside git, for TE-27 | Founder, by V6.5 | Entry 38, TS §46.6 |
+| 31 | TE-29's side-by-side panel: 20 shots, graded and ungraded, unlabelled | Founder, at V6.6a | Entry 38, TS §47.4 |
 | 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
 
 ## Known issues for later prompts
@@ -1084,3 +1088,82 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
 
 **Open:** 27 (P181). **Found, not fixed:** as above.
+
+
+## Entry 38 - 2026-11-09 - Spec revision v1.5: the Submagic benchmark as rules, the picture work Tooscut showed, the Enhance panel (outside a prompt)
+
+A planning session after V6.1's merge. Nothing in the code changed. The founder's rule: **Offcut survives only if its shorts match or beat Submagic's; skip what is very hard or a big change with low impact, keep anything that makes the output much better.** The agent read the six Submagic promos in `sh2clips/documents/submagic_clips/` frame by frame (only the "AFTER" halves of four show real Submagic output; one is an AI-generated presenter), then Tooscut's colour grading, transitions, keyframes and audio effects, and put the decisions to the founder as multiple-choice questions with a recommendation each. The three core documents are now v1.5; every change is marked "v1.5" where it sits.
+
+**What the benchmark showed.** A visual change about every 2 s (one output: 11 changes in 23 s); every shot slowly pushing in; whooshes and pops on each B-roll or card entry over a quiet music bed (-16.3 LUFS); captions plainer than expected (one to four words, a heavy white sans with a soft glow, the keyword coloured with an emoji under it, punch words about 2x in capitals, hard swaps); a mixed-size hook lockup; full-screen stock B-roll; the 9:16 crop following whoever speaks in two-person podcasts. Submagic's outputs keep the source's colours unchanged. **The gap is not the captions** (Bold is near parity, and Offcut is likely ahead on line breaks, safe areas and timing) **but motion, sound, B-roll and following the speaker.**
+
+**Founder's decisions (2026-11-09).**
+
+| # | Question | Decision | Replaces |
+|---|---|---|---|
+| 1 | Order | **Keep the release numbers;** put each addition into the release that already holds what it needs; build V6.6 as V6.6a "Picture" and V6.6b "Graphics" | BP §8A.0's order, extended; "look before the Director" was declined |
+| 2 | Following the speaker | **In, at V6.5:** mouth movement matched to speech, no new model; switch only at sentence starts; split when unsure or both speak; only in shots with two or more faces | PS §9.2's "one speaker at launch"; TS §46's rejection of speaker detection |
+| 3 | Motion | **On by default, by rules,** on talking-head shots, alternating in and out; the plan's zooms on top; one switch | TS §47.2's "zoom only where the plan asks" |
+| 4 | Switching enhancements off (the founder's request) | **Measured first, one switch each, remembered:** an Enhance panel with Voice cleanup, Motion, Colour & light, Sound effects, Music; the last choice starts the next video; Voice cleanup off keeps the loudness levelling | Voice chain always on (PS §8 principle 3) |
+| 5 | HDR | **Keep rejecting HDR** with advice; no tone mapping | TE-21's open question; the agent recommended testing real phone clips first |
+| 6 | Sound effects | **Synthesize our own** in code | TE-16's licensed bundle |
+| 7 | Music | **The person's own track only;** no library at launch | TE-16's bundled tracks; the agent recommended buying a small licensed pack |
+| 8 | Captions | **Four display fonts, six presets** with our own names, word pages, glow, punch words, emoji under the keyword | |
+| 9 | Cards B and part D | **Keep both** before launch | The agent recommended moving them after launch |
+| 10 | Quality check | **Rules fix what they can, CI checks the corpus,** never blocks an export | |
+| 11 | Founding release | **After V6.8,** behind a blind test against Submagic (E-16) | BP §8A.6: right after V6.6 |
+| 12 | V6.9-V6.11 | **Before launch, built while the founding offer sells** | Unchanged from Entry 0 |
+
+**The agent's design choices, for the founder to confirm or change (open item 28).**
+
+| # | Choice | Why |
+|---|---|---|
+| 1 | The quality work is a set of rules in the scene and the DSP (motion track, sound cues, quality check), not plan items the model must remember | The worst short must be good; a model forgets |
+| 2 | `Enhance` lives in `EditState` with `#[serde(default)]` = `Enhance::v5()`, and `Enhance::v5()` gives V5's frames and samples (DC-16, INV-33) | A stored clip reopens exactly as saved; `flags_identity.spec.ts` keeps its meaning |
+| 3 | Both voices (`out48` Clean and `lvl48` Level) are prepared, so the switch only re-runs `assemble` | The switch is instant in the preview |
+| 4 | Motion: a 5% drift per segment, segments split at 4 s, never on screen recordings, scales multiplied and capped at 1.35 | Reads as a camera operator, never as a zoom effect |
+| 5 | Speaker: a switch is a hard cut at a sentence start, at least 1.5 s per turn; the split stacks the two faces, left person on top; the Framing panel offers Follow, Show both, Show one | An editor cuts, never pans, between speakers |
+| 6 | The grade is one uniform in the video pass (`Video.grade`), so a graded list stays on the simple path; `None` keeps the old pipeline byte for byte (DC-18) | No second render path for colour; goldens untouched |
+| 7 | Grade bounds: ±0.5 EV, face light at most +0.3 EV, vignette at most 12%, saturation weighted away from skin; no colour controls for the person | Do no harm is the pass line (TE-29) |
+| 8 | Caption glow is drawn as faded strokes in Vello, not a blur | Captions stay on the simple path |
+| 9 | Six synthesized sounds; rules cues are not plan items, at most 12 per short and one per 0.8 s | Switching an item off removes its sound with it |
+| 10 | Voice tuning: denoise by measured noise floor and a three-band EQ bounded to ±3 dB; no gate, reverb or de-esser yet | A good microphone is left almost alone |
+| 11 | Quality fixes are `PlanOp::AddItem` with `origin: QualityFix`, so V6.8 builds `AddItem` early | Each fix is visible, switchable and undoable |
+| 12 | V6.6b builds parts in the order A, C, E, B, D | The benchmark weighs captions above more cards |
+| 13 | Tags `v6.6a` and `v6.6b`; a new milestone id M1.23 for Picture | Numbers and tags stay readable |
+| 14 | The Creator bitrate (8 Mb/s) is re-read in the quality pass under TE-4, not changed now | Constant motion is harder to encode; a change needs a §41.2 row |
+| 15 | B-roll takes the same drift; joins gain `ZoomIn` and `ZoomOut` (from Tooscut's transition types), each with a whoosh | |
+
+**Learned from Tooscut, in our own design (TS §53.4).** Its colour model (lift, gamma and gain wheels; slope, offset and power) becomes the automatic grade's parameters; its bezier keyframe easing becomes `easing.rs`; its `ZoomIn`/`ZoomOut` transitions join §48.3; its three-band EQ (low shelf, peak, high shelf) becomes voice tuning. Not adopted: log colour spaces, its simple tone mapping (HDR stays rejected), LUT looks, HSL and power-window controls, rotate, flip and wipe transitions, reverb, a noise gate. The no-copy rule is unchanged.
+
+**Changed.**
+
+| File | What |
+|---|---|
+| `docs/technicalspec.md` (v1.5) | Status and §0; DC-8 widened from V6.5; new DC-16 (Enhance), DC-17 (speaker split), DC-18 (`Video.grade`), DC-19 (voice tuning); §41.3 flags `motion`, `speaker_framing`, `picture`, `voice_tune`; §41.5 rows for V6.2, V6.5, V6.6a, V6.6b, V6.7, V6.8; §42 the V6.6a/V6.6b note; §40.2 `Emphasis.size`, `Emoji.place`, `HookTitle` to V6.2; §40.10 rows; §46 model line, §46.1's extra outputs, new §46.6 following the speaker; §47 retitled with the quality bar; §47.1 own music, synthesized sounds, rules cues, voice tuning; §47.2 motion by rules and easing curves; new §47.3 captions, §47.4 picture, §47.5 the Enhance panel, §47.6 the quality check; §48.3 zoom transitions, §48.4 the blur's source; §49.2 `AddItem` in V6.8 with `OpOrigin`; §28 milestones M1.9-M1.19 and new M1.23; TE-16 and TE-21 closed; new TE-27, TE-28, TE-29; INV-33; §53.4 Tooscut rows; §53.5 `export_done` fields; §53.6 items 12-15; the founding release after V6.8 |
+| `docs/product.md` (v1.5) | Title and positioning; ICP and "not targeted"; principle 3 (the Enhance panel); §9.1 flows; §9.2 rows (music, two people on screen, HDR); §9.2.1 voice cleanup off; §9.4 HDR and speakers; §9.5 rows for V6.2, V6.5, V6.6a, V6.6b, V6.7, V6.8 and the founding release; §9.7 rows; §12.8; §12.10 two people on screen; §12.12 zoom transitions; new §12.16 the finished look and the Enhance panel; §16 `MusicTrack`; §13, §18 and E-5 timing; new E-16 (the blind test); §21 items 20, 22 (HDR), 23 (music library) |
+| `docs/buildplan.md` (v1.5) | Status; a v1.5 paragraph; the version table (V6.6a, V6.6b); §8A goal and order; the founder's table (two-person set, TE-29's panel, E-16 after V6.8); the estimate; §8A.2, §8A.5, §8A.7, §8A.8 additions; §8A.6 rewritten as 8A.6a Picture and 8A.6b Graphics; the founding release and its boxes moved after V6.8; §8A.12's v1.5 inputs; V6's founding-release mentions, §11.3, §12's boxes, appendices A and B |
+| `docs/v6/v6changelog.md` | This entry; open items 21 (closed), 28-31 |
+
+**Estimate.** 154 prompts still to build (V6.2 19, V6.3 16, V6.4 14, V6.5 14, V6.6a 9, V6.6b 21, V6.7 10, V6.8 21, V6.9-V6.11 30): **+30 against v1.4,** about 6-8 weeks at the founder's pace. Public launch about February to early March 2027 (ESTIMATE). TE-27 or TE-29 at twice its estimate adds up to about 11 prompts.
+
+**Checked.** Documents only: no code or test changed, nothing built. Every edit's anchor matched exactly once, or the script wrote nothing. Every new `§` reference (§46.6, §47.1-§47.6, §8A.6a, §8A.6b, §8A.8, §12.16, PS §21 items 22-23, E-16, DC-16 to DC-19, TE-27 to TE-29, INV-33, M1.23) resolves to a heading or a row. `node scripts/check-file-tree.mjs` passes.
+
+**Not done.** Not committed: the founder asked for the documents. `docs/v6.2/v6.2implementation.md`, its guide and prompts come next, after the founder confirms open item 28; as before, each release's plan adds its new files to TS §5's tree. V6.1's tag and closing entry still wait (the V6.1 status of Entry 37).
+
+## Entry 39 - 2026-11-11 - V6.1 closed: merged, deployed, tagged; v1.5 confirmed; V6.2's branch (outside a prompt)
+
+**Merge.** The founder merged pull request 16 as `b73fea5` on 2026-11-09 (03:35 UTC), with the same tree as `628c995`. Tagged `v6.1` on `b73fea5` and pushed by the agent at the founder's word (2026-11-11).
+
+**The `main` run, 42557223857.** All five jobs green on the first attempt (`ci`, `e2e-media`, `deploy-api`, `deploy-web` with its smoke).
+
+**ON §7.3's live checks (agent, 2026-11-09).** `/healthz` through the site reads `b73fea5` with `cloud_transcribe: true`; `/api/v1/me` without a session 401 with `Cache-Control: no-store` (D-429); an unauthenticated `POST /transcribe` with `X-Offcut-Window: 0/2` 401; `@smoke` against the live site green; `/app` shows no long link and `/app/long` redirects to `/app` (`long_video` off). The only console noise is the signed-out `POST /auth/refresh` 401, which predates V6.1 and is not a regression. Screens kept outside git.
+
+**Flags in production.** `long_video` off until V6.4's alpha (F-4). `high_res` may go on at the founder's choice (F-3, Entry 37); not read here.
+
+**v1.5 confirmed.** The founder confirmed the agent's 15 design choices of Entry 38 (2026-11-11): open item 28 is closed, and the three core documents at v1.5 are committed with this entry, unchanged since Entry 38.
+
+**V6.2's branch.** `v6.2-build` from `main` at `b73fea5` (BP §8A.0 step 1); this entry is its first commit. V6.1's narrow permission rules (ON A-5) are removed from the git-excluded `.claude/settings.local.json`. `docs/v6.2/`'s plan, guide and prompts are not written yet, at the founder's word; Setup's baseline of TS §41.1's proofs is read when they are.
+
+**Open after V6.1.** For the founder: F-3 (`high_res` in production); TE-20's real sleep test; open items 19, 24 and 27 before V6.4's alpha; 25 (V6.3) and 26 (V6.4); 16 and 17 from V6. Found, not fixed: `MAX_SOURCE_DURATION` has no tolerance (a 45:00.067 file is refused).
+
+**Final counts (Entry 37).** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.

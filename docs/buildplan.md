@@ -1,8 +1,10 @@
 # buildplan.md - Offcut Build Plan (V1 to V10, with V6.1 to V6.11)
 
-**Status:** v1.4. Built from `product.md` (PS, Product Spec v1.4) and `technicalspec.md` (TS, Technical Spec v1.4).
+**Status:** v1.5. Built from `product.md` (PS, Product Spec v1.5) and `technicalspec.md` (TS, Technical Spec v1.5).
 
 **What this document is.** The order in which Offcut gets built, as ten versions plus eleven point releases. Each version is a tagged, deployed, demoable state of the product. V1 is a working skeleton. V2 to V6 add the MVP product and, from v1.2, **the seams the AI edit plan needs** (TS §40.9), so that nothing written in V4-V6 has to be rewritten later. V6.1 to V6.11 add the long path and the AI-planned editor (TS §40.10, §41-§53, §8A below), and V6.11 ends with the feature freeze. V7 to V10 add no features: they are testing, hardening and the launch gate.
+
+**v1.5 in one paragraph (founder decisions of 2026-11-09).** The product survives only if its shorts match or beat Submagic's. The benchmark's look becomes rules inside the releases that already hold what each needs, and the numbers stay: motion, caption polish and the hook title in V6.2; following the speaker in V6.5; V6.6 built as **V6.6a "Picture"** (blur, automatic colour and light) and **V6.6b "Graphics"** (all of v1.3's V6.6 but the hook title, plus fonts and presets); synthesized sound effects and voice tuning in V6.7; zoom transitions and a quality check in V6.8. An Enhance panel lets a person switch any enhancement off. The founding release moves to after V6.8, behind a blind test against Submagic (E-16). HDR stays rejected; music is the person's own track. About 30 more prompts (§8A.0).
 
 **v1.3 in one paragraph (founder decisions of 2026-11-02).** V6 comes first, then V6.1-V6.11, then V7-V10. A long video up to 20 minutes (v1.4: 45) becomes 5-10 finished shorts, built on a "virtual clip" design that leaves everything downstream unchanged. **A clip of at most 90 seconds with new features off stays V5, byte for byte: TS §41, the compatibility contract, binds every release.** The old V6.x are renumbered (table below; TS §42), so older documents and code comments are read through that map. Chapter markers and the lower third moved post-launch.
 
@@ -31,13 +33,14 @@
 | **V5** | Export that an independent tool accepts | M1.6 | Week 5, first half: 9-11 Nov | All 11 verifier checks pass |
 | **V6** | Accounts, limits, payments: the MVP features complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all v1.1 P0 features work |
 | **V6.1** | Long source (v1.4): its own page, 45 minutes read in place, 4K, HEVC, cloud transcription in resumable windows | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5. **As built:** P171-P182 on `v6.1-build` (2026-11-08/09), merged dark (`long_video` and `high_res` off in production); tag `v6.1` on the merge commit |
-| **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap | M1.9 | | AI plans validate and render; fallback works; privacy test revised |
+| **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap; (v1.5) hook lockup, caption glow, punch words, motion by rules, the Enhance panel | M1.9 | | AI plans validate and render; fallback works; privacy test revised; `Enhance::v5()` equals V5 |
 | **V6.3** | Pause and silence cuts; the `Assembly` (stitched parts) | M1.10 | | Cut and stitched exports pass the verifier at the map's duration |
 | **V6.4** | Director: a long video becomes 5-10 shorts; list; batch export | M1.17 | | A long fixture gives 5 exported shorts, API up or down. **Private alpha after this** |
-| **V6.5** | Local vision and face-tracked framing | M1.18 | | A moving speaker stays framed; no frame leaves; `FramePath::none` equals V5 |
-| **V6.6** | Finished look: cards, number moments, kinetic presets, shapes, hook title, progress bar, end card | M1.12, M1.13, M1.14 | | Goldens per kind; frame budget. **First public demos after this** |
-| **V6.7** | Music, ducking, sound cues | M1.11 | | Ducking and mix loudness measured |
-| **V6.8** | Layers: B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions, split layout | M1.19 | | Verifier 11/11 with B-roll; simple lists unchanged |
+| **V6.5** | Local vision and face-tracked framing; (v1.5) following the speaker in two-person shots | M1.18 | | A moving speaker stays framed; the person speaking is on screen (TE-27); no frame leaves; `FramePath::none` equals V5 |
+| **V6.6a** | (v1.5) Picture: blur, automatic colour and light per shot, camera matching, face light | M1.23 | | `grade: None` lists unchanged; TE-29's panel |
+| **V6.6b** | Graphics: cards, number moments, kinetic presets, (v1.5) fonts and presets, shapes, progress bar, end card | M1.12, M1.13, M1.14 | | Goldens per kind; frame budget |
+| **V6.7** | Music (the person's own track), ducking; (v1.5) synthesized sound effects by rules, voice tuning | M1.11 | | Ducking and mix loudness measured |
+| **V6.8** | Layers: B-roll (own and Pixabay stock, placed by the plan or by hand, v1.4), asset box, join transitions, split layout; (v1.5) the quality check | M1.19 | | Verifier 11/11 with B-roll; simple lists unchanged. **v1.5: E-16, then the founding release and first public demos after this** |
 | **V6.9** | Chat editing | M1.20 | | Ops apply, refuse and undo; privacy test covers chat |
 | **V6.10** | Brand kit, creator memory, back-catalogue queue | M1.15, M1.21 | | Golden matrix; memory changes the next prompt |
 | **V6.11** | Person mask: text behind speaker, background change | M1.22 | | TE-25 per effect. **M1.x gate**: every PS §9.5 V6.x row works, or the founder dropped it. **Feature freeze** |
@@ -604,7 +607,7 @@ As built, V4's exit list is `docs/v4/v4implementation.md` §23 (code and checks,
 | `server/src/db/subscriptions.rs`, `webhook_events.rs` | The transition table of TS §22.5; events older than `last_event_at` ignored |
 | Routes `POST /billing/checkout`, `GET /billing/portal`, `POST /billing/webhook` | Hosted checkout by full-page navigation; no third-party script |
 
-Replace the placeholder mail and billing variables in Render with real values. Keep `FOUNDING_OFFER_ENABLED=false` until the founding release after V6.6 (§8A.6). Prices (15 USD/month, 144 USD/year, 99 USD/year founding) are configured at the merchant and shown from `web/src/config/pricing.ts`; the server holds no amounts.
+Replace the placeholder mail and billing variables in Render with real values. Keep `FOUNDING_OFFER_ENABLED=false` until the founding release after V6.8 (§8A.8; v1.5, v1.3: after V6.6). Prices (15 USD/month, 144 USD/year, 99 USD/year founding) are configured at the merchant and shown from `web/src/config/pricing.ts`; the server holds no amounts.
 
 **D. Client**
 
@@ -627,7 +630,7 @@ Replace the placeholder mail and billing variables in Render with real values. K
 | ID | What you do | Pass | If it fails |
 |---|---|---|---|
 | TE-8 | Send 50 magic links to the major mailbox providers; read the quota terms | At least 95% in the inbox within 30 s; at least 100 emails/day; works from a single verified sender address with no purchased domain | Other candidate. There is no paid remedy: if neither delivers, sign-in is unreliable and that is a launch risk to state plainly |
-| TE-9 | Test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed in test mode; a timed-out webhook is retried. Approval for live mode is the founding release's box (§8A.6), not V6's | Second provider behind `BillingProvider` |
+| TE-9 | Test-mode purchase, renewal, cancel, refund; delay the webhook endpoint | All six `BillingEventKind`s observed in test mode; a timed-out webhook is retried. Approval for live mode is the founding release's box (§8A.8; v1.5, v1.3: §8A.6), not V6's | Second provider behind `BillingProvider` |
 
 ### 8.3 The M1 gate (Sun 15 Nov 2026): all P0 features work on dev machines
 
@@ -668,13 +671,15 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 ## 8A. V6.1 to V6.11 - The long path and the AI-planned editor (v1.3)
 
-**Goal.** After V6, turn the product into a finished-shorts maker on two paths: a long video becomes 5-10 finished shorts, and a raw clip becomes one. One AI edit plan per short drives cuts, music, kinetic captions, auto zoom, structure visuals, B-roll, transitions and the brand kit, and the editor applies it automatically (v1.4). Each path has its own page (v1.4). Each release is tagged (`v6.1` ... `v6.11`), deployed and demoable, under the §1.2 rules.
+**Goal.** After V6, turn the product into a finished-shorts maker on two paths: a long video becomes 5-10 finished shorts, and a raw clip becomes one. One AI edit plan per short drives cuts, music, kinetic captions, auto zoom, structure visuals, B-roll, transitions and the brand kit, and the editor applies it automatically (v1.4). Each path has its own page (v1.4). **(v1.5) Every short gets the benchmark's look by rules, not by chance: motion, polished captions, following the speaker, an automatic picture grade, sound effects and a quality check, each with a switch in the Enhance panel.** Each release is tagged (`v6.1` ... `v6.11`), deployed and demoable, under the §1.2 rules.
 
 **Read first.** TS §41, the compatibility contract, binds every release: flags, declared changes, both-path test runs, and when to stop and ask the founder. PS §12.9-§12.15 say what each feature is. TS §43-§53 give the contracts. This section gives the order, the build lists, the demos and the exit boxes.
 
 ### 8A.0 Rules for all eleven releases
 
 **Order and why.** V6.1 first because it holds the largest feasibility risk: if long jobs do not survive on real computers, everyone should learn that now. (v1.4: cloud transcription removed the device-speed half of that risk; reading a 45-minute 4K file in place, keeping the tab alive and the cloud windows remain. The founder kept the order on 2026-11-08.) V6.2 builds the one new contract with the provider. V6.3 changes time and audio while the visual layer is small. V6.4 is the headline feature. V6.5 makes a landscape video usable. Then the look (V6.6) and sound (V6.7), layers (V6.8), chat (V6.9), retention (V6.10) and the riskiest effects (V6.11). The order may change only where the "Depends on" lines allow it.
+
+**v1.5 (founder, 2026-11-09): quality work goes where its dependencies already are, and the numbers stay.** Motion needs only V6.2's zoom path; following the speaker needs V6.5's face tracks; colour and face light need V6.5's shots and faces; cards and layers then use V6.6a's blur; sound effects follow the visual entries of V6.2-V6.8. So V6.2, V6.5, V6.7 and V6.8 grow, and V6.6 becomes V6.6a "Picture" then V6.6b "Graphics". The founding release waits for V6.8, when every element of the benchmark exists, and for E-16's blind test. V6.9-V6.11 stay before launch, built while the founding offer sells.
 
 **Every release does these, in this order:**
 
@@ -691,34 +696,39 @@ Walk the PS §9.5 P0 rows one by one on your own machine:
 
 | When | Founder's work | Decides |
 |---|---|---|
-| Beside V6, any time before V6.4 | **E-12, optional by the founder's decision of 2026-11-02, and recommended:** test OpusClip, Submagic, Vizard and Descript by hand on one video; free shorts for 20 YouTubers from a throwaway script; ask who would pay (the founding plan is sold from V6.6's founding release) | Whether stitched shorts lead the pitch; the order of V6.8-V6.11 |
+| Beside V6, any time before V6.4 | **E-12, optional by the founder's decision of 2026-11-02, and recommended:** test OpusClip, Submagic, Vizard and Descript by hand on one video; free shorts for 20 YouTubers from a throwaway script; ask who would pay (the founding plan is sold from the founding release after V6.8, v1.5) | Whether stitched shorts lead the pitch; the order of V6.8-V6.11 |
 | V6.4 | Mark postable moments on at least 10 real long videos: the labelled set for TE-19 and E-13 | Whether the Director is good enough to keep going |
-| After V6.4 | **Private alpha** with 10-15 YouTubers on their own videos (the long-path half of E-2) | What to fix first; which of V6.6's parts and V6.7-V6.11 matter |
-| After V6.6 | **First public demos,** made with the product; **the founding release (§8A.6): live payments, then the founding-plan offer (E-5)**; waitlist, affiliate talks | Whether the look is good enough to sell |
+| After V6.4 | **Private alpha** with 10-15 YouTubers on their own videos (the long-path half of E-2) | What to fix first; which of V6.6b's parts and V6.7-V6.11 matter |
+| V6.5 (v1.5) | At least 10 two-person podcast videos (wide two-shots), with the speaker marked per sentence, for TE-27; kept outside git | Whether following the speaker ships as the default |
+| V6.6a (v1.5) | TE-29's panel: 20 shots, graded and ungraded side by side, unlabelled | Whether the automatic grade ships |
+| After V6.8 (v1.5; v1.3: after V6.6) | **E-16, the blind test** (PS §19): the same 3 videos through Submagic and Offcut, 20 viewers; then **first public demos,** made with the product; **the founding release (§8A.8): live payments, then the founding-plan offer (E-5)**; waitlist, affiliate talks | Whether the look is good enough to sell |
 | V6.11 | The person-mask panel on 20 shorts (TE-25) | Which effects ship |
 | Any time before the quality pass (v1.4) | **The benchmark:** a few Submagic-made shorts downloaded from YouTube and the caption references (`sh2clips/documents/`), kept outside git, as the repository is public | What "good enough" looks like |
 | After V6.11 | **The quality pass (§8A.12), then feature freeze.** Marketing runs alongside V7-V10 | What to tune; the launch date |
 
-**Estimate (founder's pace: V4, 38 prompts in about 8 days; V5, 8 prompts in about 2 days).** Rough, with no rework and no failed experiment. A release at twice its estimate is a stop-and-ask.
+**Estimate (founder's pace: V4, 38 prompts in about 8 days; V5, 8 prompts in about 2 days; V6.1, 12 prompts in under 2 days).** Rough, with no rework and no failed experiment. A release at twice its estimate is a stop-and-ask.
 
-| Release | Prompts (rough) |
-|---|---|
-| V6 | 14, as built (P137-P150) |
-| V6.1 | 12 (v1.4: no whole copy and no device transcription; v1.3: 14) |
-| V6.2 | 10 |
-| V6.3 | 16 (v1.4: part copies; v1.3: 14) |
-| V6.4 | 14 |
-| V6.5 | 8 |
-| V6.6 | 20 |
-| V6.7 | 7 |
-| V6.8 | 19 (v1.4: stock, placing by hand, the op log; v1.3: 16) |
-| V6.9 | 10 |
-| V6.10 | 10 |
-| V6.11 | 10 |
-| Quality pass | Set by the founder (§8A.12) |
-| **Total** | **about 150 with V6, about 5-8 weeks** |
+| Release | Prompts (rough) | v1.5 change |
+|---|---|---|
+| V6 | 14, as built (P137-P150) | |
+| V6.1 | 12, as built (P171-P182) | |
+| V6.2 | 19 (v1.4: 10) | Motion by rules +2, easing curves +1, the hook lockup +2 (moved from V6.6), glow, punch words and emoji under the keyword +1, the Enhance panel with Voice cleanup +3 |
+| V6.3 | 16 | |
+| V6.4 | 14 | |
+| V6.5 | 14 (v1.4: 8) | Following the speaker, with the split and `composite.rs`'s second path, +6 |
+| V6.6a | 9 (new) | The blur +2, automatic grade and camera matching +5, face light and vignette +2 |
+| V6.6b | 21 (v1.4: V6.6, 20) | The hook title -2 (to V6.2); fonts, presets and word pages +3 |
+| V6.7 | 10 (v1.4: 7) | Synthesized sounds placed by rules +1, voice tuning +2 |
+| V6.8 | 21 (v1.4: 19) | Zoom transitions +1, the blur already built -1, the quality check and `AddItem` +2 |
+| V6.9 | 10 | |
+| V6.10 | 10 | |
+| V6.11 | 10 | |
+| Quality pass | Set by the founder (§8A.12) | |
+| **Total** | **about 180 with V6 and V6.1; 154 still to build, about 6-8 weeks** | **+30 against v1.4.** HDR (dropped by the founder) and the music library would have added about 7 |
 
-V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIMATE). The founder sets the date when V6.11 closes.
+**Risk.** Two additions rest on experiments: following the speaker (TE-27) and the automatic grade (TE-29). If either doubles its estimate, that is up to about 11 more prompts, roughly 2 days, and the stop-and-ask rule brings it back to the founder.
+
+V7-V10 keep their five weeks, so public launch is about **February to early March 2027** (ESTIMATE; v1.4 said February). The founder sets the date when V6.11 closes.
 
 ---
 
@@ -770,13 +780,13 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 ### 8A.2 V6.2 - AI edit plan (M1.9)
 
-**Goal.** One AI request per clip returns a validated plan; the renderer draws it; a failed request never blocks anything. As the old V6.1, plus the spend cap and `DrawCmd::Image`.
+**Goal.** One AI request per clip returns a validated plan; the renderer draws it; a failed request never blocks anything. As the old V6.1, plus the spend cap and `DrawCmd::Image`. **(v1.5)** And the first half of the benchmark's look on every clip: a hook title over the first 2 seconds, glowing captions with punch words and emoji under keywords, and motion on every talking-head shot, with the Enhance panel's Voice cleanup and Motion switches.
 
-**Demo.** The reference clip with the AI plan on opens already edited: emphasis, a snap zoom on one word and a slow push across a sentence (auto zoom, v1.4), an icon and an emoji. Switch any of them off; undo. Turn off the API: the same clip reaches `ready` on the local rules, and the feed says so once.
+**Demo.** The reference clip with the AI plan on opens already edited: emphasis, a snap zoom on one word and a slow push across a sentence (auto zoom, v1.4), an icon and an emoji. Switch any of them off; undo. Turn off the API: the same clip reaches `ready` on the local rules, and the feed says so once. **(v1.5)** The short opens on a hook lockup; one word jumps to twice the size; an emoji sits under a keyword; the shot never holds still. Open Enhance: switch Motion off and the drift stops at once; switch Voice cleanup off and the sound is the original, levelled; the next clip remembers both.
 
 **Depends on.** V6.
 
-**Build.** `server/src/plan/` (`route.rs`, `provider.rs`, `quota.rs`, `spend.rs`), `migrations/0002_ai_usage.sql` (TS §52); `usecases/request-plan.ts`, `persistence/plans-repo.ts`; settings switch and provider text; catalog kinds `Emphasis`, `IconPop`, `PunchIn` (with `motion: Snap | Push`, the auto zoom of TS §47.2, v1.4), `Emoji` with drawing and goldens; `DrawCmd::Image` and a closed icon and emoji bundle; text extras panel with copy buttons; DC-7 on V-1; prompt additions of TS §47.
+**Build.** `server/src/plan/` (`route.rs`, `provider.rs`, `quota.rs`, `spend.rs`), `migrations/0002_ai_usage.sql` (TS §52); `usecases/request-plan.ts`, `persistence/plans-repo.ts`; settings switch and provider text; catalog kinds `Emphasis`, `IconPop`, `PunchIn` (with `motion: Snap | Push`, the auto zoom of TS §47.2, v1.4), `Emoji` with drawing and goldens; `DrawCmd::Image` and a closed icon and emoji bundle; text extras panel with copy buttons; DC-7 on V-1; prompt additions of TS §47. **(v1.5, TS §47.2, §47.3, §47.5, DC-16):** `HookTitle` with `offcut-scene/src/lockup.rs`; `StyleSpec.glow`; `Emphasis.size`, `Emoji.place`; `offcut-scene/src/motion.rs` and `easing.rs`; the flag `motion`; `offcut-types/src/enhance.rs`; `lvl48` beside `out48` in prepare and `assemble`'s voice choice; `ui/components/EnhancePanel.tsx`; `meta.enhanceDefault`; `flags_identity.spec.ts`'s two cases; `export_done.enhance_off`.
 
 **Experiment.** TE-15: provider, price, parse rate, latency, data terms; labelled transcripts.
 
@@ -785,6 +795,7 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 - [ ] `validate.rs` (V-1 change), `catalog_complete.rs`, `catalog_snapshot.rs`, `plan_route.rs`, `ai_cap.rs`, `ai_quota.rs`, `log_redaction.rs` (plan), `run-pipeline.test.ts` (every fallback).
 - [ ] `privacy-network.spec.ts` revised: plan on and off.
 - [ ] E-11 instrumentation live; TE-15 recorded; `AI_MONTHLY_CAP_USD` set by the founder.
+- [ ] (v1.5) `motion.rs` (segments, alternation, no motion on `Screen` shots, the zoom cap), `easing.rs`, `lockup.rs`, `enhance.rs` (each switch off equals the stage absent), goldens for glow, punch, emoji under, the hook and a motion frame; `enhance-panel.spec.ts` (each switch flips the preview within the edit budget; the choice is remembered); `flags_identity.spec.ts` under `Enhance::v5()` (DC-16).
 - [ ] Goldens for existing styles unchanged. Tagged `v6.2`.
 
 ---
@@ -857,68 +868,80 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 ### 8A.5 V6.5 - Vision and framing (M1.18)
 
-**Goal.** Landscape video becomes a well-framed vertical short, and the Director knows what is on screen. No frame leaves the computer.
+**Goal.** Landscape video becomes a well-framed vertical short, and the Director knows what is on screen. No frame leaves the computer. **(v1.5)** In a two-person shot, the frame follows whoever is speaking.
 
-**Demo.** A speaker walking across a landscape shot stays framed; the crop holds still while the speaker stands still, and does not pan across a cut. A screen-recording section is skipped by the Director, whose reason mentions it.
+**Demo.** A speaker walking across a landscape shot stays framed; the crop holds still while the speaker stands still, and does not pan across a cut. A screen-recording section is skipped by the Director, whose reason mentions it. **(v1.5)** A two-person podcast short cuts to each speaker at the start of their sentence; when both talk, it shows both stacked; "Show both" in the Framing panel splits every two-person shot.
 
 **Depends on.** V6.4.
 
-**Build (TS §46).** `crates/offcut-vision/` (and its row in `ALLOWED_CRATE_DEPS` and TS §7: depends only on `offcut-types`); `offcut-types`: `vision.rs`, `frame_path.rs`; `workers/asr/vision-runtime.ts`; `config/models/face.json`; `media.worker` frame sampling; coarse pass in `run-source-pipeline.ts`; fine pass in `prepare-short.ts`; `ShotLine` in the Director request; `framing.rs` with `FramePath` (DC-9); `offset` as a shift on the path; the 4K note.
+**Build (TS §46).** `crates/offcut-vision/` (and its row in `ALLOWED_CRATE_DEPS` and TS §7: depends only on `offcut-types`); `offcut-types`: `vision.rs`, `frame_path.rs`; `workers/asr/vision-runtime.ts`; `config/models/face.json`; `media.worker` frame sampling; coarse pass in `run-source-pipeline.ts`; fine pass in `prepare-short.ts`; `ShotLine` in the Director request; `framing.rs` with `FramePath` (DC-9); `offset` as a shift on the path; the 4K note. **(v1.5, TS §46.6, DC-17):** `offcut-vision/src/speaker.rs` (face tracks, mouth activity, the speaker decision), `FrameLayout::Split`, `composite.rs`'s second path for two `Video { Main }` commands (DC-8), `EditState.speaker` and the Framing panel's three choices, `ShotLine.people`, the flag `speaker_framing`.
 
-**Experiment.** TE-23: face detector speed, accuracy and licence.
+**Experiment.** TE-23: face detector speed, accuracy and licence. **(v1.5)** TE-27: the right person on screen in 10 real two-person shorts; if it fails, stop and ask.
 
 **Exit.**
 
 - [ ] `shots.rs`, `tracking.rs`, `vision_summary_prompt.rs`.
+- [ ] (v1.5) `speaker.rs`, `speaker-framing.spec.ts`, `composite.rs` (simple path identical); TE-27 recorded.
 - [ ] `framing.rs`: `FramePath::none` equals V5 on every existing case; goldens unchanged.
 - [ ] `vision-pass.spec.ts`; `privacy-network.spec.ts`: no frame in any request (INV-28).
 - [ ] Coarse pass at most 0.15× the duration (about 7 min on 45 minutes), reading the file in place; fine pass under 20 s per 60 s short on D1, over part files. TE-23 recorded, with its licence. Tagged `v6.5`.
 
 ---
 
-### 8A.6 V6.6 - Finished look (M1.12, M1.13, M1.14)
+### 8A.6 V6.6 - Finished look, in two releases (v1.5): V6.6a Picture, V6.6b Graphics
 
-**Goal.** A short looks made by an editor. The largest release; built in five parts, each with its own gate, in value order. **The founder kept all of it on 2026-11-02;** a part whose cost grows past its worth is a stop-and-ask, by name.
+**v1.5 (founder, 2026-11-09).** v1.3's V6.6 grew past 30 prompts with the benchmark's additions, so it ships as two releases, each with its own branch, gate and tag. The founding release no longer follows it: it moves to after V6.8 (§8A.8).
+
+#### 8A.6a V6.6a - Picture (M1.23)
+
+**Goal.** Every shot looks graded and every camera matches, without the person touching a control, and a good picture is left alone. The blur that later layouts and cards need is built once, here. What an engine on the computer can do that a server tool like Submagic does not.
+
+**Demo.** A dim, warm webcam shot comes out with the face lit and neutral whites. A two-camera podcast's angles match in colour. A shot that was already good shows no change, and the Enhance panel says "Your picture already looks right". Switch "Colour & light" off: the original returns at once. A `Full` layout test frame shows the landscape shot over a blurred copy of itself.
+
+**Depends on.** V6.5 (shots, faces, colour statistics from the fine pass).
+
+**Build (TS §47.4, DC-8, DC-18).** `offcut-render/src/blur.rs` and its use in `composite.rs`'s second path; `offcut-types/src/grade.rs`; `offcut-vision/src/grade.rs` (`shot_grades`, camera matching, face light, vignette); the fine pass's colour statistics; `Video.grade` and the graded variant of the video pass; `Enhance.picture` and the panel's "Colour & light" row; the flag `picture`.
+
+**Experiment.** TE-29: the founder's side-by-side panel on 20 shots; the frame budget on D1. If it fails: narrower bounds, then camera matching only, then ask.
+
+**Exit.**
+
+- [ ] `grade.rs` (each step's bound; an already-good shot gives `None`; a grade changes only at a shot boundary), `blur.rs`, goldens with a grade and with the blur; `golden_frames.rs` and `composite.rs`: every `grade: None` list and every simple list unchanged.
+- [ ] `enhance.rs`: Colour & light off equals no grade. TE-29 recorded. Tagged `v6.6a`.
+
+#### 8A.6b V6.6b - Graphics (M1.12, M1.13, M1.14)
+
+**Goal.** A short looks made by an editor. Built in five parts, each with its own gate, in value order. **The founder kept all of it on 2026-11-02, and again on 2026-11-09** (cards B and part D stay before launch); a part whose cost grows past its worth is a stop-and-ask, by name. (v1.5: the hook title moved to V6.2.)
 
 | Part | Build | Exit, besides goldens per kind and style |
 |---|---|---|
-| **A** Core visuals | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus`; V-9 density rule | V-5 cases for each number-bearing kind |
-| **B** More cards | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Same |
-| **C** Kinetic captions | `CaptionMotion` rows, per-glyph animation. **v1.4 candidates from the founder's references (TS §47.2):** a typographic lockup, a mixed-font pair beside the head (an OFL serif italic; the face position of V6.5), a glass treatment with the video blurred behind part A's cards. Each is a cost check by name | `frame_at` within budget at the heaviest preset on D1 |
+| **A** Core visuals | `ListBuilder`, `NumberMoment`, `QuoteCard`, `Versus`; V-9 density rule; (v1.5) the glass treatment over V6.6a's blur | V-5 cases for each number-bearing kind |
+| **C** Kinetic captions (v1.5: before B, as the benchmark weighs captions above cards) | `CaptionMotion` rows, per-glyph animation; **(v1.5, TS §47.3)** four OFL display fonts (TE-28), six presets with our own names, word pages of one word and one to three words. v1.4's caption families: the lockup is built in V6.2; the mixed-font pair beside the head is a cost check by name | `frame_at` within budget at the heaviest preset on D1; TE-28 recorded |
+| **E** Furniture | `ProgressBar`, `EndCard` with a `Hold` segment | End-card export duration equals the map's |
+| **B** More cards | `DefinitionCard`, `StepTracker`, `Timeline`, `Checklist` | Same as A |
 | **D** Shapes | `Video.mask` in the renderer's second path; `ShapeFrame`; shape `Transition` at topic shifts | **`composite.rs`: a simple list takes the old path, byte for byte (DC-8)**; render budget held |
-| **E** Furniture | `HookTitle`, `ProgressBar`, `EndCard` with a `Hold` segment | End-card export duration equals the map's |
 
-**Demo.** Switch presets live; "three reasons" builds item by item; "from 800 ms to 120 ms" becomes two bars; the speaker framed in a circle; a shape wipe between two topics; a short with a hook card, a progress bar and an end card.
+**Demo.** Switch between the six new presets live; a one-word-at-a-time preset; "three reasons" builds item by item; "from 800 ms to 120 ms" becomes two bars; a quote on glass; the speaker framed in a circle; a shape wipe between two topics; a progress bar and an end card.
 
-**Depends on.** V6.2 for the catalog; V6.3 for `EndCard`'s map. Parts A, B, C and E may ship before D.
+**Depends on.** V6.2 for the catalog; V6.3 for `EndCard`'s map; V6.6a for the blur and the second path. Parts A, C and E may ship before B and D.
 
-**Exit.** The part rows above; `catalog_complete.rs`; existing goldens unchanged. **After this, first public demos.** Tagged `v6.6`.
-
-**The founding release, right after `v6.6` (founder's decision of 2026-11-02; moved from V9, TS §22.5, E-5).** No new version number: a deploy, with its own commits, on the branch of V6.7. It adds no product feature. Early paying strangers test the price directly.
-
-- [ ] `/legal/:doc`: Terms of Service, Privacy Policy, Refund and Cancellation Policy (14 days), written as §10.3 says, with public pricing and a contact route. **Built ahead of V6 on 2026-11-02** (`site-pages`), since Dodo's FAQ says its review reads these on the live site. This box: re-read them against what is built by then, and add the seller's name if the founder chooses.
-- [ ] Dodo approves live payments, and tax settings are confirmed.
-- [ ] Vercel's plan terms are recorded, and the founder accepts the non-commercial-terms risk in writing (TS §29), since real money now passes through the site. V9 listed this; it comes first now.
-- [ ] Copy says only what BP §10.3 allows. `privacy-network.spec.ts` is V8's, so before it exists the founder reads one network capture of a clip on the live site, as V5 did, and records it. PS §17 ties the claim to that test.
-- [ ] Live products, key and webhook secret in Render with `BILLING_API_BASE_URL=https://live.dodopayments.com`. The live webhook URL is registered. Test-mode `subscriptions` rows are wiped. This makes every offer purchasable, not only the founding one.
-- [ ] One real purchase and one refund, read in `subscriptions`.
-- [ ] Then `FOUNDING_OFFER_ENABLED=true`, and the offer goes to the waitlist and alpha people. Target: at least 5 paying strangers (PS §19 E-5).
+**Exit.** The part rows above; `catalog_complete.rs`; existing goldens unchanged. Tagged `v6.6b`.
 
 ---
 
 ### 8A.7 V6.7 - Music and sound (M1.11)
 
-**Goal.** Music that dips under every sentence, and short sound cues at moments and joins.
+**Goal.** Music that dips under every sentence, and short sound cues at moments and joins. **(v1.5)** Every visual entry lands with a sound made by Offcut itself, and the voice is tuned only as far as it needs.
 
-**Demo.** A short with music ducking under speech, fading at the end, a whoosh at a join.
+**Demo.** A short with music ducking under speech, fading at the end, a whoosh at a join. **(v1.5)** Whooshes as cards come in, pops on emoji, a riser before the hook, never two within 0.8 s. A muddy laptop-mic recording comes out clearer; a studio-mic recording is left nearly as it was. Switch "Sound effects" off: only the plan's own cues remain.
 
 **Depends on.** V6.3. V6.2 for the music cue.
 
-**Build (TS §40.6, §47.1).** Music import to OPFS, picker, ducking and mix in `assemble`, `MixInput` with `none()`, plan `MusicCue`; `SoundCue` kind and a closed sound bundle if TE-16 passes; `MusicChoice` in `EditState` (default none).
+**Build (TS §40.6, §47.1, DC-19).** Music import to OPFS (the person's own track only, v1.5), picker, ducking and mix in `assemble`, `MixInput` with `none()`, plan `MusicCue`; `SoundCue` kind; `MusicChoice` in `EditState` (default none). **(v1.5)** `offcut-dsp/src/sfx.rs` (the six synthesized sounds) and `cues_for` over the scene's visual entries; `offcut-dsp/src/voice_tune.rs` (denoise by need, the three-band EQ) and the flag `voice_tune`; the panel's "Sound effects" and "Music" rows; the noise-floor line of `EnhanceReport`.
 
-**Experiment.** TE-16: music and sound licences. If none passes: user-supplied music only, and no sound cues until a licence exists.
+**Experiment.** None. (v1.5: TE-16 is closed. The founder chose the person's own music only, and the sound effects are synthesized, so no licence is read.) The sounds' parameters and levels are tuned by ear in the quality pass.
 
-**Exit.** `mix_ducking.rs`, `sound_cues.rs`, `music-import.spec.ts`; verifier check 7 on a music export; `program_identity.rs` unchanged. Tagged `v6.7`.
+**Exit.** `mix_ducking.rs`, `sound_cues.rs`, `music-import.spec.ts`; verifier check 7 on a music export; `program_identity.rs` unchanged. **(v1.5)** `sfx.rs` (each sound deterministic: the same samples on every run; peak and loudness within bounds), `cues_for` (gap and count limits; an item switched off loses its sound), `voice_tune.rs` (a clean fixture changes by at most 1 dB in any band; a muddy one is cut), `flags_identity.spec.ts` under `Enhance::v5()`. Tagged `v6.7`.
 
 ---
 
@@ -926,11 +949,11 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 
 **Goal.** Several videos in one frame. B-roll from the person's own clips and (v1.4) from Pixabay stock, placed by the plan or by hand on a word; real transitions at joins; a split layout for screen recordings.
 
-**Demo.** Drop an office clip, label it. The plan places it on "our headquarters". On "black hole", the plan places a Pixabay clip, marked "From Pixabay". Click another word, "Add B-roll here", pick a lecture clip of your own, drag the window to the 4 seconds you want; undo; redo. A dissolve at a join. A screen recording shows the screen above and the face below. Turn the stock switch off: nothing is searched.
+**Demo.** Drop an office clip, label it. The plan places it on "our headquarters". On "black hole", the plan places a Pixabay clip, marked "From Pixabay". Click another word, "Add B-roll here", pick a lecture clip of your own, drag the window to the 4 seconds you want; undo; redo. A dissolve at a join. A screen recording shows the screen above and the face below. Turn the stock switch off: nothing is searched. **(v1.5)** A zoom transition at a join, with a whoosh; the B-roll drifts like the speaker's shots; a short with a 4-second still stretch comes back with a snap zoom there, listed as an item that can be switched off.
 
-**Depends on.** V6.6 part D (second render path), V6.5 (regions).
+**Depends on.** V6.6b part D (masks), V6.6a (the blur), V6.5 (regions, and the second render path, v1.5).
 
-**Build (TS §48).** `VideoSlot`, `Scene::asset_at`, `VideoSources`; `composite.rs` runs up to `RUNS_PER_FRAME`; decoder limit of three; `offcut-types/src/assets.rs`, `AssetRef`, `AssetOrigin`; `persistence/assets-repo.ts`; `usecases/add-asset.ts`, `remove-asset.ts`; `ui/components/AssetBox.tsx`; `Broll` (with `BrollSource`), `JoinTransition`, `Layout` kinds; `Part.handle`; `AssetLine` and `stock` in plan requests; `keep_audio` in `MixInput`; "What leaves" rows for labels and stock search. **v1.4:** `plan_ops` with `PlaceAsset` and `RemoveAsset`, `effective_plan`, `validate_ops` (TS §49.2, the rest in V6.9); "Add B-roll here" in the caption editor; the part picker; `server/src/broll/` (`StockProvider`, `PixabayProvider`, the hashed 24 h cache, `POST /broll/search`); `net/stock-fetch.ts`, `usecases/resolve-stock.ts`, the search panel; `cdn.pixabay.com` in `allowlist-hosts.ts`, CSP and `check-hosts.mjs`; the flag `stock_broll` and the settings switch; `PIXABAY_API_KEY` in Render before the deploy that reads it; one Terms of Service line on the rights to added clips.
+**Build (TS §48).** `VideoSlot`, `Scene::asset_at`, `VideoSources`; `composite.rs` runs up to `RUNS_PER_FRAME`; decoder limit of three; `offcut-types/src/assets.rs`, `AssetRef`, `AssetOrigin`; `persistence/assets-repo.ts`; `usecases/add-asset.ts`, `remove-asset.ts`; `ui/components/AssetBox.tsx`; `Broll` (with `BrollSource`), `JoinTransition`, `Layout` kinds; `Part.handle`; `AssetLine` and `stock` in plan requests; `keep_audio` in `MixInput`; "What leaves" rows for labels and stock search. **v1.4:** `plan_ops` with `PlaceAsset` and `RemoveAsset`, `effective_plan`, `validate_ops` (TS §49.2, the rest in V6.9); "Add B-roll here" in the caption editor; the part picker; `server/src/broll/` (`StockProvider`, `PixabayProvider`, the hashed 24 h cache, `POST /broll/search`); `net/stock-fetch.ts`, `usecases/resolve-stock.ts`, the search panel; `cdn.pixabay.com` in `allowlist-hosts.ts`, CSP and `check-hosts.mjs`; the flag `stock_broll` and the settings switch; `PIXABAY_API_KEY` in Render before the deploy that reads it; one Terms of Service line on the rights to added clips. **(v1.5, TS §47.6, §48.3):** `ZoomIn` and `ZoomOut`; motion on B-roll; `offcut-scene/src/quality.rs` and the fixes in `prepare-short.ts` as `PlanOp::AddItem` with `origin: QualityFix`; `quality_corpus.rs` in CI.
 
 **Experiment (v1.4).** TE-26: Pixabay's terms re-read, relevance of plan-written queries, the browser fetch under COEP.
 
@@ -940,7 +963,18 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 - [ ] `handles.rs`, `join_transition.spec.ts`, `asset-box.spec.ts` (placing by hand, the part picker, undo).
 - [ ] `plan_ops.rs` (`PlaceAsset`, `RemoveAsset`), `broll_search_route.rs`, `resolve-stock.test.ts`, `stock-broll.spec.ts`, `log_redaction.rs` (a search query).
 - [ ] Verifier 11/11 on an export with own and stock B-roll and transitions; TE-14 re-read at three decoders.
+- [ ] (v1.5) `quality.rs` (each rule Q-1 to Q-5 on a fixture), `plan_ops.rs` (`AddItem` applies, refuses and undoes), `quality_corpus.rs` recording each rule's failure count as the baseline for later releases.
 - [ ] `privacy-network.spec.ts`: labels only in AI bodies; search words only in `POST /broll/search`; `cdn.pixabay.com` only with the switch on; no asset bytes. TE-26 recorded. Tagged `v6.8`.
+
+**E-16, then the founding release, right after `v6.8` (v1.5: the founder's decision of 2026-11-09; v1.3 put it after V6.6; moved from V9, TS §22.5, E-5).** First the blind test (PS §19 E-16): 3 source videos through Submagic's defaults and Offcut's defaults, 20 viewers; its result is recorded in the changelog, and a loss puts its reasons at the top of E-15's list and goes to the founder. Then the founding release: no new version number, a deploy with its own commits on the branch of V6.9. It adds no product feature. Early paying strangers test the price directly. With it come the first public demos made with the product.
+
+- [ ] `/legal/:doc`: Terms of Service, Privacy Policy, Refund and Cancellation Policy (14 days), written as §10.3 says, with public pricing and a contact route. **Built ahead of V6 on 2026-11-02** (`site-pages`), since Dodo's FAQ says its review reads these on the live site. This box: re-read them against what is built by then, and add the seller's name if the founder chooses.
+- [ ] Dodo approves live payments, and tax settings are confirmed.
+- [ ] Vercel's plan terms are recorded, and the founder accepts the non-commercial-terms risk in writing (TS §29), since real money now passes through the site. V9 listed this; it comes first now.
+- [ ] Copy says only what BP §10.3 allows. `privacy-network.spec.ts` is V8's, so before it exists the founder reads one network capture of a clip on the live site, as V5 did, and records it. PS §17 ties the claim to that test.
+- [ ] Live products, key and webhook secret in Render with `BILLING_API_BASE_URL=https://live.dodopayments.com`. The live webhook URL is registered. Test-mode `subscriptions` rows are wiped. This makes every offer purchasable, not only the founding one.
+- [ ] One real purchase and one refund, read in `subscriptions`.
+- [ ] Then `FOUNDING_OFFER_ENABLED=true`, and the offer goes to the waitlist and alpha people. Target: at least 5 paying strangers (PS §19 E-5).
 
 ---
 
@@ -1005,6 +1039,8 @@ V7-V10 keep their five weeks, so public launch is about **February 2027** (ESTIM
 **Input.** The founder's benchmark: Submagic-made shorts downloaded from YouTube, and the caption references in `sh2clips/documents/`, all outside git (the repository is public).
 
 **How.** The founder takes 3-5 source videos (both paths), makes shorts in Offcut, and compares them side by side with the benchmark: captions (motion, timing, fonts, placement), auto zoom, cards, B-roll, transitions, sound, pacing. Each difference becomes a row of a checklist in the changelog, with the agent's estimate.
+
+**v1.5.** E-16's result comes first. The default preset, motion drift, sound levels, grade bounds and the quality check's limits are set here from the benchmark, since most people never open settings. The Creator export bitrate (8 Mb/s, TS §21.2) is re-read against the benchmark under TE-4, as constant motion is harder to encode; a change needs its §41.2 row.
 
 **What changes.** Presets, timings, theme values, prompt text and catalog limits, inside the existing contracts. A new item kind or a new render path is a stop-and-ask (TS §41.4). Every §41.1 proof holds; a golden that moves needs a row of TS §41.2.
 
@@ -1171,9 +1207,9 @@ Also measure a 90-second clip. It has no budget; it is expected at about 1.5x, a
 
 Add `web/tests-e2e/api-cold-start.spec.ts`: an API delayed 45 s shows the waking copy after 3 s and then succeeds; with the API down, an export with a cached token completes and its receipt waits in the outbox (INV-3). Re-check TE-11 (Render memory, cold start, monthly hours) and TE-14 (peak memory).
 
-### 11.3 Non-code work: E-5 presale continues (moved to after V6.6, §8A.6)
+### 11.3 Non-code work: E-5 presale continues (moved to after V6.8, §8A.8; v1.5, v1.3: after V6.6)
 
-The founding offer has been live since §8A.6's release (founder's decision of 2026-11-02), with its boxes ticked there. Keep offering it at 99 USD/year to waitlist and alpha people. Target: at least 5 paying strangers, not friends or family, before launch (PS §19 E-5). E-2 finishes at the end of week 9.
+The founding offer has been live since the founding release of §8A.8 (founder's decision of 2026-11-02), with its boxes ticked there. Keep offering it at 99 USD/year to waitlist and alpha people. Target: at least 5 paying strangers, not friends or family, before launch (PS §19 E-5). E-2 finishes at the end of week 9.
 
 ### 11.4 Exit checklist
 
@@ -1232,8 +1268,8 @@ The founding offer has been live since §8A.6's release (founder's decision of 2
 
 ### 12.3 Launch items (PS §20.6)
 
-- [ ] Terms of Service, Privacy Policy and refund policy live since §8A.6, and re-read against the allowlist (section 10.3 explains the review they did and did not get).
-- [ ] Merchant-of-record account live since §8A.6, tax settings re-confirmed.
+- [ ] Terms of Service, Privacy Policy and refund policy live since the founding release (§8A.8), and re-read against the allowlist (section 10.3 explains the review they did and did not get).
+- [ ] Merchant-of-record account live since the founding release (§8A.8), tax settings re-confirmed.
 - [ ] Support inbox, FAQ page, and the uptime monitor's public status page.
 - [ ] Demo videos made with the product itself replace the hand-made E-1 demos; uploaded to the asset host.
 - [ ] `scripts/metrics.sql` returns all PS §20.5 metrics.
@@ -1290,12 +1326,13 @@ The founding offer has been live since §8A.6's release (founder's decision of 2
 | V5 | none new | `start-export.test.ts`, `export-machine.test.ts`, `blockers.test.ts` | `export-creator.spec.ts` (all 11 checks), `timeline-preserved.spec.ts` |
 | V6 | `auth_flow.rs`, `entitlement_rules.rs`, `usage_receipts.rs`, `account_delete.rs`, `account_export.rs`, `rate_limit.rs`, `log_redaction.rs`, `no_media_routes.rs`, `webhook_idempotency.rs`, `billing_events.rs`, `token_roundtrip.rs`, `profile.rs` | `auth-machine.test.ts`, `entitlement.test.ts`, `http.test.ts` | `signin.spec.ts`, `export-free.spec.ts`, `checkout.spec.ts` |
 | V6.1 | `route_probe.rs`, `audio_region.rs`, `sentences_long.rs`, `transcribe_route.rs` (window budget, v1.4) | `source-machine.test.ts`, `transcribe-source.test.ts` (v1.4) | `route_long.spec.ts`, `high-res.spec.ts`, `long-resume.spec.ts`, `flags_identity.spec.ts` |
-| V6.2 | `plan_route.rs`, `ai_cap.rs`, `ai_quota.rs`, `catalog_complete.rs` (kinds) | `run-pipeline.test.ts` (fallbacks) | `privacy-network.spec.ts` (plan on and off, early form) |
+| V6.2 | `plan_route.rs`, `ai_cap.rs`, `ai_quota.rs`, `catalog_complete.rs` (kinds), `motion.rs`, `easing.rs`, `lockup.rs`, `enhance.rs` (v1.5) | `run-pipeline.test.ts` (fallbacks) | `privacy-network.spec.ts` (plan on and off, early form), `enhance-panel.spec.ts` (v1.5) |
 | V6.3 | `timemap_build.rs`, `program_splice.rs`, `assembly.rs`, `assembly_readers.rs`, `rebase.rs`, `regions.rs`, `remux.rs` and `source_media.rs` (v1.4) | none | `cuts_applied.spec.ts`, `stitched.spec.ts` |
 | V6.4 | `shorts.rs`, `shorts_prompt_snapshot.rs`, `shorts_rules.rs`, `shorts_route.rs` | `run-source-pipeline.test.ts` | `long-to-shorts.spec.ts` |
-| V6.5 | `shots.rs`, `tracking.rs`, `vision_summary_prompt.rs` | none | `vision-pass.spec.ts` |
-| V6.6 | Goldens per kind; `composite.rs` simple-path identity | none | end-card duration |
-| V6.7 | `mix_ducking.rs`, `sound_cues.rs` | none | `music-import.spec.ts` |
+| V6.5 | `shots.rs`, `tracking.rs`, `vision_summary_prompt.rs`, `speaker.rs` (v1.5) | none | `vision-pass.spec.ts`, `speaker-framing.spec.ts` (v1.5) |
+| V6.6a | `grade.rs`, `blur.rs`, goldens with a grade | none | none |
+| V6.6b | Goldens per kind and preset; `composite.rs` simple-path identity | none | end-card duration |
+| V6.7 | `mix_ducking.rs`, `sound_cues.rs`, `sfx.rs`, `voice_tune.rs` (v1.5) | none | `music-import.spec.ts` |
 | V6.8 | `layers_goldens`, `handles.rs`, `plan_ops.rs` (v1.4), `broll_search_route.rs` (v1.4) | `resolve-stock.test.ts` (v1.4) | `join_transition.spec.ts`, `asset-box.spec.ts`, `stock-broll.spec.ts` (v1.4) |
 | V6.9 | `plan_ops.rs`, `chat_prompt_snapshot.rs`, `chat_route.rs` | none | `chat-edit.spec.ts` |
 | V6.10 | `creator_memory.rs`, brand-kit golden matrix | none | `queue.spec.ts` |
@@ -1325,10 +1362,11 @@ Weeks 1-10 are the calendar as first written; the v1.3 rows are by release.
 | V6.2 | | E-11 instrumentation | TE-15 |
 | V6.3 | | | TE-22 |
 | V6.4 | | E-13 labelled set; private alpha (long-path E-2) | TE-19 |
-| V6.5 | | | TE-23 |
-| V6.6 | | First public demos; E-5 opens | none |
-| V6.7 | | | TE-16 |
-| V6.8 | | | TE-14 re-read, TE-26 (v1.4) |
+| V6.5 | | (v1.5) two-person labelled set | TE-23, TE-27 (v1.5) |
+| V6.6a | | (v1.5) TE-29's panel | TE-29 |
+| V6.6b | | | TE-28 (v1.5) |
+| V6.7 | | | none (v1.5: TE-16 closed) |
+| V6.8 | | E-16 (v1.5); first public demos; E-5 opens | TE-14 re-read, TE-26 (v1.4) |
 | V6.11 | | | TE-24, TE-25 |
 | After launch | from launch | E-6, E-7, E-8, E-9, E-13, E-14 read at M3 | none |
 
