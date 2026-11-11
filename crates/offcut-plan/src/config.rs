@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn the_default_reads_the_catalog() {
         let cfg = PlanConfig::default();
-        assert_eq!(cfg.per_kind.len(), 4);
+        assert_eq!(cfg.per_kind.len(), 9);
         let limits = |kind| *cfg.per_kind.get(&kind).unwrap();
         assert_eq!(
             limits(EventKind::NumberReveal),

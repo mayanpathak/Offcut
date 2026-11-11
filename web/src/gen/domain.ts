@@ -493,7 +493,7 @@ export const LIMITS = {
 } as const;
 
 export const PLAN_FORMAT = 1;
-export const CATALOG_VERSION = 1;
+export const CATALOG_VERSION = 2;
 
 export const ERROR_CODES = [
   "E_MODEL_DOWNLOAD",

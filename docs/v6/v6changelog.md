@@ -1303,3 +1303,32 @@ No product code changed: two temporary probes ran and were removed, and two rend
 **Found, not fixed.** `validate.rs`' inline `v1_another_format_or_catalog_refuses_the_plan` refuses `empty_rules(2)` as a catalog too new; with `CATALOG_VERSION = 2` in P186 it will be read. P186 must handle it (it is not on D-440's list).
 
 **Open.** 35, 36. Next: P186.
+
+## Entry 46 - 2026-11-12 - P186 (with P187): the catalog rows, the prompt and the schema, v2
+
+**What changed.** **REOPENED CONTRACT (D-448):** `CATALOG_VERSION = 2` with §6.2's five rows after V4's four, all `Producers::Model`: `emphasis` (caption, Point, 12, 800 ms), `icon_pop` (event, Point, 6, 2,500 ms), `punch_in` (video, Words 1-40, 8, 1,500 ms), `emoji` (caption, Point, 6, 2,500 ms), `hook_title` (hook, ClipWide, 1, 0). Their `Enum` params list P184's final names (`IconId::NAMES`, `EmojiId::NAMES`) and the param enums' serde names; a new test proves each name deserializes. New zones `"video"` and `"hook"`, and the scene's `ZoneId` gains `Video` (the canvas) and `Hook` (the safe area), drawing nothing. The rules plan's `catalog` is 2. `pnpm gen:types`: `CATALOG_VERSION = 2` in `domain.ts`.
+
+**The prompt's new paragraphs (D-456), generated after the kinds and before the rules, numbers read from `validate`:**
+> A finished short: open with a hook title only if the first sentence does not already hook; zoom in on each sentence's key claim; never stack two visuals, so at most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) starts in any 2.5 seconds; end on the payoff, not a call to action, unless the speaker asks for one.
+>
+> Zooms: zoom on the claim, the number or the punchline, never on filler. A snap covers one strong word (1 to 3 words); a push covers a sentence that builds (2 to 40 words). A zoom stays inside one sentence; a sentence has at most one, and two zooms never overlap.
+>
+> Emphasis and emoji: emphasis marks the one word that carries a sentence. Give size punch only to the line that lands hardest: at most one punch word in any 6 seconds, and at most 4 in a clip. Put an emoji under its word, or beside it, only where it says the word better than text. Use only the icon and emoji names listed above.
+>
+> Text extras, under extras: hook, a title for the short in the speaker's voice, 2 to 9 words and at most 48 characters, with no digit the speaker did not say. Write it always; add a hook_title item, whose accent is the index of the hook's strongest word counting from 0, only if the first sentence does not already hook. post_caption: the text to post with the short, at most 2200 characters. hashtags: at most 8, each # followed by 1 to 30 letters, digits or underscores.
+
+Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0, "end": the number of words}" (validate takes exactly that, P185); the five rows' own sentences are §6.2's drafts word for word.
+
+**The schema's changes (`output_schema@v2`).** `catalog` const 2; `extras.properties` gains `hook` (string, maxLength 48), `post_caption` (string, maxLength 2200), `hashtags` (array, maxItems 8, items string `^#[A-Za-z0-9_]{1,30}$`); `items.oneOf` gains the five arms, each with `kind` const, word-range anchors, required params (`Enum`s as `enum` lists, `accent` integer 0-8), `confidence` null. No provider-shaped schema: DeepSeek takes the canonical schema as text (D-457, D-500).
+
+**Snapshots (new files, each read in full before acceptance).** `catalog_snapshot__system_prompt@v2.snap`, `catalog_snapshot__output_schema@v2.snap`, `catalog_snapshot__user_message@v2.snap` (its body identical to `@v1`'s, 190 lines: the user message is unchanged). The three `@v1` files stay on disk, unchanged and untested.
+
+**DECLARED CHANGE (D-440 (1), (9)).** `catalog.rs`' two inline tests keep every V4 assertion and gain the rows (`the_rows_are_in_code_order_once_each`: nine kinds, four zone names; `the_rows_hold_the_numbers_of_the_plan`: V4's four are `Both`, the five rows' numbers and zones, the five `Model`). `catalog_complete.rs`' three cases carry `#[ignore = "V6.2: the five kinds are drawn by P206"]`. **Beyond the list (D-440 (13), As read):** the catalog's count or version pinned in `config.rs` (4 → 9), `prompt.rs` (4 → 9), `validate.rs`' V-1 case and `offcut-wasm-render`'s refusal case (newer catalog 2 → `CATALOG_VERSION + 1` and 3; the gate allows the one removed line), `offcut-types`' TS test (`CATALOG_VERSION = 1` → 2); and one match arm in `catalog_complete.rs` for the two new zones.
+
+**Tests.** New: 8 in `validate_v62.rs` (each kind kept and resolved; a rules plan of catalog 2 refuses them; the hook title's four drops; a word outside its anchors for the three word kinds; V-3; D-452; V-9 with the hook title, and a rules plan exempt from V-9 where a model's same plan is not), `catalog.rs`' enum names, `prompt.rs`' v2 kinds and extras read as an `EditPlan`.
+
+**Counts.** Rust **939 / 0 / 7** (the three ignores are D-440 (9)'s); Vitest **650**; `cargo test -p offcut-plan` 75. Every scene snapshot and golden unchanged (gate).
+
+**Found, not fixed.** `offcut-api`'s `no_media_routes.rs` `every_post_route_refuses_a_body_over_the_limit` failed once in a full parallel workspace run and passed alone and on the re-run: load-sensitive, not a change of this prompt.
+
+**Open.** 35, 36. Next: P188 (TE-15 on DeepSeek, 30 calls, then CP 1).

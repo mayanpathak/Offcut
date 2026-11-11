@@ -242,18 +242,18 @@ fn limit(
 // --- V6.2: the text extras and the rules after V-6 (all numbers assumptions, E-11).
 
 /// The hook: at most this many characters, and 2 to 9 words (D-454).
-const HOOK_MAX_CHARS: usize = 48;
-const HOOK_WORDS: std::ops::RangeInclusive<usize> = 2..=9;
+pub(crate) const HOOK_MAX_CHARS: usize = 48;
+pub(crate) const HOOK_WORDS: std::ops::RangeInclusive<usize> = 2..=9;
 /// The shortest platform's limit for a post's caption (assumption, D-454).
-const POST_CAPTION_MAX_CHARS: usize = 2_200;
+pub(crate) const POST_CAPTION_MAX_CHARS: usize = 2_200;
 /// At most this many hashtags, each `#` and 1 to 30 letters, digits or `_`.
-const MAX_HASHTAGS: usize = 8;
-const HASHTAG_MAX_CHARS: usize = 30;
+pub(crate) const MAX_HASHTAGS: usize = 8;
+pub(crate) const HASHTAG_MAX_CHARS: usize = 30;
 /// D-452: one punch word per 6 s at most (beside the kind's own gap), 4 a clip.
-const PUNCH_GAP_MS: u32 = 6_000;
-const MAX_PUNCH: usize = 4;
+pub(crate) const PUNCH_GAP_MS: u32 = 6_000;
+pub(crate) const MAX_PUNCH: usize = 4;
 /// D-451: at most one visual starts in any window this long (model plans).
-const DENSITY_WINDOW_MS: u32 = 2_500;
+pub(crate) const DENSITY_WINDOW_MS: u32 = 2_500;
 
 /// D-454: each extra is checked alone, and a bad one is dropped alone, with
 /// `kind: None`. The hook and the hashtags say no digit the speaker did not
@@ -580,7 +580,8 @@ mod tests {
         plan.format = 2;
         let refused = validate(plan, &t, &BTreeMap::new(), &cfg).unwrap_err();
         assert_eq!(refused.reason, RejectReason::Format);
-        let refused = validate(EditPlan::empty_rules(2), &t, &BTreeMap::new(), &cfg).unwrap_err();
+        let newer = EditPlan::empty_rules(CATALOG_VERSION + 1);
+        let refused = validate(newer, &t, &BTreeMap::new(), &cfg).unwrap_err();
         assert_eq!(refused.reason, RejectReason::Catalog);
         let (valid, dropped) = run(EditPlan::empty_rules(CATALOG_VERSION));
         assert!(valid.is_empty() && dropped.is_empty());

@@ -90,6 +90,8 @@ ALLOW=(
   # P185 (D-454, D-440 (2)): a valid hook is kept now; the test's "not applied" example becomes the music cue.
   'crates/offcut-wasm-render/src/scene_api.rs|^ +let hook = input\(\|v\| v\["plan"\]\["extras"\]\["hook"\] = json!\("Watch this"\)\);$'
   'crates/offcut-wasm-render/src/scene_api.rs|^ +let \(_, dropped\) = scene_of\(hook, &clip\(\)\)\.unwrap\(\);$'
+  # P186 (D-448, D-449): catalog 2 is this build's own, so the test's newer catalog becomes 3.
+  'crates/offcut-wasm-render/src/scene_api.rs|^ +refused\(input\(\|v\| v\["plan"\]\["catalog"\] = json!\(2\)\)\),$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

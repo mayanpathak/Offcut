@@ -392,7 +392,8 @@ mod tests {
             "PlanFormat"
         );
         assert_eq!(
-            refused(input(|v| v["plan"]["catalog"] = json!(2))),
+            // V6.2 (D-449): catalog 2 is this build's; a newer one is refused.
+            refused(input(|v| v["plan"]["catalog"] = json!(3))),
             "PlanCatalog"
         );
         assert_eq!(

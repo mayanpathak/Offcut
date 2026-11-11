@@ -10,6 +10,10 @@ use offcut_types::{DurMs, PLAN_FORMAT, Sentence, Word, WordProsody};
 use serde_json::{Map, Value, json};
 
 use crate::catalog::{AnchorRule, CATALOG_VERSION, ItemSpec, ParamSpec, ParamTy, catalog};
+use crate::validate::{
+    DENSITY_WINDOW_MS, HASHTAG_MAX_CHARS, HOOK_MAX_CHARS, HOOK_WORDS, MAX_HASHTAGS, MAX_PUNCH,
+    POST_CAPTION_MAX_CHARS, PUNCH_GAP_MS,
+};
 
 /// A pause at least this long is marked in the user message (assumption, V6.2).
 pub const PAUSE_MARK_MS: u32 = 300;
@@ -52,7 +56,9 @@ fn anchor_text(anchor: AnchorRule) -> String {
     match anchor {
         AnchorRule::Words { min, max } => format!("from {min} to {max} words in a row"),
         AnchorRule::Point => "exactly one word".to_owned(),
-        AnchorRule::ClipWide => "the whole clip".to_owned(),
+        AnchorRule::ClipWide => {
+            "the whole clip, written {\"start\": 0, \"end\": the number of words}".to_owned()
+        }
     }
 }
 
@@ -90,8 +96,53 @@ fn row_text(row: &ItemSpec) -> String {
     )
 }
 
+/// V6.2's paragraphs (TS §47, §47.2, §47.3; v6.2implementation D-456): what
+/// a finished short looks like, the zooms, the punch words and emoji, and
+/// the text extras. Their numbers are `validate`'s, so the two cannot drift.
+fn finished_short_text() -> String {
+    let density = f64::from(DENSITY_WINDOW_MS) / 1_000.0;
+    let punch_gap = PUNCH_GAP_MS / 1_000;
+    let (hook_min, hook_max) = (HOOK_WORDS.start(), HOOK_WORDS.end());
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "A finished short: open with a hook title only if the first sentence does not \
+         already hook; zoom in on each sentence's key claim; never stack two visuals, so at \
+         most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) \
+         starts in any {density} seconds; end on the payoff, not a call to action, unless the \
+         speaker asks for one."
+    );
+    let _ = writeln!(
+        out,
+        "\nZooms: zoom on the claim, the number or the punchline, never on filler. A snap \
+         covers one strong word (1 to 3 words); a push covers a sentence that builds (2 to 40 \
+         words). A zoom stays inside one sentence; a sentence has at most one, and two zooms \
+         never overlap."
+    );
+    let _ = writeln!(
+        out,
+        "\nEmphasis and emoji: emphasis marks the one word that carries a sentence. Give size \
+         punch only to the line that lands hardest: at most one punch word in any {punch_gap} \
+         seconds, and at most {MAX_PUNCH} in a clip. Put an emoji under its word, or beside it, \
+         only where it says the word better than text. Use only the icon and emoji names \
+         listed above."
+    );
+    let _ = writeln!(
+        out,
+        "\nText extras, under extras: hook, a title for the short in the speaker's voice, \
+         {hook_min} to {hook_max} words and at most {HOOK_MAX_CHARS} characters, with no digit \
+         the speaker did not say. Write it always; add a hook_title item, whose accent is the \
+         index of the hook's strongest word counting from 0, only if the first sentence does \
+         not already hook. post_caption: the text to post with the short, at most \
+         {POST_CAPTION_MAX_CHARS} characters. hashtags: at most {MAX_HASHTAGS}, each # followed \
+         by 1 to {HASHTAG_MAX_CHARS} letters, digits or underscores."
+    );
+    out
+}
+
 /// The instructions, generated from the catalog: the task, the transcript's
-/// format, one paragraph per kind, and the rules every plan keeps.
+/// format, one paragraph per kind, V6.2's paragraphs, and the rules every
+/// plan keeps.
 pub fn system_prompt() -> String {
     let mut out = String::new();
     let _ = writeln!(
@@ -101,6 +152,7 @@ pub fn system_prompt() -> String {
     for row in catalog() {
         let _ = writeln!(out, "\n{}", row_text(row));
     }
+    let _ = write!(out, "\n{}", finished_short_text());
     out.push_str("\nRules:\n");
     for rule in RULES {
         let _ = writeln!(out, "- {rule}");
@@ -188,6 +240,24 @@ fn item_schema(row: &ItemSpec) -> Value {
     })
 }
 
+/// V6.2 (D-454): the three text extras, each optional.
+fn extras_schema() -> Value {
+    let hashtag = format!("^#[A-Za-z0-9_]{{1,{HASHTAG_MAX_CHARS}}}$");
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "hook": { "type": "string", "maxLength": HOOK_MAX_CHARS },
+            "post_caption": { "type": "string", "maxLength": POST_CAPTION_MAX_CHARS },
+            "hashtags": {
+                "type": "array",
+                "maxItems": MAX_HASHTAGS,
+                "items": { "type": "string", "pattern": hashtag }
+            }
+        }
+    })
+}
+
 /// The JSON Schema of an `EditPlan` as a model may write it: the catalog's
 /// kinds only, word-pointing params only, no `source` (the server sets it,
 /// TS §40.7), and the fields of later releases held empty.
@@ -205,7 +275,7 @@ pub fn output_schema() -> Value {
             "cuts": { "type": "array", "maxItems": 0 },
             "items": { "type": "array", "items": { "oneOf": items } },
             "chapters": { "type": "array", "maxItems": 0 },
-            "extras": { "type": "object", "additionalProperties": false, "properties": {} },
+            "extras": extras_schema(),
             "music": { "type": "null" }
         }
     })
@@ -324,10 +394,50 @@ mod tests {
             "music": null
         });
         let kinds: Vec<&str> = catalog().iter().map(|row| row.name).collect();
-        assert_eq!(kinds.len(), 4);
+        assert_eq!(kinds.len(), 9);
         plan["source"] = json!({ "kind": "model", "provider": "p", "model": "m" });
         let read: offcut_types::EditPlan = serde_json::from_value(plan).unwrap();
         assert_eq!(read.items.len(), 4);
         assert!(read.extras.hook.is_none() && read.music.is_none());
+    }
+
+    /// V6.2: the five kinds and the extras as the v2 schema describes them
+    /// read as an `EditPlan` too, and the schema names what the types read.
+    #[test]
+    fn the_v2_kinds_and_extras_written_to_the_schema_read_as_an_edit_plan() {
+        let range = |start: u32, end: u32| json!({ "start": start, "end": end });
+        let item = |id: &str, kind: &str, anchors: Value, params: Value| {
+            json!({ "id": id, "kind": kind, "anchors": anchors,
+                    "params": { "kind": kind, "params": params }, "confidence": null })
+        };
+        let plan = json!({
+            "format": PLAN_FORMAT,
+            "catalog": CATALOG_VERSION,
+            "source": { "kind": "model", "provider": "p", "model": "m" },
+            "cuts": [],
+            "items": [
+                item("1", "emphasis", range(2, 3),
+                     json!({ "word": 2, "treatment": "highlight", "size": "punch" })),
+                item("2", "icon_pop", range(4, 5), json!({ "word": 4, "icon": "trending_up" })),
+                item("3", "punch_in", range(6, 9), json!({ "scale": "strong", "motion": "push" })),
+                item("4", "emoji", range(10, 11),
+                     json!({ "word": 10, "emoji": "money_bag", "place": "beside" })),
+                item("5", "hook_title", range(0, 40), json!({ "accent": 2 })),
+            ],
+            "chapters": [],
+            "extras": { "hook": "How I saved hours", "post_caption": "A trick", "hashtags": ["#editing"] },
+            "music": null
+        });
+        let read: offcut_types::EditPlan = serde_json::from_value(plan).unwrap();
+        assert_eq!(read.items.len(), 5);
+        assert_eq!(read.extras.hashtags.len(), 1);
+        let schema = output_schema();
+        assert_eq!(
+            schema["properties"]["catalog"]["const"],
+            json!(CATALOG_VERSION)
+        );
+        let extras = &schema["properties"]["extras"]["properties"];
+        assert_eq!(extras["hook"]["maxLength"], json!(48));
+        assert_eq!(extras["hashtags"]["maxItems"], json!(8));
     }
 }

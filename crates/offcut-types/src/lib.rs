@@ -455,7 +455,8 @@ mod typescript {
         }
         assert_eq!(ts.matches("readonly __unit: ").count(), 25);
         assert!(ts.contains("\nexport const PLAN_FORMAT = 1;\n"));
-        assert!(ts.contains("\nexport const CATALOG_VERSION = 1;\n"));
+        // V6.2 (D-448): the catalog of the five new kinds.
+        assert!(ts.contains("\nexport const CATALOG_VERSION = 2;\n"));
 
         let limit_names: Vec<&str> = include_str!("limits.rs")
             .split("\npub const ")
