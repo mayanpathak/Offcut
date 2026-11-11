@@ -1,0 +1,5 @@
+# V6.2 Setup (v6.2implementation D-499): the LLVM linker that ships with the
+# toolchain, for faster links on Windows only. CI (Linux) and the wasm32 builds
+# are untouched. Remove this file if anything fails to link.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"

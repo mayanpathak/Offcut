@@ -32,6 +32,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 30 | At least 10 two-person podcast videos (wide two-shots) with the speaker marked per sentence, outside git, for TE-27 | Founder, by V6.5 | Entry 38, TS §46.6 |
 | 31 | TE-29's side-by-side panel: 20 shots, graded and ungraded, unlabelled | Founder, at V6.6a | Entry 38, TS §47.4 |
 | 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
+| 32 | ~~V6.2's founder questions F-1 to F-9~~ **Answered 2026-11-11:** yes to all; billing already on; 15 transcripts for TE-15; AI plans for signed-in people only (v6.2implementation D-493, D-494) | Founder | Entry 40 |
 
 ## Known issues for later prompts
 
@@ -1167,3 +1168,50 @@ A planning session after V6.1's merge. Nothing in the code changed. The founder'
 **Open after V6.1.** For the founder: F-3 (`high_res` in production); TE-20's real sleep test; open items 19, 24 and 27 before V6.4's alpha; 25 (V6.3) and 26 (V6.4); 16 and 17 from V6. Found, not fixed: `MAX_SOURCE_DURATION` has no tolerance (a 45:00.067 file is refused).
 
 **Final counts (Entry 37).** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
+
+## Entry 40 - 2026-11-11 - V6.2's plan, guide and prompts (outside a prompt)
+
+**The founder's decisions (2026-11-11).** (1) **Gemini is the only AI provider;** the key is in `.env` and `.env.deploy`. TE-15 therefore compares two Gemini models, not two providers; the `PlanProvider` trait stays, with one adapter. (2) **V6.2 is built carefully, by hand, one prompt at a time:** "this version is very crucial because further versions depend heavily on it; I don't care if the number of prompts increases." No overnight run; risky parts are split so each proves one thing before the next is built on it; four founder checkpoints.
+
+**Written (uncommitted until V6.2's Setup).** `docs/v6.2/v6.2implementation.md` (D-433 to D-499), `docs/v6.2/v6.2buildguide.md`, `docs/v6.2/coding-promptsv6.2.md` (Setup and P183-P212: 30 prompts against BP §8A.0's 19), and their TS §5 rows. Read against the code at `aef4a1a`.
+
+**What the reading of the code changed against the specs** (each marked REOPENED in the plan, copied back in P212):
+
+- `offcut-scene/src/motion.rs` is V4's caption motion, so the camera drift goes in a new `camera.rs` (TS §47.2 named `motion.rs`); `easing.rs` gains the bezier beside its existing `Easing` enum.
+- The resolved params of the new kinds go in `EventParams`, where V4's `ValidItem` keeps them (TS §40.2 lists them only as wire params).
+- `HookTitle.accent` is an index into the hook's own words, not a transcript `WordIdx`.
+- The `plans` store is IndexedDB structure version 3 (V6.1 took 2); the unused `events` store is kept, not removed (TS §40.8).
+- `EditState.enhance` is skipped when it equals `Enhance::v5()`, so stored records and the render-cache key are unchanged for every existing clip; `Enhance` has two fields in V6.2 (`voice`, `motion`), and `EnhanceReport` waits for the first stage that adapts to a measurement (V6.6a, V6.7).
+- TS §47.3 gives the glow to none of V6.2's three styles, so nobody would see it: F-3 proposes a fourth style, Glow, leaving Clean, Bold and Mono and their goldens as they are.
+- Images are drawn in the Vello overlay rather than a new compositor pass, so the video path is untouched; the emoji and icons are embedded in the render binary as the fonts are.
+- `privacy-network.spec.ts` is V8's; V6.2's network rules are asserted in a new `ai-plan.spec.ts`.
+- Nine existing tests pin V4's catalog and V6's lists on purpose; the plan names each one that V6.2 widens (D-440), and allows no other.
+
+**Open.** Item 32 (F-1 to F-9) before Setup. Open item 1 (`AI_MONTHLY_CAP_USD`) is F-6; open item 2 (provider and model) is now Gemini, the model chosen at CP 1 (P188).
+
+**The founder's answers (2026-11-11, later the same day).** "Yes to all", except: billing on the key's Google project was **already on** (F-2); **TE-15 reads 15 labelled transcripts, not 31** (D-493: `a01` and `w01`-`w14`, 60 calls; `a02`, a private recording's transcript, is never sent); **no AI plans for signed-out people, only for signed-in ones** (D-494): `/plan` requires a bearer and there is no anonymous quota, which reopens TS §40.7's "Bearer optional" and §52's anonymous row (copied back in P212). Free 40 plans a month and Creator 1,000 soft stand; the cap is 50 USD (F-6). Open item 32 is closed; open item 1 is answered (set on Render at the merge).
+
+**A review of the three documents (2026-11-11), and the founder's answers.** An independent review checked the plan against the code (every fact it sampled held) and found five problems. The founder answered yes to all but one, and the plan records them as D-495 to D-499:
+
+- **The emoji and icon names come before the catalog** (D-495): P184 fixes the 72 names (CP 2a), so TE-15 tests the real prompt; P195 makes their images (CP 2b).
+- **Real recordings in TE-15: declined.** "Gemini provides fine models": TE-15 stays on the 15 transcripts of D-493.
+- **CP 1 reads ten plans as annotated transcripts; CP 3 is the whole reference clip with its real plan, exported in the browser and watched beside the Submagic benchmark** (D-496). The review asked for a native render; the repository decodes video only in the browser, so the export is the browser's.
+- **`motion` stays off in production until V6.5** (D-497), because nothing before V6.5's shots can tell a screen recording apart (Entry 38, choice 4).
+- **Latency** (D-498): p90 ≤ 10 s targeted, 20 s the hard line, a 20 s client timeout, 15 s per provider call; the Flash-class model unless Pro's plans are clearly better.
+- **Process** (D-499): P187 joins P186 and P198 joins P199 (28 runs, numbers kept); Medium effort where goldens guard and on records, High kept on punch words, emoji and the hook; a fresh session per prompt, cited sections only, trimmed test output, entries of about 30 lines; Setup adds `scripts/v62-gate.sh`, `debug = "line-tables-only"` for dev and test builds, and `rust-lld` for the Windows target only.
+
+## Entry 41 - 2026-11-11 - V6.2 Setup: the documents, the key's name, the gate, the build settings, the floor
+
+**Branch.** `v6.2-build` at `aef4a1a` on `main`'s `b73fea5` (G 0.2 checked). Built by hand, one prompt at a time (D-434). This commit adds `docs/v6.2/` (plan, guide, prompts, `experiments.md`), Entries 40-41 and TS §5's rows.
+
+**Founder's answers, as recorded** (Entry 40; the plan's D-442, D-493 to D-499): F-1 to F-9 yes, with billing already on, TE-15 on 15 transcripts, AI plans for signed-in people only; the review's points yes, except real recordings in TE-15; Motion off in production until V6.5.
+
+**The key (F-1).** `GEMINI_API_KEY` renamed `PLAN_API_KEY` in `.env` and `.env.deploy` (one line each, value untouched, never printed); `.env` gains `PLAN_ENABLED=true`, `PLAN_PROVIDER=gemini`, `AI_MONTHLY_CAP_USD=5`. Both files stay git-ignored. Google's model list answers the key with HTTP 200 (no content sent). **Found:** the key is not in the `AIza…` form, so a pattern alone would not catch it in a file; the gate also searches for the exact values of `PLAN_API_KEY` and `TRANSCRIBE_API_KEY` from `.env`, never printing them, and skips values under 20 characters (the local `TRANSCRIBE_API_KEY` is a 6-character placeholder, which matched ordinary words).
+
+**Build settings (G 0.8).** Root `Cargo.toml`: `[profile.dev]` and `[profile.test]` with `debug = "line-tables-only"`; `[profile.release]` unchanged; no `opt-level` change. `.cargo/config.toml` (new): `rust-lld.exe` for `x86_64-pc-windows-msvc` only. Kept: from a clean `target/`, `offcut-render`'s golden tests built and linked in 89 s and `offcut-api` in 90 s. `target/` was 20.5 GB before (cleared with `cargo clean`); 6.2 GB after the whole workspace's tests.
+
+**The gate (G 0.9).** `scripts/v62-gate.sh` (TS §5 row added): branch, `zz` files, key patterns and values, the entitlement test key unset, G 0.4's frozen paths (changed or new files), no modified golden or snapshot of the base, the additive check against an allow list kept in the script (empty now; a prompt that must remove a line adds its pattern with the D-number), nothing private tracked, `check-file-tree.mjs`, and no `ignore = "V6.2` once a P206 commit exists. Self-tested: planted `zz` files, a key pattern, a frozen-file edit, a removed line in `easing.rs` and a changed golden each failed it; restored, it answers `gate: ok`.
+
+**The floor, with the new settings (D-438; V6.2's baseline, BP §8A.0 step 1).** Rust **910 / 0 / 4** (421 s); Vitest **650**; `pnpm e2e` **57**. Media 112 + 1 skipped and `FLAG_SUITES` 34 + 1 stand from V6.1 (not re-run: D-437).
+
+**Open.** Nothing new. Next: P183, read before building.

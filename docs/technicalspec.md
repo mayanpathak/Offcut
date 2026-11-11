@@ -1030,6 +1030,7 @@ offcut/
 │   ├── gen-types.sh
 │   ├── check-gen-clean.sh
 │   ├── check-file-tree.mjs            fails if a source file is absent from this section
+│   ├── v62-gate.sh                    (V6.2) every prompt's gate in one run, printing failures only (v6.2implementation D-499)
 │   ├── check-hosts.mjs                greps the built bundle for URLs outside allowlist-hosts.ts
 │   ├── check-copy-codes.mjs           every code in gen/domain.ts has copy in messages.ts
 │   ├── check-external-facts.mjs       prints the free-tier facts to re-verify (TE-5..TE-11)
@@ -1083,6 +1084,10 @@ offcut/
     ├── v6.1/coding-promptsv6.1.md      the V6.1 coding prompts (Setup, 171 to 182), run in order
     ├── v6.1/overnight-run.md           the unattended session's master prompt for V6.1: authorisations, safe paths, merge gates
     ├── v6.1/experiments.md             outcome of TE-17, TE-18, TE-20, TE-21 and the TE-12 re-read (v6.1implementation section 13)
+    ├── v6.2/v6.2implementation.md      plan for V6.2, AI edit plan (D-433 to D-499; DC-7, DC-8's V6.2 part, DC-16); its changelog is v6/v6changelog.md
+    ├── v6.2/v6.2buildguide.md          step-by-step build guide for V6.2: phases, commands, tiers, checks, the founder's checkpoints
+    ├── v6.2/coding-promptsv6.2.md      the V6.2 coding prompts (Setup, 183 to 212), run by hand one at a time
+    ├── v6.2/experiments.md             outcome of TE-15, TE-30, TE-31 and E-11 (v6.2implementation section 15)
     ├── v5/experiments.md              outcome of every reading V5 takes (v5implementation section 20), from Prompt 136
     └── file-specs/TEMPLATE.md         per-file spec template (§34)
 ```

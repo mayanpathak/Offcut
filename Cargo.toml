@@ -94,3 +94,12 @@ wildcard_enum_match_arm = "deny"
 lto = true
 codegen-units = 1
 # never panic = "abort": the server's CatchPanicLayer needs unwinding
+
+# V6.2 Setup (v6.2implementation D-499): line tables only in debug and test
+# builds, for a smaller target/ and faster links. No opt-level change, so no
+# number a test reads moves.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
