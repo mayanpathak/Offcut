@@ -47,7 +47,7 @@ unset value
 # 5. Frozen paths (Step 0.4): no change against the base, staged or not, and no new file in them.
 FROZEN=(
   fixtures/labeled fixtures/speech fixtures/cloud verify web/src/models
-  server/migrations/0001_init.sql crates/offcut-detect crates/offcut-mp4 crates/offcut-text
+  server/migrations/0001_init.sql crates/offcut-mp4 crates/offcut-text
   crates/offcut-render/src/video_pass.rs web/src/workers/asr web/src/workers/media
   web/src/usecases/transcribe-cloud.ts web/src/usecases/transcribe-source.ts
   web/src/usecases/run-source-pipeline.ts web/src/usecases/import-source.ts
@@ -58,6 +58,13 @@ for path in $(git diff --name-only "$BASE" -- "${FROZEN[@]}"); do
 done
 for path in $(git ls-files --others --exclude-standard -- "${FROZEN[@]}"); do
   fail "new file in a frozen path: $path"
+done
+# As read (P184, D-439 under D-446): offcut-detect matches every EventKind by
+# name, and D-446's codes 4-8 live in its event_id.rs, so the five kinds
+# cannot be added with the crate frozen. It is additive instead: arms may be
+# added (check 7), no line removed, no file added; its tests prove it unchanged.
+for path in $(git diff --name-only --diff-filter=AD "$BASE" -- crates/offcut-detect; git ls-files --others --exclude-standard -- crates/offcut-detect); do
+  fail "file added or removed in offcut-detect: $path"
 done
 
 # 6. No golden or snapshot that exists at the base is modified or deleted.
@@ -74,9 +81,12 @@ ADDITIVE=(
   crates/offcut-wasm-render/src/session.rs crates/offcut-wasm-render/src/scene_api.rs
   crates/offcut-wasm-core/src/audio_api.rs web/src/workers/protocol.ts web/src/net/api-client.ts
   web/src/persistence/db.ts web/src/persistence/schema.ts web/src/config/features.ts
+  crates/offcut-detect
 )
 # Each entry: "<file>|<extended regex matched against the removed line, without its leading ->"  # D-n
 ALLOW=(
+  # P184 (D-446): EventParams gains five arms; the test that pinned four tagged kinds now pins nine.
+  'crates/offcut-types/src/events.rs|^ +assert_eq!\(ts\.matches\(r#""kind": "#\)\.count\(\), 4, "\{ts\}"\);$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

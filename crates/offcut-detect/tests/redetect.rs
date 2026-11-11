@@ -162,6 +162,12 @@ fn word_23_edited_to_4000_keeps_its_id_and_nothing_else_moves() {
         other @ (EventParams::ListReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
     // The same kind and anchors, the same id (D-47; open item 14, decided
     // 2026-10-18): the user's toggle carries over.
@@ -209,6 +215,12 @@ fn an_edit_of_the_announcer_reaches_the_markers_of_sentences_8_to_10() {
         other @ (EventParams::NumberReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
 }
 

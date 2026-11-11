@@ -25,7 +25,17 @@ fn params_kind(params: &ItemParams) -> EventKind {
             EventParams::ListReveal { .. } => EventKind::ListReveal,
             EventParams::FromTo { .. } => EventKind::FromTo,
             EventParams::KeywordPop { .. } => EventKind::KeywordPop,
+            EventParams::Emphasis { .. } => EventKind::Emphasis,
+            EventParams::IconPop { .. } => EventKind::IconPop,
+            EventParams::PunchIn { .. } => EventKind::PunchIn,
+            EventParams::Emoji { .. } => EventKind::Emoji,
+            EventParams::HookTitle { .. } => EventKind::HookTitle,
         },
+        ItemParams::Emphasis { .. } => EventKind::Emphasis,
+        ItemParams::IconPop { .. } => EventKind::IconPop,
+        ItemParams::PunchIn { .. } => EventKind::PunchIn,
+        ItemParams::Emoji { .. } => EventKind::Emoji,
+        ItemParams::HookTitle { .. } => EventKind::HookTitle,
     }
 }
 
@@ -77,6 +87,11 @@ fn v2_kind_and_params(
         | ItemParams::FromTo { .. }
         | ItemParams::KeywordPop { .. }
         | ItemParams::Detected(_) => None,
+        ItemParams::Emphasis { .. }
+        | ItemParams::IconPop { .. }
+        | ItemParams::PunchIn { .. }
+        | ItemParams::Emoji { .. }
+        | ItemParams::HookTitle { .. } => None,
     };
     if let Some(points) = points {
         let max = usize::try_from(max_points(row)).unwrap_or(usize::MAX);
@@ -125,6 +140,11 @@ fn v3_anchors(item: &PlanItem, row: &ItemSpec, t: &Transcript) -> Result<(), Dro
         ItemParams::KeywordPop { word }
         | ItemParams::Detected(EventParams::KeywordPop { word }) => inside(anchors, *word),
         ItemParams::Detected(_) => true,
+        // V6.2 (D-446): the word an item marks is one of its anchors.
+        ItemParams::Emphasis { word, .. }
+        | ItemParams::IconPop { word, .. }
+        | ItemParams::Emoji { word, .. } => inside(anchors, *word),
+        ItemParams::PunchIn { .. } | ItemParams::HookTitle { .. } => true,
     };
     if !pointed {
         return Err(DropReason::AnchorRule);
@@ -147,6 +167,12 @@ fn detected_times_inside(detected: &EventParams, t: &Transcript) -> bool {
         EventParams::NumberReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. } => true,
+        // V6.2 (D-446): no times of their own.
+        EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. } => true,
     }
 }
 
@@ -164,6 +190,12 @@ fn v4_labels(item: &PlanItem, limits: KindLimits, tokens: &[Token]) -> Result<()
             labels.extend(items.iter().map(|point| (&point.label, limits.label_chars)));
         }
         ItemParams::KeywordPop { .. } | ItemParams::Detected(_) => {}
+        // V6.2 (D-446): no label; the hook is an extra, checked with the extras (D-454).
+        ItemParams::Emphasis { .. }
+        | ItemParams::IconPop { .. }
+        | ItemParams::PunchIn { .. }
+        | ItemParams::Emoji { .. }
+        | ItemParams::HookTitle { .. } => {}
     }
     let too_long = |(label, max): &(&Label, u32)| {
         u32::try_from(label.as_str().chars().count()).unwrap_or(u32::MAX) > *max
@@ -276,9 +308,21 @@ fn v5_params(
                 EventParams::NumberReveal { .. }
                 | EventParams::ListReveal { .. }
                 | EventParams::KeywordPop { .. } => Vec::new(),
+                EventParams::Emphasis { .. }
+                | EventParams::IconPop { .. }
+                | EventParams::PunchIn { .. }
+                | EventParams::Emoji { .. }
+                | EventParams::HookTitle { .. } => Vec::new(),
             };
             Ok((detected.clone(), marks))
         }
+        // V6.2 (D-446): not in the catalog until P186, so V-2 drops these
+        // first (`UnknownKind`); P185 resolves them.
+        ItemParams::Emphasis { .. }
+        | ItemParams::IconPop { .. }
+        | ItemParams::PunchIn { .. }
+        | ItemParams::Emoji { .. }
+        | ItemParams::HookTitle { .. } => Err(DropReason::UnknownKind),
     }
 }
 

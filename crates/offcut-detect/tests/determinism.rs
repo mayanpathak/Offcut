@@ -370,6 +370,12 @@ fn rank(kind: EventKind) -> u8 {
         EventKind::ListReveal => 1,
         EventKind::FromTo => 2,
         EventKind::KeywordPop => 3,
+        // V6.2 (D-446): the detector never makes these.
+        EventKind::Emphasis => 4,
+        EventKind::IconPop => 5,
+        EventKind::PunchIn => 6,
+        EventKind::Emoji => 7,
+        EventKind::HookTitle => 8,
     }
 }
 

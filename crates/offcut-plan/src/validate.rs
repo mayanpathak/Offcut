@@ -158,6 +158,12 @@ fn hold_ms(kind: EventKind) -> u32 {
     match kind {
         EventKind::NumberReveal => NUMBER_HOLD_MS,
         EventKind::ListReveal | EventKind::FromTo | EventKind::KeywordPop => EVENT_HOLD_MS,
+        // V6.2 (D-446): not in the catalog yet; P185 sets their zones' rules.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => EVENT_HOLD_MS,
     }
 }
 

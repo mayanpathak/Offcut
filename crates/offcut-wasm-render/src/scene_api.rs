@@ -10,6 +10,7 @@ use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
 use offcut_render::scene::{FontSet, Hit, Rect, Rgba, Scene, SceneInput, Theme, build_scene};
+use offcut_types::Enhance;
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
     ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript, WordRange,
@@ -34,6 +35,9 @@ struct EditInput {
     caption_position: CaptionPlacement,
     #[serde(default = "highlighted")]
     highlight_numbers: bool,
+    /// V6.2 (D-485): absent in every record before V6.2 and in every `v5()` one.
+    #[serde(default = "Enhance::v5")]
+    enhance: Enhance,
 }
 
 /// `EditState`'s default for `highlight_numbers`, read from its one home.
@@ -198,6 +202,7 @@ fn scene_of(
         crop_offset: input.edit.crop_offset,
         caption_position: input.edit.caption_position,
         highlight_numbers: input.edit.highlight_numbers,
+        enhance: input.edit.enhance,
     };
     let (plan, dropped) = validate(
         input.plan,

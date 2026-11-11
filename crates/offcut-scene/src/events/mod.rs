@@ -75,6 +75,12 @@ pub fn layout(
         EventParams::KeywordPop { word } => Ok(Some(EventTrack::KeywordPop(keyword_pop::layout(
             *word, span,
         )))),
+        // V6.2 (D-446): not drawn yet (P199-P205 draw them); no track, no command, no count.
+        EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. } => Ok(None),
     }
 }
 

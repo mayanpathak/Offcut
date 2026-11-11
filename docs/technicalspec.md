@@ -307,7 +307,7 @@ offcut/
 │   │   │   ├── source.rs              (V6.1, V6.4) SourceInfo, Route, ShortDraft, ShortsPlan, ShortSpec
 │   │   │   ├── frame_path.rs          [ONLY] (V6.5) FramePath
 │   │   │   ├── vision.rs              (V6.5) Shot, ShotKind, FacePos, ShotSummary
-│   │   │   ├── assets.rs              (V6.8) AssetId, AssetMeta, AssetRef
+│   │   │   ├── assets.rs              (V6.2) IconId, EmojiId, the bundle's closed names (v6.2 D-447); (V6.8) AssetId, AssetMeta, AssetRef
 │   │   │   ├── plan_ops.rs            [ONLY] (V6.9) PlanOp, ChatReply
 │   │   │   ├── creator.rs             (V6.10) CreatorMemory, CreatorMemorySummary
 │   │   │   ├── ids.rs                 [ONLY] id newtypes
@@ -318,6 +318,8 @@ offcut/
 │   │   │   ├── plan.rs                EditPlan, the plan's wire format, PLAN_FORMAT = 1 (v4implementation D-119, D-120)
 │   │   │   ├── prosody.rs             WordProsody, Prosody
 │   │   │   ├── edit.rs                EditState, StyleId, CropOffset
+│   │   │   ├── enhance.rs             (V6.2) Enhance, VoiceMode (§47.5, v6.2 D-485)
+│   │   │   ├── params.rs              (V6.2) Treatment, EmphasisSize, ZoomScale, ZoomMotion, EmojiPlace: the new kinds' named params (v6.2 §6.1)
 │   │   │   ├── profile.rs             Plan, ExportProfile
 │   │   │   ├── summary.rs             ChangeSummary
 │   │   │   ├── stage.rs               PipelineStage
@@ -680,6 +682,7 @@ offcut/
 │   │   │   ├── landing.ts             the landing page's and the prices' copy, imported by messages.ts (designimplementation D-321)
 │   │   │   ├── transcription.ts       (cloud transcription) the card, the processing line and the two toasts (cloudimplementation D-380)
 │   │   │   ├── long.ts                (V6.1) the long page's words, REJECT_HDR and the two E_SOURCE_* (v6.1implementation §10.5, D-426)
+│   │   │   ├── plan.ts                (V6.2) the AI plan's, the extras' and Enhance's words, imported by messages.ts (v6.2implementation §12, D-491)
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)

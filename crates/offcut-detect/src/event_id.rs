@@ -22,6 +22,12 @@ pub fn event_id(kind: EventKind, anchors: WordRange) -> EventId {
         EventKind::ListReveal => 1,
         EventKind::FromTo => 2,
         EventKind::KeywordPop => 3,
+        // V6.2 (D-446): the next codes, fixed forever like the four above.
+        EventKind::Emphasis => 4,
+        EventKind::IconPop => 5,
+        EventKind::PunchIn => 6,
+        EventKind::Emoji => 7,
+        EventKind::HookTitle => 8,
     };
     let [s0, s1, s2, s3] = anchors.start.get().to_le_bytes();
     let [e0, e1, e2, e3] = anchors.end.get().to_le_bytes();

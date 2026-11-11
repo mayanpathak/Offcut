@@ -104,6 +104,12 @@ fn the_reference_clips_five_events_become_five_items() {
         other @ (EventParams::ListReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
     match &events[3].params {
         EventParams::ListReveal { count, header, .. } => {
@@ -112,6 +118,12 @@ fn the_reference_clips_five_events_become_five_items() {
         other @ (EventParams::NumberReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
     match &events[4].params {
         EventParams::NumberReveal { value, label } => {
@@ -121,6 +133,12 @@ fn the_reference_clips_five_events_become_five_items() {
         other @ (EventParams::ListReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
 
     let plan = from_rules(&events, &t);

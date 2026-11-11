@@ -31,6 +31,12 @@ pub fn apply(
             EventKind::NumberReveal => (true, true),
             EventKind::FromTo => (true, false),
             EventKind::ListReveal | EventKind::KeywordPop => (false, false),
+            // V6.2's model-only kinds (D-446): the detector never makes them.
+            EventKind::Emphasis
+            | EventKind::IconPop
+            | EventKind::PunchIn
+            | EventKind::Emoji
+            | EventKind::HookTitle => (false, false),
         };
         let excluded = cand.parts.iter().any(|part| {
             let quantity = found.iter().find(|f| f.words == *part);

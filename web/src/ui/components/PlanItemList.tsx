@@ -12,7 +12,7 @@ import { useClipStore } from "../../state/clip-store";
 import { usePreviewStore } from "../../state/preview-store";
 import { pause, scrub } from "../../usecases/control-preview";
 import { toggleEvent } from "../../usecases/toggle-event";
-import { ArrowRight, Hash, List, Zap } from "../icons";
+import { ArrowRight, Crop, Hash, List, Sparkles, Type, Zap } from "../icons";
 import { PanelSection } from "../primitives/PanelSection";
 import { Switch } from "../primitives/Switch";
 import styles from "../styles/panel.module.css";
@@ -23,6 +23,12 @@ const KIND_ICON: Record<EventKind, ReactNode> = {
   list_reveal: <List />,
   from_to: <ArrowRight />,
   keyword_pop: <Zap />,
+  // V6.2 (D-446): stand-ins from the icons in hand; P194 sets the list's look.
+  emphasis: <Type />,
+  icon_pop: <Sparkles />,
+  punch_in: <Crop />,
+  emoji: <Sparkles />,
+  hook_title: <Type />,
 };
 
 /** The words of a range, as the transcript editor shows them (an edit in place of what was heard). */
@@ -54,6 +60,13 @@ function figureOf(item: PlanItem, words: readonly Word[], edits: Readonly<Record
       return params.header === "" ? messages.visuals.points(params.count) : params.header;
     case "keyword_pop":
       return wordsOf(words, edits, params.word, params.word + 1);
+    // V6.2's kinds (D-446) come from a model as word pointers, never as the detector's reading.
+    case "emphasis":
+    case "icon_pop":
+    case "punch_in":
+    case "emoji":
+    case "hook_title":
+      return own();
     default:
       return own();
   }

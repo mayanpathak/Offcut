@@ -147,6 +147,13 @@ function displayOf(event: DetectedEvent, transcript: Transcript): string {
       return String(params.count);
     case "keyword_pop":
       return transcript.words[params.word]?.text ?? "";
+    // V6.2's kinds (D-446): the detector never makes them, so no line shows one.
+    case "emphasis":
+    case "icon_pop":
+    case "punch_in":
+    case "emoji":
+    case "hook_title":
+      return "";
     default:
       return assertNever(params);
   }

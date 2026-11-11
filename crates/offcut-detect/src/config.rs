@@ -138,6 +138,12 @@ impl DetectorConfig {
             EventKind::ListReveal => self.threshold_list,
             EventKind::FromTo => self.threshold_from_to,
             EventKind::KeywordPop => self.threshold_keyword,
+            // V6.2's model-only kinds (D-446): no candidate reaches this.
+            EventKind::Emphasis
+            | EventKind::IconPop
+            | EventKind::PunchIn
+            | EventKind::Emoji
+            | EventKind::HookTitle => f32::INFINITY,
         }
     }
 
@@ -149,6 +155,12 @@ impl DetectorConfig {
             EventKind::ListReveal => self.list_hold_ms,
             EventKind::FromTo => self.from_to_hold_ms,
             EventKind::KeywordPop => 0,
+            // V6.2's model-only kinds (D-446): the detector never makes them.
+            EventKind::Emphasis
+            | EventKind::IconPop
+            | EventKind::PunchIn
+            | EventKind::Emoji
+            | EventKind::HookTitle => 0,
         }
     }
 }

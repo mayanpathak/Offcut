@@ -81,6 +81,12 @@ fn shown(t: &Transcript, e: &DetectedEvent) -> (EventKind, String) {
                 .collect::<String>()
                 .to_lowercase()
         }
+        // V6.2's model-only kinds (D-446): the detector never makes them.
+        EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. } => panic!("{:?}", e.params),
     };
     (e.kind, text)
 }
@@ -320,6 +326,12 @@ fn row_1_and_2_labels() {
             other @ (EventParams::ListReveal { .. }
             | EventParams::FromTo { .. }
             | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+            // V6.2's model-only kinds (D-446).
+            other @ (EventParams::Emphasis { .. }
+            | EventParams::IconPop { .. }
+            | EventParams::PunchIn { .. }
+            | EventParams::Emoji { .. }
+            | EventParams::HookTitle { .. }) => panic!("{other:?}"),
         }
     };
     assert_eq!(
@@ -350,6 +362,12 @@ fn row_13_shows_three_items() {
         other @ (EventParams::NumberReveal { .. }
         | EventParams::FromTo { .. }
         | EventParams::KeywordPop { .. }) => panic!("{other:?}"),
+        // V6.2's model-only kinds (D-446).
+        other @ (EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. }) => panic!("{other:?}"),
     }
 }
 

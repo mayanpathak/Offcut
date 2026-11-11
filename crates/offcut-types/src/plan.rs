@@ -12,8 +12,10 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::assets::{EmojiId, IconId};
 use crate::events::{EventKind, EventParams};
 use crate::ids::{EventId, WordIdx, WordRange};
+use crate::params::{EmojiPlace, EmphasisSize, Treatment, ZoomMotion, ZoomScale};
 use crate::units::{Confidence, DurMs};
 
 /// The version of this wire format. A plan of another format is refused.
@@ -123,6 +125,29 @@ pub enum ItemParams {
         word: WordIdx,
     },
     Detected(EventParams),
+    // V6.2 (D-446): the wire forms a model writes. `HookTitle`'s text is
+    // `extras.hook`; `accent` indexes a word of it (D-453).
+    Emphasis {
+        word: WordIdx,
+        treatment: Treatment,
+        size: EmphasisSize,
+    },
+    IconPop {
+        word: WordIdx,
+        icon: IconId,
+    },
+    PunchIn {
+        scale: ZoomScale,
+        motion: ZoomMotion,
+    },
+    Emoji {
+        word: WordIdx,
+        emoji: EmojiId,
+        place: EmojiPlace,
+    },
+    HookTitle {
+        accent: u8,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -201,6 +226,9 @@ pub enum DropReason {
     TooClose,
     ZoneTaken,
     NotInThisBuild,
+    // V6.2: V-9's density rule (D-451) and a `HookTitle` without a hook (D-453).
+    Density,
+    HookMissing,
 }
 
 impl Label {

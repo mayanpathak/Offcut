@@ -158,14 +158,14 @@ export type Transcript = { words: Array<Word>, sentences: Array<Sentence>, numbe
  * code; none is moved or removed. The order is the code order (a key of the
  * plan crate's per-kind limits).
  */
-export type EventKind = "number_reveal" | "list_reveal" | "from_to" | "keyword_pop";
+export type EventKind = "number_reveal" | "list_reveal" | "from_to" | "keyword_pop" | "emphasis" | "icon_pop" | "punch_in" | "emoji" | "hook_title";
 
 /**
  * `at` is the time at which the item was spoken.
  */
 export type ListItem = { ordinal: number, text: string, at: TimeMs, };
 
-export type EventParams = { "kind": "number_reveal", value: Quantity, label: string | null, } | { "kind": "list_reveal", count: number, header: string, items: Array<ListItem>, } | { "kind": "from_to", from: Quantity, to: Quantity, label: string | null, } | { "kind": "keyword_pop", word: WordIdx, };
+export type EventParams = { "kind": "number_reveal", value: Quantity, label: string | null, } | { "kind": "list_reveal", count: number, header: string, items: Array<ListItem>, } | { "kind": "from_to", from: Quantity, to: Quantity, label: string | null, } | { "kind": "keyword_pop", word: WordIdx, } | { "kind": "emphasis", word: WordIdx, treatment: Treatment, size: EmphasisSize, } | { "kind": "icon_pop", word: WordIdx, icon: IconId, } | { "kind": "punch_in", scale: ZoomScale, motion: ZoomMotion, } | { "kind": "emoji", word: WordIdx, emoji: EmojiId, place: EmojiPlace, } | { "kind": "hook_title", text: string, accent: number, };
 
 export type DetectedEvent = { id: EventId, kind: EventKind, span: Span, anchors: WordRange, params: EventParams,
 /**
@@ -222,7 +222,7 @@ confidence: Confidence | null, };
  * What an item shows. The four kinds point at words; `Detected` carries the
  * detector's own reading and is written by the rules producer only (D-120).
  */
-export type ItemParams = { "kind": "number_reveal", "params": { value: QuantityRef, label: Label | null, } } | { "kind": "list_reveal", "params": { header: Label | null, items: Array<ListPoint>, } } | { "kind": "from_to", "params": { from: QuantityRef, to: QuantityRef, label: Label | null, } } | { "kind": "keyword_pop", "params": { word: WordIdx, } } | { "kind": "detected", "params": EventParams };
+export type ItemParams = { "kind": "number_reveal", "params": { value: QuantityRef, label: Label | null, } } | { "kind": "list_reveal", "params": { header: Label | null, items: Array<ListPoint>, } } | { "kind": "from_to", "params": { from: QuantityRef, to: QuantityRef, label: Label | null, } } | { "kind": "keyword_pop", "params": { word: WordIdx, } } | { "kind": "detected", "params": EventParams } | { "kind": "emphasis", "params": { word: WordIdx, treatment: Treatment, size: EmphasisSize, } } | { "kind": "icon_pop", "params": { word: WordIdx, icon: IconId, } } | { "kind": "punch_in", "params": { scale: ZoomScale, motion: ZoomMotion, } } | { "kind": "emoji", "params": { word: WordIdx, emoji: EmojiId, place: EmojiPlace, } } | { "kind": "hook_title", "params": { accent: number, } };
 
 export type ListPoint = { at: WordIdx, label: Label, };
 
@@ -256,7 +256,7 @@ export type MusicCue = { fits: boolean, energy: MusicEnergy, };
  */
 export type Dropped = { kind: EventKind | null, reason: DropReason, };
 
-export type DropReason = "unknown_kind" | "wrong_producer" | "params_mismatch" | "anchors_out_of_range" | "anchor_rule" | "label_too_long" | "label_digits" | "number_unresolved" | "over_limit" | "too_close" | "zone_taken" | "not_in_this_build";
+export type DropReason = "unknown_kind" | "wrong_producer" | "params_mismatch" | "anchors_out_of_range" | "anchor_rule" | "label_too_long" | "label_digits" | "number_unresolved" | "over_limit" | "too_close" | "zone_taken" | "not_in_this_build" | "density" | "hook_missing";
 
 /**
  * Both values are z-scores against the word's sentence.
@@ -302,7 +302,14 @@ event_overrides: { [key in EventId]: boolean }, style: StyleId, crop_offset: Cro
 /**
  * Numbers in the captions in the accent colour (D-169).
  */
-highlight_numbers: boolean, };
+highlight_numbers: boolean,
+/**
+ * REOPENED in V6.2 (v6.2implementation D-485, DC-16): the Enhance
+ * settings. Left out of the JSON when it is `Enhance::v5()`, so a state
+ * without a choice serializes as V6.1 wrote it, and a record without the
+ * field reads as `v5()`.
+ */
+enhance?: Enhance, };
 
 /**
  * One stretch of the program, in program order.
@@ -417,6 +424,49 @@ export type RouteReject = RejectReason | SourceReject;
  * The error codes the long path adds (TS §43.9), serialized as their `E_*` codes.
  */
 export type SourceErrorCode = "E_SOURCE_READ" | "E_SOURCE_AUDIO";
+
+/**
+ * How an `Emphasis` marks its word in the caption (TS §47.3).
+ */
+export type Treatment = "colour" | "underline" | "highlight";
+
+/**
+ * `Punch` shows the word alone, large (TS §47.3; at most one per 6 s, D-452).
+ */
+export type EmphasisSize = "normal" | "punch";
+
+export type ZoomScale = "mild" | "strong";
+
+/**
+ * `Snap` jumps in on one strong word; `Push` eases in across a sentence (TS §47.2).
+ */
+export type ZoomMotion = "snap" | "push";
+
+/**
+ * Where an `Emoji` sits against its word.
+ */
+export type EmojiPlace = "beside" | "under";
+
+/**
+ * An icon of the bundle (24; D-495).
+ */
+export type IconId = "trending_up" | "trending_down" | "bar_chart" | "dollar" | "wallet" | "shopping_cart" | "briefcase" | "clock" | "calendar" | "lightbulb" | "target" | "check" | "cross" | "alert" | "arrow_right" | "heart" | "star" | "book" | "lock" | "shield" | "users" | "smartphone" | "laptop" | "mail";
+
+/**
+ * An emoji of the bundle (48; D-495).
+ */
+export type EmojiId = "laughing" | "heart_eyes" | "star_struck" | "mind_blown" | "thinking" | "shocked" | "crying" | "cool" | "partying" | "skeptical" | "eyes" | "angry" | "nervous" | "thumbs_up" | "thumbs_down" | "clap" | "raised_hands" | "muscle" | "folded_hands" | "handshake" | "money_bag" | "banknote" | "money_wings" | "gem" | "chart_up" | "chart_down" | "trophy" | "light_bulb" | "brain" | "target" | "crown" | "rocket" | "fire" | "hundred" | "sparkles" | "lightning" | "star" | "collision" | "party_popper" | "check" | "cross" | "warning" | "question" | "exclamation" | "alarm_clock" | "hourglass" | "heart" | "broken_heart";
+
+/**
+ * What the voice stage does.
+ */
+export type VoiceMode = "clean" | "level";
+
+export type Enhance = { voice: VoiceMode,
+/**
+ * The camera drift and the rules' zooms (TS §47.2).
+ */
+motion: boolean, };
 
 export const LIMITS = {
   MAX_CLIP_DURATION: 90000 as DurMs,

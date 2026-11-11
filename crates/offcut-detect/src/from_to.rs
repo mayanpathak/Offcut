@@ -222,6 +222,12 @@ mod tests {
             EventParams::NumberReveal { .. }
             | EventParams::ListReveal { .. }
             | EventParams::KeywordPop { .. } => panic!("{:?}", c.params),
+            // V6.2's model-only kinds (D-446).
+            EventParams::Emphasis { .. }
+            | EventParams::IconPop { .. }
+            | EventParams::PunchIn { .. }
+            | EventParams::Emoji { .. }
+            | EventParams::HookTitle { .. } => panic!("{:?}", c.params),
         }
     }
 

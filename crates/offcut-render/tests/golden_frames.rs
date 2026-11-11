@@ -247,6 +247,12 @@ fn kind_name(input: &Input) -> &'static str {
         EventKind::ListReveal => "list",
         EventKind::FromTo => "from_to",
         EventKind::KeywordPop => "keyword",
+        // V6.2's kinds (D-446): their goldens are new files, named by their prompts.
+        EventKind::Emphasis => "emphasis",
+        EventKind::IconPop => "icon_pop",
+        EventKind::PunchIn => "punch_in",
+        EventKind::Emoji => "emoji",
+        EventKind::HookTitle => "hook_title",
     }
 }
 

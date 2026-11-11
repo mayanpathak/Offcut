@@ -80,6 +80,12 @@ fn item(kind: EventKind) -> ValidItem {
             },
             Vec::new(),
         ),
+        // V6.2's kinds (D-446) are not in the catalog yet; P206 draws them here.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => panic!("{kind:?} has no item here before P206"),
     };
     ValidItem {
         id: EventId::new(1),

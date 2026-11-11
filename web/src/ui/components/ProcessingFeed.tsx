@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { messages } from "../../copy/messages";
 import type { EventKind } from "../../gen/domain";
 import { type ClipState, useClipStore } from "../../state/clip-store";
-import { ArrowRight, Hash, List, Zap } from "../icons";
+import { ArrowRight, Crop, Hash, List, Sparkles, Type, Zap } from "../icons";
 import styles from "../styles/components.module.css";
 
 const KIND_ICON: Record<EventKind, ReactNode> = {
@@ -18,6 +18,12 @@ const KIND_ICON: Record<EventKind, ReactNode> = {
   list_reveal: <List size={16} />,
   from_to: <ArrowRight size={16} />,
   keyword_pop: <Zap size={16} />,
+  // V6.2 (D-446): stand-ins from the icons in hand; P194 sets the list's look.
+  emphasis: <Type size={16} />,
+  icon_pop: <Sparkles size={16} />,
+  punch_in: <Crop size={16} />,
+  emoji: <Sparkles size={16} />,
+  hook_title: <Type size={16} />,
 };
 
 type FeedLine = ClipState["feed"][number];
@@ -38,6 +44,13 @@ function eventText(eventKind: EventKind, display: string, displayTo: string): st
       return found.from_to(display, displayTo);
     case "keyword_pop":
       return found.keyword_pop(display);
+    // V6.2's kinds (D-446): the detector never finds them, so the feed never lists them.
+    case "emphasis":
+    case "icon_pop":
+    case "punch_in":
+    case "emoji":
+    case "hook_title":
+      return display;
     default:
       return assertNever(eventKind);
   }

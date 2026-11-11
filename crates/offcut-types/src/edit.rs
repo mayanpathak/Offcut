@@ -6,6 +6,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use ts_rs::TS;
 
+use crate::enhance::Enhance;
 use crate::ids::{EventId, WordIdx};
 
 /// Caption style (PS §12.2).
@@ -93,6 +94,13 @@ pub struct EditState {
     /// Numbers in the captions in the accent colour (D-169).
     #[serde(default = "yes")]
     pub highlight_numbers: bool,
+    /// REOPENED in V6.2 (v6.2implementation D-485, DC-16): the Enhance
+    /// settings. Left out of the JSON when it is `Enhance::v5()`, so a state
+    /// without a choice serializes as V6.1 wrote it, and a record without the
+    /// field reads as `v5()`.
+    #[serde(default = "Enhance::v5", skip_serializing_if = "Enhance::is_v5")]
+    #[ts(optional, as = "Option<Enhance>")]
+    pub enhance: Enhance,
 }
 
 impl Default for EditState {
@@ -106,6 +114,7 @@ impl Default for EditState {
             crop_offset: CropOffset(0.0),
             caption_position: CaptionPlacement::bottom(),
             highlight_numbers: true,
+            enhance: Enhance::v5(),
         }
     }
 }
@@ -244,6 +253,100 @@ mod tests {
             (state.caption_position.get(), state.highlight_numbers),
             (0.15, false)
         );
+    }
+
+    // V6.2 (D-485, DC-16): `enhance`.
+
+    /// `default_edit_state_has_no_edits`' literal at `b73fea5`.
+    const V61_DEFAULT: &str = r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0.0,"caption_position":1.0,"highlight_numbers":true}"#;
+
+    #[test]
+    fn a_v5_state_serializes_as_v6_1_wrote_it() {
+        let state = EditState::default();
+        assert!(state.enhance.is_v5());
+        assert_eq!(serde_json::to_string(&state).unwrap(), V61_DEFAULT);
+        let edited = EditState {
+            style: StyleId::Bold,
+            enhance: Enhance::v5(),
+            ..EditState::default()
+        };
+        let json = serde_json::to_string(&edited).unwrap();
+        assert!(!json.contains("enhance"), "{json}");
+    }
+
+    #[test]
+    fn a_record_without_the_field_reads_v5() {
+        let state: EditState = serde_json::from_str(V61_DEFAULT).unwrap();
+        assert_eq!(state.enhance, Enhance::v5());
+        assert_eq!(state, EditState::default());
+        let v3 = r#"{"word_edits":{},"event_overrides":{},"style":"clean","crop_offset":0}"#;
+        let state: EditState = serde_json::from_str(v3).unwrap();
+        assert_eq!(state.enhance, Enhance::v5());
+    }
+
+    #[test]
+    fn motion_on_round_trips() {
+        let mut state = EditState {
+            enhance: Enhance::defaults(true),
+            ..EditState::default()
+        };
+        let value = serde_json::to_value(&state).unwrap();
+        assert_eq!(
+            value["enhance"],
+            serde_json::json!({ "voice": "clean", "motion": true })
+        );
+        assert_eq!(serde_json::from_value::<EditState>(value).unwrap(), state);
+        state.enhance = Enhance {
+            voice: crate::enhance::VoiceMode::Level,
+            motion: false,
+        };
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(serde_json::from_str::<EditState>(&json).unwrap(), state);
+    }
+
+    /// A V6.1 build (rollback, §14.4) reads a V6.2 record that carries the
+    /// field: `EditState` at `b73fea5` does not deny unknown fields.
+    #[test]
+    fn a_v6_1_reader_accepts_a_v6_2_record() {
+        #[derive(Deserialize)]
+        struct EditStateV61 {
+            word_edits: BTreeMap<WordIdx, String>,
+            event_overrides: BTreeMap<EventId, bool>,
+            style: StyleId,
+            crop_offset: CropOffset,
+            #[serde(default = "CaptionPlacement::bottom")]
+            caption_position: CaptionPlacement,
+            #[serde(default = "yes")]
+            highlight_numbers: bool,
+        }
+        let state = EditState {
+            style: StyleId::Tech,
+            enhance: Enhance::defaults(true),
+            ..EditState::default()
+        };
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(
+            json.contains(r#""enhance":{"voice":"clean","motion":true}"#),
+            "{json}"
+        );
+        let old: EditStateV61 = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            (
+                old.word_edits.len(),
+                old.event_overrides.len(),
+                old.style,
+                old.crop_offset.get(),
+                old.caption_position.get(),
+                old.highlight_numbers,
+            ),
+            (0, 0, StyleId::Tech, 0.0, 1.0, true)
+        );
+    }
+
+    #[test]
+    fn the_typescript_field_is_optional() {
+        let ts = EditState::decl(&ts_rs::Config::default());
+        assert!(ts.contains("enhance?: Enhance"), "{ts}");
     }
 
     #[test]
