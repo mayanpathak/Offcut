@@ -33,8 +33,10 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 31 | TE-29's side-by-side panel: 20 shots, graded and ungraded, unlabelled | Founder, at V6.6a | Entry 38, TS §47.4 |
 | 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
 | 32 | ~~V6.2's founder questions F-1 to F-9~~ **Answered 2026-11-11:** yes to all; billing already on; 15 transcripts for TE-15; AI plans for signed-in people only (v6.2implementation D-493, D-494) | Founder | Entry 40 |
-| 33 | **The Gemini key's Google project is on the free tier** (P183: a 429 naming only `free_tier` quotas, Pro's at 0), although billing was thought on. Link the key's project to an active Cloud Billing account (or make a key in the billed project and put it in `.env` and `.env.deploy` as `PLAN_API_KEY`); AI Studio shows the tier. **No Gemini call until then (P183b).** Also recommended: turn off the developer logs in AI Studio's Logs and Datasets page (on by default for projects made on or after 2026-10-26, kept up to 55 days) | Founder, before P183b and P188 | Entry 42 |
-| 34 | Gemini 3.8 Flash's price doubles on 2027-01-01 (0.75 / 3.75 → 1.50 / 7.50 USD per 1M tokens): set `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK` on Render again that day, or the spend cap counts low | Founder, 2027-01-01 | Entry 42, v6.2implementation D-463 |
+| 33 | **Closed 2026-11-11 (Entry 43): moot, DeepSeek replaces Gemini (v6.2implementation D-500).** Was: ~~The Gemini key's Google project is on the free tier~~ (P183: a 429 naming only `free_tier` quotas, Pro's at 0), although billing was thought on. Link the key's project to an active Cloud Billing account (or make a key in the billed project and put it in `.env` and `.env.deploy` as `PLAN_API_KEY`); AI Studio shows the tier. **No Gemini call until then (P183b).** Also recommended: turn off the developer logs in AI Studio's Logs and Datasets page (on by default for projects made on or after 2026-10-26, kept up to 55 days) | Founder, before P183b and P188 | Entry 42 |
+| 34 | **Closed 2026-11-11 (Entry 43): moot, Gemini is not used (D-500).** Was: ~~Gemini 3.8 Flash's price doubles on 2027-01-01~~ (0.75 / 3.75 → 1.50 / 7.50 USD per 1M tokens): set `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK` on Render again that day, or the spend cap counts low | Founder, 2027-01-01 | Entry 42, v6.2implementation D-463 |
+| 35 | **The privacy page and the settings table name DeepSeek before `ai_plan` goes on in production.** The privacy page promises "We will update this page before any new kind of data leaves your computer"; its "Cloud captions" style section, its "Who handles it" list and the settings "What leaves your device" table gain a row: the words of the transcript and their timings go to DeepSeek, in China, to plan the edit; never the audio or video. They cannot say "not kept" or "never used to train" (DeepSeek's terms state neither; D-492's note). The landing page does not change (the founder). Optional: write to DeepSeek to opt the account out of training, a right its privacy policy names | Founder (wording at CP 3) | Entry 43, v6.2implementation D-492, D-500 |
+| 36 | **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
 
 ## Known issues for later prompts
 
@@ -1239,3 +1241,23 @@ No product code changed: two temporary probes ran and were removed, and two rend
 **Counts.** Unchanged (no product code): Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57 (Entry 41).
 
 **Open.** 33 (billing, logs), 34 (prices on 2027-01-01). Next: P184 (the types, CP 2a); P183b once billing is confirmed.
+
+## Entry 43 - 2026-11-11 - P183b: DeepSeek's reads (the founder's provider)
+
+**Founder's decision (D-500, REOPENED D-435):** the paid Gemini account is blocked, so **DeepSeek is the only AI provider, with thinking always off.** The adapter becomes `deepseek.rs`. The three V6.2 documents gain one rule: where they say Gemini, read DeepSeek. P183's Gemini readings stay as history. No product code changed.
+
+**Read** (`experiments.md` TE-15, "The founder's decision"): models `deepseek-flash` (V4.1 Flash) and `deepseek-v4-pro`; prices per 1M tokens at peak: Flash 0.006 / 0.30 / 1.20 (cache hit / miss / output), Pro 0.044 / 1.32 / 3.96, off-peak half; the API, JSON-mode and thinking docs; the privacy policy and the Open Platform terms.
+
+**Real calls (F-9: `a01` only).** Thinking off, `json_object`, the `@v1` texts with the schema in the system prompt. Flash ×3: 200 in 2.5-2.8 s, about 5,670 in / 460-520 out; `validate` kept 7, 9 and 7 items (drops: two `AnchorRule`, one `NumberUnresolved`). Pro ×1: 200 in 5.1 s, 5 of 5 kept. `json_schema` strict: **400, unavailable.** Before P183b, at the founder's request: thinking on took 35 s (Flash) and 145 s (Pro). Balance $1.99 → $1.93 over thirteen calls in all.
+
+**Decisions changed by the readings.** No provider-shaped schema: the schema goes in the system prompt as text (D-457). No `PLAN_THINKING`: always disabled (D-459 → D-500). Blank content is a parse failure and takes the one retry. The spend counts input at the cache-miss price unless P191 adds a third price (D-463). `PLAN_PROVIDER=deepseek` (D-465).
+
+**Terms, and what the product may say (D-492).** DeepSeek's terms do not say that API inputs are not kept or not trained on, and its privacy policy stores data in China. So the in-app copy names DeepSeek and China and makes neither claim. The landing page does not change (the founder: its promise is about the video). The privacy page and the settings table gain DeepSeek before `ai_plan` goes on (open item 35).
+
+**First read against TE-15's lines:** parse 4/4, latency well under 10 s, cost about $0.0007 a Flash plan with the cached prompt. **Flash's median drop rate of 12.5% is over the 10% line on this one transcript;** P186's prompt prose and TE-15's 15 transcripts take it up.
+
+**Gate.** `scripts/v62-gate.sh` also searches for `PLAN_API_KEY2`'s value and a DeepSeek key pattern.
+
+**Counts.** Unchanged (no product code): Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57.
+
+**Open.** 33 and 34 closed (moot). New: 35 (the privacy page and the settings table name DeepSeek before `ai_plan` is on), 36 (rename `PLAN_API_KEY2`, before P189). Next: P184 (the types, CP 2a).

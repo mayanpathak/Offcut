@@ -31,7 +31,9 @@ zz=$(git status --porcelain --untracked-files=all | grep -cE '(^|/| )zz[-_]')
 #    TRANSCRIBE_API_KEY is one), not a key, and is not searched for.
 git grep -qE 'AIza[0-9A-Za-z_-]{35}' && fail "a Google API key pattern is in the tree"
 git grep -qE 'gsk_[A-Za-z0-9]{20}' && fail "a Groq key pattern is in the tree"
-for name in PLAN_API_KEY TRANSCRIBE_API_KEY; do
+git grep -qE '(^|[^A-Za-z0-9])sk-[0-9a-f]{32}' && fail "a DeepSeek key pattern is in the tree"
+# PLAN_API_KEY2 is DeepSeek's key until it is renamed PLAN_API_KEY (D-500, D-465).
+for name in PLAN_API_KEY PLAN_API_KEY2 TRANSCRIBE_API_KEY; do
   value=$(grep "^$name=" .env 2>/dev/null | head -n 1 | cut -d= -f2-)
   if [ "${#value}" -ge 20 ] && git grep -qF --untracked -e "$value" -- . ':!.env' ':!.env.deploy'; then
     fail "the value of $name appears in a file"

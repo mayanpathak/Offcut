@@ -2,7 +2,7 @@
 
 The readings V6.2 takes (`v6.2implementation.md` §15). Each is dated, labelled `d1` where it was read on the founder's machine, and settles the decisions it names with an "As read" note in the plan. Nothing here holds a key, a transcript's text beyond what the repository already holds, or a recording.
 
-## TE-15 - Gemini as the plan's provider
+## TE-15 - The plan's provider (Gemini read first; DeepSeek from P183b, D-500)
 
 **Setup's note (2026-11-11).** The key answers Google's model list (`GET /v1beta/models`, HTTP 200): it is valid. It is not in the `AIza…` form, so the gate searches for its exact value rather than a pattern (`scripts/v62-gate.sh`, check 3).
 
@@ -42,6 +42,43 @@ Thinking tokens are billed as output ("Output price (including thinking tokens)"
 **Not read yet, waiting on billing:** the Pro-class answer; Flash with less thinking (its latency and plan quality); Gemini 4 Argon if the founder wants it at CP 1. Two to three calls, before P188.
 
 Recorded, redacted shapes for P190 (request with the transcript texts cut to their lengths; full responses, which quote only `a01`; response headers without anything account-like) are in the session's scratchpad (`gemini-c1-flash-*.json`, `gemini-c2-pro-*.json`); P190 rebuilds them as `server/tests/fixtures/gemini/` with no key or account identifier.
+
+### The founder's decision: DeepSeek only (P183b, 2026-11-11, d1)
+
+The founder's paid Gemini account is blocked, so **DeepSeek is the only provider, with thinking always off** (D-500). The Gemini reads above stay as history. DeepSeek's key is `PLAN_API_KEY2` (D-465).
+
+**Models** (`GET /models`, HTTP 200): `deepseek-flash` ("DeepSeek-V4.1-Flash", per the pricing page `-1017`) and `deepseek-v4-pro` ("DeepSeek-V4-Pro", `-0813`), each with a 1M-token context. **Candidates for TE-15:** both, thinking off.
+
+**Prices** (`api-docs.deepseek.com/quick_start/pricing`, read 2026-11-11; no date on the page; USD per 1M tokens at peak; off-peak is half; peak is 01:00-04:00 and 06:00-10:00 UTC on weekdays, excluding Chinese public holidays). The table was read as text, so the founder confirms it at CP 1:
+
+| Model | Input, cache hit | Input, cache miss | Output |
+|---|---|---|---|
+| `deepseek-flash` | 0.006 | 0.30 | 1.20 |
+| `deepseek-v4-pro` | 0.044 | 1.32 | 3.96 |
+
+Concurrency limits are 2,500 (Flash) and 500 (Pro) per account. "Product prices may vary." Whether reasoning tokens bill as output is not stated; with thinking off there are none.
+
+**API** (`guides/json_mode`, `guides/thinking_mode`, `quick_start/rate_limit`): thinking is on by default at effort `high`; `{"thinking": {"type": "disabled"}}` turns it off. `reasoning_effort` and `effort: "low"` were sent and changed nothing measurable (reasoning tokens did not fall). Thinking mode ignores `temperature`. JSON output is `{"type": "json_object"}` only: the prompt must contain the word "json" and should show the format. "The returned `content` may contain only spaces ... even when `finish_reason` is `stop`." A non-streaming request is padded with blank lines while it waits; a request not started within 10 minutes is closed; a request over the concurrency limit gets 429.
+
+**Terms** (privacy policy updated 2026-02-10; Open Platform terms effective 2026-04-29). The API terms say nothing about training on, keeping or locating API inputs. The privacy policy says: "we directly collect, process and store your Personal Data in People's Republic of China"; personal data is used "to train and improve our technology, such as our machine learning models", with "the right to opt-out of using your Personal Data for training our models"; it is kept "for as long as you have an account". It does not cover "Personal Data collected from end users when accessing downstream systems or applications developed by developers using our open platform services". No retention period, zero-retention option or human-review rule is stated. What the product may say follows in D-492's note.
+
+**Calls of P183b** (`a01` only, public in the repository; the `@v1` system prompt with the `@v1` output schema appended as text, the `@v1` user message; `thinking` disabled, `json_object`, temperature 0.2, `max_tokens` 8000; each answer given `format`, `catalog` and `source` by a scratch validator as the server will, then `validate` with `PlanConfig::default()`):
+
+| Call | Model | Status, time | Tokens: in (cache hit) / out | Items | `validate` kept | Dropped |
+|---|---|---|---|---|---|---|
+| 1 | `deepseek-flash` | 200, 2,590 ms | 5,666 (5,504) / 460 | 8 | 7 | 1 NumberReveal, `AnchorRule` |
+| 2 | `deepseek-flash` | 200, 2,805 ms | 5,666 (5,504) / 520 | 9 | 9 | 0 |
+| 3 | `deepseek-flash` | 200, 2,483 ms | 5,666 (5,504) / 520 | 9 | 7 | 1 NumberReveal `NumberUnresolved`, 1 FromTo `AnchorRule` |
+| 4 | `deepseek-v4-pro` | 200, 5,063 ms | 5,663 (0) / 618 | 5 | 5 | 0 |
+| 5 | `deepseek-flash`, `json_schema` strict | **400** in 312 ms, "This response_format type is unavailable now" | - | - | - | - |
+
+- **Every answer parsed into `EditPlan`.** Unlike Gemini, DeepSeek wrote `format: 1` and `catalog: 1` itself. It left out `source` and wrote `cuts`, `chapters` and `music` empty and `extras` `{}`. The server still sets `format`, `catalog` and `source` (D-460).
+- **What it chose.** Flash: the three numbers ("3000 hours", "$12,000", and "8" from "8 hours", which `validate` dropped once), "90 minutes to 10 minutes", the three reasons, and 3-4 keyword pops ("brutal", "luck", "timeline", "rough", "matter"). Pro: the numbers, the from-to and the list, with no keyword pop. The same request gave different plans across runs; plans are stored, never re-requested (D-469).
+- **Against TE-15's pass lines (first read, one transcript):** parse 4/4; latency far under D-498's 10 s; **Flash's median drop rate is 12.5% of items, over the 10% line** (two `AnchorRule` drops on the anchor's length or alignment, one `NumberUnresolved`), Pro's is 0%. P186's prompt prose and TE-15's 15 transcripts read it properly.
+- **Cost per plan** at peak prices: Flash about $0.0007 with the cached system prompt, $0.0023 without; Pro about $0.010 (no cache hit yet). Off-peak is half.
+- **Other DeepSeek calls on 2026-11-11, before P183b** (the founder's request, outside a prompt): one JSON ping with no transcript; then on `a01` with thinking on: Flash 35 s / 6,000 reasoning tokens, Pro 145 s / 12,000, with all their plans valid; and Flash with thinking off once, 3.5 s, 9 items kept. The account's balance went from $1.99 to $1.93 over all thirteen calls.
+
+Recorded, redacted shapes for P190 (each request with message texts cut to their lengths and the schema named, not copied; each response with `id` and `system_fingerprint` redacted; response headers without ids, cookies or tracing) are in the session's scratchpad (`p183ds/*.record.json`); P190 rebuilds them as `server/tests/fixtures/deepseek/` with no key or account identifier.
 
 ## TE-30 - Images drawn the same in the browser and natively
 

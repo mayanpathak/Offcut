@@ -1,8 +1,10 @@
 # Offcut V6.2 "AI edit plan" — coding-promptsv6.2.md (Prompts 183–212)
 
-Source documents: `docs/v6.2/v6.2implementation.md` (written **§n**; its decisions are **D-n**, D-433 to D-499; its founder questions **F-n**, answered before Setup; its checkpoints **CP n**) and `docs/v6.2/v6.2buildguide.md` (written **G n.m**, **G item n** for an item of its "Read this first"). `TS`, `PS`, `BP` are the v1.5 specs; `V6 CL` is `docs/v6/v6changelog.md`, this release's changelog. These prompts were written after reading the code at `aef4a1a` on 2026-11-11.
+Source documents: `docs/v6.2/v6.2implementation.md` (written **§n**; its decisions are **D-n**, D-433 to D-500; its founder questions **F-n**, answered before Setup; its checkpoints **CP n**) and `docs/v6.2/v6.2buildguide.md` (written **G n.m**, **G item n** for an item of its "Read this first"). `TS`, `PS`, `BP` are the v1.5 specs; `V6 CL` is `docs/v6/v6changelog.md`, this release's changelog. These prompts were written after reading the code at `aef4a1a` on 2026-11-11.
 
 **How to use (the founder's decision of 2026-11-11: carefully, by hand).** Paste the SAB, then one prompt, **into a fresh session each time** (`/clear`; D-499). Run **Setup, then 183 to 212, in order, one at a time; P187 is done inside P186 and P198 inside P199** (D-499), so there are 28 runs. Do not start a prompt until the one before has its commit and every acceptance box ticked. A prompt that finds its scope too large stops at a clean point, commits what is proven, and the rest becomes `P<nn>b`: never rush a step to fit a prompt. A checkpoint (CP) waits for the founder.
+
+**The provider is DeepSeek, with thinking always off (D-500, the founder's decision of 2026-11-11).** Wherever a prompt below says Gemini, `gemini.rs`, `fixtures/gemini/` or `gemini_adapter.rs`, read DeepSeek, `deepseek.rs`, `fixtures/deepseek/`, `deepseek_adapter.rs`. DeepSeek's request, prices and terms are in D-500 and D-492's notes.
 
 Commits are titled `V6.2 P<nn>: <title>`. Each prompt's **Effort** line is the reasoning effort to set: **High** for every prompt that touches a protected proof, a stored or sent format, the renderer, privacy, money or a third party's API; **Medium** for records and specified screens.
 
@@ -29,7 +31,7 @@ Server tests need Postgres on port 9000 (a Windows service on D1). `gh auth stat
 1. Read the plan sections and guide steps this prompt cites, every file it touches, and the previous prompt's entry in V6 CL. **Read only the cited § and D-numbers (Grep for them); never read `technicalspec.md` or the plan whole** (D-499).
 2. Search before creating (`git grep -n "<name>"`). `offcut-types` holds the plan, events, edit state and ids; `offcut-plan` the catalog, `validate`, `prompt`; `offcut-scene` `build_scene`, `frame_at`, `video.rs`, `captions*.rs`, `events/`, `easing.rs`, `motion.rs` (the caption motion, not the camera); `offcut-render` `lib.rs`, `composite.rs`, `vello_backend.rs`; `offcut-wasm-render` `session.rs`, `scene_api.rs`; `offcut-dsp` `chain.rs`, `program.rs`; `server/src/transcribe/` (the pattern for `plan/`), `rate_limit.rs`, `config.rs`, `router.rs`, `account/`; `web/src/usecases/run-pipeline.ts`, `review-update.ts`, `restore-session.ts`; `persistence/{db,schema,opfs}.ts`; `workers/protocol.ts`; `net/api-client.ts`; `config/features.ts`; `tests-e2e/helpers/fake-api.ts`.
 3. Verify that the previous prompts' outputs behave as this prompt assumes. If not, make the smallest compatible correction and report it.
-4. **Precedence.** A decision D-433 to D-499 is binding, also where it refines TS or PS; D-1 to D-432 stand unless one of these replaces them. Otherwise TS wins over the plan and PS over both. If sources disagree in a way these do not settle, or a signature is missing: **stop and list it for the founder.**
+4. **Precedence.** A decision D-433 to D-500 is binding, also where it refines TS or PS; D-1 to D-432 stand unless one of these replaces them. Otherwise TS wins over the plan and PS over both. If sources disagree in a way these do not settle, or a signature is missing: **stop and list it for the founder.**
 5. **TS §41 binds.** Any protected proof that would change beyond DC-7, DC-8 (V6.2's part) and DC-16, any existing test beyond D-440's nine, any new runtime, browser host, dependency or paid service, any experiment whose row offers a choice, any change to what the product promises: **stop and ask with a recommendation.**
 
 **During implementation**
@@ -40,8 +42,8 @@ Server tests need Postgres on port 9000 (a Windows service on D1). `gh auth stat
 4. **Reopened contracts and declared changes are exactly:** DC-7, DC-8 (images in the overlay), DC-16; D-440's test changes; D-446, D-453, D-469, D-476, D-480, D-485 (REOPENED); D-467 (`run-pipeline.ts` step 12); the additive members of `protocol.ts`, `api-client.ts`, the WASM bindings. Say **REOPENED CONTRACT** or **DECLARED CHANGE** in the entry for each.
 5. No source file over 700 lines above its test module. Rust non-test code: no `unwrap`, `expect`, `panic!`, slice indexing. TypeScript: no `any`, `!`, `@ts-ignore`, empty `catch`, or inline style. No disabled lint, no weakened or deleted test; the one `#[ignore]` is D-440 (9)'s. Dependencies: none new (§3.1).
 6. User-facing text only in `copy/` (new strings in `copy/plan.ts`, D-491). `fetch` only in the allowed files. A temporary file is `zz-…` or `zz_…` and is deleted before the gate.
-7. **Secrets.** Never print, log, commit or paste a value from `.env`, `.env.deploy`, a token, a cookie or a link. Never `cat` either file; never source `.env.deploy`. A script reads `PLAN_API_KEY` from its environment by name. `git grep -nE "AIza[0-9A-Za-z_-]{35}"` before every commit: no output. Never query the production database.
-8. **What reaches Gemini (F-9).** Only in P183, P188, P191 (one call), P206 (the whole clip) and P211; only the 15 labelled transcripts of D-493 (`a01`, `w01`-`w14`; never `a02`) and the reference clip's transcript, as text. Never audio, a frame, or another clip's words. Each call listed in the entry (transcript, model, input/output/thinking tokens, status). Stay under the local cap (`AI_MONTHLY_CAP_USD=5`).
+7. **Secrets.** Never print, log, commit or paste a value from `.env`, `.env.deploy`, a token, a cookie or a link. Never `cat` either file; never source `.env.deploy`. A script reads `PLAN_API_KEY` (and DeepSeek's `PLAN_API_KEY2` until it is renamed, D-465) from its environment by name. `bash scripts/v62-gate.sh` searches for both values before every commit. Never query the production database.
+8. **What reaches the provider, DeepSeek (F-9, D-500).** Only in P183, P188, P191 (one call), P206 (the whole clip) and P211; only the 15 labelled transcripts of D-493 (`a01`, `w01`-`w14`; never `a02`) and the reference clip's transcript, as text. Never audio, a frame, or another clip's words. Each call listed in the entry (transcript, model, input/output/thinking tokens, status). Stay under the local cap (`AI_MONTHLY_CAP_USD=5`).
 9. Never stage `testclips/**`, `testclips_private/**`, `fixtures/.gen*/**`, `corpus/**`, `web/test-results/**`, `web/dist*/**`, `.env*`. Long runs start detached and are read from a log tail; no foreground command over 10 minutes. **Trim test output** to its result lines (`cargo test -q … 2>&1 | grep -E "^test result|FAILED|panicked"`, Playwright's last lines); never read a whole log into the session. Append to the changelog with the Edit tool, never a heredoc holding backticks.
 10. **Branch.** Commit on `v6.2-build` only. Push only where the prompt says. Never push to `main`, force-push, delete a branch or tag, or change Render, Vercel or Google settings. Ready, merge and tag are the founder's.
 
@@ -131,6 +133,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 ---
 
 ## Prompt 183b — The Gemini reads left by P183 (added in P183)
+
+**Done 2026-11-11 as DeepSeek's reads instead (D-500; V6 CL Entry 43; `experiments.md` TE-15).** The founder chose DeepSeek, so the Gemini steps below were not run and are kept as history.
 
 **Effort: Medium.**
 
