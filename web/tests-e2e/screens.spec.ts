@@ -256,3 +256,90 @@ for (const size of LANDING_SIZES) {
     });
   }
 }
+
+// --- V6.2, P194: the AI plan's screens (v6.2implementation §12) ---------------
+// On a development build with `ai_plan` on only:
+// `OFFCUT_FEATURES_ON=ai_plan pnpm screens --grep "V6.2"`. The fake API has
+// no `/plan` (P210), and nobody is signed in: the clip falls back to the rules
+// and says so; the model's plan is put on the list by the `fakePlan` hook.
+// Every state is read by axe (no serious or critical violation).
+
+type PlanHooks = {
+  flags(): { ai_plan: boolean };
+  fakePlan(): void;
+  fakePlanFallback(why: string): void;
+};
+
+const planHooks = (page: Page) => ({
+  flags: () => page.evaluate(() => (window as unknown as { __offcutDev?: PlanHooks }).__offcutDev?.flags().ai_plan ?? false),
+  fakePlan: () => page.evaluate(() => (window as unknown as { __offcutDev?: PlanHooks }).__offcutDev?.fakePlan()),
+  fallback: (why: string) =>
+    page.evaluate((w) => (window as unknown as { __offcutDev?: PlanHooks }).__offcutDev?.fakePlanFallback(w), why),
+});
+
+async function noSeriousViolation(page: Page, state: string): Promise<void> {
+  const { axe } = await import("./helpers/fixtures");
+  const found = (await axe(page)).map((v) => `${v.id}: ${String(v.nodes.length)} node(s)`);
+  expect(found, `axe on ${state}`).toEqual([]);
+}
+
+for (const size of WIDTHS) {
+  test(`V6.2, the plan: the visuals list, the text for your post, Copied, a fallback, regenerate, the settings switch, ${String(size.width)} x ${String(size.height)}`, async ({ page, context }) => {
+    await page.setViewportSize(size);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await ensureModelCached(context);
+    await openEditor(page);
+    const hooks = planHooks(page);
+    test.skip(!(await hooks.flags()), "a build with ai_plan on: OFFCUT_FEATURES_ON=ai_plan pnpm screens");
+
+    await dropClip(page, referenceClip());
+    // Signed out: no request, the rules plan, and the line that signing in gives one (D-494).
+    await expect(page.getByText(messages.plan.fallback.signedOut)).toBeVisible({ timeout: patient(240_000) });
+    await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled({ timeout: patient(240_000) });
+
+    await page.getByRole("tab", { name: messages.panel.visuals }).click();
+    await hooks.fakePlan();
+    await expect(page.getByTestId("plan-items").locator('[data-kind="hook_title"]')).toBeVisible();
+    await expect(page.getByTestId("regenerate-plan")).toBeVisible();
+    await picture(page, "plan-visuals");
+    await noSeriousViolation(page, "the visuals list");
+
+    const extras = page.getByTestId("text-extras");
+    await extras.scrollIntoViewIfNeeded();
+    await expect(extras.getByTestId("extra-hashtags")).toBeVisible();
+    await picture(page, "plan-text-extras");
+    await noSeriousViolation(page, "the text for your post");
+
+    const hook = extras.getByTestId("extra-hook");
+    await hook.getByRole("button", { name: messages.plan.extras.copy, exact: true }).click();
+    await expect(hook.getByRole("button", { name: messages.plan.extras.copied, exact: true })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await hook.locator("p").innerText());
+    await picture(page, "plan-copied", false);
+
+    await hooks.fallback("quota");
+    await expect(page.getByText(messages.plan.fallback.quota)).toBeVisible();
+    await picture(page, "plan-fallback-quota", false);
+    await noSeriousViolation(page, "a fallback's toast");
+
+    // Signed out, "Regenerate plan" asks nothing and says why; the plan stays.
+    await page.getByTestId("regenerate-plan").click();
+    await expect(page.getByText(messages.plan.regenerateWhy.signed_out)).toBeVisible();
+    await expect(page.getByTestId("plan-items").locator('[data-kind="hook_title"]')).toBeVisible();
+    await picture(page, "plan-regenerate-signed-out", false);
+    await noSeriousViolation(page, "regenerate's toast");
+
+    await page.goto("/settings");
+    const setting = page.getByTestId("ai-plan-switch");
+    await expect(setting).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("what-leaves")).toContainText("DeepSeek");
+    await picture(page, "settings-ai-plan-on");
+    await noSeriousViolation(page, "the settings switch on");
+    await setting.click();
+    await expect(setting).toHaveAttribute("aria-checked", "false");
+    await picture(page, "settings-ai-plan-off");
+    await noSeriousViolation(page, "the settings switch off");
+    // Kept on this device: a reload reads it back.
+    await page.reload();
+    await expect(page.getByTestId("ai-plan-switch")).toHaveAttribute("aria-checked", "false");
+  });
+}

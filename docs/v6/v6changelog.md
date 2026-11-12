@@ -47,7 +47,8 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
 | 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
 | 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
-| 7 | (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
+| 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
+| 8 | (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P210 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1651,3 +1652,69 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 - No media suite was run: with the flag off the run's calls are unchanged.
 
 **Open.** 35 (the privacy page and settings must name DeepSeek before `ai_plan` goes on). Known issues 5 and 7 (P212, P194). Not pushed (push 2 is P197). Next: P194.
+
+## Entry 56 - 2026-11-12 - P194: the list, the text extras, the copy
+
+**What changed.**
+- **Copy:**
+  - `copy/plan.ts` gains `planCopy` with §12's drafts, DeepSeek in place of Gemini (D-500);
+  - `fallbackLine` and `regenerateLine` choose the line for a reason;
+  - the Enhance and Glow drafts wait there for P201 and P208;
+  - `messages.ts` gains the import and one key, `plan` (683 lines).
+- **The visuals list** (`PlanItemList.tsx`):
+  - the five kinds get their own Lucide 1.61.0 icons in `icons.tsx` (highlighter, shapes, zoom-in, smile, heading; with copy and refresh-cw for the buttons);
+  - "Regenerate plan" sits under the list, also under an empty one, with `ai_plan` and the switch on. It is disabled while an export runs or a change is applied. A plan that changes nothing gives one toast with the reason.
+- **`TextExtrasPanel.tsx`** (new): "Text for your post" under the visuals. The hook, the post caption and the hashtags (as one line) each have Copy, which turns to "Copied" for 2 s and is announced to a screen reader. It shows only extras that passed, and nothing on a rules plan.
+- **The extras that passed reach the page.** `validate_plan` answers `extras` (D-454's note). The clip store holds `planExtras`, set where a model's plan is used: the pipeline, a stored plan, regenerate. A run again starts without them.
+- **The fallback toast:** `usePlanFallbackToast` beside the cloud's, in `Stage`, once a run. Signed out, it says that signing in gives an AI-planned edit (D-494).
+- **The settings page, with the flag on only:**
+  - the "AI edit plan" switch and its line;
+  - a row of "What leaves your device" after the sound's (open item 35's wording, a draft for CP 3).
+  - With the flag off the page and its table are as before.
+- **Dev hooks:** `flags`, `fakePlan` (a model's plan with one item of each new kind and its extras, on the list only, the scene not rebuilt) and `fakePlanFallback`.
+- **`screens.spec.ts`:** one new test, skipped unless the build has `ai_plan`.
+- **TS §5:** rows for `TextExtrasPanel.tsx` and `copy/plan.test.ts`; `PlanItemList.tsx`' row.
+
+**Captures** (`OFFCUT_FEATURES_ON=ai_plan pnpm screens --grep "V6.2"`, development build, D1). 14 files in `~/v6.2-review/ui/`, each at 1280 x 800 and 1920 x 1080:
+- `plan-visuals`: the list with the five kinds, the signed-out toast of the real run;
+- `plan-text-extras`;
+- `plan-copied`;
+- `plan-fallback-quota`;
+- `plan-regenerate-signed-out`;
+- `settings-ai-plan-on`, `settings-ai-plan-off`.
+
+The real run, signed out, sent no request and showed the sign-in line. Copy put the hook on the clipboard (read back). The switch off was kept across a reload.
+
+**axe.** No serious or critical violation (the suites' `axe` helper) on each of the 7 states, at both widths.
+
+**Tests.**
+- Vitest (+9):
+  - `run-pipeline.test.ts` +5: a model plan's extras reach the clip; none when every item is dropped, none after a failed request; a stored plan brings them back with no request; a run again starts without them;
+  - `regenerate-plan.test.ts` +1: new extras replace the old, and a failure keeps them;
+  - `copy/plan.test.ts` (3, new): each fallback's and regeneration's line; the settings line names DeepSeek and China and promises no keeping or training.
+- `scene_api.rs` +1: the extras that passed, a bad hashtag left out.
+- Removing the pipeline's `setPlanExtras` for a moment failed 1.
+- `review-edit.spec.ts`, unchanged: 18 passed on a fresh keyed `pnpm build:e2e` (`dist/`, `ai_plan:!1`).
+- `landing.spec.ts`: 30 passed on the same build (the settings table, flag off).
+
+**Declared.**
+- P193's two `validate_plan` tests in `scene_api.rs` (V6.2's own, not of the base) gain the `extras` field in their expected JSON; nothing removed.
+- No test of the base changed.
+- `screens.spec.ts` gains one test; its existing tests are unchanged.
+
+**Differs from the plan.**
+- §12's Gemini line reads DeepSeek.
+- Three regeneration lines and the settings row are new drafts (§12's as-read note).
+- `plan.processing` is not shown (known issue 8).
+- The captures need a flag-on development build, as the fake API has no `/plan` until P210; the model's plan is put on the list by a dev hook.
+
+**Found.**
+1. The page had no way to know which text extras passed. Fixed through `validate_plan`.
+2. `pnpm screens` writes its development build into `dist/`, so `dist/` must be built again (`pnpm build:e2e`) before a media suite.
+
+**Counts.**
+- Vitest **744** (735 + 9).
+- Rust **998 / 0 / 7** by count (997 + 1; `offcut-wasm-render` 12).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35: the settings line and row are drafted; the privacy policy's own text still needs DeepSeek before `ai_plan` goes on, and its wording is the founder's at CP 3. Known issues 5 and 8 (P212, P210). Not pushed (push 2 is P197). Next: P195 (the images; checkpoint 2b).

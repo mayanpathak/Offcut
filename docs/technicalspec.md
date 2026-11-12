@@ -693,6 +693,7 @@ offcut/
 │   │   │   ├── transcription.ts       (cloud transcription) the card, the processing line and the two toasts (cloudimplementation D-380)
 │   │   │   ├── long.ts                (V6.1) the long page's words, REJECT_HDR and the two E_SOURCE_* (v6.1implementation §10.5, D-426)
 │   │   │   ├── plan.ts                (V6.2) the AI plan's, the extras' and Enhance's words, imported by messages.ts (v6.2implementation §12, D-491)
+│   │   │   ├── plan.test.ts           (V6.2) which line each fallback and each failed regeneration shows; the settings line names DeepSeek and promises no keeping
 │   │   │   └── messages.test.ts
 │   │   ├── net/
 │   │   │   ├── http.ts                [ONLY] fetch to the app origin (/api/v1)
@@ -940,7 +941,8 @@ offcut/
 │   │       │   ├── PreviewGestures.tsx    the gestures and their chrome over the preview (v4implementation D-183)
 │   │       │   ├── CaptionEditor.tsx
 │   │       │   ├── CaptionWordControls.tsx  a transcript word's field and menu (v4implementation D-182)
-│   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item
+│   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item; (V6.2) the five kinds' icons and "Regenerate plan"
+│   │       │   ├── TextExtrasPanel.tsx    (V6.2) "Text for your post": the hook, caption and hashtags that passed, each with Copy (v6.2implementation D-454)
 │   │       │   ├── StylePanel.tsx         the style cards and Highlight numbers
 │   │       │   ├── StylePicker.tsx
 │   │       │   ├── FramingPanel.tsx       caption position and crop

@@ -101,7 +101,12 @@ export async function choosePlan(
       return rules;
     }
     const kept = await check(planned.stored.plan);
-    return "kept" in kept && kept.kept > 0 ? planned.stored.plan : rules;
+    if ("kept" in kept && kept.kept > 0) {
+      // P194: the panel shows the extras that passed (D-454).
+      clipStore.setPlanExtras(kept.extras);
+      return planned.stored.plan;
+    }
+    return rules;
   }
 
   const { choice, asked, latencyMs, requestedAt } = planned;
@@ -119,6 +124,8 @@ export async function choosePlan(
       outcome = "ok";
       plan = choice.plan;
       items = checked.kept;
+      // P194: the panel shows the extras that passed (D-454).
+      clipStore.setPlanExtras(checked.extras);
     } else {
       // Every item dropped: the rules plan, and the drops are still counted.
       dropped = checked.dropped;

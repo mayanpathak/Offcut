@@ -844,3 +844,55 @@ describe("review-update with a model's plan (P193)", () => {
     expect(clip()).toMatchObject({ status: "ready", plan: MODEL, edit: { word_edits: { 0: "three" } } });
   });
 });
+
+// --- V6.2, P194: the text extras that passed reach the clip (D-454) -----------
+
+describe("runPipeline, the plan's text extras (P194)", () => {
+  const EXTRAS = { hook: "The one thing", post_caption: "A caption.", hashtags: ["#edit"] };
+
+  beforeEach(planOn);
+
+  afterEach(() => {
+    Object.assign(cloud.flags, { ai_plan: false });
+  });
+
+  it("a model plan used: the clip holds the extras its check kept", async () => {
+    planSeams.check = () => Promise.resolve({ kept: 2, dropped: [], extras: EXTRAS });
+    await runPipeline(CLIP);
+    expect(clip()).toMatchObject({ status: "ready", plan: MODEL, planExtras: EXTRAS });
+  });
+
+  it("the rules plan used, the model's every item dropped: no extras, even those that passed", async () => {
+    planSeams.check = () => Promise.resolve({ kept: 0, dropped: [], extras: EXTRAS });
+    await runPipeline(CLIP);
+    expect(clip().plan).toBe(RULES_ITEMS);
+    expect(clip().planExtras).toBeUndefined();
+  });
+
+  it("a request that failed: no extras", async () => {
+    planSeams.choice = { source: "rules", why: "unavailable" };
+    await runPipeline(CLIP);
+    expect(clip().planExtras).toBeUndefined();
+  });
+
+  it("restore: a kept model plan brings its extras back from the check, with no request", async () => {
+    planSeams.stored = { plan: MODEL, source: "model", requestedAt: 1, catalog: CATALOG_VERSION };
+    planSeams.check = () => Promise.resolve({ kept: 3, dropped: [], extras: EXTRAS });
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plan.request");
+    expect(clip().planExtras).toEqual(EXTRAS);
+  });
+
+  it("a run again starts without the extras of the run before", async () => {
+    planSeams.check = () => Promise.resolve({ kept: 2, dropped: [], extras: EXTRAS });
+    fail("audio.assemble", "E_DSP", "audio_chain");
+    await runPipeline(CLIP);
+    expect(clip().status).toBe("failed");
+    script();
+    planOn();
+    planSeams.choice = { source: "rules", why: "timeout" };
+    await runPipeline(CLIP);
+    expect(clip()).toMatchObject({ status: "ready", plan: RULES_ITEMS });
+    expect(clip().planExtras).toBeUndefined();
+  });
+});

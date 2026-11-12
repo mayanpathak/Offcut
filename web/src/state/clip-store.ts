@@ -17,7 +17,7 @@ import type {
   TimeMap,
   Transcript,
 } from "../gen/domain";
-import type { AppFailure, FeedLine, SceneChunk } from "../workers/protocol";
+import type { AppFailure, FeedLine, PlanExtras, SceneChunk } from "../workers/protocol";
 import { clear as clearHistory } from "./history";
 import { CLIP_MACHINE, type ClipEvent, type ClipStatus } from "./machines/clip-machine";
 import { transition } from "./machines/transition";
@@ -44,6 +44,11 @@ export type ClipState = {
    * switch is off, nor when no plan was asked for.
    */
   planFallback?: Exclude<PlanOutcome, "ok" | "off">;
+  /**
+   * V6.2 (P194, D-454): the text extras of the model's plan the clip uses, as
+   * its validation kept them; absent on a rules plan, which has none.
+   */
+  planExtras?: PlanExtras;
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
@@ -220,6 +225,17 @@ export function planFellBack(reason: Exclude<PlanOutcome, "ok" | "off">): void {
   if (useClipStore.getState().status === "processing") {
     useClipStore.setState({ planFallback: reason });
   }
+}
+
+/** V6.2 (P194): the text extras of the plan the clip uses now; `undefined` for a rules plan. */
+export function setPlanExtras(extras: PlanExtras | undefined): void {
+  const next = { ...useClipStore.getState() };
+  if (extras === undefined) {
+    delete next.planExtras;
+  } else {
+    next.planExtras = extras;
+  }
+  useClipStore.setState(next, true);
 }
 
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */

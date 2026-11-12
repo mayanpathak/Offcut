@@ -261,3 +261,83 @@ export function Zap(props: IconProps) {
     </Svg>
   );
 }
+
+// V6.2 (P194): the five plan kinds' icons in the visuals list, the text
+// extras' Copy and "Regenerate plan". Lucide 1.61.0, as above.
+
+/** Lucide `highlighter`: an Emphasis. */
+export function Highlighter(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m9 11-6 6v3h9l3-3" />
+      <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
+    </Svg>
+  );
+}
+
+/** Lucide `shapes`: an Icon. */
+export function Shapes(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <circle cx="17.5" cy="17.5" r="3.5" />
+    </Svg>
+  );
+}
+
+/** Lucide `zoom-in`: a Zoom (punch in). */
+export function ZoomIn(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" x2="16.65" y1="21" y2="16.65" />
+      <line x1="11" x2="11" y1="8" y2="14" />
+      <line x1="8" x2="14" y1="11" y2="11" />
+    </Svg>
+  );
+}
+
+/** Lucide `smile`: an Emoji. */
+export function Smile(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M15 10V9" />
+      <path d="M16.472 15a6 6 0 01-8.943 0" />
+      <path d="M9 10V9" />
+      <circle cx="12" cy="12" r="10" />
+    </Svg>
+  );
+}
+
+/** Lucide `heading`: a Hook title. */
+export function Heading(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 12h12" />
+      <path d="M6 20V4" />
+      <path d="M18 20V4" />
+    </Svg>
+  );
+}
+
+export function Copy(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </Svg>
+  );
+}
+
+/** Lucide `refresh-cw`: "Regenerate plan". */
+export function RefreshCw(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </Svg>
+  );
+}

@@ -3,16 +3,23 @@
 // label, its figure, its time (a seek) and a switch; "N of M visuals on" over
 // them. With none, the sentence of PS §10 J7 and what Offcut looks for. The
 // figure is the detector's own display text (INV-22): nothing is parsed here.
+// V6.2 (P194): the five plan kinds' own icons, and "Regenerate plan" under the
+// list with `ai_plan` and the settings switch on (§8.3).
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
+import { FEATURES } from "../../config/features";
 import { messages } from "../../copy/messages";
 import type { EventKind, PlanItem, Word } from "../../gen/domain";
 import { useClipStore } from "../../state/clip-store";
+import { usePlanStore } from "../../state/plan-store";
 import { usePreviewStore } from "../../state/preview-store";
+import { useUiStore } from "../../state/ui-store";
 import { pause, scrub } from "../../usecases/control-preview";
+import { regeneratePlan } from "../../usecases/regenerate-plan";
 import { toggleEvent } from "../../usecases/toggle-event";
-import { ArrowRight, Crop, Hash, List, Sparkles, Type, Zap } from "../icons";
+import { ArrowRight, Hash, Heading, Highlighter, List, RefreshCw, Shapes, Smile, Zap, ZoomIn } from "../icons";
+import { Button } from "../primitives/Button";
 import { PanelSection } from "../primitives/PanelSection";
 import { Switch } from "../primitives/Switch";
 import styles from "../styles/panel.module.css";
@@ -23,13 +30,52 @@ const KIND_ICON: Record<EventKind, ReactNode> = {
   list_reveal: <List />,
   from_to: <ArrowRight />,
   keyword_pop: <Zap />,
-  // V6.2 (D-446): stand-ins from the icons in hand; P194 sets the list's look.
-  emphasis: <Type />,
-  icon_pop: <Sparkles />,
-  punch_in: <Crop />,
-  emoji: <Sparkles />,
-  hook_title: <Type />,
+  // V6.2 (D-446, P194): each kind its own Lucide icon.
+  emphasis: <Highlighter />,
+  icon_pop: <Shapes />,
+  punch_in: <ZoomIn />,
+  emoji: <Smile />,
+  hook_title: <Heading />,
 };
+
+/**
+ * "Regenerate plan" (§8.3): one request; a plan that keeps an item replaces
+ * the clip's, and anything else leaves it and says why in a toast.
+ */
+function RegeneratePlan() {
+  const switchOn = usePlanStore((state) => state.switchOn);
+  const ready = useClipStore((state) => state.status === "ready");
+  const locked = usePreviewStore((state) => state.status === "locked");
+  const [busy, setBusy] = useState(false);
+  if (!FEATURES.ai_plan || !switchOn) {
+    return null;
+  }
+  const copy = messages.plan;
+  return (
+    <div className={styles.regenerate}>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<RefreshCw size={16} />}
+        busy={busy}
+        disabled={!ready || locked}
+        {...(locked ? { disabledReason: messages.editor.availableAfterExport } : {})}
+        data-testid="regenerate-plan"
+        onClick={() => {
+          setBusy(true);
+          void regeneratePlan().then((result) => {
+            setBusy(false);
+            if (!result.ok) {
+              useUiStore.getState().pushToast({ id: "plan-regenerate", message: copy.regenerateLine(result.why) });
+            }
+          });
+        }}
+      >
+        {copy.regenerate}
+      </Button>
+    </div>
+  );
+}
 
 /** The words of a range, as the transcript editor shows them (an edit in place of what was heard). */
 function wordsOf(words: readonly Word[], edits: Readonly<Record<number, string>>, from: number, to: number): string {
@@ -90,6 +136,7 @@ export function PlanItemList() {
           {messages.visuals.noEventsFound}
         </p>
         <p className={styles.note}>{messages.visuals.whatWeLookFor}</p>
+        <RegeneratePlan />
         <CutsSection />
       </PanelSection>
     );
@@ -132,6 +179,7 @@ export function PlanItemList() {
           );
         })}
       </ul>
+      <RegeneratePlan />
       <CutsSection />
     </PanelSection>
   );

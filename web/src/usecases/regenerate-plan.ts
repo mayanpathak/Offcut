@@ -9,7 +9,7 @@ import { FEATURES } from "../config/features";
 import type { PlanOutcome } from "../gen/api";
 import { CATALOG_VERSION } from "../gen/domain";
 import * as plansRepo from "../persistence/plans-repo";
-import { useClipStore } from "../state/clip-store";
+import { setPlanExtras, useClipStore } from "../state/clip-store";
 import { usePlanStore } from "../state/plan-store";
 import { pool, whenFree } from "../workers/pool";
 import { planFor } from "./request-plan";
@@ -58,6 +58,10 @@ export async function regeneratePlan(): Promise<RegenerateOutcome> {
     }
     if (!(await replacePlan(choice.plan))) {
       return { ok: false, why: "busy" };
+    }
+    // P194: the panel shows the new plan's extras that passed (D-454).
+    if (useClipStore.getState().clipId === clipId) {
+      setPlanExtras(checked.extras);
     }
   } catch {
     // A worker that failed or crashed: the clip keeps the plan it has.

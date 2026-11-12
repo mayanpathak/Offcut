@@ -319,3 +319,50 @@
   font: inherit;
   box-shadow: var(--focus);
 }
+
+/* V6.2 (P194): "Text for your post", and "Regenerate plan" under the list. */
+.extras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.extra {
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--sp-1);
+}
+
+.extraHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.extraLabel {
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-500);
+}
+
+.extraText {
+  margin: var(--sp-2) 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.regenerate {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--sp-3);
+}

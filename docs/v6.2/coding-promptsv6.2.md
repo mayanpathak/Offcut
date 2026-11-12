@@ -447,6 +447,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 194 — The list, the text extras, the copy
 
+**Done 2026-11-12 (V6 CL Entry 56).** 14 captures in `~/v6.2-review/ui/`; axe clean on the 7 new states at both widths; `review-edit.spec.ts` unchanged and passing on `dist/`.
+
 **Effort: Medium.**
 
 **Objective.** A person sees and controls what the plan did.

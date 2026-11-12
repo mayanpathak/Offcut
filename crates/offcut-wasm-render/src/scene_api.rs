@@ -187,12 +187,27 @@ struct PlanCheckInput {
 }
 
 /// What `validate_plan` answers: how many items the plan keeps and what it
-/// left out, `{ kept, dropped }`, or why it was refused whole, `{ refused }`.
+/// left out, `{ kept, dropped, extras }`, or why it was refused whole, `{ refused }`.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 enum PlanCheck {
-    Valid { kept: u32, dropped: Vec<Dropped> },
-    Refused { refused: &'static str },
+    Valid {
+        kept: u32,
+        dropped: Vec<Dropped>,
+        extras: ExtrasValue,
+    },
+    Refused {
+        refused: &'static str,
+    },
+}
+
+/// V6.2 (P194, D-454): the text extras that passed, for the text extras
+/// panel: "the panel shows only what passed". `ValidExtras` as JavaScript reads it.
+#[derive(Debug, Default, PartialEq, Serialize)]
+struct ExtrasValue {
+    hook: Option<String>,
+    post_caption: Option<String>,
+    hashtags: Vec<String>,
 }
 
 /// `validate` alone, without a scene: what `set_scene` would keep of `input`'s
@@ -207,7 +222,17 @@ fn check_plan(input: PlanCheckInput) -> Result<PlanCheck, &'static str> {
     ) {
         Ok((plan, dropped)) => {
             let kept = u32::try_from(plan.items().len()).map_err(|_| "PlanCheckInput")?;
-            Ok(PlanCheck::Valid { kept, dropped })
+            let valid = plan.extras();
+            let extras = ExtrasValue {
+                hook: valid.hook.clone(),
+                post_caption: valid.post_caption.clone(),
+                hashtags: valid.hashtags.clone(),
+            };
+            Ok(PlanCheck::Valid {
+                kept,
+                dropped,
+                extras,
+            })
         }
         Err(rejected) => Ok(PlanCheck::Refused {
             refused: reject_name(rejected.reason),
@@ -565,7 +590,7 @@ mod tests {
     fn validate_plan_counts_the_items_kept_and_reports_the_drops_without_a_session() {
         // V6.2 (P193): one item on a word, one anchored past the last word.
         let checked = check(model_plan(&[1, 9]), json!({})).unwrap();
-        let PlanCheck::Valid { kept, dropped } = &checked else {
+        let PlanCheck::Valid { kept, dropped, .. } = &checked else {
             panic!("refused: {checked:?}");
         };
         assert_eq!(*kept, 1);
@@ -573,7 +598,7 @@ mod tests {
         assert_eq!(dropped[0].kind, Some(offcut_types::EventKind::Emphasis));
         assert_eq!(
             serde_json::to_value(&checked).unwrap(),
-            json!({ "kept": 1, "dropped": [{ "kind": "emphasis", "reason": serde_json::to_value(dropped[0].reason).unwrap() }] })
+            json!({ "kept": 1, "dropped": [{ "kind": "emphasis", "reason": serde_json::to_value(dropped[0].reason).unwrap() }], "extras": { "hook": null, "post_caption": null, "hashtags": [] } })
         );
         // Every item dropped is still an answer: kept 0.
         let none = check(model_plan(&[9]), json!({})).unwrap();
@@ -582,7 +607,7 @@ mod tests {
         let rules = check(from_rules(&[], &four_words()), json!({})).unwrap();
         assert_eq!(
             serde_json::to_value(rules).unwrap(),
-            json!({ "kept": 0, "dropped": [] })
+            json!({ "kept": 0, "dropped": [], "extras": { "hook": null, "post_caption": null, "hashtags": [] } })
         );
     }
 
@@ -606,5 +631,24 @@ mod tests {
             check(model_plan(&[1]), json!({ "01": "x" })),
             Err("PlanCheckInput")
         );
+    }
+
+    #[test]
+    fn validate_plan_answers_the_text_extras_that_passed_and_only_those() {
+        // V6.2 (P194, D-454): a valid hook and caption kept, a bad hashtag left out.
+        let mut plan = model_plan(&[1]);
+        plan.extras.hook = Some(serde_json::from_value(json!("We grew ten times")).unwrap());
+        plan.extras.post_caption = Some("How we grew, in one minute.".to_owned());
+        plan.extras.hashtags = vec![
+            serde_json::from_value(json!("#growth")).unwrap(),
+            serde_json::from_value(json!("#not a tag")).unwrap(),
+        ];
+        let checked = serde_json::to_value(check(plan, json!({})).unwrap()).unwrap();
+        assert_eq!(
+            checked["extras"],
+            json!({ "hook": "We grew ten times", "post_caption": "How we grew, in one minute.", "hashtags": ["#growth"] })
+        );
+        assert_eq!(checked["kept"], json!(1));
+        assert_eq!(checked["dropped"].as_array().map(Vec::len), Some(1));
     }
 }

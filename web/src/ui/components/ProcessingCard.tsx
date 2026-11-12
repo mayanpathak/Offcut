@@ -120,6 +120,20 @@ export function useCloudFallbackToast(): void {
   }, [fallback]);
 }
 
+/**
+ * V6.2 (§8.2, D-494, P194): one toast when a run asked for an AI plan and uses
+ * the built-in rules, and why; signed out, the line says that signing in gives
+ * one. Called by `Stage`, as the cloud's: told once a run.
+ */
+export function usePlanFallbackToast(): void {
+  const fallback = useClipStore((state) => state.planFallback);
+  useEffect(() => {
+    if (fallback !== undefined) {
+      useUiStore.getState().pushToast({ id: "plan-fallback", message: messages.plan.fallbackLine(fallback) });
+    }
+  }, [fallback]);
+}
+
 export function ProcessingCard({ cancelled }: { cancelled: boolean }) {
   const stage = useClipStore((state) => state.stage);
   const feed = useClipStore((state) => state.feed);

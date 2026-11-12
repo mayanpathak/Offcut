@@ -213,3 +213,18 @@ describe("regeneratePlan (§8.3)", () => {
     expect(m.calls).toEqual([]);
   });
 });
+
+describe("regeneratePlan's text extras (P194)", () => {
+  it("a new plan's extras that passed replace the clip's; a failure keeps the old ones", async () => {
+    ready();
+    const before = { hook: "Old hook", post_caption: null, hashtags: [] };
+    clipStore.setPlanExtras(before);
+    m.check = { kept: 1, dropped: [], extras: { hook: null, post_caption: "New caption.", hashtags: ["#new"] } };
+    expect(await regeneratePlan()).toEqual({ ok: true });
+    expect(clip().planExtras).toEqual({ hook: null, post_caption: "New caption.", hashtags: ["#new"] });
+
+    m.choice = { source: "rules", why: "quota" };
+    expect(await regeneratePlan()).toEqual({ ok: false, why: "quota" });
+    expect(clip().planExtras).toEqual({ hook: null, post_caption: "New caption.", hashtags: ["#new"] });
+  });
+});

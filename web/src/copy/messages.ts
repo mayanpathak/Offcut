@@ -10,7 +10,7 @@ import { FEATURES } from "../config/features";
 import { type ErrorCode, type EventKind, LIMITS, type RouteReject, SOURCE_LIMITS, type UnsupportedReason } from "../gen/domain";
 import { landingCopy, pricingCopy } from "./landing";
 import { longCopy, longRejections } from "./long";
-import { planFoundLines, planKindNames } from "./plan";
+import { planCopy, planFoundLines, planKindNames } from "./plan";
 import { transcriptionCopy } from "./transcription";
 
 type EventName = AnalyticsEvent["name"];
@@ -95,6 +95,8 @@ export const messages = {
   transcription: transcriptionCopy,
   // The long page (V6.1): copy/long.ts (v6.1implementation D-426).
   long: longCopy,
+  // V6.2's AI plan: copy/plan.ts (v6.2implementation D-491).
+  plan: planCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>

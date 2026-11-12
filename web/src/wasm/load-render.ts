@@ -40,7 +40,9 @@ import initRender, {
 import renderWasmUrl from "./pkg/render/offcut_render_bg.wasm?url";
 
 /** What `validate_plan` answers (V6.2); `workers/protocol.ts`' `PlanCheck` is the same. */
-export type PlanCheckValue = { kept: number; dropped: Dropped[] } | { refused: "PlanFormat" | "PlanCatalog" };
+export type PlanCheckValue =
+  | { kept: number; dropped: Dropped[]; extras: { hook: string | null; post_caption: string | null; hashtags: string[] } }
+  | { refused: "PlanFormat" | "PlanCatalog" };
 
 /** One compressed video frame, with its place on the clip's timeline in microseconds. */
 export type VideoSample = { data: Uint8Array; ptsUs: number; durationUs: number; isKeyframe: boolean };

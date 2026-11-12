@@ -14,6 +14,7 @@ import { ExportFailure } from "../components/ExportProgress";
 import { FramingPanel } from "../components/FramingPanel";
 import { PlanItemList } from "../components/PlanItemList";
 import { StylePanel } from "../components/StylePanel";
+import { TextExtrasPanel } from "../components/TextExtrasPanel";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { Crop, Palette, Sparkles, Type } from "../icons";
 import { Skeleton } from "../primitives/Skeleton";
@@ -39,7 +40,13 @@ function TabContent({ tab }: { tab: Tab }) {
     case "style":
       return <StylePanel />;
     case "visuals":
-      return <PlanItemList />;
+      // V6.2 (P194): the text extras of an AI plan under its visuals.
+      return (
+        <>
+          <PlanItemList />
+          <TextExtrasPanel />
+        </>
+      );
     case "framing":
       return <FramingPanel />;
     default:

@@ -202,7 +202,10 @@ export type ClockSync = { audioMs: OutMs; epochMs: number };
  * V6.2: what `validatePlan` answers: how many items the plan keeps and what
  * it left out, or why a plan of another build is refused whole (DC-7).
  */
-export type PlanCheck = { kept: number; dropped: Dropped[] } | { refused: "PlanFormat" | "PlanCatalog" };
+export type PlanCheck = { kept: number; dropped: Dropped[]; extras: PlanExtras } | { refused: "PlanFormat" | "PlanCatalog" };
+
+/** V6.2 (P194, D-454): a plan's text extras that passed its validation, for the text extras panel. */
+export type PlanExtras = { hook: string | null; post_caption: string | null; hashtags: string[] };
 
 /** What `setScene` answers: what the plan's validation left out (D-124), and the chunks of the captions (D-182). */
 export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };
