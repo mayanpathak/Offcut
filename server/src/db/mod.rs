@@ -38,6 +38,14 @@ pub async fn connect(database_url: &str) -> Result<PgPool, sqlx::Error> {
 
 /// Applies the migrations that the database does not have yet. They are
 /// forward-only and run at every boot (TS §23.3).
+///
+/// From V6.2 (v6.2implementation §14.4, V6 CL open item 38), a version the
+/// database has and this build does not know is ignored: a rollback to the
+/// previous release then boots on a database a later one migrated. sqlx
+/// refuses it by default (`VersionMissing`), which is why V6.1 needs the
+/// rollback step of §14.4.
 pub async fn migrate(pool: &PgPool) -> Result<(), MigrateError> {
-    sqlx::migrate!("./migrations").run(pool).await
+    let mut migrator = sqlx::migrate!("./migrations");
+    migrator.set_ignore_missing(true);
+    migrator.run(pool).await
 }

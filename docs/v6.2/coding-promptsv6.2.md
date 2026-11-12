@@ -307,6 +307,27 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ---
 
+## Prompt 189b — The rollback across the migration (added at open item 38)
+
+**Done 2026-11-12 (V6 CL Entry 51).**
+
+**Effort: Medium.**
+
+**Objective.** A rollback to V6.1 after V6.2's migration boots, and V6.2 comes back after it.
+
+**Do.**
+
+1. `db::migrate` sets `ignore_missing(true)`; `0002_ai_usage.sql` creates its tables `IF NOT EXISTS` (it has never been deployed).
+2. §14.4 gains the one step: `DELETE FROM _sqlx_migrations WHERE version = 2` before V6.1 boots.
+3. `migration_rollback.rs`: V6.1's migrator refused, then running after the step; V6.2's migration again with every row kept; a version this build does not know ignored. The local development database repaired the same way.
+
+**Acceptance.**
+
+- [x] `cargo test -p offcut-api` green with the new tests.
+- [x] Commit `V6.2 P189b: the rollback across the migration`.
+
+---
+
 ## Prompt 190 — The provider and the Gemini adapter
 
 **Done 2026-11-12 as the DeepSeek adapter (D-500: read `deepseek.rs`, `fixtures/deepseek/`, `deepseek_adapter.rs` for the Gemini names below), with checkpoint 1's item-level parsing in `plan/parse.rs` (V6 CL Entry 50).**

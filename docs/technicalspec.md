@@ -638,6 +638,7 @@ offcut/
 │       ├── analytics_allowlist.rs
 │       ├── rate_limit.rs
 │       ├── account_delete.rs
+│       ├── migration_rollback.rs      (V6.2) a rollback across a migration: V6.1 after §14.4's step, V6.2 back, unknown versions ignored
 │       ├── plan_route.rs
 │       ├── shorts_route.rs
 │       ├── chat_route.rs

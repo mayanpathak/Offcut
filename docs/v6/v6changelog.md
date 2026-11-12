@@ -38,7 +38,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 35 | **The privacy page and the settings table name DeepSeek before `ai_plan` goes on in production.** The privacy page promises "We will update this page before any new kind of data leaves your computer"; its "Cloud captions" style section, its "Who handles it" list and the settings "What leaves your device" table gain a row: the words of the transcript and their timings go to DeepSeek, in China, to plan the edit; never the audio or video. They cannot say "not kept" or "never used to train" (DeepSeek's terms state neither; D-492's note). The landing page does not change (the founder). Optional: write to DeepSeek to opt the account out of training, a right its privacy policy names | Founder (wording at CP 3) | Entry 43, v6.2implementation D-492, D-500 |
 | 36 | **Closed 2026-11-12 (Entry 48): renamed with the founder's yes.** Was: **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
 | 37 | **Closed 2026-11-12 (Entry 49): the founder chose `deepseek-flash`, thinking off, at 0.30 / 1.20 USD per 1M tokens; yes to the revision (done in P188b) and to item-level parsing (P190).** Was: **Checkpoint 1 (P188): choose the model, confirm the prices, and say yes or no to the prompt revision and item-level parsing.** Read `~/v6.2-review/plans/README.md`'s ten plans first, then `docs/v6.2/experiments.md` TE-15's full read. Recommended: `deepseek-flash`, thinking off; one prompt revision and Flash re-read (15 calls, about $0.02); item-level parsing in P190. P189 was built with `deepseek-flash` as the default model (the founder, 2026-11-12) | Founder, before P190 | Entry 47 |
-| 38 | **A rollback to V6.1 after V6.2's migration would not boot.** sqlx refuses a database holding a migration the binary does not know (`VersionMissing(2)`, reproduced locally). Recommended: (a) V6.2's `db::migrate` sets `ignore_missing(true)`, so later rollbacks (V6.3 → V6.2) work; and (b) §14.4 and the merge's rollback note gain one step: before booting V6.1 on a migrated database, `DELETE FROM _sqlx_migrations WHERE version = 2` (the three tables stay, unused). Nothing was changed; the founder decides, before P212 | Founder, before P212 | Entry 48 |
+| 38 | **Closed 2026-11-12 (Entry 51): the founder said yes; done in P189b.** Was: **A rollback to V6.1 after V6.2's migration would not boot.** sqlx refuses a database holding a migration the binary does not know (`VersionMissing(2)`, reproduced locally). Recommended: (a) V6.2's `db::migrate` sets `ignore_missing(true)`, so later rollbacks (V6.3 → V6.2) work; and (b) §14.4 and the merge's rollback note gain one step: before booting V6.1 on a migrated database, `DELETE FROM _sqlx_migrations WHERE version = 2` (the three tables stay, unused). Nothing was changed; the founder decides, before P212 | Founder, before P212 | Entry 48 |
 
 ## Known issues for later prompts
 
@@ -1422,3 +1422,25 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Counts.** `cargo test -p offcut-api` **305** (289 + 16), with `.env` loaded for `DATABASE_URL`. Rust **964 / 0 / 7** by count (948 + the 16 new): only `offcut-api` changed, and only `offcut-api` and `offcut-plan` were re-run. Vitest 650, unchanged: no web change, not re-run. `clippy -D warnings`, `fmt` and the gate are clean.
 
 **Open.** 35, **38 (the rollback; the founder's yes still due before P212)**. Next: P191 (the route, quotas, the cap; push 1).
+
+## Entry 51 - 2026-11-12 - P189b: the rollback across the migration (open item 38)
+
+**The founder's answer.** Yes to all of open item 38's fix, including the gap found while explaining it: going back to V6.2 after a rollback would rerun `0002` over its own tables. Open item 38 is closed.
+
+**What changed.**
+- `db::migrate` sets `ignore_missing(true)`, so this build ignores a version it does not know. A rollback from a later release to V6.2 then boots.
+- `0002_ai_usage.sql` creates its three tables `IF NOT EXISTS`. Its checksum changes, which is safe because no deployed database has it yet.
+- §14.4 gains the one step for V6.1: `DELETE FROM _sqlx_migrations WHERE version = 2` before V6.1 boots. The tables and their rows stay, unused.
+- `migration_rollback.rs` is new, with its TS §5 row.
+
+**Tests (`migration_rollback.rs`, 2).**
+1. On a database V6.2 migrated, V6.1's migrator (`0001` alone, as its binary embeds it) is refused with `VersionMissing(2)`. After the step it runs. V6.2's migration then runs again, `ai_spend`'s row is kept, and versions 1 and 2 are recorded.
+2. A version 3 recorded by a later release is ignored.
+
+**Found.** sqlx 0.9 returns `VersionMissing` while still holding its advisory lock, on the connection the pool keeps. In production the refused binary exits, which frees the lock. In a test that goes on, the next migration waits forever: the first run hung and was stopped. The test's V6.1 migrator now takes no lock. The hung run left one `offcut_test_*` database behind; it was dropped.
+
+**The local development database** recorded `0002` with its old checksum and would have refused the new file. It was repaired with §14.4's own step: the row deleted, then `sqlx migrate run --ignore-missing`. `0002` ran again over its three tables, with the new checksum.
+
+**Counts.** `cargo test -p offcut-api` 307 (305 + 2). Rust 966 / 0 / 7 by count.
+
+**Open.** 35. Next: P188c (the founder's yes to a second prompt fix), then P191.
