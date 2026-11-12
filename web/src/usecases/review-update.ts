@@ -82,6 +82,11 @@ async function eventsFor(transcript: Transcript, previous: EditState, next: Edit
   return answered(await whenFree(() => pool.render.detect({ transcript, prosody, wordEdits: next.word_edits })));
 }
 
+/** V6.2 (P193): whether the clip's plan is a model's, which a word edit keeps (§8.3). */
+function isModelPlan(plan: EditPlan): boolean {
+  return "source" in plan && plan.source.kind === "model";
+}
+
 /** The change in flight, settled however it ended: the next one starts after it (D-147). */
 let inFlight: Promise<void> = Promise.resolve();
 
@@ -117,7 +122,11 @@ async function apply(
     if (mode === "plan") {
       const found = await eventsFor(transcript, previous, next);
       events = found;
-      plan = answered(await whenFree(() => pool.render.rulesPlan({ transcript, events: found })));
+      // V6.2 (P193): a model's plan stays the clip's plan; the scene validates
+      // it against the edited words. Only a rules plan is made again.
+      if (!isModelPlan(planBefore)) {
+        plan = answered(await whenFree(() => pool.render.rulesPlan({ transcript, events: found })));
+      }
     }
     // 5. The paused preview is drawn again with the new scene (D-173).
     const report = answered(
@@ -225,4 +234,53 @@ export function undoFailedChange(): Promise<void> {
 /** Resolves when no change is in flight. */
 export function settled(): Promise<void> {
   return inFlight;
+}
+
+/**
+ * V6.2 (v6.2implementation §8.3, P193): "Regenerate plan" puts `plan` in place
+ * of the clip's plan, in the queue of changes (D-147). The edit is kept:
+ * overrides whose ids are in the new plan apply to them, and the others touch
+ * nothing. Not a step of the history, as the edit did not change. `false`:
+ * the clip could not take it now, or the scene failed (stored on the clip as
+ * an edit's failure is), and the plan before stays.
+ */
+export function replacePlan(plan: EditPlan): Promise<boolean> {
+  const run = inFlight.then(() => putPlan(plan));
+  inFlight = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function putPlan(plan: EditPlan): Promise<boolean> {
+  const clip = clipStore.useClipStore.getState();
+  const { transcript, timeMap, edit } = clip;
+  if (clip.status !== "ready" || transcript === undefined || timeMap === undefined || usePreviewStore.getState().status === "locked") {
+    return false;
+  }
+  clipStore.editStarted(edit);
+  const resume = usePreviewStore.getState().status === "playing";
+  if (resume) {
+    await pause();
+  }
+  try {
+    const report = answered(
+      await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
+    );
+    clipStore.setChunks(report.chunks);
+    clipStore.setPlan(plan);
+  } catch (error) {
+    const failure = failureOf(error);
+    clipStore.editFailed(edit, failure ?? { code: "E_INTERNAL", stage: "preview", retryable: false });
+    if (failure === null) {
+      throw error;
+    }
+    return false;
+  }
+  clipStore.editDone();
+  if (resume) {
+    await play();
+  }
+  return true;
 }

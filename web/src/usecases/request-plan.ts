@@ -79,6 +79,25 @@ function isPlanResponse(data: unknown): data is { plan: EditPlan; plans_remainin
 }
 
 /**
+ * Why no request would be sent now, or `undefined` when `planFor` sends one
+ * (P193: the pipeline reads it to know whether a request was made). The flag
+ * or the switch off, nobody signed in (D-494), or the browser offline.
+ */
+export function reasonNotToAsk(switchOn: boolean): "off" | "signed_out" | "offline" | undefined {
+  if (!FEATURES.ai_plan || !switchOn) {
+    return "off";
+  }
+  if (useAuthStore.getState().status !== "signed_in") {
+    // D-494: AI plans are for signed-in people; nothing is sent.
+    return "signed_out";
+  }
+  if (!navigator.onLine) {
+    return "offline";
+  }
+  return undefined;
+}
+
+/**
  * The clip's AI plan, or the reason it uses the rules plan. Off, signed out
  * or offline: at once, with no request. Otherwise one `POST /plan`, given
  * `PLAN_CLIENT_TIMEOUT_MS` in all (D-498). A cancel by the caller aborts the
@@ -86,15 +105,9 @@ function isPlanResponse(data: unknown): data is { plan: EditPlan; plans_remainin
  * own signal and reports nothing.
  */
 export async function planFor(input: PlanInput): Promise<PlanChoice> {
-  if (!FEATURES.ai_plan || !input.switchOn) {
-    return { source: "rules", why: "off" };
-  }
-  if (useAuthStore.getState().status !== "signed_in") {
-    // D-494: AI plans are for signed-in people; nothing is sent.
-    return { source: "rules", why: "signed_out" };
-  }
-  if (!navigator.onLine) {
-    return { source: "rules", why: "offline" };
+  const notAsked = reasonNotToAsk(input.switchOn);
+  if (notAsked !== undefined) {
+    return { source: "rules", why: notAsked };
   }
 
   const stop = new AbortController();

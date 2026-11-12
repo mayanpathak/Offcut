@@ -35,8 +35,12 @@ import initRender, {
   redetect_sentence,
   type RenderSession as ModuleSession,
   rules_plan,
+  validate_plan,
 } from "./pkg/render/offcut_render";
 import renderWasmUrl from "./pkg/render/offcut_render_bg.wasm?url";
+
+/** What `validate_plan` answers (V6.2); `workers/protocol.ts`' `PlanCheck` is the same. */
+export type PlanCheckValue = { kept: number; dropped: Dropped[] } | { refused: "PlanFormat" | "PlanCatalog" };
 
 /** One compressed video frame, with its place on the clip's timeline in microseconds. */
 export type VideoSample = { data: Uint8Array; ptsUs: number; durationUs: number; isKeyframe: boolean };
@@ -103,6 +107,12 @@ export type { Mp4MuxerHandle };
 export type RenderApi = {
   /** The plan of the detector's events (D-124). */
   rulesPlan(transcript: Transcript, events: readonly DetectedEvent[]): EditPlan;
+  /**
+   * V6.2 (v6.2implementation §8.1): what the validation keeps of `plan`, with
+   * the user's word edits, without a scene: `{ kept, dropped }`, or the
+   * reason a plan of another build is refused whole.
+   */
+  validatePlan(transcript: Transcript, plan: EditPlan, edits: Record<number, string>): PlanCheckValue;
   /** The visual events of a transcript. `edits` is the user's word edits, by word number. */
   detect(transcript: Transcript, prosody: Prosody, edits: Record<number, string>): DetectedEvent[];
   /**
@@ -151,6 +161,7 @@ export async function preloadRender(): Promise<void> {
 
 const api: RenderApi = {
   rulesPlan: (transcript, events) => rules_plan(transcript, [...events]) as EditPlan,
+  validatePlan: (transcript, plan, wordEdits) => validate_plan({ transcript, plan, wordEdits }) as PlanCheckValue,
   detect: (transcript, prosody, edits) => detect(transcript, prosody, edits) as DetectedEvent[],
   redetectSentence: (transcript, prosody, edits, sentence, prev) =>
     redetect_sentence(transcript, prosody, edits, sentence, [...prev]) as DetectedEvent[],

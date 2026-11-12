@@ -52,6 +52,10 @@ fn one_of_each() -> Vec<Value> {
             "error_code": "E_WORKER_CRASH", "stage": "import"}}),
         json!({"name": "local_data_cleared"}),
         json!({"name": "asr_cloud", "props": {"outcome": "ok", "duration_ms": 1200}}),
+        // V6.2 (v6.2implementation D-490).
+        json!({"name": "plan_result", "props": {
+            "source": "model", "outcome": "ok", "latency_bucket": "lt5", "items": 7,
+            "dropped_by_reason": {"density": 2, "too_close": 1}}}),
     ]
 }
 
@@ -130,7 +134,8 @@ async fn one_valid_event_of_each_kind_is_stored_as_sent() {
     assert_eq!(response.text().await.unwrap(), "");
 
     let stored = rows(&app).await;
-    assert_eq!(stored.len(), 20);
+    // V6.2: 21 with plan_result (P193).
+    assert_eq!(stored.len(), 21);
     let docs = offcut_api_types::ANALYTICS_EVENT_DOCS;
     for ((sent, (name, props)), doc) in events.iter().zip(&stored).zip(docs) {
         assert_eq!(
@@ -206,7 +211,8 @@ async fn a_free_text_prop_is_rejected_on_any_event() {
         "outcome": "ok", "duration_ms": text, "resumed": false}})]));
     bodies.push(batch(&[json!({"name": "model_download", "props": {
         "outcome": "ok", "duration_ms": 1, "resumed": text}})]));
-    assert_eq!(bodies.len(), 22);
+    // V6.2: one more event, plan_result (P193).
+    assert_eq!(bodies.len(), 23);
     assert_all_rejected(&app, &bodies).await;
 }
 
@@ -437,4 +443,30 @@ async fn the_purge_also_takes_old_links_old_webhook_events_and_finished_sessions
         ["00000000-0000-0000-0000-000000000003"]
     );
     assert_eq!(purge_once(&app.pool).await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn a_plan_result_is_stored_as_sent_and_its_counts_are_capped() {
+    // V6.2 (v6.2implementation D-490): a drop count is at most 99, the items at most 10,000.
+    let app = TestApp::spawn().await;
+    let plan = |items: u64, density: u64| {
+        json!({"name": "plan_result", "props": {
+            "source": "rules", "outcome": "invalid", "latency_bucket": "gte20",
+            "items": items, "dropped_by_reason": {"density": density}}})
+    };
+    let bodies = [
+        batch(&[plan(1, 100)]),
+        batch(&[plan(10_001, 0)]),
+        batch(&[json!({"name": "plan_result", "props": {
+            "source": "model", "outcome": "ok", "items": 1,
+            "dropped_by_reason": {"the words": 1}}})]),
+    ];
+    assert_all_rejected(&app, &bodies).await;
+
+    let at_caps = batch(&[plan(10_000, 99)]);
+    assert_eq!(post(&app, &at_caps).await.status(), StatusCode::NO_CONTENT);
+    let stored = rows(&app).await;
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].0, "plan_result");
+    assert_eq!(stored[0].1["dropped_by_reason"], json!({"density": 99}));
 }

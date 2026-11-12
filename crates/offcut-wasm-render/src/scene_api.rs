@@ -175,6 +175,58 @@ pub fn rules_plan(transcript: JsValue, events: JsValue) -> Result<JsValue, JsVal
     to_js(&from_rules(&events, &transcript))
 }
 
+/// What `validate_plan` takes (V6.2, v6.2implementation §8.1): the
+/// transcript, a plan and the user's word edits, keyed by strings as
+/// JavaScript holds them.
+#[derive(Deserialize)]
+struct PlanCheckInput {
+    transcript: Transcript,
+    plan: EditPlan,
+    #[serde(rename = "wordEdits")]
+    word_edits: BTreeMap<String, String>,
+}
+
+/// What `validate_plan` answers: how many items the plan keeps and what it
+/// left out, `{ kept, dropped }`, or why it was refused whole, `{ refused }`.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+enum PlanCheck {
+    Valid { kept: u32, dropped: Vec<Dropped> },
+    Refused { refused: &'static str },
+}
+
+/// `validate` alone, without a scene: what `set_scene` would keep of `input`'s
+/// plan. `Err` is a detail of `E_INTERNAL`: the page built every part.
+fn check_plan(input: PlanCheckInput) -> Result<PlanCheck, &'static str> {
+    let edits = word_edits(input.word_edits).ok_or("PlanCheckInput")?;
+    match validate(
+        input.plan,
+        &input.transcript,
+        &edits,
+        &PlanConfig::default(),
+    ) {
+        Ok((plan, dropped)) => {
+            let kept = u32::try_from(plan.items().len()).map_err(|_| "PlanCheckInput")?;
+            Ok(PlanCheck::Valid { kept, dropped })
+        }
+        Err(rejected) => Ok(PlanCheck::Refused {
+            refused: reject_name(rejected.reason),
+        }),
+    }
+}
+
+/// V6.2 (v6.2implementation D-467, §8.1): what the plan validation would keep
+/// of a model's plan, before the page chooses it over the rules plan. The
+/// session and its scene are not touched. `input` is
+/// `{ transcript, plan, wordEdits }`; the answer `{ kept, dropped }` or
+/// `{ refused: "PlanFormat" | "PlanCatalog" }`.
+#[wasm_bindgen]
+pub fn validate_plan(input: JsValue) -> Result<JsValue, JsValue> {
+    let input: PlanCheckInput = from_js(input, "PlanCheckInput")?;
+    let check = check_plan(input).map_err(|detail| failure(ErrorCode::Internal, detail))?;
+    to_js(&check)
+}
+
 /// The variant's name: the `detail` of a refused plan.
 fn reject_name(reason: RejectReason) -> &'static str {
     match reason {
@@ -455,6 +507,104 @@ mod tests {
         assert_eq!(
             serde_json::to_value(mirror).unwrap(),
             json!({ "text": "WE MADE IT", "colors": ["#ffffffff"] })
+        );
+    }
+
+    /// "We grew ten times." as a transcript of four timed words, one sentence.
+    fn four_words() -> Transcript {
+        serde_json::from_value(json!({
+            "words": [
+                { "text": "We", "start_ms": 500, "end_ms": 800, "confidence": 1.0 },
+                { "text": "grew", "start_ms": 900, "end_ms": 1_200, "confidence": 1.0 },
+                { "text": "ten", "start_ms": 1_300, "end_ms": 1_600, "confidence": 1.0 },
+                { "text": "times.", "start_ms": 1_700, "end_ms": 2_000, "confidence": 1.0 },
+            ],
+            "sentences": [{ "words": { "start": 0, "end": 4 }, "start_ms": 500, "end_ms": 2_000 }],
+            "numbers": [],
+            "model_version": "test",
+        }))
+        .unwrap()
+    }
+
+    /// A model's plan of emphasis items, one on each word given.
+    fn model_plan(words: &[u32]) -> EditPlan {
+        use offcut_types::{
+            EmphasisSize, EventKind, ItemParams, PlanItem, PlanSource, Treatment, WordIdx,
+        };
+        let mut plan = from_rules(&[], &four_words());
+        plan.source = PlanSource::Model {
+            provider: "deepseek".to_owned(),
+            model: "test".to_owned(),
+        };
+        plan.items = (1u64..)
+            .zip(words)
+            .map(|(id, &word)| PlanItem {
+                id: EventId::new(id),
+                kind: EventKind::Emphasis,
+                anchors: WordRange {
+                    start: WordIdx::new(word),
+                    end: WordIdx::new(word + 1),
+                },
+                params: ItemParams::Emphasis {
+                    word: WordIdx::new(word),
+                    treatment: Treatment::Colour,
+                    size: EmphasisSize::Normal,
+                },
+                confidence: None,
+            })
+            .collect();
+        plan
+    }
+
+    fn check(plan: EditPlan, edits: Value) -> Result<PlanCheck, &'static str> {
+        let input = json!({ "transcript": four_words(), "plan": plan, "wordEdits": edits });
+        check_plan(serde_json::from_value(input).unwrap())
+    }
+
+    #[test]
+    fn validate_plan_counts_the_items_kept_and_reports_the_drops_without_a_session() {
+        // V6.2 (P193): one item on a word, one anchored past the last word.
+        let checked = check(model_plan(&[1, 9]), json!({})).unwrap();
+        let PlanCheck::Valid { kept, dropped } = &checked else {
+            panic!("refused: {checked:?}");
+        };
+        assert_eq!(*kept, 1);
+        assert_eq!(dropped.len(), 1);
+        assert_eq!(dropped[0].kind, Some(offcut_types::EventKind::Emphasis));
+        assert_eq!(
+            serde_json::to_value(&checked).unwrap(),
+            json!({ "kept": 1, "dropped": [{ "kind": "emphasis", "reason": serde_json::to_value(dropped[0].reason).unwrap() }] })
+        );
+        // Every item dropped is still an answer: kept 0.
+        let none = check(model_plan(&[9]), json!({})).unwrap();
+        assert!(matches!(none, PlanCheck::Valid { kept: 0, .. }), "{none:?}");
+        // The rules plan of no events keeps nothing and drops nothing.
+        let rules = check(from_rules(&[], &four_words()), json!({})).unwrap();
+        assert_eq!(
+            serde_json::to_value(rules).unwrap(),
+            json!({ "kept": 0, "dropped": [] })
+        );
+    }
+
+    #[test]
+    fn validate_plan_answers_a_refused_plan_and_refuses_a_bad_input() {
+        let mut newer = model_plan(&[1]);
+        newer.catalog = offcut_plan::CATALOG_VERSION + 1;
+        assert_eq!(
+            serde_json::to_value(check(newer, json!({})).unwrap()).unwrap(),
+            json!({ "refused": "PlanCatalog" })
+        );
+        let mut other = serde_json::to_value(model_plan(&[1])).unwrap();
+        other["format"] = json!(2);
+        assert_eq!(
+            check(serde_json::from_value(other).unwrap(), json!({})).unwrap(),
+            PlanCheck::Refused {
+                refused: "PlanFormat"
+            }
+        );
+        assert_eq!(
+            check(model_plan(&[1]), json!({ "01": "x" })),
+            Err("PlanCheckInput")
         );
     }
 }

@@ -546,3 +546,301 @@ describe("runPipeline, cloud transcription", () => {
     expect(m.calls).not.toContain("asr.load");
   });
 });
+
+// --- V6.2: the AI plan (v6.2implementation D-467, §8.2) ----------------------
+// The flags above are `{ cloud_transcribe }` alone, so every case before this
+// block runs with `ai_plan` off. This block reads that run against today's.
+
+describe("runPipeline, the AI plan (D-467)", () => {
+  afterEach(() => {
+    Object.assign(cloud.flags, { ai_plan: false });
+  });
+
+  it("with ai_plan off: the worker calls of b73fea5, in their order, and nothing of the plan", async () => {
+    Object.assign(cloud.flags, { ai_plan: false });
+    useAuthStore.setState({ status: "signed_in", email: "a@example.com", accessToken: "token" });
+    useCloudStore.setState({ availability: "available", choice: "device" });
+    try {
+      await runPipeline(CLIP);
+    } finally {
+      useAuthStore.setState({ status: "unknown", email: null, accessToken: null });
+      useCloudStore.setState({ availability: "unknown", choice: "cloud" });
+    }
+    expect(m.calls).toEqual(DEVICE_CALLS);
+    expect(clip()).toMatchObject({ status: "ready", plan: PLAN });
+    expect(named("plan_result")).toEqual([]);
+    expect(m.events.map((event) => event.name)).toEqual(["stage_timing", "stage_timing", "stage_timing", "stage_timing", "pipeline_done"]);
+  });
+});
+
+// The plan's two seams, faked for this block. Each call is recorded in the
+// same list as the workers', so the case above shows none is made with the
+// flag off.
+type PlanSeams = {
+  choice: unknown;
+  notAsked: string | undefined;
+  pending: Promise<unknown> | undefined;
+  inputs: { switchOn: boolean; signal: AbortSignal; duration: number }[];
+  stored: unknown;
+  puts: { plan: unknown; source: string; catalog: number }[];
+  check: (plan: unknown) => Promise<unknown>;
+  scenePlans: unknown[];
+};
+const planSeams = vi.hoisted(
+  (): PlanSeams => ({
+    choice: undefined,
+    notAsked: undefined,
+    pending: undefined,
+    inputs: [],
+    stored: undefined,
+    puts: [],
+    check: () => Promise.resolve({ kept: 0, dropped: [] }),
+    scenePlans: [],
+  }),
+);
+vi.mock("./request-plan", () => ({
+  planFor: (input: { switchOn: boolean; signal: AbortSignal; duration: number }) => {
+    m.calls.push("plan.request");
+    planSeams.inputs.push(input);
+    return planSeams.pending ?? Promise.resolve(planSeams.choice);
+  },
+  reasonNotToAsk: () => planSeams.notAsked,
+}));
+vi.mock("../persistence/plans-repo", () => ({
+  get: () => {
+    m.calls.push("plansRepo.get");
+    return Promise.resolve(planSeams.stored);
+  },
+  put: (_clipId: unknown, record: { plan: unknown; source: string; catalog: number }) => {
+    m.calls.push("plansRepo.put");
+    planSeams.puts.push(record);
+    return Promise.resolve();
+  },
+  clear: () => Promise.resolve(),
+}));
+
+const { usePlanStore } = await import("../state/plan-store");
+const { CATALOG_VERSION } = await import("../gen/domain");
+
+const MODEL = {
+  format: 1,
+  catalog: CATALOG_VERSION,
+  source: { kind: "model", provider: "deepseek", model: "deepseek-flash" },
+  items: [{ id: "11" }, { id: "12" }, { id: "13" }],
+} as unknown as EditPlan;
+const RULES_ITEMS = { ...PLAN, items: [{ id: "1" }] } as unknown as EditPlan;
+
+/** The cases below: the flag on, the switch on, an AI plan asked for and answered. */
+function planOn(): void {
+  Object.assign(cloud.flags, { ai_plan: true });
+  usePlanStore.setState({ switchOn: true });
+  planSeams.choice = { source: "model", plan: MODEL, plansRemaining: 30 };
+  planSeams.notAsked = undefined;
+  planSeams.pending = undefined;
+  planSeams.inputs.length = 0;
+  planSeams.stored = undefined;
+  planSeams.puts.length = 0;
+  planSeams.check = () => Promise.resolve({ kept: 3, dropped: [] });
+  planSeams.scenePlans.length = 0;
+  answer("render.rulesPlan", RULES_ITEMS);
+  m.answers.set("render.setScene", (params) => {
+    planSeams.scenePlans.push((params as { plan: unknown }).plan);
+    return Promise.resolve({ chunks: [] });
+  });
+  Object.assign(m.pool.render, {
+    validatePlan: (params: { plan: unknown }) => {
+      m.calls.push("render.validatePlan");
+      return planSeams.check(params.plan);
+    },
+  });
+}
+
+const planResults = () => named("plan_result").map((event) => event.props);
+
+describe("runPipeline, the AI plan chosen (D-467, D-469, D-490)", () => {
+  beforeEach(planOn);
+
+  afterEach(() => {
+    Object.assign(cloud.flags, { ai_plan: false });
+    usePlanStore.setState({ switchOn: true });
+  });
+
+  it("a model plan that keeps its items is the clip's: asked after the prosody, checked before the scene, kept", async () => {
+    await runPipeline(CLIP);
+    const at = (call: string) => m.calls.indexOf(call);
+    // Today's calls, with the plan's beside them: asked once the prosody is measured.
+    expect(m.calls.filter((call) => !call.startsWith("plan") && call !== "render.validatePlan")).toEqual(DEVICE_CALLS);
+    expect(at("plansRepo.get")).toBe(at("audio.measureProsody") + 1);
+    expect(at("plan.request")).toBeGreaterThan(at("plansRepo.get"));
+    expect(at("plan.request")).toBeLessThan(at("render.validatePlan"));
+    expect(at("render.rulesPlan")).toBeLessThan(at("render.validatePlan"));
+    expect(at("render.validatePlan")).toBeLessThan(at("render.setScene"));
+    expect(planSeams.inputs).toMatchObject([{ switchOn: true, duration: 20_000 }]);
+
+    expect(planSeams.scenePlans).toEqual([MODEL]);
+    expect(clip()).toMatchObject({ status: "ready", plan: MODEL });
+    expect(clip().planFallback).toBeUndefined();
+    expect(planSeams.puts).toEqual([expect.objectContaining({ plan: MODEL, source: "model", catalog: CATALOG_VERSION })]);
+    expect(planResults()).toEqual([
+      { source: "model", outcome: "ok", latency_bucket: "lt2", items: 3, dropped_by_reason: {} },
+    ]);
+  });
+
+  it("a model plan that drops some items still wins, and the drops are counted by reason", async () => {
+    planSeams.check = () =>
+      Promise.resolve({
+        kept: 1,
+        dropped: [
+          { kind: "emphasis", reason: "too_close" },
+          { kind: "emoji", reason: "too_close" },
+          { kind: null, reason: "label_too_long" },
+        ],
+      });
+    await runPipeline(CLIP);
+    expect(clip().plan).toBe(MODEL);
+    expect(planResults()).toEqual([
+      { source: "model", outcome: "ok", latency_bucket: "lt2", items: 1, dropped_by_reason: { too_close: 2, label_too_long: 1 } },
+    ]);
+  });
+
+  it("a model plan whose every item is dropped: the rules plan, as invalid, kept so a run again asks nothing", async () => {
+    planSeams.check = () =>
+      Promise.resolve({ kept: 0, dropped: [{ kind: "emphasis", reason: "anchors_out_of_range" }, { kind: "zoom", reason: "anchors_out_of_range" }] });
+    await runPipeline(CLIP);
+    expect(planSeams.scenePlans).toEqual([RULES_ITEMS]);
+    expect(clip()).toMatchObject({ status: "ready", plan: RULES_ITEMS, planFallback: "invalid" });
+    expect(planSeams.puts).toEqual([expect.objectContaining({ plan: RULES_ITEMS, source: "rules" })]);
+    expect(planResults()).toEqual([
+      { source: "rules", outcome: "invalid", latency_bucket: "lt2", items: 1, dropped_by_reason: { anchors_out_of_range: 2 } },
+    ]);
+  });
+
+  it("a model plan of a newer catalog is refused whole: the rules plan, as catalog (DC-7)", async () => {
+    planSeams.check = () => Promise.resolve({ refused: "PlanCatalog" });
+    await runPipeline(CLIP);
+    expect(clip()).toMatchObject({ plan: RULES_ITEMS, planFallback: "catalog" });
+    expect(planResults()).toMatchObject([{ source: "rules", outcome: "catalog" }]);
+  });
+
+  it.each(["quota", "unavailable", "invalid", "timeout", "offline", "catalog", "signed_out"] as const)(
+    "the request's %s: the rules plan, told once, and nothing checked",
+    async (why) => {
+      planSeams.choice = { source: "rules", why };
+      // Signed out sends nothing (D-494); the others were asked.
+      const asked = why !== "signed_out";
+      planSeams.notAsked = asked ? undefined : why;
+      await runPipeline(CLIP);
+      expect(m.calls).not.toContain("render.validatePlan");
+      expect(planSeams.scenePlans).toEqual([RULES_ITEMS]);
+      expect(clip()).toMatchObject({ status: "ready", plan: RULES_ITEMS, planFallback: why });
+      expect(planSeams.puts).toEqual(asked ? [expect.objectContaining({ plan: RULES_ITEMS, source: "rules" })] : []);
+      expect(planResults()).toEqual([
+        { source: "rules", outcome: why, ...(asked && { latency_bucket: "lt2" }), items: 1, dropped_by_reason: {} },
+      ]);
+    },
+  );
+
+  it("the switch off: no stored plan read, nothing kept, no line, and plan_result says off", async () => {
+    usePlanStore.setState({ switchOn: false });
+    planSeams.choice = { source: "rules", why: "off" };
+    planSeams.notAsked = "off";
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plansRepo.get");
+    expect(planSeams.inputs).toMatchObject([{ switchOn: false }]);
+    expect(planSeams.puts).toEqual([]);
+    expect(clip()).toMatchObject({ status: "ready", plan: RULES_ITEMS });
+    expect(clip().planFallback).toBeUndefined();
+    expect(planResults()).toEqual([{ source: "rules", outcome: "off", items: 1, dropped_by_reason: {} }]);
+  });
+
+  it("restore: a plan this clip kept is used with no request, checked again, and not reported twice (D-469)", async () => {
+    planSeams.stored = { plan: MODEL, source: "model", requestedAt: 1, catalog: CATALOG_VERSION };
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plan.request");
+    expect(m.calls).toContain("render.validatePlan");
+    expect(planSeams.scenePlans).toEqual([MODEL]);
+    expect(clip().plan).toBe(MODEL);
+    expect(planSeams.puts).toEqual([]);
+    expect(planResults()).toEqual([]);
+  });
+
+  it("restore of a clip that fell back: the rules plan again, with no request and no check", async () => {
+    planSeams.stored = { plan: RULES_ITEMS, source: "rules", requestedAt: 1, catalog: CATALOG_VERSION };
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plan.request");
+    expect(m.calls).not.toContain("render.validatePlan");
+    expect(clip().plan).toBe(RULES_ITEMS);
+  });
+
+  it("restore of a stored plan that no longer keeps an item: the rules plan, with no request", async () => {
+    planSeams.stored = { plan: MODEL, source: "model", requestedAt: 1, catalog: CATALOG_VERSION };
+    planSeams.check = () => Promise.resolve({ kept: 0, dropped: [] });
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plan.request");
+    expect(clip().plan).toBe(RULES_ITEMS);
+  });
+
+  it("Retry after a failure past the plan asks nothing: the plan the first run kept is used", async () => {
+    fail("audio.assemble", "E_DSP", "audio_chain");
+    await runPipeline(CLIP);
+    expect(clip().status).toBe("failed");
+    const kept = planSeams.puts[0];
+    expect(kept).toMatchObject({ plan: MODEL, source: "model" });
+    script();
+    planOn();
+    planSeams.stored = kept;
+    m.calls.length = 0;
+    await runPipeline(CLIP);
+    expect(m.calls).not.toContain("plan.request");
+    expect(clip()).toMatchObject({ status: "ready", plan: MODEL });
+  });
+
+  it("a cancel while the plan is awaited ends accepted: no scene, nothing kept, nothing reported", async () => {
+    const answered = deferred("plan");
+    planSeams.pending = answered.promise;
+    const run = runPipeline(CLIP);
+    await vi.waitFor(() => expect(m.calls).toContain("render.rulesPlan"));
+    const cancelled = cancelJob("pipeline");
+    // `planFor` reads the run's cancel as unavailable (D-466).
+    answered.resolve({ source: "rules", why: "unavailable" });
+    await cancelled;
+    await run;
+    expect(planSeams.inputs[0]?.signal.aborted).toBe(true);
+    expect(clip()).toMatchObject({ status: "accepted", cancelled: true });
+    expect(m.calls).not.toContain("render.setScene");
+    expect(planSeams.puts).toEqual([]);
+    expect(planResults()).toEqual([]);
+    expect(clip().planFallback).toBeUndefined();
+  });
+});
+
+describe("review-update with a model's plan (P193)", () => {
+  beforeEach(() => {
+    planOn();
+    clipStore.useClipStore.setState(
+      {
+        ...clipStore.useClipStore.getInitialState(),
+        status: "ready",
+        clipId: CLIP,
+        clipInfo: INFO,
+        transcript: TRANSCRIPT,
+        prosody: PROSODY,
+        plan: MODEL,
+        timeMap: IDENTITY,
+        prog48: new Float32Array(48),
+      },
+      true,
+    );
+  });
+
+  afterEach(() => {
+    Object.assign(cloud.flags, { ai_plan: false });
+  });
+
+  it("a word edit keeps the model's plan: the events are found again, the plan is not made from the rules", async () => {
+    await update((edit) => ({ ...edit, word_edits: words({ 0: "three" }) }), "plan", "word_edit");
+    expect(m.calls).toEqual(["render.redetectSentence", "render.setScene", "editsRepo.put"]);
+    expect(planSeams.scenePlans).toEqual([MODEL]);
+    expect(clip()).toMatchObject({ status: "ready", plan: MODEL, edit: { word_edits: { 0: "three" } } });
+  });
+});

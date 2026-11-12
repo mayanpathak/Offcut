@@ -33,7 +33,13 @@ export const STORES = {
   meta: "meta",
 } as const;
 
-export const META_KEYS = { anonId: "anonId", persistRequested: "persistRequested", transcription: "transcription" } as const;
+/** V6.2 adds `aiPlan`, the settings switch "AI edit plan" (v6.2implementation D-466, P193). */
+export const META_KEYS = {
+  anonId: "anonId",
+  persistRequested: "persistRequested",
+  transcription: "transcription",
+  aiPlan: "aiPlan",
+} as const;
 
 /**
  * Every stored value is wrapped this way. A value whose `schemaVersion` is

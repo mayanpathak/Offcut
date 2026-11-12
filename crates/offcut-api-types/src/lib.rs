@@ -78,6 +78,9 @@ mod typescript {
         v.visit::<SigninStep>();
         v.visit::<CheckoutStep>();
         v.visit::<CloudOutcome>();
+        v.visit::<PlanResultSource>();
+        v.visit::<PlanOutcome>();
+        v.visit::<LatencyBucket>();
         v.visit::<AnalyticsEvent>();
         v.visit::<EventsBatch>();
         v.visit::<ApiError>();
@@ -196,7 +199,8 @@ mod typescript {
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
         // 45 types cross the API (the cloud transcription release adds four, V6.2's
         // plan three). `EventDoc` does not: its table is written as a constant.
-        assert_eq!(names.len(), 46);
+        // V6.2's `plan_result` adds three prop enums (P193, D-440 (15) widened).
+        assert_eq!(names.len(), 49);
         for name in names.into_iter().filter(|name| *name != "EventDoc") {
             let declarations = ts.matches(&format!("\nexport type {name} = ")).count();
             assert_eq!(declarations, 1, "{name} is declared {declarations} times");
@@ -204,8 +208,10 @@ mod typescript {
 
         let imports = domain_imports(&Config::default());
         // V6.2's plan types add DurMs, EditPlan, TimeMs and WordRange.
+        // V6.2's `plan_result` adds DropReason.
         let expected = [
             "AnonId",
+            "DropReason",
             "DurMs",
             "EditPlan",
             "ErrorCode",
@@ -229,7 +235,7 @@ mod typescript {
             .nth(1)
             .unwrap();
         let docs = docs.split("] as const;").next().unwrap();
-        assert_eq!(docs.lines().count(), 20);
+        assert_eq!(docs.lines().count(), 21);
         assert!(ts.ends_with("\nexport const MAX_EVENTS_PER_BATCH = 50;\n"));
     }
 }

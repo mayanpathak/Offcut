@@ -718,6 +718,7 @@ offcut/
 │   │   │   ├── export-store.ts
 │   │   │   ├── auth-store.ts
 │   │   │   ├── cloud-store.ts         (cloud transcription) what /healthz said, and this device's choice
+│   │   │   ├── plan-store.ts          (V6.2) the settings switch "AI edit plan" for the page (default on)
 │   │   │   ├── entitlement-store.ts
 │   │   │   ├── entitlement-store.test.ts
 │   │   │   ├── ui-store.ts            selected tab, follow switch, editing word, toasts, save state (v4implementation §17)
@@ -764,6 +765,11 @@ offcut/
 │   │   │   ├── transcribe-source.test.ts
 │   │   │   ├── request-plan.ts        (V6.2) POST /plan and its fallbacks; the only use-case that builds a `PlanRequest`: the heard words, never the person's edits; off, signed out or offline send nothing; 20 s in all (v6.2implementation D-466, D-494, D-498)
 │   │   │   ├── request-plan.test.ts   (V6.2) each outcome; no request when off, signed out or offline; the body; the 20 s timer; never a throw
+│   │   │   ├── choose-plan.ts         (V6.2) which plan a run builds its scene from: the plan kept for the clip (no request), or a model's that keeps an item, else the rules plan; keeps it, tells a fallback once, `plan_result` (v6.2implementation D-467, D-469, D-490)
+│   │   │   ├── regenerate-plan.ts     (V6.2) "Regenerate plan": the only request for a clip that has a plan; on success the plan is replaced in the update queue and kept, on failure nothing changes (§8.3)
+│   │   │   ├── regenerate-plan.test.ts  (V6.2) success; each failure leaves the clip as it was; a clip that went; not ready or flag off asks nothing
+│   │   │   ├── set-ai-plan.ts         (V6.2) the settings switch "AI edit plan", for the page and the next visit
+│   │   │   ├── set-ai-plan.test.ts    (V6.2) on by default and when unreadable; kept under `aiPlan`; a failed write
 │   │   │   ├── prepare-short.ts       (V6.3, V6.4) one ShortSpec → a ready virtual clip (§45.7)
 │   │   │   ├── request-shorts.ts      (V6.4) POST /shorts and its fallback
 │   │   │   ├── open-short.ts          (V6.4) load a short into the editor

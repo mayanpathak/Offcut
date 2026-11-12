@@ -8,12 +8,13 @@ import type { AnonId } from "../gen/domain";
 import * as modelManager from "../models/model-manager";
 import { checkHealth } from "../net/api-client";
 import { metaGet, metaSet } from "../persistence/db";
-import { getTranscriptionChoice } from "../persistence/prefs-repo";
+import { getAiPlanSwitch, getTranscriptionChoice } from "../persistence/prefs-repo";
 import { META_KEYS } from "../persistence/schema";
 import { runCapabilityCheck } from "../platform/capability";
 import { beginCheck, setSupported, setUnsupported } from "../state/capability-store";
 import { setAvailability, setChoice } from "../state/cloud-store";
 import { setIllegalTransitionReporter } from "../state/machines/transition";
+import { setPlanSwitch } from "../state/plan-store";
 import { preload } from "../workers/pool";
 import { restoreSource } from "./continue-source";
 import { connectAccount, restoreSession } from "./restore-session";
@@ -88,6 +89,10 @@ async function run(options: StartOptions): Promise<void> {
     setAvailability(health.ok && health.data.cloud_transcribe === true ? "available" : "unavailable");
   });
   void getTranscriptionChoice().then(setChoice);
+  // V6.2 (P193): the settings switch "AI edit plan", only where the flag is on.
+  if (FEATURES.ai_plan) {
+    void getAiPlanSwitch().then(setPlanSwitch);
+  }
 
   // The session this browser may hold. Nothing waits for it (INV-3, D-289).
   if (options.restoreSession) {

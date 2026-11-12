@@ -2,9 +2,11 @@
 //! properties each may carry. Every property is an enum, a `bool` or a `u32`;
 //! no event can carry free text. The integer caps are enforced by the server.
 
+use std::collections::BTreeMap;
+
 use offcut_types::{
-    AnonId, ErrorCode, EventKind, FailureStage, Orientation, PipelineStage, RejectReason, StyleId,
-    UnsupportedReason,
+    AnonId, DropReason, ErrorCode, EventKind, FailureStage, Orientation, PipelineStage,
+    RejectReason, StyleId, UnsupportedReason,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -12,6 +14,8 @@ use ts_rs::TS;
 pub const MAX_EVENTS_PER_BATCH: usize = 50; // TS §22.1
 pub const MAX_DURATION_MS: u32 = 3_600_000; // TS §22.6
 pub const MAX_COUNT: u32 = 10_000; // TS §22.6
+/// V6.2 (v6.2implementation D-490): a count of `plan_result`'s `dropped_by_reason`.
+pub const MAX_DROPPED: u32 = 99;
 
 /// Declares the prop enums: each is a closed set of values, serialized as
 /// `snake_case` strings. One line per enum, as in the table of v1implementation §7.2.
@@ -46,6 +50,9 @@ prop_enums! {
     SigninStep: LinkRequested, Completed;
     CheckoutStep: Started, ReturnedSuccess, ReturnedCancel;
     CloudOutcome: Ok, Unavailable, Limited, Timeout, Offline, Unsupported, Failed;
+    PlanResultSource: Rules, Model;
+    PlanOutcome: Ok, Off, SignedOut, Offline, Quota, Unavailable, Invalid, Timeout, Catalog;
+    LatencyBucket: Lt2, Lt5, Lt10, Lt20, Gte20;
 }
 
 /// One variant per row of TS §22.6. A variant without props serializes as
@@ -143,6 +150,18 @@ pub enum AnalyticsEvent {
         outcome: CloudOutcome,
         duration_ms: u32,
     },
+    /// V6.2 (v6.2implementation D-490): which plan a clip's run used and why.
+    /// `latency_bucket` only when a request was sent; `items` the items of the
+    /// plan used; `dropped_by_reason` what the validation left out of a
+    /// model's plan, each count at most `MAX_DROPPED` (enums and counts only, INV-18).
+    PlanResult {
+        source: PlanResultSource,
+        outcome: PlanOutcome,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        latency_bucket: Option<LatencyBucket>,
+        items: u32,
+        dropped_by_reason: BTreeMap<DropReason, u32>,
+    },
 }
 
 impl AnalyticsEvent {
@@ -169,6 +188,7 @@ impl AnalyticsEvent {
             Self::ClientError { .. } => "client_error",
             Self::LocalDataCleared => "local_data_cleared",
             Self::AsrCloud { .. } => "asr_cloud",
+            Self::PlanResult { .. } => "plan_result",
         }
     }
 }
@@ -215,6 +235,7 @@ pub const ANALYTICS_EVENT_DOCS: &[EventDoc] = &[
     doc("client_error", "That something went wrong, with the error code and the stage it happened in."),
     doc("local_data_cleared", "That you cleared the data Offcut keeps in this browser."),
     doc("asr_cloud", "Whether cloud transcription of a clip worked or why it fell back to this device, and how long it took, never the words."),
+    doc("plan_result", "Whether a clip used an AI-planned edit or the built-in rules and why, roughly how long the plan took, and how many visual moments it kept or left out by reason, never the words."),
 ];
 
 #[cfg(test)]
@@ -222,7 +243,7 @@ mod tests {
     use super::*;
 
     /// One sample per variant, in enum order, exactly as the client sends it.
-    const SAMPLES: [&str; 20] = [
+    const SAMPLES: [&str; 21] = [
         r#"{"name":"landing_view","props":{"hero_variant":"outcome"}}"#,
         r#"{"name":"capability_check","props":{"result":"fail","unsupported_reason":"UNSUPPORTED_WEBGPU","gpu_vendor":"intel","memory_bucket":"gb8plus","platform":"windows"}}"#,
         r#"{"name":"clip_accepted","props":{"duration_bucket":"lt60","orientation":"portrait","source":"user"}}"#,
@@ -243,6 +264,8 @@ mod tests {
         r#"{"name":"client_error","props":{"error_code":"E_WORKER_CRASH","stage":"import"}}"#,
         r#"{"name":"local_data_cleared"}"#,
         r#"{"name":"asr_cloud","props":{"outcome":"limited","duration_ms":1200}}"#,
+        // V6.2 (D-490, D-440 (5)).
+        r#"{"name":"plan_result","props":{"source":"model","outcome":"ok","latency_bucket":"lt5","items":7,"dropped_by_reason":{"too_close":1,"density":2}}}"#,
     ];
 
     fn parse(json: &str) -> serde_json::Result<AnalyticsEvent> {
@@ -373,8 +396,12 @@ mod tests {
             (SigninStep::inline(&cfg), "link_requested, completed"),
             (CheckoutStep::inline(&cfg), "started, returned_success, returned_cancel"),
             (CloudOutcome::inline(&cfg), "ok, unavailable, limited, timeout, offline, unsupported, failed"),
+            // V6.2 (v6.2implementation D-490, D-440 (5)).
+            (PlanResultSource::inline(&cfg), "rules, model"),
+            (PlanOutcome::inline(&cfg), "ok, off, signed_out, offline, quota, unavailable, invalid, timeout, catalog"),
+            (LatencyBucket::inline(&cfg), "lt2, lt5, lt10, lt20, gte20"),
         ];
-        assert_eq!(table.len(), 17);
+        assert_eq!(table.len(), 20);
         for (union, values) in table {
             assert_eq!(union.replace('"', "").replace(" | ", ", "), values);
         }
@@ -419,5 +446,33 @@ mod tests {
             !union.contains(": string") && !union.contains("unknown"),
             "{union}"
         );
+    }
+
+    #[test]
+    fn plan_result_counts_drops_by_reason_and_carries_a_latency_only_when_asked() {
+        // V6.2 (D-490): a fallback with no request has no latency and an empty map.
+        let off = r#"{"name":"plan_result","props":{"source":"rules","outcome":"signed_out","items":3,"dropped_by_reason":{}}}"#;
+        let event = parse(off).unwrap();
+        assert_eq!(serde_json::to_string(&event).unwrap(), off);
+        let AnalyticsEvent::PlanResult {
+            latency_bucket,
+            dropped_by_reason,
+            ..
+        } = &event
+        else {
+            panic!("not a plan_result: {event:?}");
+        };
+        assert_eq!(*latency_bucket, None);
+        assert!(dropped_by_reason.is_empty());
+        // The map's keys are drop reasons, written as they are; anything else is refused.
+        for bad in [
+            r#"{"name":"plan_result","props":{"source":"model","outcome":"ok","items":1,"dropped_by_reason":{"because the words":1}}}"#,
+            r#"{"name":"plan_result","props":{"source":"model","outcome":"ok","items":1,"dropped_by_reason":{"density":"two"}}}"#,
+            r#"{"name":"plan_result","props":{"source":"model","outcome":"ok","items":1}}"#,
+            r#"{"name":"plan_result","props":{"source":"ai","outcome":"ok","items":1,"dropped_by_reason":{}}}"#,
+            r#"{"name":"plan_result","props":{"source":"model","outcome":"ok","latency_bucket":"3.2s","items":1,"dropped_by_reason":{}}}"#,
+        ] {
+            assert!(parse(bad).is_err(), "{bad} was accepted");
+        }
     }
 }

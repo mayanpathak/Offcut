@@ -149,6 +149,12 @@ export interface RenderWorkerApi {
   redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): Promise<DetectedEvent[]>;
   /** The plan of the detector's events (D-124). Stateless. */
   rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan>;
+  /**
+   * V6.2 (v6.2implementation D-467, §8.1): what the validation keeps of a
+   * model's plan against the transcript as edited, before the page chooses
+   * it. Stateless: the session and its scene are not touched.
+   */
+  validatePlan(p: { transcript: Transcript; plan: EditPlan; wordEdits: Record<number, string> }): Promise<PlanCheck>;
   /** The plan is validated against the transcript as edited before the scene is built (TS §40.4). */
   setScene(p: {
     transcript: Transcript;
@@ -191,6 +197,12 @@ export interface RenderWorkerApi {
 
 /** `epochMs` is `performance.timeOrigin + performance.now()`. `audioMs` is program time (D-126). */
 export type ClockSync = { audioMs: OutMs; epochMs: number };
+
+/**
+ * V6.2: what `validatePlan` answers: how many items the plan keeps and what
+ * it left out, or why a plan of another build is refused whole (DC-7).
+ */
+export type PlanCheck = { kept: number; dropped: Dropped[] } | { refused: "PlanFormat" | "PlanCatalog" };
 
 /** What `setScene` answers: what the plan's validation left out (D-124), and the chunks of the captions (D-182). */
 export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };

@@ -25,7 +25,7 @@ import type {
 import { OpfsError } from "../persistence/opfs";
 import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
-import type { FailureStage, RenderWorkerApi, SceneReport } from "./protocol";
+import type { FailureStage, PlanCheck, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
 import {
   captionMirror,
@@ -163,6 +163,19 @@ async function rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] })
   }
 }
 
+/** V6.2 (§8.1): what the validation keeps of a plan, without a scene. It keeps nothing. */
+async function validatePlan(p: {
+  transcript: Transcript;
+  plan: EditPlan;
+  wordEdits: Record<number, string>;
+}): Promise<PlanCheck> {
+  try {
+    return (await loadRender()).validatePlan(p.transcript, p.plan, p.wordEdits);
+  } catch (thrown) {
+    throw staged(thrown, "detect_scene");
+  }
+}
+
 /**
  * Validates the plan and builds the scene (TS §40.8); keeps what it was
  * built from, for the export's switch and back. A plan this build cannot
@@ -256,6 +269,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   detect,
   redetectSentence: (p: Parameters<typeof redetectSentence>[0]) => Promise.resolve(redetectSentence(p)),
   rulesPlan,
+  validatePlan,
   setScene,
   attachPreview,
   previewPlay: (p: Parameters<typeof previewPlay>[0]) => previewPlay(p, worker),

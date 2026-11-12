@@ -422,6 +422,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 193 — The pipeline chooses the plan
 
+**Done 2026-11-12 (V6 CL Entry 55).** The call-sequence case passed before the change and after. A word edit keeps a model's plan. The interface (switch row, button, fallback line) is P194's (known issue 7).
+
 **Effort: High.**
 
 **Objective.** With `ai_plan` on, a clip uses a model plan when one arrives and validates, and the rules plan otherwise; with it off, the pipeline is exactly today's.

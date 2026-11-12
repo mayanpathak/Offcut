@@ -476,6 +476,7 @@ export const messages = {
       client_error: "Error in the app",
       local_data_cleared: "Local data cleared",
       asr_cloud: "Cloud transcription result",
+      plan_result: "AI edit plan result",
     } satisfies Record<EventName, string>,
   },
 

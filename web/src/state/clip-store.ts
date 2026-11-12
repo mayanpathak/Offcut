@@ -4,7 +4,7 @@
 
 import { create } from "zustand";
 
-import type { ClipSource, CloudOutcome } from "../gen/api";
+import type { ClipSource, CloudOutcome, PlanOutcome } from "../gen/api";
 import type {
   ClipId,
   ClipInfo,
@@ -38,6 +38,12 @@ export type ClipState = {
   asrMode?: "cloud" | "device";
   /** Why this run's cloud transcription fell back, once; the interface says so (D-348). */
   asrFallback?: Exclude<CloudOutcome, "ok">;
+  /**
+   * V6.2 (v6.2implementation §8.2): why this run asked for an AI plan and used
+   * the rules plan, once; the interface says so (P194). Not set when the
+   * switch is off, nor when no plan was asked for.
+   */
+  planFallback?: Exclude<PlanOutcome, "ok" | "off">;
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
@@ -206,6 +212,13 @@ export function setAsrMode(asrMode: "cloud" | "device"): void {
 export function cloudFellBack(reason: Exclude<CloudOutcome, "ok">): void {
   if (useClipStore.getState().status === "processing") {
     useClipStore.setState({ asrMode: "device", asrFallback: reason });
+  }
+}
+
+/** V6.2: the run used the rules plan in place of an AI plan, for `reason` (§8.2). */
+export function planFellBack(reason: Exclude<PlanOutcome, "ok" | "off">): void {
+  if (useClipStore.getState().status === "processing") {
+    useClipStore.setState({ planFallback: reason });
   }
 }
 

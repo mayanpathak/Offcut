@@ -6,7 +6,7 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use offcut_api_types::{
-    AnalyticsEvent, EventsBatch, MAX_COUNT, MAX_DURATION_MS, MAX_EVENTS_PER_BATCH,
+    AnalyticsEvent, EventsBatch, MAX_COUNT, MAX_DROPPED, MAX_DURATION_MS, MAX_EVENTS_PER_BATCH,
 };
 use serde_json::Value;
 
@@ -76,6 +76,12 @@ fn within_bounds(event: &AnalyticsEvent) -> bool {
                     .into_iter()
                     .all(count)
         }
+        // V6.2 (v6.2implementation D-490): each count of drops is at most 99.
+        AnalyticsEvent::PlanResult {
+            items,
+            dropped_by_reason,
+            ..
+        } => count(items) && dropped_by_reason.values().all(|n| *n <= MAX_DROPPED),
         AnalyticsEvent::LandingView { .. }
         | AnalyticsEvent::CapabilityCheck { .. }
         | AnalyticsEvent::ClipAccepted { .. }

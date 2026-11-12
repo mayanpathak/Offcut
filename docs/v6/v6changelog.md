@@ -46,7 +46,8 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 |---|---|---|
 | 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
 | 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
-| 6 | (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
+| 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
+| 7 | (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1568,3 +1569,85 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Counts.** Vitest **696** (650 + 46: 29 + 9 + 7 + 1). Rust 993 / 0 / 7 by count, unchanged: no crate or server file changed (`pnpm check`'s clippy covered the workspace). `pnpm check` is clean (clippy, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). `pnpm build`'s bundle has `cloud_transcribe:!0,long_video:!1,high_res:!1,ai_plan:!1,motion:!1` (in the page's `index-*.js`). The gate prints `gate: ok`. Browser e2e was not run: no page reads the new flags or calls the new code yet (P193, P194).
 
 **Open.** 35. Known issues 5 and 6 (P212, P193). Not pushed (push 2 is P197). Next: P193 (the pipeline chooses the plan).
+
+## Entry 55 - 2026-11-12 - P193: the pipeline chooses the plan
+
+**First, before any change.** The call-sequence case in `run-pipeline.test.ts`: with `ai_plan` off, the run's calls are exactly today's 15 (`DEVICE_CALLS`), in order, with no `plan_result`, a person signed in and the card on this device. It passed on the unchanged code (30 of 30). After the change it still passes, and the mocks of `request-plan` and `plans-repo` write into the same call list, so any plan call with the flag off would fail it.
+
+**What changed.**
+- `usecases/choose-plan.ts` (new):
+  - `startPlan` (step 11b): with the switch on, a plan kept for this clip is used with no request; otherwise `planFor`, with whether a request went out and how long it took.
+  - `choosePlan` (step 12b):
+    - a model's plan that keeps at least one item is used; else the rules plan, with the reason;
+    - a plan asked for now is kept for the clip, the rules plan too when the model's could not be used;
+    - a fallback other than `off` is set on the clip once (`planFallback`);
+    - one `plan_result`.
+- `run-pipeline.ts`: 11b starts the plan only with `FEATURES.ai_plan`; 12b waits for it inside `detect_scene`, after the rules plan, then `setScene` once with the plan chosen. One line changed (the rules plan's name), 576 lines.
+- The binding: `validate_plan` in `scene_api.rs` (additive): `validate` alone, no session, `{ kept, dropped }` or `{ refused }`. It is wired through `load-render.ts`, the render worker's `validatePlan` and `protocol.ts`' `PlanCheck` (additive).
+- `review-update.ts`:
+  - a word edit keeps a model's plan, and the scene validates it against the edited words; only a rules plan is made again;
+  - `replacePlan` puts a plan in place of the clip's in the update queue.
+- `regenerate-plan.ts` (new): asks again, checks, replaces, keeps; any failure changes nothing and returns the reason.
+- The settings switch:
+  - `META_KEYS.aiPlan` (the gate's allow list gains the one-line `META_KEYS`);
+  - `prefs-repo.ts`' `getAiPlanSwitch` and `setAiPlanSwitch` (on unless stored `false`);
+  - `state/plan-store.ts` and `usecases/set-ai-plan.ts` (new);
+  - `start-app.ts` reads the switch only with the flag on.
+- `import-clip.ts`: the sweep clears `plans`, only with the flag on (known issue 6a).
+- `clip-store.ts`: `planFallback` and `planFellBack`, as `asrFallback`.
+- `plan_result` (D-490):
+  - `offcut-api-types` gains `PlanResultSource`, `PlanOutcome`, `LatencyBucket`, `MAX_DROPPED = 99`, the variant and its description;
+  - the server bounds `items` (10,000) and each drop count (99);
+  - `messages.ts` gains its name;
+  - `pnpm gen:types` was run.
+- `request-plan.ts`: its three "no request" checks are now `reasonNotToAsk`, exported so the pipeline knows a request went out; `planFor`'s behaviour is unchanged (its 29 tests pass).
+- `eslint.config.js`: the edges `run-pipeline → choose-plan`, `choose-plan, regenerate-plan → request-plan`, `regenerate-plan → review-update`.
+- TS §5: rows for the six new files.
+
+**Tests.**
+- `run-pipeline.test.ts` (+19, new cases only):
+  - the call-sequence case;
+  - a model plan chosen: asked right after the prosody, checked before the scene, kept, `plan_result` exact;
+  - a model plan with some drops still wins, the drops counted by reason;
+  - **a fully dropped model plan**: the rules plan as `invalid`, kept, its drops counted;
+  - a newer catalog: `catalog`;
+  - **each fallback** (7): quota, unavailable, invalid, timeout, offline, catalog, signed out (signed out keeps nothing and has no latency);
+  - the switch off: no stored read, nothing kept, no line;
+  - **restore makes no request** (3): a kept model plan used and checked with no request and no second `plan_result`; a kept rules plan, no request and no check; a kept plan that no longer keeps an item gives the rules plan, no request;
+  - Retry after a failure past the plan asks nothing;
+  - a cancel while the plan is awaited ends `accepted`, with no scene, nothing kept and nothing reported;
+  - a word edit on a model's plan keeps it (`redetectSentence`, `setScene`, `editsRepo.put`; no `rulesPlan`).
+- `regenerate-plan.test.ts` (16, new): success with the edit kept whole and no history step; 8 request outcomes; every item dropped, newer catalog, another format; a scene that fails; a worker that cannot check; a clip that went; not ready; flag off.
+- `set-ai-plan.test.ts` (4, new): on by default and when unreadable; kept under `aiPlan`; a failed write.
+- `scene_api.rs` (+2): kept and drops reported without a session; refused whole; a bad word-edit key.
+- `analytics.rs` (+1): a fallback without latency; a map key or value off the list is refused.
+- `analytics_allowlist.rs` (+1): stored as sent; 100 drops and 10,001 items refused; at the caps accepted.
+- Breaking the code on purpose:
+  - each of four changes failed the new cases: a fully dropped plan used (1), no stored read (4), the flag ignored (13, the call-sequence case among them), a word edit making the rules plan (1);
+  - removing `regeneratePlan`'s empty-plan guard failed 1.
+
+**DECLARED CHANGES (D-440, as read; none deletes an assertion).**
+- (5) `analytics.rs`: 20 → 21 samples, 17 → 20 enum rows.
+- (15) `lib.rs`: 46 → 49 names, `DropReason` imported, 21 docs.
+- (19) `server/tests/analytics_allowlist.rs`: `one_of_each` gains `plan_result`, 20 → 21 rows, 22 → 23 bodies.
+
+**Differs from the plan.**
+- `PipelineStage::Plan` is not added (D-467's note: it widens the web's failure stages; `latency_bucket` measures the wait).
+- The plan helpers live in `choose-plan.ts`, not `run-pipeline.ts` (700 lines).
+- §8.3's "`restore-session.ts` reads `plansRepo`": that file restores the account; there is no clip restore before V7, so the stored plan is read when a clip's run starts again.
+- The interface is P194's (known issue 7).
+- No `plan_result` for a reused plan or for "Regenerate plan".
+
+**Found.**
+1. `review-update.ts` would have replaced an AI plan with the rules plan on the first word edit, while the store kept the AI one. Fixed here (D-469's note).
+2. `run-pipeline.ts` would have reached 709 lines with the helpers inside it.
+3. `eslint --fix` removed `as` casts in two `vi.hoisted` objects that gave their fields their types; `tsc` caught it, and the objects now have return types.
+
+**Counts.**
+- Vitest **735** (696 + 39: 19 + 16 + 4).
+- Rust **997 / 0 / 7** by count (993 + 4): `offcut-wasm-render` 11, `offcut-api-types` 33, and `offcut-api` 334 run in full with `.env` loaded.
+- `pnpm check` is clean (fmt, clippy on the workspace, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). The gate prints `gate: ok`.
+- `landing.spec.ts` on a fresh `pnpm build:e2e`: 30 passed. Its table test counts the events against the generated list, so it checked the new `plan_result` row.
+- No media suite was run: with the flag off the run's calls are unchanged.
+
+**Open.** 35 (the privacy page and settings must name DeepSeek before `ai_plan` goes on). Known issues 5 and 7 (P212, P194). Not pushed (push 2 is P197). Next: P194.

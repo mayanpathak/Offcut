@@ -207,6 +207,22 @@ const layerPolicies = [
     from: fromFile("usecases", "start-app.ts"),
     allow: { to: to("usecases", "continue-source.ts") },
   },
+  // V6.2, the AI plan (v6.2implementation §4.1, P193): the pipeline chooses its
+  // plan in choose-plan.ts, which asks through request-plan.ts, the one
+  // use-case that sends transcript text (P-1, P-14); "Regenerate plan" asks
+  // through it too and hands the plan to the update rule's queue (D-147).
+  {
+    from: fromFile("usecases", "run-pipeline.ts"),
+    allow: { to: to("usecases", "choose-plan.ts") },
+  },
+  {
+    from: fromFile("usecases", "choose-plan.ts", "regenerate-plan.ts"),
+    allow: { to: to("usecases", "request-plan.ts") },
+  },
+  {
+    from: fromFile("usecases", "regenerate-plan.ts"),
+    allow: { to: to("usecases", "review-update.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------

@@ -9,6 +9,9 @@
 // said leaves in an analytics event. The one exception is cloud mode
 // (cloudimplementation §8.5, D-375): `transcribe-cloud.ts` sends the clip's
 // sound, and any failure there finishes the clip on the device.
+// V6.2 (v6.2implementation D-467): with `ai_plan` on, an AI plan is asked for
+// once the prosody is measured (`choose-plan.ts`), and step 12 uses it in
+// place of the rules plan when it keeps an item; with the flag off, as before.
 
 import { track } from "../analytics/client";
 import { FEATURES } from "../config/features";
@@ -34,6 +37,7 @@ import { useModelStore } from "../state/model-store";
 import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { failureShown, signalFor } from "./cancel-job";
+import { choosePlan, startPlan } from "./choose-plan";
 import { transcribeInCloud } from "./transcribe-cloud";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
@@ -431,6 +435,9 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   );
   const { prosody } = measured;
   const out48 = owned(measured.out48);
+  // 11b. V6.2 (D-467): with `ai_plan` on, the plan is asked for now and
+  //      awaited at step 12. With it off, nothing of the plan runs.
+  const planned = FEATURES.ai_plan ? startPlan(clipId, transcript, prosody, clipInfo.duration, signal) : undefined;
 
   // 12. (E) The events, their plan, and the scene built from it (D-124).
   run.stage = "detect_scene";
@@ -448,7 +455,21 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
       ...(displayTo !== undefined && { displayTo }),
     });
   }
-  const plan = answered(await pool.render.rulesPlan({ transcript, events }), run.stage, signal);
+  const rules = answered(await pool.render.rulesPlan({ transcript, events }), run.stage, signal);
+  // 12b. V6.2 (D-467): the AI plan asked for at 11b, waited for inside
+  //      `detect_scene`, used if it keeps an item against the edited words.
+  let plan = rules;
+  if (planned !== undefined) {
+    const started = await planned;
+    goOn(signal);
+    plan = await choosePlan(started, rules, clipId, async (candidate) =>
+      answered(
+        await pool.render.validatePlan({ transcript, plan: candidate, wordEdits: edit.word_edits }),
+        run.stage,
+        signal,
+      ),
+    );
+  }
   clipStore.setPlan(plan);
   const timeMap = identityTimeMap(clipInfo.duration);
   const report = answered(

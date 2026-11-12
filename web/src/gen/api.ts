@@ -3,6 +3,7 @@
 
 import type {
   AnonId,
+  DropReason,
   DurMs,
   EditPlan,
   ErrorCode,
@@ -165,11 +166,17 @@ export type CheckoutStep = "started" | "returned_success" | "returned_cancel";
 
 export type CloudOutcome = "ok" | "unavailable" | "limited" | "timeout" | "offline" | "unsupported" | "failed";
 
+export type PlanResultSource = "rules" | "model";
+
+export type PlanOutcome = "ok" | "off" | "signed_out" | "offline" | "quota" | "unavailable" | "invalid" | "timeout" | "catalog";
+
+export type LatencyBucket = "lt2" | "lt5" | "lt10" | "lt20" | "gte20";
+
 /**
  * One variant per row of TS §22.6. A variant without props serializes as
  * `{"name":"preview_played"}`, with no `props` key.
  */
-export type AnalyticsEvent = { "name": "landing_view", "props": { hero_variant: HeroVariant, } } | { "name": "capability_check", "props": { result: CheckResult, unsupported_reason?: UnsupportedReason | null, gpu_vendor: GpuVendor, memory_bucket: MemoryBucket, platform: Platform, } } | { "name": "clip_accepted", "props": { duration_bucket: DurationBucket, orientation: Orientation, source: ClipSource, } } | { "name": "clip_rejected", "props": { reject_reason: RejectReason, } } | { "name": "model_download", "props": { outcome: DownloadOutcome, duration_ms: number, resumed: boolean, } } | { "name": "stage_timing", "props": { stage: PipelineStage, duration_ms: number, asr_backend?: AsrBackend | null, } } | { "name": "pipeline_done", "props": { total_ms: number, n_number: number, n_list: number, n_from_to: number, n_keyword: number, } } | { "name": "preview_played" } | { "name": "review_action", "props": { action: ReviewActionKind, event_kind?: EventKind | null, enabled?: boolean | null, } } | { "name": "export_started", "props": { profile: ExportedAs, } } | { "name": "export_done", "props": { total_ms: number, profile: ExportedAs, word_edits: number, events_kept: number, events_disabled: number, style: StyleId, crop_adjusted: boolean, from_cache: boolean, } } | { "name": "export_failed", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "job_cancelled", "props": { stage: FailureStage, } } | { "name": "post_export_answer", "props": { answer: PostExportAnswer, } } | { "name": "upgrade_prompt", "props": { placement: PromptPlacement, action: PromptAction, } } | { "name": "signin_step", "props": { step: SigninStep, } } | { "name": "checkout_step", "props": { step: CheckoutStep, } } | { "name": "client_error", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "local_data_cleared" } | { "name": "asr_cloud", "props": { outcome: CloudOutcome, duration_ms: number, } };
+export type AnalyticsEvent = { "name": "landing_view", "props": { hero_variant: HeroVariant, } } | { "name": "capability_check", "props": { result: CheckResult, unsupported_reason?: UnsupportedReason | null, gpu_vendor: GpuVendor, memory_bucket: MemoryBucket, platform: Platform, } } | { "name": "clip_accepted", "props": { duration_bucket: DurationBucket, orientation: Orientation, source: ClipSource, } } | { "name": "clip_rejected", "props": { reject_reason: RejectReason, } } | { "name": "model_download", "props": { outcome: DownloadOutcome, duration_ms: number, resumed: boolean, } } | { "name": "stage_timing", "props": { stage: PipelineStage, duration_ms: number, asr_backend?: AsrBackend | null, } } | { "name": "pipeline_done", "props": { total_ms: number, n_number: number, n_list: number, n_from_to: number, n_keyword: number, } } | { "name": "preview_played" } | { "name": "review_action", "props": { action: ReviewActionKind, event_kind?: EventKind | null, enabled?: boolean | null, } } | { "name": "export_started", "props": { profile: ExportedAs, } } | { "name": "export_done", "props": { total_ms: number, profile: ExportedAs, word_edits: number, events_kept: number, events_disabled: number, style: StyleId, crop_adjusted: boolean, from_cache: boolean, } } | { "name": "export_failed", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "job_cancelled", "props": { stage: FailureStage, } } | { "name": "post_export_answer", "props": { answer: PostExportAnswer, } } | { "name": "upgrade_prompt", "props": { placement: PromptPlacement, action: PromptAction, } } | { "name": "signin_step", "props": { step: SigninStep, } } | { "name": "checkout_step", "props": { step: CheckoutStep, } } | { "name": "client_error", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "local_data_cleared" } | { "name": "asr_cloud", "props": { outcome: CloudOutcome, duration_ms: number, } } | { "name": "plan_result", "props": { source: PlanResultSource, outcome: PlanOutcome, latency_bucket?: LatencyBucket | null, items: number, dropped_by_reason: { [key in DropReason]?: number }, } };
 
 export type EventsBatch = { anon_id: AnonId, events: Array<AnalyticsEvent>, };
 
@@ -203,6 +210,7 @@ export const ANALYTICS_EVENT_DOCS = [
   { name: "client_error", description: "That something went wrong, with the error code and the stage it happened in." },
   { name: "local_data_cleared", description: "That you cleared the data Offcut keeps in this browser." },
   { name: "asr_cloud", description: "Whether cloud transcription of a clip worked or why it fell back to this device, and how long it took, never the words." },
+  { name: "plan_result", description: "Whether a clip used an AI-planned edit or the built-in rules and why, roughly how long the plan took, and how many visual moments it kept or left out by reason, never the words." },
 ] as const;
 
 export const MAX_EVENTS_PER_BATCH = 50;

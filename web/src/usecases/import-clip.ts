@@ -13,6 +13,7 @@ import { fetchAsset, SAMPLE_CLIP_PATH } from "../net/asset-fetch";
 import * as clipsRepo from "../persistence/clips-repo";
 import * as editsRepo from "../persistence/edits-repo";
 import * as opfs from "../persistence/opfs";
+import * as plansRepo from "../persistence/plans-repo";
 import * as renderCacheRepo from "../persistence/render-cache-repo";
 import * as transcriptRepo from "../persistence/transcript-repo";
 import { forImport } from "../state/blockers";
@@ -143,6 +144,11 @@ export async function importClip(file: File, source: ClipSource): Promise<void> 
   //    disk, step 9 a database that fails.
   await opfs.remove(opfs.paths.clipsRoot()).catch(() => undefined);
   await Promise.all([clipsRepo.clear(), transcriptRepo.clear(), editsRepo.clear(), renderCacheRepo.clear()]).catch(() => undefined);
+  // V6.2 (D-469): the plan the clip before kept, only in a build that may have
+  // kept one: with `ai_plan` off the database is never upgraded to hold it.
+  if (FEATURES.ai_plan) {
+    await plansRepo.clear().catch(() => undefined);
+  }
 
   // 5. `probe_audio` and the total are counted from here (D-35).
   startTimer(clipId);
