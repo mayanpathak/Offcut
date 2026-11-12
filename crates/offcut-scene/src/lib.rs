@@ -17,6 +17,7 @@ pub mod framing;
 pub mod hit;
 pub mod images;
 pub mod layout;
+pub mod lockup;
 pub mod motion;
 pub mod placement;
 pub mod readability;
@@ -91,6 +92,9 @@ pub struct Scene {
     /// The plan's emoji, placed by their chunks (V6.2, D-483), drawn after
     /// the captions.
     emojis: Vec<events::emoji::Placed>,
+    /// While the hook is shown (V6.2, D-484), from the program's start: no
+    /// caption is drawn or hit.
+    hook_until: Option<OutMs>,
     tracks: Vec<EventTrack>,
     /// Drawn over everything when the export profile asks (INV-9).
     watermark: Option<watermark::Track>,
@@ -225,6 +229,13 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         emphasis,
         marks,
         emojis,
+        hook_until: tracks.iter().find_map(|track| {
+            if let EventTrack::HookTitle(hook) = track {
+                Some(hook.until)
+            } else {
+                None
+            }
+        }),
         tracks,
         watermark,
     })
@@ -285,17 +296,32 @@ impl Scene {
         u32::try_from(frames).unwrap_or(u32::MAX)
     }
 
+    /// Whether the plan's hook is shown at `t` (V6.2, D-484).
+    fn hooked(&self, t: OutMs) -> bool {
+        self.hook_until.is_some_and(|until| t < until)
+    }
+
+    /// The chunk shown at `t`: none while the hook is (D-484).
+    fn shown_chunk(&self, t: OutMs) -> Option<&Chunk> {
+        if self.hooked(t) {
+            return None;
+        }
+        self.chunks.iter().find(|chunk| chunk.visible_at(t))
+    }
+
     /// What is drawn at `t`, in pixels of the output canvas: the video, the
-    /// caption chunk that is shown, every item that is shown, and the
-    /// watermark when the profile asks.
+    /// caption chunk that is shown (none under the plan's hook), every item
+    /// that is shown, and the watermark when the profile asks.
     pub fn frame_at(&self, t: OutMs) -> DisplayList {
         let mut cmds = vec![self.video.cmd(t, self.canvas)];
-        if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
+        if let Some(chunk) = self.shown_chunk(t) {
             let look = (&self.style, &self.theme);
             captions_draw::draw_marked(chunk, t, look, &self.emphasis, &self.marks, &mut cmds);
         }
-        for emoji in &self.emojis {
-            events::emoji::draw_placed(emoji, t, &mut cmds);
+        if !self.hooked(t) {
+            for emoji in &self.emojis {
+                events::emoji::draw_placed(emoji, t, &mut cmds);
+            }
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
@@ -314,7 +340,7 @@ impl Scene {
     /// `t` (D-174): a word of the chunk shown then, the caption block, or
     /// the video. `None` outside the canvas.
     pub fn hit(&self, t: OutMs, x: f32, y: f32) -> Option<Hit> {
-        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t));
+        let shown = self.shown_chunk(t);
         hit::hit(shown, self.caption_block, x, y)
     }
 
@@ -322,7 +348,7 @@ impl Scene {
     /// the box `hit` finds it by, which the page outlines (D-183). `None`
     /// when no chunk shown then holds it.
     pub fn word_box(&self, t: OutMs, word: WordIdx) -> Option<Rect> {
-        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t))?;
+        let shown = self.shown_chunk(t)?;
         let mut boxes = hit::word_boxes(shown).into_iter();
         boxes.find(|(at, _)| *at == word).map(|(_, r)| r)
     }
@@ -350,7 +376,7 @@ impl Scene {
     /// Each word of the chunk shown at `t` as it is drawn, with its fill:
     /// what development builds of the page mirror for the tests (D-155).
     pub fn caption_words(&self, t: OutMs) -> Vec<(String, Rgba)> {
-        let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) else {
+        let Some(chunk) = self.shown_chunk(t) else {
             return Vec::new();
         };
         let look = (&self.style, &self.theme);

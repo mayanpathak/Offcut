@@ -19,6 +19,9 @@ mod scenes;
 // V6.2 (P202): a model's plan of emphases over the labeled files.
 #[path = "common/model.rs"]
 mod model;
+// V6.2 (P205): a model's plan with the hook.
+#[path = "common/hook.rs"]
+mod hook;
 
 use std::path::PathBuf;
 
@@ -587,6 +590,83 @@ fn no_emoji_or_icon_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_water
         problems.len()
     );
     assert!(kept > 1_000 && images > 50_000, "{kept} {images}");
+    let first: Vec<&String> = problems.iter().take(20).collect();
+    assert!(problems.is_empty(), "{first:#?}");
+}
+
+/// V6.2 (P205, D-484): hooks of 2 to 9 words and up to 48 characters, each
+/// word the accent in turn, over a labeled scene, in the four styles, at
+/// the three placements, watermark on, at every 33 ms of the hook's 2 s.
+/// **No run of a lockup, nor its shadow, leaves the safe area or meets the
+/// watermark.**
+#[test]
+fn no_hook_leaves_the_safe_area_or_meets_the_watermark() {
+    const HOOKS: [&str; 12] = [
+        "Stop scrolling",
+        "Watch this",
+        "The one thing nobody tells you",
+        "This changed everything for me",
+        "Why most startups fail in year one",
+        "I quit my job to do this",
+        "The one thing nobody tells you about saving",
+        "Three habits that made me a better writer",
+        "You are doing it wrong",
+        "Nobody talks about this but it works",
+        "Read this before you sign anything",
+        "Internationalization matters more than ever",
+    ];
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let (mut drawn, mut runs) = (0u32, 0u64);
+    let mut problems: Vec<String> = Vec::new();
+    for style in styles {
+        let theme = Theme::default_for(style);
+        let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+        for text in HOOKS {
+            for accent in 0..text.split_whitespace().count() {
+                for p in PLACES {
+                    let case = labeled::case("a01-scriptA", |edit, _| {
+                        edit.style = style;
+                        edit.caption_position = CaptionPlacement::new(p).unwrap();
+                    });
+                    let case = hook::with_hook(case, text, accent as u8, Vec::new());
+                    assert_eq!(case.plan.items().len(), 1, "{text:?} {accent}");
+                    let scene = scenes::build_with(&case, 1080, true);
+                    drawn += scene.summary().visual_moments;
+                    for t in (0..2_000).step_by(STEP_MS as usize) {
+                        for cmd in &scene.frame_at(OutMs::new(t)).cmds {
+                            let Some((r, is_mark)) = bounds(cmd) else {
+                                continue;
+                            };
+                            runs += 1;
+                            let what = || {
+                                format!(
+                                    "{text:?} {accent} {style:?} at {p}, {t} ms: {r:?} of {}",
+                                    kind(cmd)
+                                )
+                            };
+                            if !inside(r, SAFE_AREA) {
+                                problems.push(format!("outside the safe area: {}", what()));
+                            }
+                            if !is_mark && overlap(r, mark) {
+                                problems.push(format!("on the watermark: {}", what()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "Hooks: {drawn} drawn of {} scenes, {runs} boxes, {} problems",
+        styles.len()
+            * 3
+            * HOOKS
+                .iter()
+                .map(|h| h.split_whitespace().count())
+                .sum::<usize>(),
+        problems.len()
+    );
+    assert!(drawn > 300, "{drawn}");
     let first: Vec<&String> = problems.iter().take(20).collect();
     assert!(problems.is_empty(), "{first:#?}");
 }

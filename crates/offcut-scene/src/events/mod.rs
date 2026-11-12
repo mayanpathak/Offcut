@@ -4,6 +4,7 @@
 pub mod emoji;
 pub mod emphasis;
 pub mod from_to;
+pub mod hook_title;
 pub mod icon_pop;
 pub mod keyword_pop;
 pub mod list_reveal;
@@ -36,6 +37,8 @@ pub enum EventTrack {
     Emoji(emoji::Track),
     /// V6.2 (D-483): an icon on a disc in the event zone.
     IconPop(icon_pop::Track),
+    /// V6.2 (D-484): the hook's lockup over the first 2 s.
+    HookTitle(hook_title::Track),
 }
 
 impl EventTrack {
@@ -50,6 +53,7 @@ impl EventTrack {
             EventTrack::Emphasis(_) => EventKind::Emphasis,
             EventTrack::Emoji(_) => EventKind::Emoji,
             EventTrack::IconPop(_) => EventKind::IconPop,
+            EventTrack::HookTitle(_) => EventKind::HookTitle,
         }
     }
 }
@@ -111,8 +115,14 @@ pub fn layout(
         EventParams::IconPop { word, icon } => Ok(Some(EventTrack::IconPop(icon_pop::layout(
             *word, *icon, span, zone, theme,
         )))),
-        // V6.2 (D-446): not drawn yet (P205 draws it); no track, no command, no count.
-        EventParams::HookTitle { .. } => Ok(None),
+        // V6.2 (D-484): the hook's lockup over the program's first 2 s, in the
+        // safe area (the zone "hook"), not the item's span; none when it
+        // cannot fit, so not drawn and not counted.
+        EventParams::HookTitle { text, accent } => {
+            let duration = OutMs::new(map.out_duration().get());
+            let track = hook_title::layout(text, *accent, duration, theme, fonts)?;
+            Ok(track.map(EventTrack::HookTitle))
+        }
     }
 }
 
@@ -127,6 +137,7 @@ pub fn draw(track: &EventTrack, t: OutMs, out: &mut Vec<DrawCmd>) {
         EventTrack::Emphasis(track) => emphasis::draw(track, t, out),
         EventTrack::Emoji(track) => emoji::draw(track, t, out),
         EventTrack::IconPop(track) => icon_pop::draw(track, t, out),
+        EventTrack::HookTitle(track) => hook_title::draw(track, t, out),
     }
 }
 

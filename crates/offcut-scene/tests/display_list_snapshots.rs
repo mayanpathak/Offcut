@@ -22,6 +22,9 @@ mod scenes;
 // V6.2 (P202): a model's plan for the emphasis snapshots.
 #[path = "common/model.rs"]
 mod model;
+// V6.2 (P205): a model's plan with the hook.
+#[path = "common/hook.rs"]
+mod hook;
 
 use std::collections::BTreeMap;
 
@@ -392,6 +395,30 @@ fn emoji_and_icon_in_each_style() {
                 .count();
             assert_eq!(drawn, 1, "{name} {style:?}");
             insta::assert_json_snapshot!(format!("{name}_{}", style_name(style)), list);
+        }
+    }
+}
+
+/// V6.2 (P205, D-484): the KeywordPop input's sentences with a model's plan
+/// of the hook "The one thing nobody tells you" ("NOBODY" the accent), in
+/// the four styles: entering (0 ms) and at rest (1,000 ms), no caption under
+/// it. New files.
+#[test]
+fn hook_in_each_style_entering_and_at_rest() {
+    let input = &INPUTS[3];
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let case = case(input, style, BTreeMap::new());
+        let case = hook::with_hook(case, "The one thing nobody tells you", 3, Vec::new());
+        assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+        let scene = scenes::build(&case, 1080);
+        for (when, t) in [("enter", 0), ("rest", 1_000)] {
+            let list = scene.frame_at(OutMs::new(t));
+            let words = ["THE", "ONE", "THING", "NOBODY", "TELLS", "YOU"];
+            assert!(
+                texts(&list).iter().all(|t| words.contains(&t.as_str())),
+                "{style:?}"
+            );
+            insta::assert_json_snapshot!(format!("hook_{}_{when}", style_name(style)), list);
         }
     }
 }

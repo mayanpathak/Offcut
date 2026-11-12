@@ -844,3 +844,66 @@ fn icon_pop() {
     assert!(found[0].x > disc.x && found[0].x + found[0].w < disc.x + disc.w);
     golden("icon_pop", (&pattern(1080, 1920), Rotation::R0), &list);
 }
+
+/// The hook (V6.2, D-484): `text` with its word `accent` the accent, in
+/// Clean, at 1,000 ms (at rest), over the KeywordPop input's video. While the
+/// hook is shown a scene draws its video and the hook alone, the hook as
+/// `hook_title::draw` adds it scaled to the canvas: `offcut-scene`'s
+/// `hook_title.rs` proves that frame equal to this list at 540 wide. (The
+/// list is made here, not by a scene, as a hook plan's text is a `Label`,
+/// which this crate's tests cannot build without a new dependency.)
+fn hook_golden(name: &str, text: &str, accent: u8, lines: usize) {
+    use offcut_render::scene::events::hook_title;
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Clean, BTreeMap::new());
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let t = OutMs::new(1_000);
+    let theme = Theme::default_for(StyleId::Clean);
+    let track = hook_title::layout(
+        text,
+        accent,
+        OutMs::new(case.length),
+        &theme,
+        &FontSet::embedded(),
+    )
+    .unwrap()
+    .unwrap_or_else(|| panic!("{name}: the hook fits"));
+    let room = offcut_render::scene::lockup::lay_out(
+        text,
+        usize::from(accent),
+        (hook_title::room().w, hook_title::room().h),
+        &FontSet::embedded(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(room.lines.len(), lines, "{name}");
+    let mut cmds = vec![scene.frame_at(t).cmds[0].clone()];
+    let mut hook = Vec::new();
+    hook_title::draw(&track, t, &mut hook);
+    for cmd in &mut hook {
+        cmd.scale(WIDTH as f32 / 1080.0);
+    }
+    cmds.extend(hook);
+    golden(
+        name,
+        (&pattern(1080, 1920), Rotation::R0),
+        &DisplayList { cmds },
+    );
+}
+
+/// Two short words, the second the accent.
+#[test]
+fn hook_short() {
+    hook_golden("hook_short", "Stop scrolling", 1, 2);
+}
+
+/// Eight words, 43 characters, in three lines.
+#[test]
+fn hook_long() {
+    hook_golden(
+        "hook_long",
+        "The one thing nobody tells you about saving",
+        3,
+        3,
+    );
+}

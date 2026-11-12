@@ -469,6 +469,7 @@ offcut/
 │   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops; (V6.2) Glow's glow strokes (D-479); the plan's emphasis: colour, underline, highlight (D-481)
 │   │   │   ├── hit.rs                 Scene::hit (D-174)
 │   │   │   ├── layout.rs              text shaping through parley; (V6.2) cap_height (v6.2implementation D-483)
+│   │   │   ├── lockup.rs              (V6.2) the hook's lockup: 2 or 3 lines of their own sizes filling a width, the accent at 2x; pure (v6.2implementation D-484, §10.4)
 │   │   │   ├── easing.rs              Easing, ease(); (V6.2) CubicBezier, bezier(), STANDARD, OUT, IN_OUT (D-475)
 │   │   │   ├── anim.rs                keyframe tracks evaluated at TimeMs
 │   │   │   ├── events/mod.rs
@@ -479,11 +480,12 @@ offcut/
 │   │   │   ├── events/punch_in.rs     (V6.2) PunchIn: the plan's zoom, Snap or Push, released over 300 ms; drawn by the video track (v6.2implementation D-478)
 │   │   │   ├── events/emoji.rs        (V6.2) Emoji: under its word below the lines, over them without room, or beside its line; placed by its chunk, drawn after the captions (v6.2implementation D-483)
 │   │   │   ├── events/icon_pop.rs     (V6.2) IconPop: an icon on an accent disc in the event zone, centred on its word, leaving with its chunk (D-483)
+│   │   │   ├── events/hook_title.rs   (V6.2) HookTitle: the lockup over the first 2 s in the safe area, entering 0.9 to 1.0; the captions hidden under it (D-484)
 │   │   │   ├── events/emphasis.rs     (V6.2) Emphasis: a word, its treatment and program start, handed to the captions, which draw it (v6.2implementation D-481)
 │   │   │   ├── watermark.rs
 │   │   │   ├── framing.rs             [ONLY] crop rectangle from ClipInfo + CropOffset
 │   │   │   ├── video.rs               the per-frame Video command: crop, placement (v4implementation D-130); (V6.2) the camera's zoom, MAX_TOTAL_ZOOM (D-477)
-│   │   │   ├── display_list.rs        DisplayList, DrawCmd (backend-neutral)
+│   │   │   ├── display_list.rs        DisplayList, DrawCmd (backend-neutral); (V6.2) DrawCmd::scale public, for tests that compose a list
 │   │   │   └── summary.rs             change_summary(); (V6.2) an Emphasis counts as captions emphasized (D-481)
 │   │   └── tests/
 │   │       ├── display_list_snapshots.rs
@@ -501,12 +503,15 @@ offcut/
 │   │       ├── camera.rs              (V6.2) the drift's segments; motion off is today's scene, on changes only Video.src (D-476, D-477)
 │   │       ├── punch_in.rs            (V6.2) a model's zoom in a scene: held, released, with the drift, switched off, counted (D-478)
 │   │       ├── emoji_icon.rs          (V6.2) a model's emoji and icon in a scene: size, under, over, beside and its fallback, the pop and the exit, the disc in the event zone, only images added, hidden or off (D-483)
+│   │       ├── lockup.rs              (V6.2) the lockup, pure: short, long, one-word, impossible; as large as fits; against a brute force; widths linear in size (D-484)
+│   │       ├── hook_title.rs          (V6.2) the hook in a scene: the video and the hook for 2 s, then the frame without it; no caption hit; cannot fit or off: nothing, not counted (D-484)
 │   │       ├── punch_word.rs          (V6.2) a model's punch word in a scene: alone, the reading floor, two 6 s apart, the clip's last word, its sentence only, switched off or hidden (D-482, D-452)
 │   │       ├── emphasis.rs            (V6.2) a model's emphasis in a scene: its start to its chunk's end, its own chunk only, a hidden word, switched off, only the captions change, counted (D-481)
 │   │       ├── image_bundle.rs        (V6.2) the manifest equals EmojiId and IconId; each file 160 px RGBA with its SHA-256; keys distinct; licences (D-447, D-470)
 │   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
 │   │       ├── common/model.rs        (V6.2) a model's plan of given items, validated, for a case (P200)
+│   │       ├── common/hook.rs         (V6.2) a model's plan with the hook and extras.hook, validated, for a case (P205)
 │   │       ├── common/scenes.rs       written sentences timed like the labeled set, detected and validated; their scenes, watermark on or off
 │   │       └── snapshots/             insta snapshot files
 │   ├── offcut-render/
@@ -1059,7 +1064,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478); glow_style, the Glow style (D-479, D-480); emphasis_colour, emphasis_underline, emphasis_highlight, Bold (D-481); punch_word, Clean (D-482); emoji_under, Bold at Middle, and icon_pop, Clean at Bottom (D-483)
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478); glow_style, the Glow style (D-479, D-480); emphasis_colour, emphasis_underline, emphasis_highlight, Bold (D-481); punch_word, Clean (D-482); emoji_under, Bold at Middle, and icon_pop, Clean at Bottom (D-483); hook_short, hook_long, Clean (D-484)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh

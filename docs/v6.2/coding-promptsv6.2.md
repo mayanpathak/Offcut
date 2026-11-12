@@ -672,6 +672,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 205 — The hook title
 
+**Done 2026-11-13 (V6 CL Entry 66).** `hook_short` and `hook_long` written once on WARP and read by eye; every old golden and snapshot unchanged; 8 new snapshots; no hook leaves the safe area or meets the watermark.
+
 **Effort: High.**
 
 **Objective.** A lockup that fills the width for 2 s, or nothing when it cannot fit.

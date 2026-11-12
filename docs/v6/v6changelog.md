@@ -2207,3 +2207,59 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 and 64): at Bottom, the default, an emoji "under" its word is drawn over it; **the white icons on Clean's, Bold's and Glow's yellow disc are weak in contrast** (Mono's green is fine; a dark disc or an accent ring are the alternatives); at Bottom the icon sits about 120 lp above the captions. Not pushed (push 3 is P206). Next: P205 (the hook title).
+
+## Entry 66 - 2026-11-13 - P205: the hook title
+
+**What changed.**
+- **`lockup.rs`** (new, pure; D-484, §10.4): `lay_out(text, accent, (width, height), fonts)`. The hook's words in Inter 800 capitals (`LOCKUP_FONT`).
+  - Every split into 2, then 3, lines is tried. **Each line takes its own size**: the largest from 140 lp down to 48 lp in steps of 4 at which it fits the width, the accent word at twice its line's.
+  - Least worst distance from the width wins; ties go to fewer lines, then the first split.
+  - Lines are stacked by their capitals, 0.25 of the smaller size apart; the lockup must fit the room.
+  - Words are measured once at 100 lp and scaled. A one-word hook, a bad accent, or a line too wide at 48 lp gives `None`.
+- **`events/hook_title.rs`** (new): the lockup centred in the safe area above the watermark's band; the theme's `Text`, the accent word in `Accent`, over a drop shadow of Clean's grown with the size; entering 0.9 → 1.0 over 150 ms on `OUT`; shown over `[0, 2 s)` of program time or a shorter clip's length.
+- **`events/mod.rs`:** `EventTrack::HookTitle`; the item carries its text (`EventParams::HookTitle { text, accent }`), so it is laid out like any kind. **Every kind of the catalog is now drawn.**
+- **`lib.rs`:** `pub mod lockup`; `Scene.hook_until`; `shown_chunk`: **under the hook no caption is drawn, hit or boxed, nor its emoji**.
+- **`display_list.rs`:** `DrawCmd::scale` public, so that a test can compose a list as `frame_at` does.
+- **Docs:** TS §5 rows (`lockup.rs`, `events/hook_title.rs`, `display_list.rs`, `tests/{lockup,hook_title}.rs`, `common/hook.rs`, the goldens); "As read (P205)" under D-484 and §10.4.
+
+**Differs from the plan.**
+- `lay_out` takes the room's width and height and returns `Result<Option<..>>`: the height rules out a split too tall, and a font error is not a hook that does not fit.
+- D-484's "within 10% of the safe width" is what the search reaches, not a rule: two short words cannot ("STOP / SCROLLING" leaves 58%). Hooks of 5 words or more reach 0.7-3.1%.
+- **The two goldens' lists are composed, not built by a scene:** a hook plan needs a `Label`, which `offcut-render`'s tests cannot build without a new dependency (§3.1). `hook_title.rs` proves a scene's frame under the hook equal to that composition at 1080 and at 540.
+
+**Tests (+18).**
+- `events/hook_title.rs` +3:
+  - its colours and centre, until 2 s or a shorter clip;
+  - the entry on `OUT`, shadow then runs, gone at its end;
+  - a hook that cannot fit has no track.
+- `tests/lockup.rs` (new, 7):
+  - widths linear in the size (to 1e-3);
+  - the face is Inter 800;
+  - each line as large as fits (one size up does not), the accent at 2×, capitals, every word once;
+  - **against a brute force that shapes every line at every size: the same worst distance and the same number of lines** for 8 hooks;
+  - long hooks within 10%;
+  - one word, a bad accent, a word too wide, an accent too wide, no room: `None`;
+  - the same lockup twice.
+- `tests/hook_title.rs` (new, 4; four styles):
+  - **for 2 s each frame is the video and the hook exactly, then the frame without the hook exactly** (1080 and 540);
+  - no caption word boxed or hit under it;
+  - a hook that cannot fit, or switched off: every frame as without, not counted; on, one visual moment;
+  - a clip under 2 s shows it throughout.
+- `layout_safe_area.rs` +1: **12 hooks with each word the accent, four styles, three placements, watermark on: 804 of 816 drawn (the 12 others, one accent word too wide at 96 lp, not drawn), 676,287 boxes, 0 problems.**
+- `display_list_snapshots.rs` +1: **8 new snapshot files** (four styles, entering and at rest). Clean read command by command: "THE ONE THING" at 112, "NOBODY" at 120 in the accent beside "TELLS YOU" at 60, the shadow layer first, 0.9 when entering.
+- `golden_frames.rs` +2: **`hook_short`** ("STOP / SCROLLING") and **`hook_long`** ("THE ONE THING / NOBODY TELLS YOU / ABOUT SAVING"), Clean at 1,000 ms. Written once on WARP by exact name (only the two files appeared) and read by eye.
+
+**Declared.** No test of the base changed. `display_list_snapshots.rs`, `layout_safe_area.rs` and `golden_frames.rs` gain lines only.
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases and `image-parity.spec.ts`, 6 passed (TE-30 0.9995). No browser flow can draw a hook yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,522,176 → **7,534,119** bytes (+11,943).
+
+**Counts.**
+- Rust **1122 / 0 / 7** by count (1104 + 18; `offcut-scene` 198 / 0 / 4, `offcut-render` 45, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 to 65): the lockup is centred in the frame, over a speaker's face for its 2 s. **For P206:** `catalog_complete.rs`' harness item gains the five kinds; a caption-zone kind (Emphasis, Emoji) draws nothing in `events::draw`, IconPop draws in the event zone, PunchIn nothing (the video's), HookTitle in the safe area. Not pushed (push 3 is P206). Next: P206 (everything together, CP 3, push 3).
