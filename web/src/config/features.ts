@@ -7,6 +7,7 @@
 // (cloudimplementation D-365): a redeploy with
 // `OFFCUT_FEATURES_OFF=cloud_transcribe` removes the cloud card and path. The
 // V6.x flags default off, so a merge ships them dark (BP §8A.0 step 5).
+// V6.2 adds `ai_plan` and `motion` (v6.2implementation D-443).
 
 export type FeatureFlags = {
   /** The transcription card in the drop zone, and the cloud path of `run-pipeline.ts`. */
@@ -15,6 +16,10 @@ export type FeatureFlags = {
   readonly long_video: boolean;
   /** V6.1: 4K and decodable HEVC on the clip page, and its 16 GB file limit (DC-2, DC-3). */
   readonly high_res: boolean;
+  /** V6.2: the plan request, its settings switch, the text extras panel (v6.2implementation D-443). */
+  readonly ai_plan: boolean;
+  /** V6.2: the camera drift, the Enhance panel and `lvl48` (D-443). */
+  readonly motion: boolean;
 };
 
 export type FeatureName = keyof FeatureFlags;
@@ -24,6 +29,8 @@ export const DEFAULTS: FeatureFlags = Object.freeze({
   cloud_transcribe: true,
   long_video: false,
   high_res: false,
+  ai_plan: false,
+  motion: false,
 });
 
 const NAMES = Object.keys(DEFAULTS) as readonly FeatureName[];
@@ -60,7 +67,13 @@ export function featureFlags(on: string | undefined, off: string | undefined): F
     }
   }
   const value = (name: FeatureName): boolean => (turnOn.has(name) ? true : turnOff.has(name) ? false : DEFAULTS[name]);
-  return { cloud_transcribe: value("cloud_transcribe"), long_video: value("long_video"), high_res: value("high_res") };
+  return {
+    cloud_transcribe: value("cloud_transcribe"),
+    long_video: value("long_video"),
+    high_res: value("high_res"),
+    ai_plan: value("ai_plan"),
+    motion: value("motion"),
+  };
 }
 
 // Absent where no bundler ran (Vitest, and the e2e suites importing files in Node).

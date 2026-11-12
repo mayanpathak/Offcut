@@ -45,7 +45,8 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | # | Issue | Prompt |
 |---|---|---|
 | 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
-| 4 | (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
+| 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
+| 6 | (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1508,3 +1509,62 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Push 1.** `v6.2-build` pushed after this commit (not waited on, as the prompt says).
 
 **Open.** 35. Known issues 4 and 5 (P192, P212). Next: P192.
+
+## Entry 54 - 2026-11-12 - P192: flags, the request, the store
+
+**What changed.**
+- `config/features.ts`: `ai_plan` and `motion`, both default off (D-443). `featureFlags`' one-line return of three flags becomes a return of five, the one removed line Step 0.4 allows; `scripts/v62-gate.sh` gains its allow-list pattern. `vite.config.ts` is unchanged: its define writes whatever `featureFlags` returns.
+- `package.json`'s `build:e2e:flags` and `ci.yml`'s `dist-flags/` step: `long_video,high_res,ai_plan,motion` (D-444). Nothing reads the two new flags yet, so `dist-flags/` behaves as before.
+- `net/api-client.ts` (additions only): `PLAN_CLIENT_TIMEOUT_MS = 20_000` and `requestPlan(body, signal)`, through `authed` (one refresh on a 401), **one attempt**, 20 s.
+- `usecases/request-plan.ts` (new): `planFor({ transcript, prosody, duration, switchOn, signal })` → `{ source: "model", plan, plansRemaining }` or `{ source: "rules", why }` (D-466).
+  - `ai_plan` off or the switch off → `off`; not signed in → `signed_out`; offline → `offline`. Each at once, with no request.
+  - Otherwise one `POST /plan` and a 20 s timer over the whole request; the request is aborted when the timer wins.
+  - Codes map as D-466's note says. It never throws.
+  - `planRequestOf` builds the body from the transcript as heard and the prosody: four fields, nothing the person typed.
+  - No caller yet (P193).
+- `persistence/schema.ts` (additions): `PLANS_STRUCTURE_VERSION = 3`, `PLAN_STORES`, `PlanRecord { plan, source: "model" | "rules", requestedAt, catalog }`, `OffcutPlansDb`. `DB_STRUCTURE_VERSION` stays 2.
+- `persistence/db.ts` (additions): upgrade 3 makes `plans`; `openPlansDb()` copies `openSourcesDb`: asks for 3, opens a newer database as it is, closes itself when another tab upgrades.
+- `persistence/plans-repo.ts` (new): `put`, `get` (a newer `schemaVersion` is absent and removed), `clear`; failures are `OpfsError`.
+- TS §5: rows for the four new files; `features.ts`' row says five flags; `plans-repo.ts`' row loses "its op log" (D-469 has none).
+
+**Known issue 4 (closed).** `requestPlan` uses `retry: "none"`, as `transcribeAudio` does. A 502 or 504 `plan_unavailable` and a 502 `plan_invalid` come back on the first answer with their code, so `planFor` reads them as `unavailable` and `invalid` at once. A proxy's 502 to 504 with no body (an API still waking) is one attempt too, read as `unavailable`: the plan never waits for a cold start, and the clip goes on with the rules plan. The other fix (two new `ErrorCode`s in `PROVIDER_FAILURES`) was not taken: it would change `offcut-types`, the generated files and `http.ts` for no gain. A check: with `retry: "cold-start"` put back for a moment, 5 of the new cases failed.
+
+**Tests.**
+- `request-plan.test.ts` (29, new):
+  - off by the flag, off by the switch, four signed-out states, offline: each with no request;
+  - the model's plan, and a Creator's without a count;
+  - 12 failures, each to its outcome;
+  - a 200 without a plan is `invalid`; a client that throws, at once or later, is `unavailable`;
+  - a caller's cancel reaches the request;
+  - no answer by 20 s is `timeout`, with the request aborted (not at 19.999 s); an answer at 19.999 s is used and no timer is left;
+  - the body field for field; word edits in the clip store never reach it; a missing prosody entry reads as 0.
+- `plans-repo.test.ts` (9, new): the real `db.ts` and `plans-repo.ts` over an in-memory `openDB` that keeps IndexedDB's version rules (no npm package added, §3.1):
+  - **1 → 3 and 2 → 3 keep every record**, compared store by store, and the clip path and long path read theirs after;
+  - **the clip path still opens version 1 and the long path 2**, neither making `plans`;
+  - a new page's clip path on a version-3 database asks for 1, is refused and opens it as it is; a database at 4 opens as it is;
+  - records, the newer-`schemaVersion` rule, the sweep, `OpfsError` quota and io;
+  - only `db.ts` and `plans-repo.ts` name `openPlansDb` (D-469).
+  - Two changes to `db.ts`, each tried for a moment, failed 7 and 4 of these.
+- `api-client.test.ts` (+7, new cases only): the body once as JSON with the token and one refresh; 502 `plan_unavailable`, 504 `plan_unavailable` and 502 `plan_invalid` each one attempt; a proxy's 503 one attempt; a 401 after the refresh is `E_AUTH_SESSION_EXPIRED` with no third attempt; the attempt may take 20 s.
+- `features.test.ts`: one new case (the four names on, each new flag alone, a name in both lists).
+
+**Real browser (once, not committed).** The Vite dev server and installed Chrome, through the real `db.ts` and `plans-repo.ts`:
+- 1 → 3: 8 stores → 12, version 3, with the clip, transcript, edits and `meta` records read back;
+- 2 → 3: 11 → 12, with the source and window records read back too;
+- in both, a reloaded page's clip path read the version-3 database.
+
+**DECLARED CHANGE (D-440 (18), as read).** `features.test.ts`' two cases that compare the whole flag object gain `ai_plan: false, motion: false`; every old key and value is kept, and no assertion is deleted. `api-client.test.ts` gains new cases only.
+
+**Differs from the plan.**
+- The timer is 20 s (D-466, D-498), not §8.1's or TS §40.7's 30 s; TS's flow line still says 30 s, for P212's copy-back.
+- `ci.yml` changed as well as `package.json`, since CI builds `dist-flags/` with its own list.
+- `planFor` takes the switch as an input (P193 reads it).
+
+**Found.**
+1. Chrome's headless shell is not installed for Playwright here; the check used installed Chrome (`channel: "chrome"`), as the e2e suites do.
+2. Opening 1 → 3 also makes the three source stores, empty, in a build with `long_video` off (D-469's note).
+3. Two things for P193, as known issue 6: the clip sweep must clear `plans`, and a caller's cancel must not be reported.
+
+**Counts.** Vitest **696** (650 + 46: 29 + 9 + 7 + 1). Rust 993 / 0 / 7 by count, unchanged: no crate or server file changed (`pnpm check`'s clippy covered the workspace). `pnpm check` is clean (clippy, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). `pnpm build`'s bundle has `cloud_transcribe:!0,long_video:!1,high_res:!1,ai_plan:!1,motion:!1` (in the page's `index-*.js`). The gate prints `gate: ok`. Browser e2e was not run: no page reads the new flags or calls the new code yet (P193, P194).
+
+**Open.** 35. Known issues 5 and 6 (P212, P193). Not pushed (push 2 is P197). Next: P193 (the pipeline chooses the plan).

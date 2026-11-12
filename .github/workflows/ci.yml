@@ -422,10 +422,11 @@ jobs:
       # V6.1 (v6.1implementation D-394, §12.1): the same build with
       # `long_video` and `high_res` on, for the media-flags project of step 10.
       # Tested only, never deployed: production's build names no flag.
+      # V6.2 (v6.2implementation D-444): `ai_plan` and `motion` on as well.
       - name: Build the web app with the V6.1 flags on
         env:
           VITE_ENTITLEMENT_TEST_PUBLIC_KEY: ${{ env.E2E_TEST_PUBLIC_KEY }}
-          OFFCUT_FEATURES_ON: long_video,high_res
+          OFFCUT_FEATURES_ON: long_video,high_res,ai_plan,motion
         run: pnpm --filter web exec vite build --outDir dist-flags
 
       - name: Hand the flags-on build to the media suites

@@ -684,7 +684,7 @@ offcut/
 │   │   │   ├── pricing.ts             [ONLY] display prices (PS §11)
 │   │   │   ├── model-manifest.json    model files: path, size, sha256
 │   │   │   ├── models/                (V6.5, V6.11) one manifest per extra model: face, person; the ASR manifest stays above (DC-4)
-│   │   │   ├── features.ts            [ONLY] FeatureFlags from a Vite define (§41.3): three flags, each with a default; `featureFlags(on, off)` for vite.config.ts (v6.1implementation D-393)
+│   │   │   ├── features.ts            [ONLY] FeatureFlags from a Vite define (§41.3): five flags, each with a default (V6.2 adds `ai_plan` and `motion`, off: v6.2implementation D-443); `featureFlags(on, off)` for vite.config.ts (v6.1implementation D-393)
 │   │   │   ├── features.test.ts       (V6.1) the defaults, OFFCUT_FEATURES_ON and _OFF, an unknown name and a name in both lists
 │   │   │   └── entitlement-public-key.ts
 │   │   ├── copy/
@@ -762,7 +762,8 @@ offcut/
 │   │   │   ├── run-source-pipeline.test.ts
 │   │   │   ├── transcribe-source.ts   (V6.1) a source's cloud windows to its master transcript; the second use-case that sends audio (v6.1implementation §8.1)
 │   │   │   ├── transcribe-source.test.ts
-│   │   │   ├── request-plan.ts        (V6.2) POST /plan and its fallbacks
+│   │   │   ├── request-plan.ts        (V6.2) POST /plan and its fallbacks; the only use-case that builds a `PlanRequest`: the heard words, never the person's edits; off, signed out or offline send nothing; 20 s in all (v6.2implementation D-466, D-494, D-498)
+│   │   │   ├── request-plan.test.ts   (V6.2) each outcome; no request when off, signed out or offline; the body; the 20 s timer; never a throw
 │   │   │   ├── prepare-short.ts       (V6.3, V6.4) one ShortSpec → a ready virtual clip (§45.7)
 │   │   │   ├── request-shorts.ts      (V6.4) POST /shorts and its fallback
 │   │   │   ├── open-short.ts          (V6.4) load a short into the editor
@@ -814,7 +815,8 @@ offcut/
 │   │   │   ├── clips-repo.ts
 │   │   │   ├── transcript-repo.ts
 │   │   │   ├── edits-repo.ts
-│   │   │   ├── plans-repo.ts          (V6.2) the plans store and its op log
+│   │   │   ├── plans-repo.ts          (V6.2) the plans store at structure version 3, its only reader and writer and the only caller of `openPlansDb` (v6.2implementation D-469)
+│   │   │   ├── plans-repo.test.ts     (V6.2) 1 → 3 and 2 → 3 keep every record; the clip path still opens 1 and the long path 2; records, the newer-schemaVersion rule, the sweep
 │   │   │   ├── sources-repo.ts        (V6.1) sources, checkpoints, master transcripts
 │   │   │   ├── sources-repo.test.ts   (V6.1) records, compound window keys, the newer-schemaVersion rule, removal and the sweep
 │   │   │   ├── shorts-repo.ts         (V6.4)

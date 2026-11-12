@@ -7,7 +7,10 @@ import {
   DB_STRUCTURE_VERSION,
   DB_VERSION,
   type OffcutDb,
+  type OffcutPlansDb,
   type OffcutSourcesDb,
+  PLAN_STORES,
+  PLANS_STRUCTURE_VERSION,
   SOURCE_STORES,
   STORES,
   type Versioned,
@@ -31,6 +34,11 @@ const UPGRADES: readonly Upgrade[] = [
     for (const store of Object.values(SOURCE_STORES)) {
       db.createObjectStore(store);
     }
+  },
+  // 3 (V6.2, D-469): the `plans` store, made only when `plans-repo.ts` first opens it.
+  // Opened from 1, upgrade 2 runs first, so the source stores exist, empty.
+  (db) => {
+    (db as unknown as IDBPDatabase<OffcutPlansDb>).createObjectStore(PLAN_STORES.plans);
   },
 ];
 
@@ -118,6 +126,48 @@ async function openSources(): Promise<IDBPDatabase<OffcutSourcesDb>> {
     });
   try {
     return await at(DB_STRUCTURE_VERSION);
+  } catch (error) {
+    if (isVersionError(error)) {
+      return at(undefined);
+    }
+    throw error;
+  }
+}
+
+let openedPlans: Promise<IDBPDatabase<OffcutPlansDb>> | undefined;
+
+/**
+ * V6.2 (D-469): the database at structure version 3, with the `plans` store,
+ * upgraded on first use, as `openSourcesDb` opens version 2. Only
+ * `plans-repo.ts` calls this, and only with `ai_plan` on, so a build with the
+ * flag off never upgrades anyone's database. A connection the clip path or the
+ * long path holds closes itself when asked (`blocking`); a database newer than
+ * 3 is opened as it is (`VersionError`), as V6.1's two openers do.
+ */
+export function openPlansDb(): Promise<IDBPDatabase<OffcutPlansDb>> {
+  openedPlans ??= openPlans().catch((error: unknown) => {
+    openedPlans = undefined;
+    throw error;
+  });
+  return openedPlans;
+}
+
+async function openPlans(): Promise<IDBPDatabase<OffcutPlansDb>> {
+  const at = (version: number | undefined) =>
+    openDB<OffcutPlansDb>(DB_NAME, version, {
+      upgrade(db, oldVersion, newVersion) {
+        runUpgrades(db as unknown as IDBPDatabase<OffcutSourcesDb>, oldVersion, newVersion);
+      },
+      blocking(_currentVersion, _blockedVersion, event) {
+        (event.target as IDBDatabase).close();
+        openedPlans = undefined;
+      },
+      terminated() {
+        openedPlans = undefined;
+      },
+    });
+  try {
+    return await at(PLANS_STRUCTURE_VERSION);
   } catch (error) {
     if (isVersionError(error)) {
       return at(undefined);

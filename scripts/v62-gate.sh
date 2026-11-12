@@ -92,6 +92,8 @@ ALLOW=(
   'crates/offcut-wasm-render/src/scene_api.rs|^ +let \(_, dropped\) = scene_of\(hook, &clip\(\)\)\.unwrap\(\);$'
   # P186 (D-448, D-449): catalog 2 is this build's own, so the test's newer catalog becomes 3.
   'crates/offcut-wasm-render/src/scene_api.rs|^ +refused\(input\(\|v\| v\["plan"\]\["catalog"\] = json!\(2\)\)\),$'
+  # P192 (D-443, Step 0.4): featureFlags' one-line return of three flags becomes a return of five.
+  'web/src/config/features.ts|^  return \{ cloud_transcribe: value\("cloud_transcribe"\), long_video: value\("long_video"\), high_res: value\("high_res"\) \};$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

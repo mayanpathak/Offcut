@@ -398,6 +398,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 192 — Flags, the request, the store
 
+**Done 2026-11-12 (V6 CL Entry 54).** Known issue 4 closed: `requestPlan` makes one attempt. The upgrades 1 → 3 and 2 → 3 also read once in real Chrome.
+
 **Effort: High.**
 
 **Objective.** The client can ask for a plan and keep it, behind `ai_plan`, without touching the pipeline yet.

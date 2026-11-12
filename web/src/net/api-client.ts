@@ -13,6 +13,8 @@ import type {
   MagicLinkRequest,
   MeResponse,
   NotifyMeRequest,
+  PlanRequest,
+  PlanResponse,
   SessionResponse,
   TranscribeResponse,
   UrlResponse,
@@ -196,6 +198,26 @@ export function transcribeAudio(
     signal,
     // V6.1 (D-413): a window of a long source says so; a clip's request is as before.
     ...(window === undefined ? {} : { window }),
+  });
+}
+
+/** V6.2 (v6.2implementation D-466, D-498): how long the whole plan request may take. */
+export const PLAN_CLIENT_TIMEOUT_MS = 20_000;
+
+/**
+ * V6.2 (D-466): `POST /plan`, one clip's transcript, its plan back. One
+ * attempt, as `transcribeAudio`: a 502 or 504 with `plan_unavailable` or
+ * `plan_invalid` is the running API's answer, read by its code, never waited
+ * out as a waking API (V6 CL known issue 4). A 401 refreshes once (D-288).
+ */
+export function requestPlan(body: PlanRequest, signal: AbortSignal): Promise<HttpResult<PlanResponse>> {
+  return authed<PlanResponse>({
+    method: "POST",
+    path: "/plan",
+    body,
+    retry: "none",
+    attemptTimeoutMs: PLAN_CLIENT_TIMEOUT_MS,
+    signal,
   });
 }
 
