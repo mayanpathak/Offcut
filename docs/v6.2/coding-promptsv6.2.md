@@ -634,6 +634,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 203 — Punch words
 
+**Done 2026-11-13 (V6 CL Entry 64).** `punch_word` written once on WARP and read beside the frame without it; `line_breaks.rs`, every chunking snapshot and every old golden unchanged; 8 new snapshots; the four styles read by eye.
+
 **Effort: High.**
 
 **Objective.** One word alone, in capitals, at 1.9×, with the readability rules kept, and no other clip's chunking changed.

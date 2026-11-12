@@ -29,8 +29,8 @@ pub mod watermark;
 
 use offcut_plan::ValidPlan;
 use offcut_types::{
-    ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
-    Transcript, WordIdx, WordRange,
+    ChangeSummary, ClipInfo, DurMs, EditState, EmphasisSize, EventId, EventParams, ExportProfile,
+    OUTPUT_FPS, OutMs, SrcPos, TimeMap, Transcript, WordIdx, WordRange,
 };
 use thiserror::Error;
 
@@ -104,7 +104,33 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
 
     let words = captions::words(input.transcript, &input.edit.word_edits, map);
     let sentences = &input.transcript.sentences;
-    let mut chunks = captions::chunk(&words, sentences, &style, theme, fonts, block)?;
+    // The user's choice for an item, when there is one; every V4 item is
+    // shown by default (TS §10.8, D-145).
+    let shown = |id: &EventId| input.edit.event_overrides.get(id).copied().unwrap_or(true);
+    // A punch word (V6.2, D-482): the word of each Emphasis of size `Punch`
+    // that is shown, when the captions show the word. Without one, the
+    // chunks are `captions::chunk`'s.
+    let punches: Vec<WordIdx> = input
+        .plan
+        .items()
+        .iter()
+        .filter(|item| shown(&item.id))
+        .filter_map(|item| {
+            if let EventParams::Emphasis {
+                word,
+                size: EmphasisSize::Punch,
+                ..
+            } = item.params
+            {
+                Some(word)
+            } else {
+                None
+            }
+        })
+        .filter(|word| words.iter().any(|caption| caption.word == *word))
+        .collect();
+    let look = (&style, theme, fonts);
+    let mut chunks = captions::chunk_punched(&words, sentences, look, block, &punches)?;
     readability::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
 
     let mut tracks = Vec::new();
@@ -114,15 +140,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     };
     let mut marks = Vec::new();
     for item in input.plan.items() {
-        // The user's choice for this item, when there is one; every V4 item
-        // is shown by default (TS §10.8, D-145).
-        let shown = input
-            .edit
-            .event_overrides
-            .get(&item.id)
-            .copied()
-            .unwrap_or(true);
-        if !shown {
+        if !shown(&item.id) {
             continue;
         }
         let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;

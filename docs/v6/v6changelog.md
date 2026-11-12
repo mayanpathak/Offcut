@@ -2110,3 +2110,47 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3:** in Clean a highlight looks like the spoken word's pill (both yellow); in Bold, Mono and Glow a coloured word is the spoken word's colour; in Mono the cursor joins a spoken word's highlight; in Bold a highlight sits close to a neighbour as it pops. Not pushed (push 3 is P206). Next: P203 (punch words).
+
+## Entry 64 - 2026-11-13 - P203: punch words
+
+**What changed.**
+- **`captions.rs`** (D-482; 455 lines above its tests): `PUNCH_SCALE = 1.9`, `chunk_punched(words, sentences, look, block, punches)` and `punch_line`. `chunk` keeps its signature and calls `chunk_punched` with no punch word, so the frozen `line_breaks.rs` and every V4 caller are untouched.
+  - A punch word is a hard break before and after it: a chunk alone; the rest of its sentence is laid out by the same search on each side. No other sentence's chunks change.
+  - In capitals in every style. **Its size is its line's `scale`** (the runs shaped at the style's size), which every part of the drawing already follows: glyphs, outline, Clean's pill, Mono's panel and cursor, Glow's glow, P202's marks, word boxes and hits. `captions_draw.rs` is unchanged.
+  - Too wide at 1.9 for the block less the decoration grown 1.9 times: as large as fits. Down the block as `lines` places one line (DC-13's lowering), the decoration inside.
+- **`lib.rs`:** `build_scene` takes the punch words before chunking: each switched-on `Emphasis { size: Punch }` whose word the captions show. Switched off or hidden: the chunks are as without it. One `shown` closure now serves both loops.
+- **`events/emphasis.rs`:** its doc says where `Punch` goes now.
+- **Docs:** TS §5 rows (`captions.rs`, `tests/punch_word.rs`, the goldens); "As read (P203)" under D-482 and D-440 (21).
+
+**Differs from the plan.** None of substance. `captions_punch.rs` was not needed (455 lines, under 650). The reading floor needed no code: `hold_for_reading` runs on every chunk.
+
+**Tests (+12).**
+- `captions.rs` +4:
+  - with no punch word, `chunk_punched` is `chunk` (four styles, three placements), and a punch word the captions do not hold changes nothing;
+  - a punch word alone, every word once in order, in capitals at 1.9, shaped at the style's size, centred, its box and decoration in the block (four styles, three placements);
+  - "internationalization" drawn as large as the block holds;
+  - at a sentence's start or end, alone too.
+- `tests/punch_word.rs` (new, 5; a model's plan over written sentences, four styles):
+  - **the reading floor:** with silence after it, shown exactly 700 ms; with the next word at once, shown until the next chunk (470 ms), every word whole;
+  - **two punch words 6 s apart** each alone, and a third 3 s after the second dropped (D-452 counts from the end of the one before);
+  - **at the clip's last word:** the last chunk, shown to the floor or the clip's end, in capitals;
+  - only its own sentence chunked anew, and a normal emphasis changes no chunk;
+  - switched off or hidden by an edit, every frame as without it; on, one emphasis of the summary.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, up to 4 punch words each: 1,416 kept, 15,972 frames with one, 0 problems.**
+- `display_list_snapshots.rs` +1: **8 new snapshot files** (four styles, while said and the next chunk). Clean, Bold and Mono read command by command: Clean's pill around "BRUTAL" at 1.9 in ink; Bold's pop held to about 1.016 by the safe area (1.93); Mono's panel and a cursor 63.8 lp wide.
+- `golden_frames.rs` +1, **`punch_word`** (Clean, while said; one caption run, "BRUTAL" at 1.9, asserted first). Written once on WARP by exact name (only the one file appeared); read beside the frame without it and at 200%, with the other three styles, its fade-in and the hand-over from a scratch render.
+
+**Declared.** D-440 (21): `tests/emphasis.rs`' `a_punch_word_is_marked_at_the_captions_size_until_p203` (P202's, pinning P202's interim rule) becomes `a_punch_word_is_marked_with_its_treatment_in_a_chunk_of_its_own`. Its frame equality is kept for the other sentence; it gains the punch word alone, in capitals, 1.9 times as tall, still marked. The equality over the punch word's own sentence cannot stay: D-482 changes those frames by design. Other test files gain lines only.
+
+**Every existing frame unchanged.** `line_breaks.rs` passes unchanged; no existing snapshot or golden is modified (P202's 18 emphasis snapshots included); every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases, 5 passed. No browser flow can draw a punch word yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,509,799 → **7,512,492** bytes (+2,693).
+
+**Counts.**
+- Rust **1088 / 0 / 7** by count (1076 + 12; `offcut-scene` 168 / 0 / 4, `offcut-render` 41, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entry 63's): a punch word followed at once by speech is on screen only for its own word (about 0.4 to 0.5 s); Glow's halo and Mono's cursor grow with it. Not pushed (push 3 is P206). Next: P204 (emoji and icons).

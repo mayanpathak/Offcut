@@ -4,9 +4,9 @@
 //! and its program start to the captions (`captions_draw.rs`), which colour
 //! it, underline it or highlight it from then until its chunk ends.
 //!
-//! `size: Punch` (a punch word, D-482) is P203's: its chunking and its size.
-//! Until then a punch word is marked with its treatment at the caption's
-//! size, and the track keeps the size for P203.
+//! `size: Punch` (a punch word, D-482) is the chunking's: `build_scene`
+//! hands the word to `captions::chunk_punched`, which shows it alone, in
+//! capitals, at `PUNCH_SCALE`; the captions mark it with its treatment there.
 
 use offcut_types::{EmphasisSize, OutMs, OutSpan, Treatment, WordIdx};
 

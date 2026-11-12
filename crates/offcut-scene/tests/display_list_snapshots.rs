@@ -268,3 +268,47 @@ fn emphasis_each_treatment_in_each_style_while_said_and_after() {
         }
     }
 }
+
+/// V6.2 (P203, D-482): the KeywordPop input's sentences with a model's plan
+/// of one punch word, "brutal" (colour), in the four styles: while it is
+/// said, alone in capitals at 1.9 times the size, and when the next chunk
+/// is shown. New files.
+#[test]
+fn punch_word_in_each_style_while_said_and_next() {
+    use offcut_types::{
+        EmphasisSize, EventId, EventKind, ItemParams, PlanItem, Treatment, WordRange,
+    };
+    let input = &INPUTS[3];
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let case = case(input, style, BTreeMap::new());
+        let words = &case.transcript.words;
+        let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+        let item = PlanItem {
+            id: EventId::new(9_200),
+            kind: EventKind::Emphasis,
+            anchors: WordRange {
+                start: WordIdx::new(brutal),
+                end: WordIdx::new(brutal + 1),
+            },
+            params: ItemParams::Emphasis {
+                word: WordIdx::new(brutal),
+                treatment: Treatment::Colour,
+                size: EmphasisSize::Punch,
+            },
+            confidence: None,
+        };
+        let case = model::with_model_items(case, vec![item]);
+        assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+        let scene = scenes::build(&case, 1080);
+        let said = scene.frame_at(OutMs::new(input.at[1]));
+        assert_eq!(
+            texts(&said).last().map(String::as_str),
+            Some("BRUTAL"),
+            "{style:?}"
+        );
+        let next = scene.frame_at(OutMs::new(input.at[2]));
+        assert!(!texts(&next).iter().any(|t| t == "BRUTAL"), "{style:?}");
+        insta::assert_json_snapshot!(format!("punch_word_{}_said", style_name(style)), said);
+        insta::assert_json_snapshot!(format!("punch_word_{}_next", style_name(style)), next);
+    }
+}

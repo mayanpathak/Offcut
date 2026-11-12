@@ -684,3 +684,58 @@ fn emphasis_underline() {
 fn emphasis_highlight() {
     emphasis_golden("emphasis_highlight", offcut_types::Treatment::Highlight);
 }
+
+/// A punch word (V6.2, D-482): the KeywordPop input's sentences in Clean,
+/// the default style, with a model's plan of one punch word on "brutal"
+/// (colour), while it is said: alone, in capitals, at 1.9 times the style's
+/// size, in ink on the pill.
+#[test]
+fn punch_word() {
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Clean, BTreeMap::new());
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_200),
+        kind: EventKind::Emphasis,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal),
+            end: offcut_types::WordIdx::new(brutal + 1),
+        },
+        params: offcut_types::ItemParams::Emphasis {
+            word: offcut_types::WordIdx::new(brutal),
+            treatment: offcut_types::Treatment::Colour,
+            size: offcut_types::EmphasisSize::Punch,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(
+        case.plan.items().len(),
+        1,
+        "the punch word passed validation"
+    );
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(OutMs::new(input.at[1]));
+    // The list before the pixels: one caption run, "BRUTAL", at 1.9.
+    let runs: Vec<(String, f32)> = list
+        .cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::GlyphRun {
+                text, transform, ..
+            } = cmd
+            {
+                Some((text.clone(), transform.m[0]))
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(runs.len(), 1, "{runs:?}");
+    assert_eq!(runs[0].0, "BRUTAL");
+    // The frame's own scale (540 of 1080) goes into the run's size, not its
+    // transform: the transform is the punch word's 1.9.
+    assert!((runs[0].1 - 1.9).abs() < 1e-4, "{runs:?}");
+    golden("punch_word", (&pattern(1080, 1920), Rotation::R0), &list);
+}

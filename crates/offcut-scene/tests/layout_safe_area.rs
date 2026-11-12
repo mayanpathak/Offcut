@@ -368,3 +368,100 @@ fn no_emphasis_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_watermark(
     let first: Vec<&String> = problems.iter().take(20).collect();
     assert!(problems.is_empty(), "{first:#?}");
 }
+
+/// V6.2 (P203, D-482): the labeled scenes with a model's plan of punch
+/// words: from the first word, the next starting at least 6.5 s after the
+/// last one ends (D-452's gap is 6 s), up to D-452's 4 a clip, colour,
+/// underline and highlight in turn; in the four styles, at the three
+/// placements, watermark on, at every 33 ms. No punch word, at 1.9 times
+/// the style's size, nor what is drawn with it, leaves the safe area or
+/// meets the watermark.
+#[test]
+fn no_punch_word_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_watermark() {
+    use offcut_types::{
+        EmphasisSize, EventId, ItemParams, PlanItem, Treatment, WordIdx, WordRange,
+    };
+    let treatments = [
+        Treatment::Colour,
+        Treatment::Underline,
+        Treatment::Highlight,
+    ];
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let (mut punches, mut punched_frames, mut frames) = (0usize, 0u64, 0u64);
+    let mut problems: Vec<String> = Vec::new();
+    for style in styles {
+        let theme = Theme::default_for(style);
+        let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+        for name in &names() {
+            for p in PLACES {
+                let case = labeled::case(name, |edit, _| {
+                    edit.style = style;
+                    edit.caption_position = CaptionPlacement::new(p).unwrap();
+                });
+                let mut items = Vec::new();
+                let mut last_end: Option<u32> = None;
+                for (i, word) in case.transcript.words.iter().enumerate() {
+                    let start = word.start_ms.get();
+                    if items.len() == 4 || last_end.is_some_and(|end| start < end + 6_500) {
+                        continue;
+                    }
+                    let at = WordIdx::new(i as u32);
+                    items.push(PlanItem {
+                        id: EventId::new(9_400 + i as u64),
+                        kind: EventKind::Emphasis,
+                        anchors: WordRange {
+                            start: at,
+                            end: WordIdx::new(i as u32 + 1),
+                        },
+                        params: ItemParams::Emphasis {
+                            word: at,
+                            treatment: treatments[items.len() % 3],
+                            size: EmphasisSize::Punch,
+                        },
+                        confidence: None,
+                    });
+                    last_end = Some(word.end_ms.get());
+                }
+                let case = model::with_model_items(case, items);
+                punches += case.plan.items().len();
+                let scene = scenes::build_with(&case, 1080, true);
+                let mut t = 0;
+                while t < scene.duration().get() {
+                    frames += 1;
+                    let list = scene.frame_at(OutMs::new(t));
+                    // A punch word's runs are drawn at 1.9 times their size
+                    // or near it, which no other run of the captions is.
+                    let big = list.cmds.iter().any(|cmd| {
+                        matches!(cmd, DrawCmd::GlyphRun { transform, text, .. }
+                            if transform.m[0] > 1.5 && text != WATERMARK_TEXT)
+                    });
+                    punched_frames += u64::from(big);
+                    for cmd in &list.cmds {
+                        let Some((r, is_mark)) = bounds(cmd) else {
+                            continue;
+                        };
+                        let what =
+                            || format!("{name} {style:?} at {p}, {t} ms: {r:?} of {}", kind(cmd));
+                        if !inside(r, SAFE_AREA) {
+                            problems.push(format!("outside the safe area: {}", what()));
+                        }
+                        if !is_mark && overlap(r, mark) {
+                            problems.push(format!("on the watermark: {}", what()));
+                        }
+                    }
+                    t += STEP_MS;
+                }
+            }
+        }
+    }
+    println!(
+        "Punch words: {punches} kept, {punched_frames} of {frames} frames with one, {} problems",
+        problems.len()
+    );
+    assert!(
+        punches > 400 && punched_frames > 5_000,
+        "{punches} {punched_frames}"
+    );
+    let first: Vec<&String> = problems.iter().take(20).collect();
+    assert!(problems.is_empty(), "{first:#?}");
+}

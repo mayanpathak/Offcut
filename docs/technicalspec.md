@@ -463,7 +463,7 @@ offcut/
 │   │   │   ├── safe_area.rs           [ONLY] logical canvas and safe-area constants
 │   │   │   ├── fonts.rs               font registry (embedded bytes)
 │   │   │   ├── images.rs              (V6.2) ImageSet::embedded(): the bundle's PNGs by ImageKey; ImageKey::of_emoji, of_icon (v6.2implementation D-471)
-│   │   │   ├── captions.rs            caption chunking and line layout
+│   │   │   ├── captions.rs            caption chunking and line layout; (V6.2) punch words: chunk_punched, PUNCH_SCALE (v6.2implementation D-482)
 │   │   │   ├── readability.rs         [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168)
 │   │   │   ├── placement.rs           [ONLY] caption block and event zone from CaptionPlacement (D-171)
 │   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops; (V6.2) Glow's glow strokes (D-479); the plan's emphasis: colour, underline, highlight (D-481)
@@ -498,6 +498,7 @@ offcut/
 │   │       ├── hit.rs                 Scene::hit (D-174)
 │   │       ├── camera.rs              (V6.2) the drift's segments; motion off is today's scene, on changes only Video.src (D-476, D-477)
 │   │       ├── punch_in.rs            (V6.2) a model's zoom in a scene: held, released, with the drift, switched off, counted (D-478)
+│   │       ├── punch_word.rs          (V6.2) a model's punch word in a scene: alone, the reading floor, two 6 s apart, the clip's last word, its sentence only, switched off or hidden (D-482, D-452)
 │   │       ├── emphasis.rs            (V6.2) a model's emphasis in a scene: its start to its chunk's end, its own chunk only, a hidden word, switched off, only the captions change, counted (D-481)
 │   │       ├── image_bundle.rs        (V6.2) the manifest equals EmojiId and IconId; each file 160 px RGBA with its SHA-256; keys distinct; licences (D-447, D-470)
 │   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
@@ -1055,7 +1056,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478); glow_style, the Glow style (D-479, D-480); emphasis_colour, emphasis_underline, emphasis_highlight, Bold (D-481)
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478); glow_style, the Glow style (D-479, D-480); emphasis_colour, emphasis_underline, emphasis_highlight, Bold (D-481); punch_word, Clean (D-482)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh

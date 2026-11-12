@@ -3,8 +3,8 @@
 //! four styles. The captions mark the word from its program start until its
 //! chunk ends, and only in its own chunk; a word an edit hid is not marked;
 //! switched off, it is gone; only the captions change; it counts as
-//! "captions emphasized"; a punch word is marked at the captions' size until
-//! P203 gives it its own chunk.
+//! "captions emphasized"; a punch word is marked with its treatment in a
+//! chunk of its own (P203, D-482).
 
 #![allow(
     clippy::unwrap_used,
@@ -288,8 +288,11 @@ fn only_the_captions_change_the_video_and_every_word_stay_where_they_were() {
     }
 }
 
+/// V6.2 (P203, D-440 (21)): this case pinned P202's "until P203" (a punch
+/// word drawn as a normal one). Its equality holds now for the other
+/// sentence, and the punch word is alone, at 1.9x, still marked.
 #[test]
-fn a_punch_word_is_marked_at_the_captions_size_until_p203() {
+fn a_punch_word_is_marked_with_its_treatment_in_a_chunk_of_its_own() {
     for treatment in TREATMENTS {
         let normal = case(
             StyleId::Bold,
@@ -300,8 +303,43 @@ fn a_punch_word_is_marked_at_the_captions_size_until_p203() {
             vec![emphasis(BRUTAL, treatment, EmphasisSize::Punch)],
         );
         let (a, b) = (scenes::build(&normal, 1080), scenes::build(&punch, 1080));
-        for t in frames(&normal) {
+        // The other sentence is chunked and drawn as with a normal emphasis.
+        let tail = |scene: &Scene| {
+            let ranges = scene.chunk_ranges();
+            ranges
+                .iter()
+                .find(|(r, _)| r.start.get() > LAST_WEEK / 2)
+                .unwrap()
+                .1
+        };
+        assert_eq!(tail(&a), tail(&b));
+        for t in frames(&normal).filter(|t| *t >= tail(&a).get()) {
             assert_eq!(at(&a, t), at(&b, t), "{treatment:?} at {t}");
         }
+        // While "brutal" is said: alone, in capitals, 1.9 times as tall, marked.
+        let said = OutMs::new(punch.transcript.words[BRUTAL as usize].start_ms.get() + 200);
+        let alone = b.caption_words(said);
+        assert_eq!(alone.len(), 1, "{treatment:?}");
+        assert_eq!(alone[0].0, "BRUTAL");
+        let word = WordIdx::new(BRUTAL);
+        let (big, small) = (
+            b.word_box(said, word).unwrap(),
+            a.word_box(said, word).unwrap(),
+        );
+        assert!((big.h / small.h - 1.9).abs() < 1e-3, "{big:?} {small:?}");
+        let theme = offcut_scene::Theme::default_for(StyleId::Bold);
+        let marks = rects(&at(&b, said.get()))
+            .into_iter()
+            .filter(|r| overlap(*r, big))
+            .count();
+        let want = usize::from(treatment != Treatment::Colour);
+        assert_eq!(marks, want, "{treatment:?}");
+        // Spoken, Bold's accent; highlighted, in ink.
+        let fill = if treatment == Treatment::Highlight {
+            theme.on_accent
+        } else {
+            theme.accent
+        };
+        assert_eq!(alone[0].1, fill, "{treatment:?}");
     }
 }
