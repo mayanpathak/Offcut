@@ -456,7 +456,7 @@ offcut/
 │   │   │   └── images/                (V6.2) the 72 images, 160 px RGBA PNGs: emoji/ (48, Fluent Emoji 3D, MIT), icons/ (24, Lucide, ISC), manifest.json (id, key, file, SHA-256, pinned source, licence), LICENSES/; made by scripts/gen-image-bundle.mjs (v6.2implementation D-470)
 │   │   ├── src/
 │   │   │   ├── lib.rs                 build_scene(), Scene::frame_at()
-│   │   │   ├── styles.rs              [ONLY] StyleSpec for Clean, Bold, Tech
+│   │   │   ├── styles.rs              [ONLY] StyleSpec for Clean, Bold, Tech; (V6.2) Glow and StyleSpec.glow (v6.2implementation D-479, D-480)
 │   │   │   ├── theme.rs               [ONLY colour values] Theme, Role, FontRole, default_for (v4implementation D-136)
 │   │   │   ├── motion.rs              CaptionMotion, MotionUnit, MotionPreset, ActiveTreatment (D-137)
 │   │   │   ├── camera.rs              (V6.2) CameraTrack: the slow drift by rules, build(), none(), scale_at() (v6.2implementation D-476)
@@ -466,7 +466,7 @@ offcut/
 │   │   │   ├── captions.rs            caption chunking and line layout
 │   │   │   ├── readability.rs         [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168)
 │   │   │   ├── placement.rs           [ONLY] caption block and event zone from CaptionPlacement (D-171)
-│   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops
+│   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops; (V6.2) Glow's glow strokes (D-479)
 │   │   │   ├── hit.rs                 Scene::hit (D-174)
 │   │   │   ├── layout.rs              text shaping through parley
 │   │   │   ├── easing.rs              Easing, ease(); (V6.2) CubicBezier, bezier(), STANDARD, OUT, IN_OUT (D-475)
@@ -955,7 +955,7 @@ offcut/
 │   │       │   ├── CaptionWordControls.tsx  a transcript word's field and menu (v4implementation D-182)
 │   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item; (V6.2) the five kinds' icons and "Regenerate plan"
 │   │       │   ├── TextExtrasPanel.tsx    (V6.2) "Text for your post": the hook, caption and hashtags that passed, each with Copy (v6.2implementation D-454)
-│   │       │   ├── StylePanel.tsx         the style cards and Highlight numbers
+│   │       │   ├── StylePanel.tsx         the style cards (four since V6.2: Glow) and Highlight numbers
 │   │       │   ├── StylePicker.tsx
 │   │       │   ├── FramingPanel.tsx       caption position and crop
 │   │       │   ├── CropOffsetControl.tsx

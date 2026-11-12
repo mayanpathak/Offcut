@@ -271,7 +271,7 @@ export type Prosody = { per_word: Array<WordProsody>, };
 /**
  * Caption style (PS §12.2).
  */
-export type StyleId = "clean" | "bold" | "tech";
+export type StyleId = "clean" | "bold" | "tech" | "glow";
 
 /**
  * Horizontal crop position: -1.0 (left) ..= 1.0 (right); 0.0 is the centre.

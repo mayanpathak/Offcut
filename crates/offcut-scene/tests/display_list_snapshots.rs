@@ -191,3 +191,17 @@ fn the_from_to_steps_to_its_second_value_at_its_mark() {
     assert_eq!(parts(mark - 1), (true, false, false));
     assert_eq!(parts(mark), (true, true, true));
 }
+
+/// V6.2 (P201, D-480): the Glow style with each kind's visual, before it,
+/// while it shows and after it. New files; the three styles' are unchanged.
+#[test]
+fn glow_with_each_kind_before_during_and_after_its_visual() {
+    let style = StyleId::Glow;
+    for input in &INPUTS {
+        let scene = scenes::build(&case(input, style, BTreeMap::new()), 1080);
+        for (when, t) in ["before", "during", "after"].into_iter().zip(input.at) {
+            let name = format!("{}_{}_{when}", style_name(style), input.name);
+            insta::assert_json_snapshot!(name, scene.frame_at(OutMs::new(t)));
+        }
+    }
+}

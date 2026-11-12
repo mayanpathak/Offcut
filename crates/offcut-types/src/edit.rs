@@ -17,6 +17,10 @@ pub enum StyleId {
     Clean,
     Bold,
     Tech,
+    /// V6.2 (v6.2implementation D-480, F-3): white Inter 800 with a soft
+    /// glow, the keyword in the accent colour. After Mono in the picker; the
+    /// default stays Clean.
+    Glow,
 }
 
 /// Horizontal crop position: -1.0 (left) ..= 1.0 (right); 0.0 is the centre.
@@ -161,6 +165,18 @@ mod tests {
             assert_eq!(json, format!("\"{name}\""));
             assert_eq!(serde_json::from_str::<StyleId>(&json).unwrap(), style);
         }
+        assert_eq!(StyleId::default(), StyleId::Clean);
+    }
+
+    #[test]
+    fn glow_is_the_fourth_style_and_serializes_as_glow() {
+        let json = serde_json::to_string(&StyleId::Glow).unwrap();
+        assert_eq!(json, "\"glow\"");
+        assert_eq!(
+            serde_json::from_str::<StyleId>(&json).unwrap(),
+            StyleId::Glow
+        );
+        // Appended: the default is still Clean.
         assert_eq!(StyleId::default(), StyleId::Clean);
     }
 

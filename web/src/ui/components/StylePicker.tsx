@@ -1,4 +1,4 @@
-// The three style cards (v4implementation D-186): each the clip's own frame
+// The style cards (v4implementation D-186; V6.2's fourth, Glow, D-480): each the clip's own frame
 // in that style, drawn by the real renderer with the current edits, its name
 // and one line; the chosen one has a ring and `aria-pressed`. What a card
 // shows is what the export will show (D-172). Until the frames come, each
@@ -18,6 +18,7 @@ const STYLES: readonly { id: StyleId; name: string; line: string }[] = [
   { id: "clean", name: messages.style.clean, line: messages.style.cleanLine },
   { id: "bold", name: messages.style.bold, line: messages.style.boldLine },
   { id: "tech", name: messages.style.mono, line: messages.style.monoLine },
+  { id: "glow", name: messages.plan.glow, line: messages.plan.glowLine },
 ];
 
 /** A card's frame: the bitmap drawn on a canvas of its size, kept by the store (which closes it when replaced). */

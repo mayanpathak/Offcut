@@ -282,13 +282,37 @@ fn draw_shadow(
     out.push(DrawCmd::PopLayer);
 }
 
+/// Glow's glow (V6.2, D-479): behind every word, `layers` strokes in the
+/// word's own colour at the glow's `alpha`, the widest first, each a glyph
+/// run with a clear fill. Where they overlap, near the letters, the glow is
+/// strongest. Nothing for a style without a glow.
+fn draw_glow(words: &[Drawn<'_>], style: &StyleSpec, out: &mut Vec<DrawCmd>) {
+    let Some(glow) = style.glow else {
+        return;
+    };
+    let alpha = (glow.alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
+    for layer in (1..=glow.layers).rev() {
+        let width = style.stroke_width.max(0.0) + glow.spread * f32::from(layer);
+        for word in words {
+            let stroke = Some(Stroke {
+                width,
+                color: word.fill.with_alpha(alpha),
+            });
+            let clear = word.fill.with_alpha(0);
+            for &(run, transform) in &word.runs {
+                out.push(glyph_run(run, clear, stroke, transform));
+            }
+        }
+    }
+}
+
 /// `draw_with` and no emphasis besides the spoken word.
 pub fn draw(chunk: &Chunk, t: OutMs, style: &StyleSpec, theme: &Theme, out: &mut Vec<DrawCmd>) {
     draw_with(chunk, t, style, theme, &Emphasis::default(), out);
 }
 
 /// Adds the chunk as it looks at `t`, in this order: Tech's panel, the
-/// shadow, Clean's pill, the words (each in the colour of its first layer of
+/// shadow, Glow's glow, Clean's pill, the words (each in the colour of its first layer of
 /// emphasis, each moving as the style's motion says), Tech's cursor.
 pub fn draw_with(
     chunk: &Chunk,
@@ -343,6 +367,7 @@ pub fn draw_with(
     // the pill holds it all: ink, no outline, no shadow (D-170).
     let sliding = pill_now.is_some_and(|(_, _, sliding)| sliding);
     draw_shadow(&words, !on_pill || sliding, style, theme, out);
+    draw_glow(&words, style, out);
     if sliding && let Some(spoken) = spoken {
         for &(run, transform) in &spoken.runs {
             out.push(glyph_run(run, spoken.quiet, stroke, transform));
@@ -926,5 +951,73 @@ mod tests {
             .iter()
             .filter(|c| matches!(c, DrawCmd::PushLayer { .. }));
         assert_eq!(layers.count(), 1, "the shadow's only");
+    }
+
+    #[test]
+    fn glow_draws_four_fading_strokes_of_each_words_own_colour_before_the_words() {
+        let (chunk, style, theme) = chunk_of(StyleId::Glow);
+        let glow = style.glow.unwrap();
+        let alpha = (glow.alpha * 255.0).round() as u8;
+        // A time inside the chunk, while a word is spoken.
+        let t = chunk.words[0].start.get() + 10;
+        let cmds = plain(&chunk, t, &style, &theme);
+        let glyphs: Vec<(Rgba, Option<Stroke>)> = cmds
+            .iter()
+            .filter_map(|cmd| {
+                if let DrawCmd::GlyphRun { fill, stroke, .. } = cmd {
+                    Some((*fill, *stroke))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let glows: Vec<(Rgba, Stroke)> = glyphs
+            .iter()
+            .filter(|(fill, _)| fill.a == 0)
+            .map(|(fill, stroke)| (*fill, stroke.unwrap()))
+            .collect();
+        let words = glyphs
+            .iter()
+            .filter(|(fill, _)| fill.a == 255 && *fill != theme.shadow)
+            .count();
+        assert!(words > 0);
+        assert_eq!(glows.len(), 4 * words, "four strokes a word's run");
+        // The widest first, each the word's colour at the glow's alpha.
+        let widths: Vec<f32> = glows.iter().map(|(_, s)| s.width).collect();
+        assert!(widths.windows(2).all(|w| w[0] >= w[1]), "{widths:?}");
+        assert_eq!((widths[0], widths[widths.len() - 1]), (24.0, 6.0));
+        for (fill, stroke) in &glows {
+            assert_eq!(stroke.color, fill.with_alpha(alpha));
+        }
+        // The spoken word glows in the accent, the others in white.
+        let colours: std::collections::BTreeSet<(u8, u8, u8)> =
+            glows.iter().map(|(f, _)| (f.r, f.g, f.b)).collect();
+        assert!(
+            colours.contains(&(255, 255, 255)) && colours.contains(&(255, 214, 10)),
+            "{colours:?}"
+        );
+        // Every glow stroke comes before every word.
+        let first_word = cmds
+            .iter()
+            .position(|c| matches!(c, DrawCmd::GlyphRun { fill, .. } if fill.a == 255 && *fill != theme.shadow))
+            .unwrap();
+        let last_glow = cmds
+            .iter()
+            .rposition(|c| matches!(c, DrawCmd::GlyphRun { fill, .. } if fill.a == 0))
+            .unwrap();
+        assert!(last_glow < first_word);
+    }
+
+    #[test]
+    fn the_three_other_styles_draw_no_glow() {
+        for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech] {
+            let (chunk, spec, theme) = chunk_of(style);
+            let t = chunk.words[0].start.get() + 10;
+            let cmds = plain(&chunk, t, &spec, &theme);
+            let clear = cmds
+                .iter()
+                .any(|c| matches!(c, DrawCmd::GlyphRun { fill, .. } if fill.a == 0));
+            assert!(!clear, "{style:?}");
+        }
     }
 }

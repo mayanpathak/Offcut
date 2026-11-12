@@ -592,6 +592,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 201 — Glow and the Glow style
 
+**Done 2026-11-13 (V6 CL Entry 62).** `glow_style` written once on WARP; 12 new Glow snapshots read; Clean, Bold and Mono goldens and snapshots unchanged; the four cards in 72 ms on D1 (budget 400).
+
 **Effort: Medium** (D-499; guarded by the old goldens).
 
 **Objective.** A soft glow behind caption text, in a fourth style, with the three styles unchanged.

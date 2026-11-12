@@ -96,4 +96,6 @@ export const planCopy = {
     reset: "Back to recommended",
   },
   glow: "Glow",
+  /** The Glow card's line (P201; a draft for checkpoint 3). */
+  glowLine: "Bright and soft: white words that glow, the keyword in colour.",
 } as const;

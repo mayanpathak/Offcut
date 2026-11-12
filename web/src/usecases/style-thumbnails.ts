@@ -1,4 +1,4 @@
-// The Style tab's three cards (v4implementation D-186): the clip's frame at
+// The Style tab's four cards (v4implementation D-186; Glow since V6.2): the clip's frame at
 // the preview's position, drawn by the render worker in Clean, Bold and Mono
 // with the current edits. Asked at once when the tab opens, then again
 // `THUMB_DEBOUNCE_MS` after the last change of what the frame shows; the

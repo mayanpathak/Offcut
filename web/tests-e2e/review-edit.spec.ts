@@ -45,7 +45,7 @@ import {
 
 /** Analytics sends what it has every 10 s; a case waits that long for an event, and a little more. */
 const FLUSH_WAIT_MS = 25_000;
-/** The style cards' three images (assumption, D-186; §21.1). */
+/** The style cards' four images (assumption, D-186; §21.1). */
 const THUMBNAILS_MS = 400;
 /** One output frame, at 30 fps. */
 const FRAME_MS = 1000 / 30;
@@ -538,17 +538,17 @@ test.describe("the editor (review-edit), on a clip of its own", () => {
 
   // On its own load: the store keeps the cards of the last time the tab was open, and
   // on a shared clip they would show at once, and this time would measure nothing.
-  test("14. style cards and Highlight numbers: three images within 400 ms; Highlight numbers off takes the accent off the number; Bold applies", async ({ page }, testInfo) => {
+  test("14. style cards and Highlight numbers: four images within 400 ms; Highlight numbers off takes the accent off the number; Bold applies", async ({ page }, testInfo) => {
     await openClip(page, referenceClip());
     const ninety = (await transcriptWords(page)).find((word) => word.text === "90");
     await showWord(page, ninety?.index ?? -1);
     await captionWhen(page, (text) => tokens(text).includes("90"), "the caption shows the number");
 
-    // The three images, timed from the tab's click in the page itself.
+    // The four images (Glow since V6.2, D-480), timed from the tab's click in the page itself.
     await page.evaluate(() => {
       const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
       new MutationObserver(() => {
-        if (w.e2eCardsAt === undefined && document.querySelectorAll('[data-testid="style-cards"] canvas').length === 3) {
+        if (w.e2eCardsAt === undefined && document.querySelectorAll('[data-testid="style-cards"] canvas').length === 4) {
           w.e2eCardsAt = performance.now();
         }
       }).observe(document, { childList: true, subtree: true });
@@ -557,16 +557,16 @@ test.describe("the editor (review-edit), on a clip of its own", () => {
       }, true);
     });
     await openTab(page, "Style");
-    await expect(page.getByTestId("style-cards").locator("canvas")).toHaveCount(3, { timeout: 5_000 });
+    await expect(page.getByTestId("style-cards").locator("canvas")).toHaveCount(4, { timeout: 5_000 });
     const ms = Math.round(
       await page.evaluate(() => {
         const w = window as unknown as { e2eCardsAt?: number; e2eTabAt?: number };
         return (w.e2eCardsAt ?? Number.NaN) - (w.e2eTabAt ?? Number.NaN);
       }),
     );
-    testInfo.annotations.push({ type: "reading", description: `style cards: three images ${String(ms)} ms after the tab's click` });
-    process.stdout.write(`      style cards: three images ${String(ms)} ms after the tab's click (target ${String(THUMBNAILS_MS)})\n`);
-    expect(ms, `the three images came ${String(ms)} ms after the click`).toBeLessThanOrEqual(THUMBNAILS_MS);
+    testInfo.annotations.push({ type: "reading", description: `style cards: four images ${String(ms)} ms after the tab's click` });
+    process.stdout.write(`      style cards: four images ${String(ms)} ms after the tab's click (target ${String(THUMBNAILS_MS)})\n`);
+    expect(ms, `the four images came ${String(ms)} ms after the click`).toBeLessThanOrEqual(THUMBNAILS_MS);
 
     const on = (await captionMirror(page)).colors;
     const highlight = page.getByTestId("highlight-numbers");

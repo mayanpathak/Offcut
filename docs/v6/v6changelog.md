@@ -2011,3 +2011,60 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P201 (Glow and the Glow style).
+
+## Entry 62 - 2026-11-13 - P201: glow and the Glow style
+
+**What changed.**
+- **The glow (D-479):**
+  - `styles.rs`: `Glow { layers, spread, alpha }` with `reach`, and `StyleSpec.glow`, `None` for Clean, Bold and Mono. Its reach is counted in `decoration_width`/`decoration_height` as a `max` with half the stroke, so a style with none lays out bit for bit as before.
+  - `captions_draw.rs`' `draw_glow`, after the shadow and before the words: per layer, the widest first, each word's runs again as glyph runs with a clear fill and a stroke of the word's own colour at `alpha`.
+  - `display_list.rs`: `Rgba::with_alpha`, so no colour literal leaves the files `styles_use_theme.rs` allows.
+- **The Glow style (D-480):** `StyleId::Glow` appended (`edit.rs`, additive; the default stays Clean).
+  - Its spec: Inter 800 at 76 lp as spoken, 2 lines of 14 characters, 3 words, no outline, Clean's drop shadow, the glow (4 strokes of 24, 18, 12 and 6 lp at alpha 41, reaching 12 lp), the spoken word highlighted in the accent, cut in hard, a keyword in `AccentAlt`.
+  - Its theme is Clean's. **Each word glows in its own colour:** white words white, the spoken word and the keyword yellow.
+- **Web:**
+  - the picker's fourth card (`messages.plan.glow`, and `glowLine` in `copy/plan.ts`, a draft for CP 3: "Bright and soft: white words that glow, the keyword in colour.");
+  - **the cards in two rows of two** (`panel.module.css`), so each keeps its width;
+  - the worker draws four thumbnails (`THUMBNAIL_STYLES`);
+  - `pnpm gen:types` (`StyleId` gains `"glow"`);
+  - comments in `StylePanel.tsx` and `style-thumbnails.ts`.
+- **Docs:** TS §5 rows (`styles.rs`, `captions_draw.rs`, `StylePanel.tsx`); "As read (P201)" under D-479, D-480 and D-440 (20).
+
+**Differs from the plan.**
+- `Glow` has no `role` (D-479 named one): the word's own colour is D-480's "keyword in the accent colour with glow" in one rule, with no new theme role.
+- `protocol.ts`' doc line still says "three frames" (an additive file; its wording is left).
+- The analytics' `style` is the `StyleId` type, so `"glow"` is accepted with no list changed.
+
+**Tests (+8).**
+- `edit.rs` +1: Glow serializes as `"glow"`, and the default is Clean.
+- `styles.rs` +1: only Glow has a glow; its values; its decoration room (12 lp + the shadow).
+- `theme.rs` +1: Glow's theme is Clean's.
+- `captions_draw.rs` +2:
+  - four strokes a word's run, the widest first (24 to 6), each the word's colour at alpha 41, white and yellow, all before the words;
+  - Clean, Bold and Mono draw no glow.
+- `layout_safe_area.rs` +1: **Glow over the 31 labeled files at three placements, watermark on: 79,059 frames and 748,344 glow strokes, each box counting its stroke's width; none leaves the safe area or meets the watermark.**
+- `display_list_snapshots.rs` +1: Glow with each kind before, during and after: **12 new snapshot files**. `glow_keyword_pop_during` read command by command: the shadow layer, four glow layers, the words, the keyword at 1.25.
+- `golden_frames.rs` +1, **`glow_style`**: the KeywordPop input during its pop. Written once on WARP and read beside `clean_keyword` and at 200%: a soft, graded halo with no hard ring; "brutal" yellow on a yellow glow.
+
+**Declared.**
+- D-440 (20): `review-edit.spec.ts` case 14 counts four cards, not three (`toHaveCount` and the observer that times them, and its words). The 400 ms budget and every other assertion are unchanged.
+- Other test files gain lines only.
+
+**Every existing frame unchanged.** No snapshot of Clean, Bold or Mono changed. Every old golden reads 1.0000. `styles_use_theme.rs` passes with Glow.
+
+**Media** (keyed `pnpm build:e2e`, D1):
+- **the four cards came 72 ms after the tab's click** (budget 400);
+- `review-edit.spec.ts` 16 and `export-free.spec.ts` 12 passed (30 with the setup), axe clean on the editor.
+
+**Captures** (`pnpm screens`, development build): `~/v6.2-review/ui/style-tab-glow-1280x800.png` and `-1920x1080.png`.
+- At 1920 × 1080 the four cards and Highlight numbers fit.
+- **At 1280 × 800 the second row's lines and the Highlight numbers switch are below the fold** (the panel scrolls). The layout is the founder's at CP 3.
+
+**Render binary.** 7,507,821 → **7,508,635** bytes (+814).
+
+**Counts.**
+- Rust **1056 / 0 / 7** by count (1048 + 8; `offcut-types` 94, `offcut-scene` 140, `offcut-render` 37, `offcut-wasm-render` 12, `offcut-api-types` 33 re-run).
+- Vitest **744**.
+- `pnpm check` is clean (generated files staged first); the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). For CP 3: Glow's card line, and the style cards at 1280 × 800. Not pushed (push 3 is P206). Next: P202 (`Emphasis`).

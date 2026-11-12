@@ -131,6 +131,13 @@ pub enum DrawCmd {
     },
 }
 
+impl Rgba {
+    /// The same colour at the opacity `a` (V6.2: Glow's strokes, D-479).
+    pub const fn with_alpha(self, a: u8) -> Rgba {
+        Rgba { a, ..self }
+    }
+}
+
 impl Affine {
     pub const IDENTITY: Affine = Affine {
         m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],

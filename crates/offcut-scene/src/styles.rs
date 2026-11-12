@@ -24,6 +24,26 @@ pub struct PanelSpec {
     pub padding: f32,
 }
 
+/// A soft glow behind each word (V6.2, v6.2implementation D-479): `layers`
+/// strokes of the word's own colour, the widest drawn first, each `spread`
+/// wider than the one before and `alpha` opaque, so that where they overlap
+/// near the letters the glow is strongest. No blur: strokes in Vello.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Glow {
+    pub layers: u8,
+    /// In logical pixels.
+    pub spread: f32,
+    pub alpha: f32,
+}
+
+impl Glow {
+    /// How far past a glyph's outline the widest stroke reaches, in logical
+    /// pixels, on one side, over a run stroked `stroke_width` wide.
+    pub fn reach(&self, stroke_width: f32) -> f32 {
+        (stroke_width.max(0.0) + self.spread * f32::from(self.layers)) / 2.0
+    }
+}
+
 /// One row of the table of TS §19.4.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleSpec {
@@ -44,6 +64,8 @@ pub struct StyleSpec {
     pub pop: Role,
     pub panel: Option<PanelSpec>,
     pub shadow: Option<ShadowSpec>,
+    /// V6.2 (D-479): Glow's only; the other styles have none.
+    pub glow: Option<Glow>,
     pub motion: CaptionMotion,
 }
 
@@ -69,7 +91,7 @@ impl StyleSpec {
     /// block (§8.6, §8.9). It moves no line that fits.
     pub fn decoration_width(&self) -> f32 {
         let shadow = self.shadow.map_or(0.0, |s| s.offset.0.abs());
-        let stroke = self.stroke_width.max(0.0) / 2.0 + shadow;
+        let stroke = (self.stroke_width.max(0.0) / 2.0).max(self.glow_reach()) + shadow;
         let cursor = match self.motion.active {
             ActiveTreatment::Cursor => CURSOR_WIDTH_EM * self.size,
             ActiveTreatment::Highlight | ActiveTreatment::Pill => 0.0,
@@ -89,11 +111,26 @@ impl StyleSpec {
     /// shadow and the pill count whether the style draws them or not: they
     /// change no layout box (V4), so a line sits where it would without them.
     pub fn decoration_height(&self) -> f32 {
-        let stroke = self.stroke_width.max(0.0) / 2.0 + DROP_SHADOW.offset.1.abs();
+        let stroke =
+            (self.stroke_width.max(0.0) / 2.0).max(self.glow_reach()) + DROP_SHADOW.offset.1.abs();
         let panel = self.panel.map_or(0.0, |panel| panel.padding);
         stroke.max(PILL_PADDING.1).max(panel)
     }
+
+    /// How far the glow reaches past the outline: 0.0 without one, so a
+    /// style with none is laid out as before.
+    fn glow_reach(&self) -> f32 {
+        self.glow.map_or(0.0, |glow| glow.reach(self.stroke_width))
+    }
 }
+
+/// Glow's glow (D-479; assumption, tuned in the quality pass): four strokes
+/// reaching 12 lp past the letters at 72 lp.
+const GLOW: Glow = Glow {
+    layers: 4,
+    spread: 6.0,
+    alpha: 0.16,
+};
 
 /// The premium default (D-170): Inter 800, a drop shadow, the spoken word on
 /// a sliding pill, the chunk fading in.
@@ -112,6 +149,7 @@ fn clean() -> StyleSpec {
         pop: Role::AccentAlt,
         panel: None,
         shadow: Some(DROP_SHADOW),
+        glow: None,
         motion: CaptionMotion {
             unit: MotionUnit::Word,
             enter: MotionPreset::Fade,
@@ -139,6 +177,7 @@ fn bold() -> StyleSpec {
         pop: Role::AccentAlt,
         panel: None,
         shadow: Some(DROP_SHADOW),
+        glow: None,
         motion: CaptionMotion {
             unit: MotionUnit::Word,
             enter: MotionPreset::Pop,
@@ -170,6 +209,7 @@ fn tech() -> StyleSpec {
             padding: 32.0,
         }),
         shadow: None,
+        glow: None,
         motion: CaptionMotion {
             unit: MotionUnit::Word,
             enter: MotionPreset::None,
@@ -180,11 +220,41 @@ fn tech() -> StyleSpec {
     }
 }
 
+/// V6.2 (D-480, F-3): white Inter 800 with a soft glow and Clean's drop
+/// shadow, two or three words, cut in hard, the spoken word and a keyword in
+/// the accent, each glowing in its own colour.
+fn glow() -> StyleSpec {
+    StyleSpec {
+        font: FontRole::Display,
+        size: 76.0,
+        case: Case::AsSpoken,
+        max_chars_per_line: 14,
+        max_lines: 2,
+        max_words: 3,
+        fill: Role::Text,
+        stroke_width: 0.0,
+        stroke: Role::Stroke,
+        active: Role::Accent,
+        pop: Role::AccentAlt,
+        panel: None,
+        shadow: Some(DROP_SHADOW),
+        glow: Some(GLOW),
+        motion: CaptionMotion {
+            unit: MotionUnit::Word,
+            enter: MotionPreset::None,
+            active: ActiveTreatment::Highlight,
+            easing: Easing::EaseOutCubic,
+            duration_ms: 100,
+        },
+    }
+}
+
 pub fn spec(id: StyleId) -> StyleSpec {
     match id {
         StyleId::Clean => clean(),
         StyleId::Bold => bold(),
         StyleId::Tech => tech(),
+        StyleId::Glow => glow(),
     }
 }
 
@@ -260,5 +330,32 @@ mod tests {
         // Tech: the panel's 32 lp and a cursor cell of 0.6 x 56 lp.
         let tech = spec(StyleId::Tech).decoration_width();
         assert!((tech - 2.0 * (32.0 + 33.6)).abs() < 1e-3, "{tech}");
+    }
+
+    #[test]
+    fn only_glow_has_a_glow_and_the_others_lay_out_as_before() {
+        for style in STYLES {
+            assert_eq!(spec(style).glow, None, "{style:?}");
+        }
+        let glow = spec(StyleId::Glow);
+        assert_eq!(
+            glow.glow,
+            Some(Glow {
+                layers: 4,
+                spread: 6.0,
+                alpha: 0.16
+            })
+        );
+        assert_eq!(
+            (glow.size, glow.max_words, glow.stroke_width),
+            (76.0, 3, 0.0)
+        );
+        assert_eq!(glow.motion.active, ActiveTreatment::Highlight);
+        assert_eq!(glow.motion.enter, MotionPreset::None);
+        assert_eq!(glow.shadow, Some(DROP_SHADOW));
+        // The glow reaches 12 lp past the letters: the room kept beside a line.
+        assert_eq!(GLOW.reach(0.0), 12.0);
+        assert_eq!(glow.decoration_width(), 2.0 * (12.0 + 0.0));
+        assert_eq!(glow.decoration_height(), 12.0 + 4.0);
     }
 }

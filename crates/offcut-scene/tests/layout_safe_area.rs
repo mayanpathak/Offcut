@@ -224,3 +224,55 @@ fn the_six_shared_scenes_stay_in_the_safe_area_without_the_watermark() {
         }
     }
 }
+
+/// V6.2 (P201, D-479, D-480): the Glow style over the same labeled scenes,
+/// placements and instants, watermark on. Its glow reaches 12 lp past the
+/// letters, and the box of each glow stroke counts its width: none leaves
+/// the safe area or meets the watermark.
+#[test]
+fn no_box_of_any_labeled_scene_in_glow_leaves_the_safe_area_or_meets_the_watermark() {
+    let style = StyleId::Glow;
+    let names = names();
+    let theme = Theme::default_for(style);
+    let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+    let (mut frames, mut glows) = (0u64, 0u64);
+    let mut problems: Vec<String> = Vec::new();
+    for name in &names {
+        for p in PLACES {
+            let case = labeled::case(name, |edit, _| {
+                edit.style = style;
+                edit.caption_position = CaptionPlacement::new(p).unwrap();
+            });
+            let scene = scenes::build_with(&case, 1080, true);
+            let mut t = 0;
+            while t < scene.duration().get() {
+                frames += 1;
+                for cmd in &scene.frame_at(OutMs::new(t)).cmds {
+                    let Some((r, is_mark)) = bounds(cmd) else {
+                        continue;
+                    };
+                    if let DrawCmd::GlyphRun { fill, .. } = cmd
+                        && fill.a == 0
+                    {
+                        glows += 1;
+                    }
+                    let what = || format!("{name} at {p}, {t} ms: {r:?} of {}", kind(cmd));
+                    if !inside(r, SAFE_AREA) {
+                        problems.push(format!("outside the safe area: {}", what()));
+                    }
+                    if !is_mark && overlap(r, mark) {
+                        problems.push(format!("on the watermark: {}", what()));
+                    }
+                }
+                t += STEP_MS;
+            }
+        }
+    }
+    println!(
+        "Glow: {frames} frames, {glows} glow strokes, {} problems",
+        problems.len()
+    );
+    assert!(glows > 1_000, "{glows} glow strokes");
+    let first: Vec<&String> = problems.iter().take(20).collect();
+    assert!(problems.is_empty(), "{first:#?}");
+}

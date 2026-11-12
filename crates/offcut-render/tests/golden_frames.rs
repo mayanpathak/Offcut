@@ -592,3 +592,17 @@ fn punch_snap() {
 fn punch_push() {
     punch_golden("punch_push", offcut_types::ZoomMotion::Push, 1.125);
 }
+
+/// The Glow style (V6.2, D-479, D-480): the KeywordPop input during its pop,
+/// the spoken word and the keyword in the accent, every word glowing in its
+/// own colour over Clean's drop shadow.
+#[test]
+fn glow_style() {
+    let (source, list) = scene_frame(StyleId::Glow, &INPUTS[3], false);
+    let glowing = list
+        .cmds
+        .iter()
+        .any(|cmd| matches!(cmd, DrawCmd::GlyphRun { fill, stroke: Some(_), .. } if fill.a == 0));
+    assert!(glowing, "the glow's strokes are drawn");
+    golden("glow_style", (&source, Rotation::R0), &list);
+}
