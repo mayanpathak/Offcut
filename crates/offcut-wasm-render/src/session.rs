@@ -9,6 +9,8 @@ use offcut_mp4::reader::RandomAccess;
 use offcut_mp4::{ContainerError, IoError};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::{Scene, SceneError};
+// V6.2 (v6.2implementation D-471, §9.2): the images a list may name.
+use offcut_render::scene::ImageSet;
 use offcut_render::{RenderError, Renderer, VideoSources};
 use offcut_types::{Bytes, ClipInfo, ErrorCode, OutMs, Px, TimeMs};
 use wasm_bindgen::JsValue;
@@ -144,6 +146,11 @@ fn render_error(error: RenderError) -> JsValue {
     failure(code, detail)
 }
 
+/// The same failure, for the development check of `check_api.rs` (P197).
+pub(crate) fn render_error_value(error: RenderError) -> JsValue {
+    render_error(error)
+}
+
 #[wasm_bindgen]
 pub struct RenderSession {
     pub(crate) clip: ClipInfo,
@@ -214,6 +221,13 @@ impl RenderSession {
             None => {
                 let renderer = Renderer::new(canvas, width, height)
                     .await
+                    .map_err(render_error)?;
+                // V6.2 (D-471, §9.2): the bundle's images, each decoded once,
+                // handed over when the renderer is made; a later canvas
+                // keeps them. The scene names them by key from P204.
+                let mut renderer = renderer;
+                renderer
+                    .set_images(&ImageSet::embedded())
                     .map_err(render_error)?;
                 self.renderer = Some(renderer);
                 Ok(())

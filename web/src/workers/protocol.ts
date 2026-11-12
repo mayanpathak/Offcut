@@ -193,7 +193,15 @@ export interface RenderWorkerApi {
     prog48: Float32Array;
   }): Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
+  /**
+   * V6.2 (TE-30, D-474): draws `image_basic`'s frame in this worker and reads
+   * it back. A development build's check only; a production build refuses it.
+   */
+  devImageCheck(): Promise<ImageCheckResult>;
 }
+
+/** What the image check read back: RGBA rows from the top-left, and the images' decode time. */
+export type ImageCheckResult = { width: number; height: number; pixels: Uint8Array; decodeMs: number };
 
 /** `epochMs` is `performance.timeOrigin + performance.now()`. `audioMs` is program time (D-126). */
 export type ClockSync = { audioMs: OutMs; epochMs: number };

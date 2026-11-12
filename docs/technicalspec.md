@@ -506,6 +506,7 @@ offcut/
 │   │   │   ├── video_pass.rs          external frame import, rotate, crop, scale
 │   │   │   ├── vello_backend.rs       DisplayList -> vello::Scene -> overlay texture; (V6.2) the images, decoded once by set_images, drawn in list order (v6.2implementation D-472)
 │   │   │   ├── composite.rs           video + overlay -> target
+│   │   │   ├── check.rs               (V6.2) TE-30's frame, defined once: the goldens' synthetic source and image_basic's list (v6.2implementation D-474)
 │   │   │   └── shaders/video.wgsl
 │   │   └── tests/
 │   │       ├── golden_frames.rs       native wgpu, software adapter; reads fixtures/golden/
@@ -552,6 +553,7 @@ offcut/
 │           ├── scene_api.rs           set_scene (validate + build), source_at, summary; rules_plan (v4implementation D-150)
 │           ├── detect_api.rs          detect, redetect_sentence
 │           ├── profile_api.rs         export_profile_from_token, preview_profile (v2implementation D-53)
+│           ├── check_api.rs           (V6.2) check_source, draw_image_check: TE-30's frame for a development build's check (D-474)
 │           └── mux_api.rs             Mp4MuxerHandle
 ├── server/
 │   ├── Cargo.toml
@@ -872,6 +874,7 @@ offcut/
 │   │   │   ├── render/source-position.ts  (V6.3) recording time → source time, through the Assembly (INV-27)
 │   │   │   ├── render/preview-job.ts        play, pause, seek, clock, the resize rule (D-148, D-149, D-150)
 │   │   │   ├── render/export-job.ts         the export handlers, out of render.worker.ts (D-150)
+│   │   │   ├── render/image-check.ts        (V6.2) development builds only: TE-30's frame drawn and read back (v6.2implementation D-474)
 │   │   │   ├── render/preview-loop.ts
 │   │   │   ├── render/export-loop.ts
 │   │   │   ├── render/export-loop.test.ts   the loop with fake WebCodecs: frames, program time, restarts (v5implementation D-219)
@@ -991,6 +994,7 @@ offcut/
 │       ├── helpers/fake-api.ts
 │       ├── helpers/long-windows.ts    (V6.1) each window's answer from the cloud fixture (D-431); the long page's helpers
 │       ├── helpers/fixtures.ts
+│       ├── helpers/ssim.ts            (V6.2) the golden frames' SSIM, a copy of offcut-render/tests/common/ssim.rs (D-474)
 │       ├── media.setup.ts             fills fixtures/.cache/ for the media suites and the bench (v2buildguide item 6b)
 │       ├── landing.spec.ts
 │       ├── capability.spec.ts
@@ -1016,6 +1020,7 @@ offcut/
 │       ├── flags-identity.spec.ts     (V6.1, as built) one clip on both builds: the same records, render-cache key and export (INV-26)
 │       ├── route-long.spec.ts         (V6.1, as built) the two ways in, the gate, a 12-minute video through the fake windows, the refusals
 │       ├── high-res.spec.ts           (V6.1)
+│       ├── image-parity.spec.ts       (V6.2) TE-30: the browser's image_basic against its golden, D1 only (D-474)
 │       ├── long-resume.spec.ts        (V6.1) tab killed, tab hidden, source evicted
 │       ├── cuts_applied.spec.ts       (V6.3)
 │       ├── stitched.spec.ts           (V6.3) out-of-order parts

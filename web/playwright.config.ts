@@ -34,6 +34,8 @@ const MEDIA_SUITES = [
   "review-edit.spec.ts",
   "cancel.spec.ts",
   "cloud-transcribe.spec.ts",
+  // V6.2 (TE-30, D-474): the images drawn in the browser against their golden. D1 only (no @no-gpu case).
+  "image-parity.spec.ts",
 ];
 // V6.1 (§11.4): the suites of the flags-on build. `rejections.spec.ts` runs
 // there unchanged, less the three cases whose file the flags-on clip page

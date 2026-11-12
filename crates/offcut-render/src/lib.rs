@@ -3,6 +3,7 @@
 //! draws what it is given. It does not know what a scene means, it detects
 //! nothing, and it closes no `VideoFrame`: the caller does (TS §19.6).
 
+pub mod check;
 mod composite;
 mod gpu;
 mod vello_backend;

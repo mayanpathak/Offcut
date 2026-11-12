@@ -4,7 +4,7 @@
 // production build has neither it nor the workers' halves (rpc-worker.ts).
 
 import { pool } from "../workers/pool";
-import type { WorkerKind } from "../workers/protocol";
+import type { ImageCheckResult, WorkerKind } from "../workers/protocol";
 
 /** Worker `kind` throws where nothing catches it: the page sees its crash (D-153). */
 export function crashWorker(kind: WorkerKind): void {
@@ -24,4 +24,16 @@ export function failEncoderAt(frame: number, times: number): void {
 /** The render worker's next `setScene` fails: a review change then fails as one can (D-190). */
 export function failNextSetScene(): void {
   pool.render.notify("devFailNext", { method: "setScene" });
+}
+
+/**
+ * V6.2 (TE-30, v6.2implementation D-474): the render worker draws the frame of
+ * the `image_basic` golden and reads it back, for `image-parity.spec.ts`.
+ */
+export async function imageCheck(): Promise<ImageCheckResult> {
+  const result = await pool.render.devImageCheck();
+  if ("cancelled" in result) {
+    throw new Error("the image check was cancelled");
+  }
+  return result;
 }

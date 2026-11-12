@@ -27,6 +27,7 @@ import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
 import type { FailureStage, PlanCheck, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
+import { imageCheck } from "./render/image-check";
 import {
   captionMirror,
   drawStill,
@@ -41,7 +42,7 @@ import {
 } from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
 import { toAppFailure } from "./rpc";
-import { type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
+import { DEV_FAULTS, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The clip that is open, from `openSession` to `closeSession` (TS §14.3).
 // The export and the preview are in `render/export-job.ts` and
@@ -282,6 +283,9 @@ const handlers: Handlers<RenderWorkerApi> = {
   exportProfile,
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
+  // V6.2 (TE-30): a development build's check; a production build folds
+  // `DEV_FAULTS` to false and keeps neither the check nor its file.
+  devImageCheck: () => (DEV_FAULTS ? imageCheck() : Promise.reject(new WorkerFailure("E_INTERNAL", "NoHandler"))),
 };
 
 serveWorker(handlers, {

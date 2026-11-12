@@ -523,6 +523,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 197 — Images in the browser, TE-30; push 2, waited on
 
+**Done 2026-11-12 (V6 CL Entry 59).** TE-30: SSIM 0.9995 on D1 (Intel gen-12lp WebGPU); the images decode in 24 ms per renderer. Push 2: CI's result is recorded in the entry of the next prompt.
+
 **Effort: High.**
 
 **Objective.** The browser draws the same image list as the native renderer, and CI's lavapipe agrees.

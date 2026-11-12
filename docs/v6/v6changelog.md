@@ -1829,3 +1829,58 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5 and 8 (P212, P210); 9 closed. Not pushed (push 2 is P197, waited on: CI's lavapipe must pass `image_basic`). Next: P197 (images in the browser, TE-30).
+
+## Entry 59 - 2026-11-12 - P197: images in the browser, TE-30; push 2
+
+**What changed.**
+- **`offcut-render/src/check.rs`** (new, `pub mod check`): TE-30's frame defined once, the goldens' synthetic source (`pattern`) and `image_basic`'s list. `golden_frames.rs` asserts both equal its own:
+  - `image_basic` gains `assert_eq!(list, check::image_basic())`;
+  - a new test compares the two patterns at 1080 × 1920 and 1920 × 1080, and the canvas size.
+- **The binding:**
+  - `session.rs` (additive only): `attach_canvas` hands `ImageSet::embedded()` to the renderer when it makes it; a later canvas keeps them. `render_error_value` is added for the check.
+  - `check_api.rs` (new): `check_source()` and `draw_image_check(canvas, frame)`. The second uses a renderer of its own with the images held, kept alive until the page has read the canvas, and gives `decode_ms()`.
+- **The worker passes nothing** (the prompt says it passes the images). The images are in the WASM (D-471), so the binding hands them over itself ("As read (P197)" under D-474).
+- **Web:**
+  - `protocol.ts` (additive): `devImageCheck` and `ImageCheckResult`;
+  - `render.worker.ts` serves it only when `DEV_FAULTS` holds;
+  - `workers/render/image-check.ts` (new): a `VideoFrame` of the source (`RGBA`), the draw, and the canvas read back through an `ImageBitmap`;
+  - `load-render.ts`: `checkSource`, `drawImageCheck`;
+  - `usecases/dev-faults.ts`: `imageCheck`;
+  - `ui/dev-hooks.ts`: `__offcutDev.imageCheck()`.
+- **`tests-e2e/image-parity.spec.ts`** (new, in `MEDIA_SUITES`; no `@no-gpu` case, so D1 only) and **`helpers/ssim.ts`** (new): a line-for-line copy of `ssim.rs`, which gives Rust's numbers to 10 decimals on three golden pairs. The browser's frame is kept in `web/test-results/image-parity/`.
+- **Docs:** TS §5 rows (`check.rs`, `check_api.rs`, `image-check.ts`, `helpers/ssim.ts`, `image-parity.spec.ts`); "As read (P197)" under D-474; TE-30 in `experiments.md`.
+
+**TE-30 (D-474): passes on D1.**
+- **SSIM 0.9995** (line 0.98), browser against the WARP golden, on Chrome's WebGPU, Intel "gen-12lp".
+- Read by eye at 200%: the same placement, edges, opacity, order and cut as the golden.
+- **The 72 images decode in 24 ms**, once per renderer, in the worker. `pipeline-preview`'s "no main-thread task over 100 ms from the drop to ready" passes.
+
+**The render binary.** 6,484,358 → **7,496,980** bytes: +1,012,622 for this prompt, **+1,015,633 against P195's base** (the images, the PNG decoder and the check), the ~1.0 MB the founder approved at CP 2b.
+
+**Production build** (checked in a scratch folder):
+- no `__offcutDev`, no `imageCheck`, and none of `image-check.ts`' text;
+- what stays is the `devImageCheck` stub, which refuses (`NoHandler`), and the two loader wrappers (about 100 bytes);
+- the WASM carries `check_api`, a few kB.
+
+**Tests.**
+- **Tier 3:**
+  - `pnpm check` clean;
+  - `pnpm fixtures` up to date;
+  - `pnpm test`: Rust **1013 / 0 / 7** (the workspace, run), Vitest **744**;
+  - `pnpm e2e --workers=4`: **57**;
+  - `golden_frames` 21 (+1).
+- **Media, on a keyed `pnpm build:e2e`:**
+  - `image-parity.spec.ts` 1;
+  - `pipeline-preview.spec.ts` 15 and `export-creator.spec.ts` 18: every session now decodes the images, and both pass, with the verifier's PASS on the Creator export.
+
+**Declared.**
+- `golden_frames.rs` gains lines only.
+- `playwright.config.ts`' `MEDIA_SUITES` gains one line.
+- `session.rs` and `protocol.ts` gain lines only, as the gate checks.
+- No test of the base changed.
+
+**Found.** From the Bash tool, `verifyMp4`'s plain `python` is MSYS2's 3.9 without NumPy, so `export-creator`'s verifier case failed on the first run ("NumPy cannot be imported"). With Python 3.13 first on `PATH` it passed. This is the machine's setup; nothing in the repository is changed.
+
+**Push 2.** Pushed after this commit and waited on. CI's result (`golden_frames` on lavapipe, `image_basic` included) is recorded in the next prompt's entry.
+
+**Open.** 35. Known issues 5 and 8 (P212, P210). Next: P199 with P198 (Bezier easing and the camera drift).

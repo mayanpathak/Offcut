@@ -13,7 +13,7 @@ import type { EditPlan, ErrorCode, EventKind, PlanItem } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
-import { crashWorker, failEncoderAt, failNextSetScene, hangWorker } from "../usecases/dev-faults";
+import { crashWorker, failEncoderAt, failNextSetScene, hangWorker, imageCheck } from "../usecases/dev-faults";
 import { wordAt } from "../usecases/replace-all";
 
 type WorkerKind = Parameters<typeof crashWorker>[0];
@@ -55,6 +55,12 @@ export type DevHooks = {
   fakePlan(): void;
   /** V6.2 (P194): the run fell back to the rules plan for `why`; its toast shows. */
   fakePlanFallback(why: Exclude<PlanOutcome, "ok" | "off">): void;
+  /**
+   * V6.2 (P197, TE-30): the render worker draws the `image_basic` golden's
+   * frame, images included, and reads it back: RGBA rows from the top-left,
+   * and how long the images took to decode.
+   */
+  imageCheck(): ReturnType<typeof imageCheck>;
 };
 
 /** The five kinds of V6.2, each on the word at that share of the transcript. */
@@ -144,5 +150,6 @@ export function installDevHooks(): void {
     fakePlanFallback: (why) => {
       useClipStore.setState({ planFallback: why });
     },
+    imageCheck,
   };
 }

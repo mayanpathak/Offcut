@@ -27,13 +27,16 @@ import type {
   WordIdx,
 } from "../gen/domain";
 import initRender, {
+  check_source,
   detect,
+  draw_image_check,
   export_profile_from_token,
   Mp4MuxerHandle,
   open_session,
   preview_profile,
   redetect_sentence,
   type RenderSession as ModuleSession,
+  type ImageCheck,
   rules_plan,
   validate_plan,
 } from "./pkg/render/offcut_render";
@@ -138,6 +141,14 @@ export type RenderApi = {
     v: { width: Px; height: Px; avcc: Uint8Array; frameCountHint: number },
     asc: Uint8Array,
   ): Mp4MuxerHandle;
+  /**
+   * V6.2 (TE-30, v6.2implementation D-474), for a development build's check
+   * only: the golden frames' synthetic source (RGBA, 1080 x 1920), and
+   * `image_basic`'s frame drawn over a frame of it on `canvas` (540 x 960).
+   * The check holds its renderer until `free()`, so the canvas can be read.
+   */
+  checkSource(): Uint8Array;
+  drawImageCheck(canvas: OffscreenCanvas, frame: VideoFrame): Promise<ImageCheck>;
 };
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -171,6 +182,8 @@ const api: RenderApi = {
   previewProfile: () => preview_profile() as ExportProfile,
   openSession: (clip, source) => open_session(clip, source),
   newMuxer: (sink, v, asc) => new Mp4MuxerHandle(sink, v.width, v.height, v.avcc, v.frameCountHint, asc),
+  checkSource: () => check_source(),
+  drawImageCheck: (canvas, frame) => draw_image_check(canvas, frame),
 };
 
 /** Instantiates the compiled module, compiling it first if needed. For the render worker. */

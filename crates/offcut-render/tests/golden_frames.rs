@@ -505,5 +505,20 @@ fn image_basic() {
             },
         },
     ]);
+    // The browser's check draws this frame from `offcut_render::check` (P197, TE-30).
+    assert_eq!(list, offcut_render::check::image_basic());
     golden("image_basic", (&source, Rotation::R0), &list);
+}
+
+/// TE-30's frame is one definition (P197, D-474): the source and the list
+/// the browser's check draws are this file's own.
+#[test]
+fn the_browser_checks_source_and_list_are_the_goldens() {
+    let (w, h) = offcut_render::check::SOURCE;
+    assert_eq!(offcut_render::check::pattern(w, h), pattern(w, h));
+    assert_eq!(
+        offcut_render::check::pattern(1920, 1080),
+        pattern(1920, 1080)
+    );
+    assert_eq!(offcut_render::check::CANVAS, (WIDTH, HEIGHT));
 }
