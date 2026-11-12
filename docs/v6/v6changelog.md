@@ -39,6 +39,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 36 | **Closed 2026-11-12 (Entry 48): renamed with the founder's yes.** Was: **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
 | 37 | **Closed 2026-11-12 (Entry 49): the founder chose `deepseek-flash`, thinking off, at 0.30 / 1.20 USD per 1M tokens; yes to the revision (done in P188b) and to item-level parsing (P190).** Was: **Checkpoint 1 (P188): choose the model, confirm the prices, and say yes or no to the prompt revision and item-level parsing.** Read `~/v6.2-review/plans/README.md`'s ten plans first, then `docs/v6.2/experiments.md` TE-15's full read. Recommended: `deepseek-flash`, thinking off; one prompt revision and Flash re-read (15 calls, about $0.02); item-level parsing in P190. P189 was built with `deepseek-flash` as the default model (the founder, 2026-11-12) | Founder, before P190 | Entry 47 |
 | 38 | **Closed 2026-11-12 (Entry 51): the founder said yes; done in P189b.** Was: **A rollback to V6.1 after V6.2's migration would not boot.** sqlx refuses a database holding a migration the binary does not know (`VersionMissing(2)`, reproduced locally). Recommended: (a) V6.2's `db::migrate` sets `ignore_missing(true)`, so later rollbacks (V6.3 → V6.2) work; and (b) §14.4 and the merge's rollback note gain one step: before booting V6.1 on a migrated database, `DELETE FROM _sqlx_migrations WHERE version = 2` (the three tables stay, unused). Nothing was changed; the founder decides, before P212 | Founder, before P212 | Entry 48 |
+| 39 | **Checkpoint 3's points, open after the founder's go (2026-11-13, no change asked).** Each is the founder's, for the quality pass (BP §8A.12) or earlier: (1) Clean: a highlight looks like the spoken word's pill; (2) Bold, Mono, Glow: a coloured word is the spoken word's colour; (3) Mono: the cursor joins a spoken word's highlight; (4) Bold: a highlight close to a popping neighbour; (5) a punch word followed at once by speech shows about 0.4-0.5 s; (6) Glow's halo and Mono's cursor grow with a punch word; (7) at Bottom an emoji "under" its word is drawn over it; (8) white icons on a yellow disc are weak in contrast; (9) at Bottom the icon sits about 120 lp above the captions; (10) the hook is centred, over the speaker's face; (11) **the landing page has no sign-in entry, yet AI plans need one**; (12) the model may leave the hook item out (it did on the founder's clip) | Founder | Entries 63-67, `~/v6.2-review/look/README.md` |
 
 ## Known issues for later prompts
 
@@ -2263,3 +2264,54 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 to 65): the lockup is centred in the frame, over a speaker's face for its 2 s. **For P206:** `catalog_complete.rs`' harness item gains the five kinds; a caption-zone kind (Emphasis, Emoji) draws nothing in `events::draw`, IconPop draws in the event zone, PunchIn nothing (the video's), HookTitle in the safe area. Not pushed (push 3 is P206). Next: P206 (everything together, CP 3, push 3).
+
+## Entry 67 - 2026-11-13 - P206: everything together, checkpoint 3; push 3
+
+**What changed.**
+- **`catalog_complete.rs` un-ignored (D-440 (9))**: the release's only ignores are gone (`git grep 'ignore = "V6.2' crates` is empty). The harness is widened, nothing deleted:
+  - `KINDS` 4 → 9, and `item` makes one of each new kind;
+  - the zone names gain `video` and `hook`, and `points` measures an `Image`;
+  - each kind is drawn at 1,500 ms as well as 3,300 ms (the hook shows in the program's first 2 s);
+  - a caption- or video-zone kind draws nothing of its own; every other kind draws inside its zone.
+- **`tests/common/all_kinds.rs`** (new): the reference transcript (`a01-scriptA`) with a model's plan of a hook, four emphases (one a punch word), two emoji, two icons, a snap and a push, every item kept, Motion on.
+- **New cases** (with all five kinds, four styles):
+  - `determinism.rs`: two builds equal, the same bytes at every frame and in any order;
+  - `parity.rs`: 540 and 720 the 1080 list after scaling, at every frame;
+  - `display_list_snapshots.rs`: Glow at ten instants (10 new files, each read to show its kind).
+- **The frame cost** (§10.5): `scene_timing_all_kinds` (ignored, release only). **0.78-1.23× today's per frame** (Mono's the worst, under the 1.5× line), every frame in microseconds; recorded in `docs/v6.2/experiments.md`.
+- **Captures** in `~/v6.2-review/look/`: each kind at rest in each style (40), the hook at three lengths, ten drift frames, and `README.md` with §12's copy and the points to judge.
+- **The whole clip** (D-496), in `~/v6.2-review/cp3/`: the MP4 and `plan-annotated.md`. How it was run is "As read (P206)" under D-496: `dist-flags/` behind a scratch same-origin proxy to the local API, per-process values for that run only, the founder's real SMTP values in the local `.env`, sign-in by magic link.
+- **Docs:** TS §5 rows (`common/all_kinds.rs`, `determinism.rs`); "As read (P206)" under D-440 (9), D-496 and §10.5; open item 39.
+
+**Checkpoint 3.** The founder's own recording (79 s), cloud transcription, **DeepSeek's plan (D-500)**, Glow, exported at the free plan's 720p.
+- **The plan:** 15 items, **11 drawn** (3 zooms, 3 emphases one a punch word, 2 emoji, 2 icons, 1 number), 4 numbers dropped `NumberUnresolved`, **no `hook_title` item** (a hook text only).
+- **Motion could not be turned on:** its switch is P208's Enhance panel, so the clip has the plan's zooms and no drift.
+- **Found on the way** (not code faults; how the local run is set up):
+  - the build verifies plan tokens with its test key, so the local API signed with the e2e test seed;
+  - the cloud card needs `TRANSCRIBE_ENABLED`;
+  - the landing page has no sign-in entry.
+- **The founder's go, 2026-11-13, with no change asked.** The points raised stay open: open item 39 (twelve, from Entries 63-66 and this run).
+
+**Differs from the plan.**
+- The provider is DeepSeek, not Gemini (D-500).
+- No drift in the clip (P208).
+- `v62_kinds.rs` (§13.1) was built as one test file per kind (`emphasis.rs`, `punch_word.rs`, `emoji_icon.rs`, `hook_title.rs`, `lockup.rs`).
+
+**Tests (+6, 3 un-ignored).** `catalog_complete.rs` 3 now run; `determinism.rs` +1 (+1 ignored timing); `parity.rs` +1; `display_list_snapshots.rs` +1.
+
+**Declared.** D-440 (9): `catalog_complete.rs` as above. Other test files gain lines only (`display_list_snapshots.rs`' `labeled` module carries `#[allow(dead_code)]`: only its `case` is used there).
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every golden reads SSIM 1.0000 on WARP (32 readings), parity 0.9996-0.9998.
+
+**Tier 3** (D1):
+- `pnpm check && pnpm fixtures && pnpm test` exit 0 (`.env` loaded for the server's database tests);
+- `pnpm e2e --workers=4`: 57 passed;
+- `golden_frames`: 33 passed.
+
+**Render binary.** 7,534,119 bytes (no scene code changed).
+
+**Counts.**
+- Rust **1128 / 0 / 5** (`cargo test --workspace`: 1122 + 6; the ignores 7 - 3 + 1; `offcut-scene` 204 / 0 / 2).
+- Vitest **744**. `pnpm e2e` 57.
+
+**Open.** 35, 39. Known issues 5, 8, 10 (P212, P210, P209). **Push 3** (not waited on). Next: P207 (the levelled voice in the DSP).

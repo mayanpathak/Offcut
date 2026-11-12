@@ -25,6 +25,13 @@ mod model;
 // V6.2 (P205): a model's plan with the hook.
 #[path = "common/hook.rs"]
 mod hook;
+// V6.2 (P206): the reference transcript with all five kinds.
+#[path = "common/all_kinds.rs"]
+mod all_kinds;
+// Only its `case` is used here.
+#[allow(dead_code)]
+#[path = "common/labeled.rs"]
+mod labeled;
 
 use std::collections::BTreeMap;
 
@@ -420,5 +427,35 @@ fn hook_in_each_style_entering_and_at_rest() {
             );
             insta::assert_json_snapshot!(format!("hook_{}_{when}", style_name(style)), list);
         }
+    }
+}
+
+/// V6.2 (P206): the reference transcript (`a01-scriptA`) with all five
+/// kinds, Motion on, in Glow (checkpoint 3's style), at an instant that
+/// shows each at rest. New files.
+#[test]
+fn the_reference_with_all_five_kinds_in_glow() {
+    /// The instants that show each kind at rest: the hook, the underline
+    /// ("editing"), the highlight ("literally"), the snap and the emoji beside
+    /// "brutal", the push, the colour ("evenings"), the punch word ("luck."),
+    /// the icons ("numbers", "laptop.").
+    const INSTANTS: [(&str, u32); 10] = [
+        ("hook", 1_000),
+        ("emoji_under", 6_100),
+        ("underline", 11_000),
+        ("highlight", 13_200),
+        ("snap_emoji_beside", 13_800),
+        ("push", 23_300),
+        ("colour", 27_700),
+        ("punch_word", 30_300),
+        ("icon_numbers", 37_500),
+        ("icon_laptop", 41_600),
+    ];
+    let scene = scenes::build(&all_kinds::reference(StyleId::Glow), 1080);
+    for (name, t) in INSTANTS {
+        insta::assert_json_snapshot!(
+            format!("all_kinds_glow_{name}"),
+            scene.frame_at(OutMs::new(t))
+        );
     }
 }

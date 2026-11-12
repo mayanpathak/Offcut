@@ -179,6 +179,19 @@ Recorded, redacted shapes for P190 (each request with message texts cut to their
 
 **P183's first look (2026-11-11, d1, WARP):** the synthetic source of `golden_frames.rs` (1080 × 1920) drawn at 540 × 960 through the real video pass with `src` scaled linearly from 1.00 to 1.05 over 150 frames; frames 70-80: the red disc's centre moved 0.021 to 0.039 output pixels every frame (0.030 expected), never zero and never a jump. **The video pass samples a fractional crop continuously: nothing snaps the crop to whole pixels**, so a slow drift cannot step. At the canvas edge the linear drift moves about 0.09 output pixels a frame; the `STANDARD` curve's peak about doubles that. P199 reads the curve's frames.
 
+## §10.5 - The scene's cost with every kind (P206)
+
+**Read 2026-11-13 (P206), d1, release: passes.** `determinism.rs`' `scene_timing_all_kinds` (ignored by default; `cargo test -p offcut-scene --release --test determinism -- --ignored scene_timing_all_kinds --nocapture`): the reference transcript (`a01-scriptA`, 2,013 frames) in each style, today's scene (its rules plan, Motion off) against the same transcript with a model's plan of all five kinds (a hook, four emphases with a punch word, two emoji, two icons, a snap and a push) and Motion on; each built 5 times and every frame drawn 5 times, the means.
+
+| Style | `build_scene`, today → all five | `frame_at` mean, today → all five |
+|---|---|---|
+| Clean | 2.13 → 0.55 ms | 0.0016 → 0.0015 ms (0.98×) |
+| Bold | 0.77 → 0.48 ms | 0.0019 → 0.0016 ms (0.81×) |
+| Mono | 0.94 → 0.59 ms | 0.0013 → 0.0017 ms (1.23×) |
+| Glow | 0.89 → 1.05 ms | 0.0029 → 0.0023 ms (0.78×) |
+
+The worst per-frame ratio is Mono's 1.23×, under §10.5's 1.5× line; every frame stays in microseconds, against V4's 2 ms and the 150 ms edit budget. The rules scene itself still reads V4's numbers (`scene_timing` a01: `build_scene` 5.0 ms cold, `frame_at` 0.002 ms; V4: 6.3 ms, 0.002 ms). The all-kinds builds ran second, with the shaping cache warm, so their build times read low; the per-frame times are the comparison. The browser's per-frame cost at export was not benched separately: the whole clip of CP 3 exported normally (78.9 s, 720p).
+
 ## E-11 - Instrumentation
 
 Not read yet. P193 and P211.

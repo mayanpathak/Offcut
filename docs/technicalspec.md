@@ -491,7 +491,7 @@ offcut/
 │   │       ├── display_list_snapshots.rs
 │   │       ├── layout_safe_area.rs
 │   │       ├── framing.rs
-│   │       ├── determinism.rs
+│   │       ├── determinism.rs         (V6.2) and all five kinds; scene_timing_all_kinds, release only (§10.5)
 │   │       ├── styles_use_theme.rs    no colour literal outside theme.rs (D-136)
 │   │       ├── timemap_identity.rs    the scene on the identity map (S-1)
 │   │       ├── catalog_complete.rs    catalog kinds and drawn kinds are one set (INV-23)
@@ -512,6 +512,7 @@ offcut/
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
 │   │       ├── common/model.rs        (V6.2) a model's plan of given items, validated, for a case (P200)
 │   │       ├── common/hook.rs         (V6.2) a model's plan with the hook and extras.hook, validated, for a case (P205)
+│   │       ├── common/all_kinds.rs    (V6.2) the reference transcript with all five kinds and Motion on, for determinism.rs, parity.rs and the snapshots (P206)
 │   │       ├── common/scenes.rs       written sentences timed like the labeled set, detected and validated; their scenes, watermark on or off
 │   │       └── snapshots/             insta snapshot files
 │   ├── offcut-render/
