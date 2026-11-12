@@ -1865,8 +1865,10 @@ dependencies = [
  "offcut-text",
  "offcut-types",
  "parley",
+ "png",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror",
 ]
 

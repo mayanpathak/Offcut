@@ -471,6 +471,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 195 — The image bundle, and checkpoint 2b
 
+**Done 2026-11-12 (V6 CL Entry 57).** CP 2b: the founder approved the 72 images as drawn, no swaps, and chose 160 px with the size line raised to about 1.0 MB (+999,343 bytes measured; 128 px would have been +738,702, over 600 kB too). Contact sheets in `~/v6.2-review/`.
+
 **Effort: High.**
 
 **Objective.** The images for the 72 names approved in P184 (D-495), licensed and embedded.

@@ -49,6 +49,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
 | 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
 | 8 | (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P210 |
+| 9 | (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1718,3 +1719,63 @@ The real run, signed out, sent no request and showed the sign-in line. Copy put 
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35: the settings line and row are drafted; the privacy policy's own text still needs DeepSeek before `ai_plan` goes on, and its wording is the founder's at CP 3. Known issues 5 and 8 (P212, P210). Not pushed (push 2 is P197). Next: P195 (the images; checkpoint 2b).
+
+## Entry 57 - 2026-11-12 - P195: the image bundle
+
+**Founder's decisions at CP 2b (2026-11-12).**
+- **The 72 images are approved as drawn, with no swaps** ("I don't want to swap anything until anything is breaking").
+- **160 px, with D-471's size line raised from 600 kB to about 1.0 MB:** "effortless user experience should be prioritized; most customers use 5G and wifi; downloading a few extra MBs might not be as big a deal".
+- The sheets they read: `~/v6.2-review/images.png` (all 72 at 1×, emoji on mid-grey, icons on mid-grey and on dark, then all at 48 px), `images-2x.png`, `images-128-vs-160.png`, `images-README.md`.
+
+**What changed.**
+- **`scripts/gen-image-bundle.mjs`** (new; `node scripts/gen-image-bundle.mjs`, with `--out` and `--size` for dry runs):
+  - reads the names and upstream files from `assets.rs`' variant docs;
+  - fetches each at its pin: Fluent Emoji `raw.githubusercontent.com/microsoft/fluentui-emoji/1ffb34c…/assets/<Name>/3D/<name>_3d.png` (the six hand gestures from `Default/`), and `unpkg.com/lucide-static@1.61.0/icons/<name>.svg`;
+  - emoji: resized 256 → 160 px in Node, Lanczos-3 on premultiplied colour, written with straight alpha;
+  - icons: drawn white by the installed Chrome (Playwright, `channel: "chrome"`, GPU off, network blocked) on Lucide's 24-unit grid, stroke 2;
+  - encodes every PNG itself (IHDR, IDAT, IEND only), keeping the smallest of a few filter and zlib settings;
+  - downloads go to a fresh temporary folder.
+- **`crates/offcut-scene/assets/images/`** (new):
+  - `emoji/` (48) and `icons/` (24): 160 × 160 RGBA PNGs, 997,875 bytes;
+  - `manifest.json`: per image its set, id, code, key, file, bytes, SHA-256, pinned source, the upstream file's SHA-256 and the licence. A later run fails if a pinned upstream file changed;
+  - `LICENSES/fluent-emoji-MIT.txt` and `LICENSES/lucide-ISC.txt` (with Feather's MIT), as shipped.
+- **`offcut-scene/src/images.rs`** (new):
+  - `ImageSet::embedded()` (`include_bytes!` of each PNG by `ImageKey`, `Clone`), with `get`, `contains`, `iter`, `len` and `SIZE = 160`;
+  - `ImageKey::of_emoji` (the code) and `ImageKey::of_icon` (`ICON_BASE` 1000 + the code);
+  - `lib.rs` exports it.
+- **`web/LICENSES.md`:** two rows for the bundle and Fluent Emoji's MIT text. The bundle's Lucide icons are covered by the Lucide section; eight of them are Feather's.
+- **`offcut-scene/Cargo.toml`:** `png` and `sha2` as dev-dependencies only. Both are workspace dependencies already, so `Cargo.lock` gains two lines in the crate's list and no package. `cargo deny check` is clean.
+- **Docs:** TS §5 rows (the script, `images.rs`, `assets/images/`, `image_bundle.rs`); "As read (P195)" notes under D-470, D-471 and §3.1.
+
+**Determinism.** Two runs into scratch folders, then a third in place: byte-identical files, icons included (Node 24.19.0, Chrome, D1).
+
+**The render binary (`offcut_render_bg.wasm`, release, `pnpm build:wasm`).**
+
+| Build | Bytes | Growth | Brotli |
+|---|---|---|---|
+| Before (`67d6247`) | 6,481,347 | | 2,452,729 |
+| After, as committed | 6,481,347 | 0 | |
+| With every image kept (a temporary reference, not committed): what P196/P197 ship | 7,480,690 | **+999,343** | 3,451,389 |
+| The same at 128 px (D-471's fallback, not taken) | 7,220,049 | +738,702 | 3,191,793 |
+
+Nothing in `offcut-wasm-render` uses `ImageSet` until P197, so the linker drops the images today. P183's estimate (10-11 kB an emoji, from Fire) was low: they average 19.7 kB.
+
+**Tests (+7).**
+- `images.rs` +3: the keys are the codes and the icons start at the base; one image per name, in key order, the same bytes when asked again; `Debug` shows lengths.
+- `tests/image_bundle.rs` (new, 4):
+  - the manifest's names equal `EmojiId::NAMES` and `IconId::NAMES` in order (72 in all), with each code and key;
+  - each file is a 160 × 160 RGBA PNG, not blank, with its SHA-256;
+  - keys and files are distinct, and the embedded bytes of each key hash to the manifest's;
+  - each source is pinned and each licence file exists.
+- Swapping two names in `images.rs` for a moment failed 1.
+- Re-run: `offcut-types` 93 / 0 / 1, `offcut-scene` 102 / 0 / 4, `offcut-render` 25 / 0 / 0 (`golden_frames` 19 passed, no golden touched), `offcut-wasm-render` 12.
+
+**Declared.** No existing test changed. No web code changed, so Vitest was not run.
+
+**Found.**
+1. Every transparent pixel is 0, 0, 0, 0. P183 read no dark fringe with straight alpha; P196's `image_basic` reads it on these files (known issue 9).
+2. `ImageSet` is not in `SceneInput` yet. P204 adds it where the scene first emits `Image` (§9.2).
+
+**Counts.** Rust **1005 / 0 / 7** by count (998 + 7); Vitest **744**. `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8 and 9 (P212, P210, P196). Not pushed (push 2 is P197). Next: P196 (the renderer draws images).

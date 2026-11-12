@@ -14,6 +14,7 @@ pub mod events;
 pub mod fonts;
 pub mod framing;
 pub mod hit;
+pub mod images;
 pub mod layout;
 pub mod motion;
 pub mod placement;
@@ -40,6 +41,7 @@ pub use crate::display_list::{
 use crate::events::EventTrack;
 pub use crate::fonts::{FontFace, FontSet};
 pub use crate::hit::Hit;
+pub use crate::images::ImageSet;
 use crate::styles::StyleSpec;
 pub use crate::theme::{FontRole, Role, Theme};
 

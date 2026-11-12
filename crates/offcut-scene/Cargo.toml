@@ -27,3 +27,8 @@ insta = { workspace = true }
 # §3.2). The identity reference that also used them is gone (V4 Prompt 101).
 offcut-detect = { workspace = true }
 serde_json = { workspace = true }
+# The image bundle's test (tests/image_bundle.rs, v6.2implementation D-470):
+# each embedded PNG is read and hashed. Test-only; both are workspace
+# dependencies already (P195).
+png = { workspace = true }
+sha2 = { workspace = true }

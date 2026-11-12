@@ -452,7 +452,8 @@ offcut/
 │   │   │   ├── fonts/Inter-Variable.ttf
 │   │   │   ├── fonts/JetBrainsMono-Variable.ttf
 │   │   │   ├── fonts/NotoEmoji-Variable.ttf
-│   │   │   └── fonts/LICENSES.md
+│   │   │   ├── fonts/LICENSES.md
+│   │   │   └── images/                (V6.2) the 72 images, 160 px RGBA PNGs: emoji/ (48, Fluent Emoji 3D, MIT), icons/ (24, Lucide, ISC), manifest.json (id, key, file, SHA-256, pinned source, licence), LICENSES/; made by scripts/gen-image-bundle.mjs (v6.2implementation D-470)
 │   │   ├── src/
 │   │   │   ├── lib.rs                 build_scene(), Scene::frame_at()
 │   │   │   ├── styles.rs              [ONLY] StyleSpec for Clean, Bold, Tech
@@ -460,6 +461,7 @@ offcut/
 │   │   │   ├── motion.rs              CaptionMotion, MotionUnit, MotionPreset, ActiveTreatment (D-137)
 │   │   │   ├── safe_area.rs           [ONLY] logical canvas and safe-area constants
 │   │   │   ├── fonts.rs               font registry (embedded bytes)
+│   │   │   ├── images.rs              (V6.2) ImageSet::embedded(): the bundle's PNGs by ImageKey; ImageKey::of_emoji, of_icon (v6.2implementation D-471)
 │   │   │   ├── captions.rs            caption chunking and line layout
 │   │   │   ├── readability.rs         [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168)
 │   │   │   ├── placement.rs           [ONLY] caption block and event zone from CaptionPlacement (D-171)
@@ -491,6 +493,7 @@ offcut/
 │   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
 │   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
 │   │       ├── hit.rs                 Scene::hit (D-174)
+│   │       ├── image_bundle.rs        (V6.2) the manifest equals EmojiId and IconId; each file 160 px RGBA with its SHA-256; keys distinct; licences (D-447, D-470)
 │   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
 │   │       ├── common/scenes.rs       written sentences timed like the labeled set, detected and validated; their scenes, watermark on or off
@@ -1049,6 +1052,7 @@ offcut/
 │   └── results/                       committed runs, <device>-<date>-<clip>.json (v3implementation §19.19); .gitkeep
 ├── scripts/
 │   ├── build-wasm.sh
+│   ├── gen-image-bundle.mjs           (V6.2) the image bundle: fetches each upstream file at its pinned version, writes the 160 px PNGs, manifest.json and LICENSES/ (v6.2implementation D-470)
 │   ├── gen-long-fixture.sh            (V6.1) the 45-minute local fixtures into fixtures/.gen-local/, D1 only (v6.1implementation D-430)
 │   ├── gen-types.sh
 │   ├── check-gen-clean.sh
