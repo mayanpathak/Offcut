@@ -6,13 +6,15 @@
 
 use std::fmt::Write as _;
 
-use offcut_types::{DurMs, PLAN_FORMAT, Sentence, Word, WordProsody};
+use offcut_types::{DurMs, EventKind, PLAN_FORMAT, Sentence, Word, WordProsody};
 use serde_json::{Map, Value, json};
 
-use crate::catalog::{AnchorRule, CATALOG_VERSION, ItemSpec, ParamSpec, ParamTy, catalog};
+use crate::catalog::{
+    AnchorRule, CATALOG_VERSION, EVENT_ZONE, ItemSpec, ParamSpec, ParamTy, catalog, spec,
+};
 use crate::validate::{
-    DENSITY_WINDOW_MS, HASHTAG_MAX_CHARS, HOOK_MAX_CHARS, HOOK_WORDS, MAX_HASHTAGS, MAX_PUNCH,
-    POST_CAPTION_MAX_CHARS, PUNCH_GAP_MS,
+    DENSITY_WINDOW_MS, EVENT_HOLD_MS, HASHTAG_MAX_CHARS, HOOK_MAX_CHARS, HOOK_WORDS, MAX_HASHTAGS,
+    MAX_PUNCH, POST_CAPTION_MAX_CHARS, PUNCH_GAP_MS,
 };
 
 /// A pause at least this long is marked in the user message (assumption, V6.2).
@@ -96,28 +98,72 @@ fn row_text(row: &ItemSpec) -> String {
     )
 }
 
+/// Seconds from milliseconds, as the prompt writes them (`1.5`, `6`).
+fn seconds(ms: u32) -> f64 {
+    f64::from(ms) / 1_000.0
+}
+
+/// The most words a kind's anchors may hold, from its catalog row.
+fn max_anchor_words(kind: EventKind) -> u32 {
+    match spec(kind).map(|row| row.anchor) {
+        Some(AnchorRule::Words { max, .. }) => max,
+        _ => 1,
+    }
+}
+
 /// V6.2's paragraphs (TS §47, §47.2, §47.3; v6.2implementation D-456): what
 /// a finished short looks like, the zooms, the punch words and emoji, and
 /// the text extras. Their numbers are `validate`'s, so the two cannot drift.
+/// P188b (TE-15, CP 1): the zooms are fewer and cover only their claim, a
+/// one-word item is anchored to its word, a number's range is exactly its
+/// words, and the event zone is shared.
 fn finished_short_text() -> String {
-    let density = f64::from(DENSITY_WINDOW_MS) / 1_000.0;
-    let punch_gap = PUNCH_GAP_MS / 1_000;
+    let density = seconds(DENSITY_WINDOW_MS);
+    let punch_gap = seconds(PUNCH_GAP_MS);
+    let zoom_gap = seconds(spec(EventKind::PunchIn).map_or(0, |row| row.min_gap_ms));
+    let number_words = max_anchor_words(EventKind::NumberReveal);
+    let event_hold = seconds(EVENT_HOLD_MS);
+    let mut event_kinds: Vec<&str> = catalog()
+        .iter()
+        .filter(|row| row.zone == EVENT_ZONE)
+        .map(|row| row.name)
+        .collect();
+    let last_event_kind = event_kinds.pop().unwrap_or_default();
     let (hook_min, hook_max) = (HOOK_WORDS.start(), HOOK_WORDS.end());
     let mut out = String::new();
     let _ = writeln!(
         out,
         "A finished short: open with a hook title only if the first sentence does not \
-         already hook; zoom in on each sentence's key claim; never stack two visuals, so at \
-         most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) \
-         starts in any {density} seconds; end on the payoff, not a call to action, unless the \
-         speaker asks for one."
+         already hook; zoom only on the sentences that land hardest, so most sentences have no \
+         zoom; never stack two visuals, so at most one visual (a number, a list, a from-to, an \
+         icon, an emoji or the hook title) starts in any {density} seconds; end on the payoff, \
+         not a call to action, unless the speaker asks for one."
     );
     let _ = writeln!(
         out,
-        "\nZooms: zoom on the claim, the number or the punchline, never on filler. A snap \
-         covers one strong word (1 to 3 words); a push covers a sentence that builds (2 to 40 \
-         words). A zoom stays inside one sentence; a sentence has at most one, and two zooms \
-         never overlap."
+        "\nZooms: zoom on the claim, the number or the punchline, never on filler, and only \
+         where it earns it: about one sentence in three. A zoom covers only the words of its \
+         claim, not its whole sentence: a snap covers one strong word (1 to 3 words); a push \
+         covers the few words that build to it (2 to 40 words). A zoom stays inside one \
+         sentence, and a sentence has at most one. Two zooms never overlap, and a zoom starts \
+         at least {zoom_gap} seconds after the last one ends, so two sentences in a row are \
+         never both zoomed."
+    );
+    let _ = writeln!(
+        out,
+        "\nPointing at words: an item that marks one word (emphasis, keyword_pop, icon_pop, \
+         emoji) is anchored to that word alone, written {{\"start\": w, \"end\": w + 1}} where w \
+         is the word's index, never to its sentence. A number's value, and each side of a \
+         from-to, is the range of exactly the words that say the number and its unit, with no \
+         word before it: \"$2,400\", not \"cost $2,400\"; \"3000 hours\". A number_reveal is \
+         anchored to those words, or to at most {number_words} words around them."
+    );
+    let _ = writeln!(
+        out,
+        "\nThe event zone: {} and {last_event_kind} share it, and each holds it until \
+         {event_hold} seconds after its last word. Never put an icon on a number, a list or a \
+         from-to, or just after one.",
+        event_kinds.join(", ")
     );
     let _ = writeln!(
         out,
@@ -363,6 +409,10 @@ mod tests {
         }
         assert!(prompt.contains("Never write a number: point at the words that say it."));
         assert!(prompt.contains("Return JSON matching the schema; no prose."));
+        // P188b: the one-word anchor and the zoom's gap, from the catalog.
+        assert!(prompt.contains(r#"{"start": w, "end": w + 1}"#));
+        assert!(prompt.contains("at least 1.5 seconds after the last one ends"));
+        assert!(prompt.contains("number_reveal, list_reveal, from_to and icon_pop share it"));
         let schema = output_schema().to_string();
         assert!(!schema.contains("detected") && !schema.contains("\"source\""));
     }

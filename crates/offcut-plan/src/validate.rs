@@ -25,7 +25,7 @@ use crate::validate_params::check_item;
 /// How long after its last word a visual of the event zone still holds it
 /// (the visual's own hold and fade, TS §19.5): NumberReveal, then the others.
 const NUMBER_HOLD_MS: u32 = 1_200;
-const EVENT_HOLD_MS: u32 = 1_500;
+pub(crate) const EVENT_HOLD_MS: u32 = 1_500;
 
 /// A plan the scene may draw. It has no public constructor: `validate` is the
 /// only way to make one (INV-21).

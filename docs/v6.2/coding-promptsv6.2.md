@@ -260,6 +260,30 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ---
 
+## Prompt 188b — Checkpoint 1's answers: the prompt revision and TE-15 on Flash again (added at CP 1)
+
+**Done 2026-11-12 (V6 CL Entry 49; `experiments.md` TE-15).**
+
+**Effort: Medium.**
+
+**Objective.** Record CP 1's answers, and cut Flash's drops with one prompt revision, read on the same 15 transcripts.
+
+**Read first.** `experiments.md` TE-15's full read and its recommendation; `~/v6.2-review/plans/`; `validate`'s rules for zooms (V-3, the 1.5 s gap), anchors and the event zone.
+
+**Do.**
+
+1. The revision in `prompt.rs` (and `punch_in`'s purpose in `catalog.rs`), every number from the catalog or `validate`: fewer zooms, each on its claim's words; one-word anchors written `{"start": w, "end": w + 1}`; a number's range exactly its words; the shared event zone. Read the `@v2` system prompt snapshot again and accept it.
+2. TE-15 on `deepseek-flash` only: the same harness, request and 15 transcripts; at most 20 calls. The table beside P188's, the drops, the annotated plans in `~/v6.2-review/p188b/plans/`.
+3. CP 1's answers in D-498, the revision in D-456, open item 37 closed.
+
+**Acceptance.**
+
+- [x] `cargo test -p offcut-plan --all-features` green; the `@v2` system prompt snapshot read and accepted.
+- [x] 15 calls, every one listed; the founder's choice in the entry.
+- [x] Commit `V6.2 P188b: checkpoint 1, the prompt revision, TE-15 on Flash again`.
+
+---
+
 ## Prompt 189 — The tables and the configuration
 
 **Effort: High.**

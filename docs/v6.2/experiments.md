@@ -117,6 +117,34 @@ Recorded, redacted shapes for P190 (each request with message texts cut to their
 3. Accept Flash as it is: `validate` is the gate, and drops cost nothing but a fuller plan.
 4. Pro: not recommended.
 
+### Checkpoint 1 and the prompt revision (P188b, 2026-11-12 07:16-07:17 UTC, d1)
+
+**The founder's answers (CP 1, 2026-11-12):** `deepseek-flash`, thinking off; the budget prices Flash 0.30 in / 1.20 out USD per 1M tokens (peak, cache miss; D-463 counts every input token at the miss price); yes to the one prompt revision and the 15-call Flash re-read; yes to item-level parsing in P190.
+
+**The revision** (`@v2` read again: nothing ships on it yet). The "finished short" paragraph says to zoom only on the sentences that land hardest, so most have none (it said "zoom in on each sentence's key claim"). The zoom paragraph says "about one sentence in three", that a zoom covers only its claim's words, and that a zoom starts at least 1.5 s after the last one ends, so two sentences in a row are never both zoomed. A new paragraph covers pointing at words: a one-word item is anchored `{"start": w, "end": w + 1}`, never to its sentence; a number's range is exactly the number and its unit, with no word before it (`$2,400`, not `cost $2,400`); a `number_reveal` is anchored to those words or to at most 6 around them. A second new paragraph covers the event zone: `number_reveal`, `list_reveal`, `from_to` and `icon_pop` share it, each holding it until 1.5 s after its last word, so an icon never goes on a number or just after one. `punch_in`'s purpose says `push` covers "the few words that build to it" (it said "a sentence that builds"). Every number in these paragraphs comes from the catalog or `validate`'s constants. The system message grew from 15,194 to 16,159 characters.
+
+**The re-read.** The same harness as P188, with the same request (D-500), the same 15 transcripts and `deepseek-flash` only: 15 calls, all HTTP 200, `finish_reason: stop`, no thinking tokens. **Peak hours** (07:16 UTC on a weekday): about $0.017 for the 15 calls at peak prices. The account's balance, shown to the cent, read $1.87 before and after.
+
+| `deepseek-flash` | P188 (`@v2` as P186 wrote it) | **P188b (revised)** | Pass line |
+|---|---|---|---|
+| Parse, first try / after one retry | 13 / 15, 15 / 15 | **15 / 15**, 15 / 15 | ≥ 98% after one retry: pass |
+| Calls | 17 | 15 | |
+| Items written / kept | 128 / 104 | 111 / 98 | |
+| Items per plan, median (kept) | 8 (7) | 7 (6) | |
+| **Item drop rate, median (mean)** | 16.7% (17.8%) | **14.3% (10.9%)** | ≤ 10%: **still fails on the median** |
+| Plans at or under 10% drops | 4 of 15 | 6 of 15 | |
+| Zooms written / dropped | 56 / 12 | **45 / 1** | |
+| Latency p50 / p90 / max | 2.8 / 3.3 / 6.0 s | 2.8 / **3.5** / 3.6 s | p90 ≤ 10 s: pass |
+| Tokens in (cache hit) / out, median | 5,151 (3,840) / 549 | 5,408 (4,096) / 500 | |
+| Cost per plan at peak, median (no cache) | $0.0011 ($0.0022) | $0.0011 ($0.0023) | recorded |
+| Hook / caption / hashtags written | 15 / 15 / median 5 | 15 / 15 / median 5 | |
+
+**Drops (13 items).** `from_to` number unresolved 5; `number_reveal` number unresolved 3; `icon_pop` zone taken 3, density 1; `punch_in` too close 1. One hook was too long. **No `AnchorRule` drop is left** (P188: 6), and no emoji or icon name fell outside the 72.
+
+**What is left: the number's last word.** Seven of the eight unresolved numbers take one word past the number: `$12 a` (month), `$2,800 a`, `$3,000 a`, `$60 an` (hour), `3 sets of`, `10 pm` (`pm` is not a unit `parse_quantity` reads), and one takes a word before it (`Rust 1.80`); one from-to's second side is not a number at all (`twice as fast`). The zooms are now 2 to 4 a script (`a01`: 3 in 17 sentences), each on a few words. The annotated plans are in `~/v6.2-review/p188b/plans/`.
+
+**Read.** The revision did what it was for: zoom drops 12 → 1, anchor drops 6 → 0, parse failures 2 → 0, mean drops 17.8% → 10.9%. The median line still fails at 14.3%, now on the number's range alone. Not acted on (the founder approved one revision): a second line in the pointing paragraph ("the range ends on the number or its unit word: never `a`, `an`, `of`, `per`"), or letting `validate` trim a trailing filler word, would take most of the rest. Item-level parsing (P190) does not change these numbers: no plan failed to parse here.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 Not read yet (P197).

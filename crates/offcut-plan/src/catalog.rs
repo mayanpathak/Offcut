@@ -229,7 +229,7 @@ const CATALOG: [ItemSpec; 9] = [
     ItemSpec {
         kind: EventKind::PunchIn,
         name: "punch_in",
-        purpose: "Zoom on the claim, the number or the punchline, never on filler: `snap` on one strong word, `push` across a sentence that builds.",
+        purpose: "Zoom on the claim, the number or the punchline, never on filler: `snap` on one strong word, `push` across the few words that build to it.",
         anchor: AnchorRule::Words { min: 1, max: 40 },
         params: &[
             ParamSpec {
