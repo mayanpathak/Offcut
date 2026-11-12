@@ -718,6 +718,71 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ---
 
+## Prompt 206a — A way to sign in from the landing page
+
+**The founder's change at CP 3 (2026-11-13; D-501; V6 CL open item 39 (11)).** **Effort: Medium.**
+
+**Objective.** A person can sign in without first finding the Account page or starting an export: the landing page offers it, and so does the "Sign in to get an AI-planned edit" line.
+
+**Read first.** D-501, D-494; `web/src/ui/pages/LandingPage.tsx` and `ui/landing/Hero.tsx`; `ui/components/SignInDialog.tsx` (`SignInDialog`, `SignInForm`); `ui/pages/AccountPage.tsx`; the plan fallback toast (P194, `copy/plan.ts` `fallback.signedOut`); `tests-e2e/landing.spec.ts`, `signin.spec.ts`.
+
+**Do.**
+
+1. The landing page's header gains one control: **"Sign in"** when signed out, **"Account"** when signed in; both go to `/account`, where `SignInForm` already lives. The landing page has no clip, so leaving it loses nothing.
+2. The "Sign in to get an AI-planned edit" toast gains a **"Sign in"** action that opens `SignInDialog` **in place**. Never navigate away from the editor: before V7 a clip is not restored, so leaving it loses the processed clip.
+3. Copy in `messages`, drafts for the founder: "Sign in", "Account". Vitest for the control in both states; `landing.spec.ts` gains a case (signed out: "Sign in" leads to the form; signed in: "Account"); the toast's action, in a Vitest of the toast.
+4. A capture of the landing page at 1280 × 800 and 390 × 844 to `~/v6.2-review/look-fixes/` for the founder.
+
+**Acceptance.**
+
+- [ ] Every existing case unchanged (new cases only); Vitest and `pnpm e2e` green.
+- [ ] Commit `V6.2 P206a: sign in from the landing page`.
+
+---
+
+## Prompt 206b — Icons that read on every video
+
+**The founder's change at CP 3 (2026-11-13; D-502; open item 39 (8)).** **Effort: Medium.**
+
+**Objective.** An IconPop's white icon is plainly readable in every style: on a dark disc ringed in the accent, not on the accent itself.
+
+**Read first.** D-502, D-483; `offcut-scene/src/events/icon_pop.rs`; `theme.rs` (`Role::Panel`, 85% dark); P204's `icon_pop` golden and the `icon_pop_*` and `all_kinds_glow_icon_*` snapshots.
+
+**Do.**
+
+1. `icon_pop::draw`: the accent disc (168 lp), then a disc in `Panel` inset by 8 lp (152 lp), then the white icon (112 lp); the pop scales all three about the centre. Every colour from a theme role. Mono gets the same (its green ring).
+2. P204's and P206's files that draw an icon change by design: `icon_pop.png`, the four `icon_pop_*` snapshots, `all_kinds_glow_icon_numbers` and `all_kinds_glow_icon_laptop`. They are V6.2's own files, not the base's, so the gate allows them. Each is regenerated **by its exact name** and declared; every other golden and snapshot stays byte for byte, and SSIM 1.0000. `icon_pop.rs`' unit test of the disc is widened (D-440 (22)): it asserts the ring and the inner disc, keeping its other assertions.
+3. Before the commit: the four styles' icon frames (Top and Bottom) at 200% to `~/v6.2-review/look-fixes/`, beside P204's, for the founder's yes.
+
+**Acceptance.**
+
+- [ ] Every image and disc still inside the safe area (`layout_safe_area.rs`' emoji and icon case green).
+- [ ] The founder's yes on the new icon; commit `V6.2 P206b: icons on a dark disc`.
+
+---
+
+## Prompt 206c — The hook title always shown
+
+**The founder's change at CP 3 (2026-11-13; D-503; open item 39 (12)).** **Effort: High.**
+
+**Objective.** When the AI writes a hook, the clip opens on it. On the founder's clip DeepSeek wrote `extras.hook` but no `hook_title` item, so nothing was drawn.
+
+**Read first.** D-503, D-453, D-451, D-484; `offcut-plan/src/{validate,validate_params,prompt}.rs`; `tests/validate_v62.rs`; the `@v2` prompt snapshots; `deepseek_adapter.rs`' recorded request (P188c).
+
+**Do.**
+
+1. **The guarantee, in `validate` (no AI call):** a model plan whose `extras.hook` is valid and that has no `HookTitle` item gains one: anchors the clip's words, `accent` the hook's longest word (the first of equal ones), and an id no item of the plan has (one more than the largest). It is added before V-9, so it is the clip's first visual, and a visual starting in the 2.5 s after it is dropped as V-9 says; those would show under the hook anyway. A rules plan is unchanged; a lockup that cannot fit still draws nothing and is not counted (D-484).
+2. **The instruction:** `prompt.rs`' "open with a hook title only if the first sentence does not already hook" becomes an instruction to always write the hook title, its accent the hook's strongest word. The `@v2` snapshots and the recorded request change by design and are declared.
+3. **Re-read (needs the founder's yes first, about $0.02):** 15 Flash calls on TE-15's transcripts, as P188b did: every plan parses, and how often the model writes the item itself. Without the yes, only step 1 ships, and the instruction waits.
+4. Tests: `validate_v62.rs` gains the cases (the hook added, its accent and id, V-9 after it, a rules plan untouched, a plan that has its own hook untouched). A scene test: the founder's case (a hook text, no item) draws the lockup over the first 2 s.
+
+**Acceptance.**
+
+- [ ] Every existing validate case unchanged, or widened and declared (D-440).
+- [ ] Commit `V6.2 P206c: the hook title always shown`.
+
+---
+
 ## Prompt 207 — The levelled voice in the DSP
 
 **Effort: High.**
