@@ -44,12 +44,13 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1). **Seen again (V6.2 push 2, run 43263410381):** two `model-download.spec.ts` `@no-gpu` cases held "Checking your browser…" and passed on their retry; the run was green | V6.1 |
 | 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
 | 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
 | 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
 | 8 | (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P210 |
 | 9 | **Done in P196 (Entry 58): no dark fringe at 0.5×, 1.37× or 1.5×, read as pixels; Vello premultiplies each texel before it filters.** Was: (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
+| 10 | (P199) `flags-identity.spec.ts` line 130, `expect(on.version).toBe(2)`, fails since P192: with `ai_plan` on, the flags-on build opens the `plans` store at structure version 3 (D-469), as designed. Every other check of the case passes with the pin read as 3 (P199's temporary probe: the same records, the same export). Widen it with D-440 (8)'s edit of the spec: version 3 when the build has `ai_plan`, else 2, declared | P209 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1884,3 +1885,76 @@ All restored; no golden of the base is modified.
 **Push 2.** Pushed after this commit and waited on. CI's result (`golden_frames` on lavapipe, `image_basic` included) is recorded in the next prompt's entry.
 
 **Open.** 35. Known issues 5 and 8 (P212, P210). Next: P199 with P198 (Bezier easing and the camera drift).
+
+## Entry 60 - 2026-11-12 - P199 (with P198): bezier easing and the camera drift
+
+**P197's push 2, read (CI run 43263410381, head `1f531d5`): green.** Jobs `changes`, `ci` and `e2e-media` succeeded (deploys skipped, as on a branch).
+- `golden_frames` on lavapipe (llvmpipe, LLVM 21.1.8): `image_basic` **0.9997**, every golden at least 0.9996, 21 passed. TE-30 passes on both lines.
+- gitleaks: 288 commits, no leaks (the bundle's SHA-256s pass).
+- The media job: 24 passed and 29 passed (flags). Two `model-download` `@no-gpu` cases passed on their retry: known issue 3, seen again.
+
+**What changed.**
+- **Easing first (P198's part).** `easing.rs` gains, below `ease()`:
+  - `CubicBezier` and `bezier(c, t)` (Newton's method, bisection where it fails, solved in f64);
+  - `STANDARD` (0.4, 0, 0.2, 1), `OUT` (0, 0, 0.2, 1), `IN_OUT` (0.65, 0, 0.35, 1).
+  - `Easing` and `ease()` are byte for byte as before (the gate's additive check).
+- **`camera.rs`** (new, pure; D-476):
+  - `CameraTrack` (`none()`, `scale_at`, `segs`), `CameraSeg`, `build(changes, sentences, duration)`, `for_clip(transcript, map)`;
+  - `MAX_SEG_MS = 4,000`, `MIN_SEG_MS = 800`, `DRIFT = 0.05`.
+- **`video.rs`** (D-477):
+  - `Track` holds the camera and the source frame's size; `src_at(t)` is the crop at a scale of exactly 1.0, else the crop shrunk about its centre and clamped inside the frame;
+  - `MAX_TOTAL_ZOOM = 1.35` caps it (the `PunchIn` keys join in P200).
+- **`build_scene`** takes `Track::fixed(crop)` with `Enhance.motion` off (today's path) and the camera's track with it on.
+- **Docs:**
+  - TS §5 rows (`camera.rs`, `easing.rs`, `video.rs`, `tests/camera.rs`, `motion_mid`);
+  - "As read (P199)" under D-475, D-476, D-477;
+  - TE-31 and TE-30's lavapipe line in `experiments.md`.
+
+**Differs from the plan (the As read notes).**
+- `build` takes no `shots` (none exist before V6.5).
+- The only change point is the clip's start: the hook's end joins when P205 draws the hook.
+- The scale is continuous: each segment starts where the last ended, and a held segment (under 0.8 s) holds that level, not 1.0, so a split inside one shot never jumps.
+
+**Who sees it.** Nobody yet. No web code sets `enhance` until P208's panel, so every build, flags on included, draws `v5()`: Motion off, today's frames.
+
+**Tests (+21).**
+- `easing.rs` +5:
+  - ends exact, and NaN and outside held;
+  - rising over 1,000 points;
+  - **known values to 1e-4** at five points per curve, computed apart from the code (bisection to 1e-13 in Python); moving one control point by 0.02 fails it;
+  - Newton and bisection agree to 1e-5 (Newton answers more than 900 of 999 points);
+  - `IN_OUT` symmetric.
+- `video.rs` +5:
+  - no drift equals today at every frame of a 60 s clip, `src` bit for bit;
+  - a scale of exactly 1.0 gives the crop bit for bit;
+  - the zoom is about the centre;
+  - the clamp at the frame's edge;
+  - the cap.
+- `tests/camera.rs` (new, 10):
+  - `none()`; no split up to 4 s; the split at the nearest sentence start, repeated, the earlier of two;
+  - a long stretch with no start stays whole; changes as bounds;
+  - alternation without a jump; the held short segment; the curve and the range; determinism;
+  - **the six labeled cases with motion off and on: at every frame, only `Video.src` differs** (inside the crop, smaller by at most the drift), and off is today's.
+- `golden_frames.rs` +1, **`motion_mid`**: Clean's NumberReveal with motion on at the middle of the first segment (scale about 1.03, asserted). Written once on WARP, read beside the same instant with motion off: the video zoomed about its centre, the captions and the visual unmoved.
+
+**TE-31: passes** (`experiments.md`).
+- 150 frames (5 s at 30 fps) of the drift, drawn on WARP and read to a fraction of a pixel.
+- The frame follows the scale to within 0.019 px.
+- In 136 of the frames the expected move is over 0.005 px. There each frame moved 0.81 to 1.12 times its expected move (median 1.008), and none stood still then jumped.
+- The fastest move is 0.14 output px a frame.
+
+**Every existing frame unchanged.** No snapshot changed. Every old golden reads SSIM 1.0000 on WARP.
+
+**Media (Tier 2):**
+- keyed `pnpm build:e2e` and `pnpm build:e2e:flags`;
+- `flags-identity.spec.ts` fails at its V6.1 pin of the flags-on database version (2; 3 since P192's `plans` store), **not from this prompt**: known issue 10, for P209 with D-440 (8);
+- read with the pin temporarily at 3, the whole case passes (the same records, and the same export from both builds), and the spec file was restored unchanged.
+
+**Render binary.** 7,496,980 → **7,507,007** bytes (+10,027: the curves and the camera).
+
+**Counts.**
+- Rust **1034 / 0 / 7** by count (1013 + 21; `offcut-scene` 122, `offcut-render` 34, `offcut-wasm-render` 12 re-run).
+- Vitest **744** (no web code).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P200 (`PunchIn`).

@@ -459,6 +459,7 @@ offcut/
 │   │   │   ├── styles.rs              [ONLY] StyleSpec for Clean, Bold, Tech
 │   │   │   ├── theme.rs               [ONLY colour values] Theme, Role, FontRole, default_for (v4implementation D-136)
 │   │   │   ├── motion.rs              CaptionMotion, MotionUnit, MotionPreset, ActiveTreatment (D-137)
+│   │   │   ├── camera.rs              (V6.2) CameraTrack: the slow drift by rules, build(), none(), scale_at() (v6.2implementation D-476)
 │   │   │   ├── safe_area.rs           [ONLY] logical canvas and safe-area constants
 │   │   │   ├── fonts.rs               font registry (embedded bytes)
 │   │   │   ├── images.rs              (V6.2) ImageSet::embedded(): the bundle's PNGs by ImageKey; ImageKey::of_emoji, of_icon (v6.2implementation D-471)
@@ -468,7 +469,7 @@ offcut/
 │   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops
 │   │   │   ├── hit.rs                 Scene::hit (D-174)
 │   │   │   ├── layout.rs              text shaping through parley
-│   │   │   ├── easing.rs
+│   │   │   ├── easing.rs              Easing, ease(); (V6.2) CubicBezier, bezier(), STANDARD, OUT, IN_OUT (D-475)
 │   │   │   ├── anim.rs                keyframe tracks evaluated at TimeMs
 │   │   │   ├── events/mod.rs
 │   │   │   ├── events/number_reveal.rs
@@ -477,7 +478,7 @@ offcut/
 │   │   │   ├── events/keyword_pop.rs
 │   │   │   ├── watermark.rs
 │   │   │   ├── framing.rs             [ONLY] crop rectangle from ClipInfo + CropOffset
-│   │   │   ├── video.rs               the per-frame Video command: crop, placement (v4implementation D-130)
+│   │   │   ├── video.rs               the per-frame Video command: crop, placement (v4implementation D-130); (V6.2) the camera's zoom, MAX_TOTAL_ZOOM (D-477)
 │   │   │   ├── display_list.rs        DisplayList, DrawCmd (backend-neutral)
 │   │   │   └── summary.rs             change_summary()
 │   │   └── tests/
@@ -493,6 +494,7 @@ offcut/
 │   │       ├── placement.rs           caption placement at the snap points and the extremes (D-171)
 │   │       ├── scene_cache.rs         identical output with the cache cold, warm and off (D-173)
 │   │       ├── hit.rs                 Scene::hit (D-174)
+│   │       ├── camera.rs              (V6.2) the drift's segments; motion off is today's scene, on changes only Video.src (D-476, D-477)
 │   │       ├── image_bundle.rs        (V6.2) the manifest equals EmojiId and IconId; each file 160 px RGBA with its SHA-256; keys distinct; licences (D-447, D-470)
 │   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
@@ -1048,7 +1050,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1)
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh

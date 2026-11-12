@@ -547,6 +547,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 198 + 199 — Bezier easing and the camera drift
 
+**Done 2026-11-12 (V6 CL Entry 60).** Easing first (known values to 1e-4), then `camera.rs` and the track; every snapshot and old golden unchanged; `motion_mid` written once on WARP; TE-31 passes (no stepping). P197's push 2 CI read in the entry.
+
 **Effort: High.**
 
 **Objective.** The curves every V6.2 motion uses, exact and tested beside the old ones; then every shot drifts slowly by rules, and with Motion off every frame is today's. One prompt, one commit (D-499); the easing is written and tested first.

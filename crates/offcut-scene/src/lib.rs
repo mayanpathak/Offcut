@@ -6,6 +6,7 @@
 //! D-169), or moves a timestamp except through the time map (D-126).
 
 pub mod anim;
+pub mod camera;
 pub mod captions;
 mod captions_draw;
 pub mod display_list;
@@ -147,7 +148,19 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let scale = width as f32 / safe_area::CANVAS_WIDTH;
     Ok(Scene {
         time_map: map.clone(),
-        video: video::Track::fixed(crop),
+        // V6.2 (D-476, D-477): the drift with `Enhance.motion`, else today's fixed crop.
+        video: if input.edit.enhance.motion {
+            video::Track::with_camera(
+                crop,
+                camera::for_clip(input.transcript, map),
+                (
+                    input.clip.display_width.get() as f32,
+                    input.clip.display_height.get() as f32,
+                ),
+            )
+        } else {
+            video::Track::fixed(crop)
+        },
         canvas: (width as f32, height as f32),
         scale,
         style,

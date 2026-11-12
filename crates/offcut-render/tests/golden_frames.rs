@@ -522,3 +522,26 @@ fn the_browser_checks_source_and_list_are_the_goldens() {
     );
     assert_eq!(offcut_render::check::CANVAS, (WIDTH, HEIGHT));
 }
+
+/// The camera drift (V6.2, D-476, D-477, §10.1): Clean's NumberReveal with
+/// `Enhance.motion` on, at the middle of the first drift segment, where the
+/// crop is zoomed about its centre by about half the drift.
+#[test]
+fn motion_mid() {
+    let input = &INPUTS[0];
+    let mut case = case(input, StyleId::Clean, BTreeMap::new());
+    case.edit.enhance.motion = true;
+    let map = TimeMap::identity(DurMs::new(case.length));
+    let camera = offcut_render::scene::camera::for_clip(&case.transcript, &map);
+    let first = camera.segs()[0];
+    let mid = OutMs::new((first.start.get() + first.end.get()) / 2);
+    let scale = camera.scale_at(mid);
+    assert!(scale > 1.02 && scale < 1.04, "{scale} at {mid:?}");
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(mid);
+    let DrawCmd::Video { src, .. } = &list.cmds[0] else {
+        panic!("the video first");
+    };
+    assert!((src.w - 1080.0 / scale).abs() < 1e-2, "{src:?} at {scale}");
+    golden("motion_mid", (&pattern(1080, 1920), Rotation::R0), &list);
+}
