@@ -6,6 +6,7 @@ use offcut_types::OutMs;
 
 use crate::camera::CameraTrack;
 use crate::display_list::{CropRect, DrawCmd, Rect, VideoSlot};
+use crate::events::punch_in;
 
 /// The most the frame is ever zoomed: the camera's drift times the plan's
 /// punch-in (P200), and later the cut's jump zoom (v6.2implementation D-477,
@@ -18,6 +19,8 @@ pub const MAX_TOTAL_ZOOM: f32 = 1.35;
 pub(crate) struct Track {
     crop: CropRect,
     camera: CameraTrack,
+    /// The plan's zooms (P200, D-478), in the plan's order.
+    punches: Vec<punch_in::Track>,
     /// The source frame's display size: a zoomed crop never leaves it.
     frame: (f32, f32),
 }
@@ -28,6 +31,7 @@ impl Track {
         Track {
             crop,
             camera: CameraTrack::none(),
+            punches: Vec::new(),
             frame: (crop.x + crop.w, crop.y + crop.h),
         }
     }
@@ -37,15 +41,33 @@ impl Track {
         Track {
             crop,
             camera,
+            punches: Vec::new(),
             frame,
         }
+    }
+
+    /// The same track with the plan's zooms (P200, D-478).
+    pub fn with_punches(self, punches: Vec<punch_in::Track>) -> Track {
+        Track { punches, ..self }
+    }
+
+    /// The scale of the frame at `t`: the camera's drift times the plan's
+    /// zoom (the strongest at `t`, should a release touch the next zoom:
+    /// two zooms never multiply), capped at `MAX_TOTAL_ZOOM`, never below 1.0.
+    pub fn scale_at(&self, t: OutMs) -> f32 {
+        let punch = self
+            .punches
+            .iter()
+            .map(|p| p.scale_at(t))
+            .fold(1.0, f32::max);
+        (self.camera.scale_at(t) * punch).clamp(1.0, MAX_TOTAL_ZOOM)
     }
 
     /// The part of the source shown at `t`: the crop itself at a scale of
     /// exactly 1.0 (bit for bit), else the crop shrunk by the scale about
     /// its centre and moved back inside the source frame.
     pub fn src_at(&self, t: OutMs) -> CropRect {
-        let scale = self.camera.scale_at(t).clamp(1.0, MAX_TOTAL_ZOOM);
+        let scale = self.scale_at(t);
         if scale == 1.0 {
             return self.crop;
         }
@@ -203,5 +225,67 @@ mod tests {
         }]);
         let src = Track::with_camera(CROP, camera, FRAME).src_at(OutMs::new(500));
         assert!((src.w - CROP.w / MAX_TOTAL_ZOOM).abs() < 1e-3, "{src:?}");
+    }
+
+    /// A plan zoom over `[start, end)` ms.
+    fn punch(start: u32, end: u32, scale: offcut_types::ZoomScale) -> punch_in::Track {
+        let span = offcut_types::OutSpan::new(OutMs::new(start), OutMs::new(end)).unwrap();
+        punch_in::layout(scale, offcut_types::ZoomMotion::Snap, span)
+    }
+
+    #[test]
+    fn a_plan_zoom_multiplies_the_drift() {
+        use offcut_types::ZoomScale::Strong;
+        let camera = crate::camera::build(&[], &[], OutMs::new(3_000));
+        let track = Track::with_camera(CROP, camera.clone(), FRAME)
+            .with_punches(vec![punch(1_000, 2_000, Strong)]);
+        for t in [500, 1_000, 1_500, 1_999, 2_150, 2_400] {
+            let t = OutMs::new(t);
+            let want = camera.scale_at(t) * punch(1_000, 2_000, Strong).scale_at(t);
+            assert!((track.scale_at(t) - want).abs() < 1e-6, "{t:?}");
+            assert!((track.src_at(t).w - CROP.w / want).abs() < 1e-3, "{t:?}");
+        }
+        // With no drift, the zoom alone; before and after it, the crop bit for bit.
+        let alone = Track::with_camera(CROP, CameraTrack::none(), FRAME)
+            .with_punches(vec![punch(1_000, 2_000, Strong)]);
+        assert_eq!(alone.scale_at(OutMs::new(1_500)), 1.25);
+        assert_eq!(bits(alone.src_at(OutMs::new(999))), bits(CROP));
+        assert_eq!(bits(alone.src_at(OutMs::new(2_300))), bits(CROP));
+    }
+
+    #[test]
+    fn two_zooms_never_multiply_each_other() {
+        use offcut_types::ZoomScale::{Mild, Strong};
+        // The first's release (2,000 to 2,300) touches the second, from 2,010.
+        let (strong, mild) = (punch(1_000, 2_000, Strong), punch(2_010, 3_000, Mild));
+        let track =
+            Track::with_camera(CROP, CameraTrack::none(), FRAME).with_punches(vec![strong, mild]);
+        for t in [2_010, 2_030, 2_150, 2_299, 2_500] {
+            let t = OutMs::new(t);
+            let (a, b) = (strong.scale_at(t), mild.scale_at(t));
+            // The stronger of the two, never their product.
+            assert_eq!(track.scale_at(t), a.max(b), "{t:?}");
+            assert!(track.scale_at(t) < a * b || a == 1.0, "{t:?}");
+        }
+        // Just after the second starts the first is still the stronger; soon after, the second.
+        assert!(strong.scale_at(OutMs::new(2_010)) > 1.12);
+        assert_eq!(track.scale_at(OutMs::new(2_500)), 1.12);
+    }
+
+    #[test]
+    fn the_product_is_capped_at_the_total_zoom() {
+        let camera = CameraTrack::from_segs(vec![crate::camera::CameraSeg {
+            start: OutMs::new(0),
+            end: OutMs::new(4_000),
+            from: 1.2,
+            to: 1.2,
+        }]);
+        let track = Track::with_camera(CROP, camera, FRAME).with_punches(vec![punch(
+            0,
+            2_000,
+            offcut_types::ZoomScale::Strong,
+        )]);
+        assert_eq!(track.scale_at(OutMs::new(1_000)), MAX_TOTAL_ZOOM);
+        assert_eq!(track.scale_at(OutMs::new(3_000)), 1.2);
     }
 }

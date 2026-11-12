@@ -5,6 +5,7 @@ pub mod from_to;
 pub mod keyword_pop;
 pub mod list_reveal;
 pub mod number_reveal;
+pub mod punch_in;
 
 use offcut_plan::ValidItem;
 use offcut_types::{EventKind, EventParams, OutMs, OutSpan, TimeMap, Transcript};
@@ -24,6 +25,8 @@ pub enum EventTrack {
     ListReveal(list_reveal::Track),
     FromTo(from_to::Track),
     KeywordPop(keyword_pop::Track),
+    /// V6.2 (D-478): the plan's zoom, drawn by the video track.
+    PunchIn(punch_in::Track),
 }
 
 impl EventTrack {
@@ -34,6 +37,7 @@ impl EventTrack {
             EventTrack::ListReveal(_) => EventKind::ListReveal,
             EventTrack::FromTo(_) => EventKind::FromTo,
             EventTrack::KeywordPop(_) => EventKind::KeywordPop,
+            EventTrack::PunchIn(_) => EventKind::PunchIn,
         }
     }
 }
@@ -75,10 +79,13 @@ pub fn layout(
         EventParams::KeywordPop { word } => Ok(Some(EventTrack::KeywordPop(keyword_pop::layout(
             *word, span,
         )))),
-        // V6.2 (D-446): not drawn yet (P199-P205 draw them); no track, no command, no count.
+        // V6.2 (D-478): a zoom over the item's program span.
+        EventParams::PunchIn { scale, motion } => Ok(Some(EventTrack::PunchIn(punch_in::layout(
+            *scale, *motion, span,
+        )))),
+        // V6.2 (D-446): not drawn yet (P201-P205 draw them); no track, no command, no count.
         EventParams::Emphasis { .. }
         | EventParams::IconPop { .. }
-        | EventParams::PunchIn { .. }
         | EventParams::Emoji { .. }
         | EventParams::HookTitle { .. } => Ok(None),
     }
@@ -91,6 +98,7 @@ pub fn draw(track: &EventTrack, t: OutMs, out: &mut Vec<DrawCmd>) {
         EventTrack::ListReveal(track) => list_reveal::draw(track, t, out),
         EventTrack::FromTo(track) => from_to::draw(track, t, out),
         EventTrack::KeywordPop(track) => keyword_pop::draw(track, t, out),
+        EventTrack::PunchIn(track) => punch_in::draw(track, t, out),
     }
 }
 

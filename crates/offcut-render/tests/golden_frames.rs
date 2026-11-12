@@ -23,6 +23,9 @@
 mod inputs;
 #[path = "../../offcut-scene/tests/common/scenes.rs"]
 mod scenes;
+// V6.2 (P200): a model's plan for the zoom goldens.
+#[path = "../../offcut-scene/tests/common/model.rs"]
+mod model;
 #[path = "common/ssim.rs"]
 mod ssim;
 
@@ -544,4 +547,48 @@ fn motion_mid() {
     };
     assert!((src.w - 1080.0 / scale).abs() < 1e-2, "{src:?} at {scale}");
     golden("motion_mid", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// A zoom of the plan (V6.2, D-478): the NumberReveal input's sentences with
+/// a model's plan of one Strong `PunchIn` on "3,000 users", motion off, at
+/// the middle of its anchors.
+fn punch_golden(name: &str, motion: offcut_types::ZoomMotion, want: f32) {
+    let case = case(&INPUTS[0], StyleId::Clean, BTreeMap::new());
+    let words = &case.transcript.words;
+    let three = words.iter().position(|w| w.text == "3,000").unwrap() as u32;
+    let zoom = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_100),
+        kind: EventKind::PunchIn,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(three),
+            end: offcut_types::WordIdx::new(three + 2),
+        },
+        params: offcut_types::ItemParams::PunchIn {
+            scale: offcut_types::ZoomScale::Strong,
+            motion,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![zoom]);
+    let span = case.plan.items()[0].span;
+    let mid = OutMs::new((span.start.get() + span.end.get()) / 2);
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(mid);
+    let DrawCmd::Video { src, .. } = &list.cmds[0] else {
+        panic!("the video first");
+    };
+    assert!((1080.0 / src.w - want).abs() < 1e-3, "{name}: {src:?}");
+    golden(name, (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// `Snap`: at the scale for the whole of its anchors.
+#[test]
+fn punch_snap() {
+    punch_golden("punch_snap", offcut_types::ZoomMotion::Snap, 1.25);
+}
+
+/// `Push`: half way up at half its anchors (`IN_OUT` is symmetric).
+#[test]
+fn punch_push() {
+    punch_golden("punch_push", offcut_types::ZoomMotion::Push, 1.125);
 }

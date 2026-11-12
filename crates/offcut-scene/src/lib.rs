@@ -148,19 +148,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let scale = width as f32 / safe_area::CANVAS_WIDTH;
     Ok(Scene {
         time_map: map.clone(),
-        // V6.2 (D-476, D-477): the drift with `Enhance.motion`, else today's fixed crop.
-        video: if input.edit.enhance.motion {
-            video::Track::with_camera(
-                crop,
-                camera::for_clip(input.transcript, map),
-                (
-                    input.clip.display_width.get() as f32,
-                    input.clip.display_height.get() as f32,
-                ),
-            )
-        } else {
-            video::Track::fixed(crop)
-        },
+        video: video_track(crop, &input, map, &tracks),
         canvas: (width as f32, height as f32),
         scale,
         style,
@@ -172,6 +160,41 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         tracks,
         watermark,
     })
+}
+
+/// The video of the scene (V6.2, D-476 to D-478): today's fixed crop, unless
+/// `Enhance.motion` drifts it or a `PunchIn` of the plan zooms it. The plan's
+/// zooms stay with motion off (§12: "the plan's zooms stay").
+fn video_track(
+    crop: CropRect,
+    input: &SceneInput<'_>,
+    map: &TimeMap,
+    tracks: &[EventTrack],
+) -> video::Track {
+    let punches: Vec<events::punch_in::Track> = tracks
+        .iter()
+        .filter_map(|track| {
+            if let EventTrack::PunchIn(punch) = track {
+                Some(*punch)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let motion = input.edit.enhance.motion;
+    if !motion && punches.is_empty() {
+        return video::Track::fixed(crop);
+    }
+    let drift = if motion {
+        camera::for_clip(input.transcript, map)
+    } else {
+        camera::CameraTrack::none()
+    };
+    let frame = (
+        input.clip.display_width.get() as f32,
+        input.clip.display_height.get() as f32,
+    );
+    video::Track::with_camera(crop, drift, frame).with_punches(punches)
 }
 
 impl Scene {

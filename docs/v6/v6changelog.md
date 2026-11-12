@@ -1958,3 +1958,56 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P200 (`PunchIn`).
+
+## Entry 61 - 2026-11-13 - P200: PunchIn
+
+**What changed.**
+- **`events/punch_in.rs`** (new; D-478): `Track { span, scale, motion }`, `layout`, `scale_at`, and a `draw` that adds nothing (as `KeywordPop`'s):
+  - `Snap` is at the scale from its first word's program start over its anchors;
+  - `Push` rises from 1.0 on `IN_OUT` across them;
+  - both release to 1.0 over `ZOOM_RELEASE_MS = 300` on `OUT`;
+  - `MILD = 1.12`, `STRONG = 1.25`.
+- **`events/mod.rs`:** `EventTrack::PunchIn`, its `kind`, its layout arm (the item's program span) and its `draw` arm. `PunchIn` leaves the "not drawn yet" arm.
+- **`video.rs`:** `Track::with_punches` and `Track::scale_at`. The scale is the drift times the strongest zoom at `t` (two zooms never multiply), capped at `MAX_TOTAL_ZOOM = 1.35`, never below 1.0.
+- **`lib.rs`:** `video_track` hands the plan's zooms to the video track.
+  - Motion off and no zoom: `Track::fixed`, today's path.
+  - **The plan's zooms stay with motion off** (§12: "the plan's zooms stay"); the switch is the camera's only.
+- **Tests' `common/model.rs`** (new): `with_model_items`, a model's plan of given items validated for a case. It is its own file, so the binaries that do not use it do not warn.
+- **Docs:** TS §5 rows (`events/punch_in.rs`, `tests/punch_in.rs`, `common/model.rs`, the goldens); "As read (P200)" under D-478.
+
+**Tests (+14).**
+- `punch_in.rs` +5:
+  - Mild and Strong;
+  - a snap in at its first word, held, released over 300 ms on `OUT`, falling all the way;
+  - a push on `IN_OUT`, half way at half time;
+  - an empty span only releases;
+  - it draws nothing.
+- `video.rs` +3:
+  - a zoom multiplies the drift, and alone it leaves the crop bit for bit before and after;
+  - two zooms whose release and start touch take the stronger, never the product;
+  - the product capped at 1.35.
+- `tests/punch_in.rs` (new, 4; a model's plan of one Strong zoom on "3,000 users"):
+  - a snap held over its anchors and released in 300 ms with motion off, about the centre, at every frame;
+  - a push rising across its anchors;
+  - **the zoom changes only `Video.src`**, switched off (`event_overrides`) it is gone, and it is one visual moment of the summary;
+  - with motion on, the drift times the zoom at every frame, never past the cap.
+- `golden_frames.rs` +2:
+  - **`punch_snap`** (×1.25 at the middle of its anchors) and **`punch_push`** (×1.125, half way), motion off, the scale asserted before the golden;
+  - written once on WARP, read side by side: the video zoomed about its centre, the captions unmoved.
+
+**Declared.** `golden_frames.rs` gains lines only (a module line and the two tests). No test of the base changed. P199's `video.rs` tests are unchanged (`with_punches` is additive).
+
+**Every existing frame unchanged.**
+- No snapshot changed. Every old golden reads SSIM 1.0000 on WARP.
+- **`punch_in_110.png` is byte for byte its committed file.** The update run's name filter (`punch_`) also matched it: it was rewritten identically, then checked out from git and its hash compared.
+- Media: on a keyed `pnpm build:e2e`, `pipeline-preview`'s three preview cases pass.
+- No browser flow can draw a `PunchIn` yet: model plans arrive through `/plan`, which the fake API lacks until P210.
+
+**Render binary.** 7,507,007 → **7,507,821** bytes (+814).
+
+**Counts.**
+- Rust **1048 / 0 / 7** by count (1034 + 14; `offcut-scene` 134, `offcut-render` 36, `offcut-wasm-render` 12 re-run).
+- Vitest **744**.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P201 (Glow and the Glow style).

@@ -573,6 +573,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 200 — PunchIn
 
+**Done 2026-11-13 (V6 CL Entry 61).** `punch_snap` and `punch_push` written once on WARP; every old golden 1.0000, `punch_in_110.png` byte for byte.
+
 **Effort: High.**
 
 **Objective.** The plan's zooms, on the same track as the drift, capped.
