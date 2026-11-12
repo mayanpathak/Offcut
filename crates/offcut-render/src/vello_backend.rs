@@ -1,14 +1,18 @@
 //! The overlay: the commands of a display list after its video, drawn by
 //! Vello into a texture as large as the target. This file reads them command
-//! by command and knows nothing of what they mean. The video and any image
-//! are the compositor's (D-133).
+//! by command and knows nothing of what they mean. The video is the
+//! compositor's (D-133); images are drawn here, in list order with the text
+//! (v6.2implementation D-472).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use offcut_scene::{Affine, DrawCmd, FontKey, FontSet, PathEl, Rect, Rgba};
+use offcut_scene::{Affine, DrawCmd, FontKey, FontSet, ImageKey, ImageSet, PathEl, Rect, Rgba};
 use vello::kurbo;
-use vello::peniko::{Blob, Color, Fill, FontData, Mix};
+use vello::peniko::{
+    Blob, Color, Fill, FontData, ImageAlphaType, ImageBrush, ImageData, ImageFormat, ImageQuality,
+    Mix,
+};
 
 use crate::RenderError;
 
@@ -33,6 +37,8 @@ pub(crate) struct Overlay {
     height: u32,
     /// Each face is read on its first use, once per key (D-132).
     faces: BTreeMap<FontKey, Face>,
+    /// The images handed over last, each decoded once (D-472).
+    images: BTreeMap<ImageKey, ImageData>,
 }
 
 fn texture_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -64,6 +70,40 @@ fn affine(a: &Affine) -> kurbo::Affine {
 fn rect(r: &Rect) -> kurbo::Rect {
     let (x, y) = (f64::from(r.x), f64::from(r.y));
     kurbo::Rect::new(x, y, x + f64::from(r.w), y + f64::from(r.h))
+}
+
+/// A PNG of the bundle as Vello takes it: 8-bit RGBA, straight alpha, as the
+/// file holds it. Vello premultiplies each texel before it filters (its
+/// `fine.wgsl`, `maybe_premul_alpha`), so nothing is premultiplied here
+/// (D-472's note of P183). `Overlay` for a file that is not an 8-bit RGBA PNG.
+pub(crate) fn decode(file: &[u8]) -> Result<ImageData, RenderError> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(file));
+    let mut reader = decoder.read_info().map_err(|_| RenderError::Overlay)?;
+    let mut data = vec![0; reader.output_buffer_size().ok_or(RenderError::Overlay)?];
+    let info = reader
+        .next_frame(&mut data)
+        .map_err(|_| RenderError::Overlay)?;
+    if (info.color_type, info.bit_depth) != (png::ColorType::Rgba, png::BitDepth::Eight) {
+        return Err(RenderError::Overlay);
+    }
+    data.truncate(info.buffer_size());
+    Ok(ImageData {
+        data: Blob::from(data),
+        format: ImageFormat::Rgba8,
+        alpha_type: ImageAlphaType::Alpha,
+        width: info.width,
+        height: info.height,
+    })
+}
+
+/// Where an image of `size` pixels lands to fill `r`: scaled, then moved.
+fn placed(r: &Rect, size: (u32, u32)) -> kurbo::Affine {
+    let (sx, sy) = (
+        f64::from(r.w) / f64::from(size.0),
+        f64::from(r.h) / f64::from(size.1),
+    );
+    kurbo::Affine::translate((f64::from(r.x), f64::from(r.y)))
+        * kurbo::Affine::scale_non_uniform(sx, sy)
 }
 
 fn path(elements: &[PathEl]) -> kurbo::BezPath {
@@ -100,7 +140,19 @@ impl Overlay {
             width,
             height,
             faces: BTreeMap::new(),
+            images: BTreeMap::new(),
         })
+    }
+
+    /// Holds the images of `images`, each decoded once, in place of those
+    /// held before. On an error the images held before are kept.
+    pub fn set_images(&mut self, images: &ImageSet) -> Result<(), RenderError> {
+        let decoded = images
+            .iter()
+            .map(|(key, file)| Ok((key, decode(file)?)))
+            .collect::<Result<BTreeMap<_, _>, RenderError>>()?;
+        self.images = decoded;
+        Ok(())
     }
 
     pub fn view(&self) -> &wgpu::TextureView {
@@ -136,7 +188,8 @@ impl Overlay {
 
     /// Draws `cmds` into the overlay texture, over nothing: where they draw
     /// nothing the texture is transparent. Glyph runs are set in the faces of
-    /// `fonts`.
+    /// `fonts`; an image is one `set_images` handed over, and a key it did not
+    /// is `Unsupported`, never a blank (§9.2).
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -229,8 +282,27 @@ impl Overlay {
                         layers -= 1;
                     }
                 }
-                // The compositor draws the video; V4 draws no image.
-                DrawCmd::Video { .. } | DrawCmd::Image { .. } => {}
+                DrawCmd::Image {
+                    image,
+                    rect: r,
+                    opacity,
+                } => {
+                    let data = self.images.get(image).ok_or(RenderError::Unsupported)?;
+                    if ![r.x, r.y, r.w, r.h, *opacity].iter().all(|v| v.is_finite()) {
+                        return Err(RenderError::Unsupported);
+                    }
+                    // An empty rectangle or no opacity draws nothing: a pop
+                    // that starts from zero.
+                    if r.w > 0.0 && r.h > 0.0 && *opacity > 0.0 {
+                        let brush = ImageBrush::new(data.clone())
+                            .with_quality(ImageQuality::Medium)
+                            .with_alpha(opacity.min(1.0));
+                        let transform = placed(r, (data.width, data.height));
+                        self.scene.draw_image(&brush, transform);
+                    }
+                }
+                // The compositor draws the video.
+                DrawCmd::Video { .. } => {}
             }
         }
         // A list that leaves a layer open is closed here, so that it cannot
@@ -248,5 +320,62 @@ impl Overlay {
         self.renderer
             .render_to_texture(device, queue, &self.scene, &self.view, &params)
             .map_err(|_| RenderError::Overlay)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bundle_file_decodes_to_its_own_straight_alpha_pixels() {
+        let set = ImageSet::embedded();
+        let (key, file) = set.iter().next().unwrap();
+        assert_eq!(key, ImageKey(0));
+        let image = decode(file).unwrap();
+        assert_eq!(
+            (image.width, image.height),
+            (ImageSet::SIZE, ImageSet::SIZE)
+        );
+        assert_eq!(image.format, ImageFormat::Rgba8);
+        assert_eq!(image.alpha_type, ImageAlphaType::Alpha);
+        let bytes = image.data.data();
+        assert_eq!(bytes.len(), 160 * 160 * 4);
+        // Straight alpha: a soft edge pixel keeps its full colour.
+        let soft = bytes.chunks(4).find(|p| p[3] > 0 && p[3] < 128).unwrap();
+        assert!(soft[..3].iter().any(|c| *c > soft[3]), "{soft:?}");
+    }
+
+    #[test]
+    fn a_file_that_is_not_an_rgba_png_is_refused() {
+        assert_eq!(decode(b"not a png"), Err(RenderError::Overlay));
+        let mut rgb = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut rgb, 2, 2);
+            encoder.set_color(png::ColorType::Rgb);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&[0; 12]).unwrap();
+        }
+        assert_eq!(decode(&rgb), Err(RenderError::Overlay));
+    }
+
+    #[test]
+    fn an_image_is_scaled_into_its_rectangle_then_moved() {
+        let r = Rect {
+            x: 10.0,
+            y: 20.0,
+            w: 80.0,
+            h: 240.0,
+        };
+        let t = placed(&r, (160, 160));
+        assert_eq!(
+            t * kurbo::Point::new(0.0, 0.0),
+            kurbo::Point::new(10.0, 20.0)
+        );
+        assert_eq!(
+            t * kurbo::Point::new(160.0, 160.0),
+            kurbo::Point::new(90.0, 260.0)
+        );
     }
 }

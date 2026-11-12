@@ -38,11 +38,13 @@ use std::task::{Context, Poll, Waker};
 use offcut_render::scene::{
     CropRect, DisplayList, DrawCmd, FontSet, Rect, SceneInput, Theme, VideoSlot, build_scene,
 };
+use offcut_render::scene::{ImageKey, ImageSet};
 use offcut_render::{Renderer, RgbaImage};
 use offcut_types::{
     BitsPerSec, ClipInfo, DurMs, EventKind, ExportProfile, Hz, Orientation, OutMs, ProfileKind, Px,
     Rotation, StyleId, TimeMap,
 };
+use offcut_types::{EmojiId, IconId};
 
 use inputs::{INPUTS, Input, STYLES, case, style_name};
 
@@ -169,6 +171,9 @@ fn software(name: &str, width: u32, height: u32) -> Renderer {
 /// `OFFCUT_GOLDEN_UPDATE=1`.
 fn golden(name: &str, (source, rotation): (&RgbaImage, Rotation), list: &DisplayList) {
     let mut renderer = software(name, WIDTH, HEIGHT);
+    // Every golden is drawn with the bundle's images held (V6.2, D-472): a
+    // list that names none draws as it did before them.
+    renderer.set_images(&ImageSet::embedded()).unwrap();
     let adapter = renderer.adapter_info();
     let drawn = renderer
         .render_to_image(source, rotation, list, &FontSet::embedded())
@@ -447,4 +452,58 @@ fn parity_1080_box_filtered_is_540() {
             case.name
         );
     }
+}
+
+/// An image of the bundle at `rect` (x, y, side) and `opacity`.
+fn image(image: ImageKey, (x, y, side): (f32, f32, f32), opacity: f32) -> DrawCmd {
+    DrawCmd::Image {
+        image,
+        rect: Rect {
+            x,
+            y,
+            w: side,
+            h: side,
+        },
+        opacity,
+    }
+}
+
+/// Images in the overlay (V6.2, D-472, §9.1 step 2): over the portrait
+/// pattern, three emoji at 0.5x, 1x and 1.5x (the last between pixels, over
+/// the disc), one at opacity 0.5, one across the right edge, a white icon,
+/// and a half-dark rectangle after one emoji, which list order puts over it.
+#[test]
+fn image_basic() {
+    let source = pattern(1080, 1920);
+    let mut list = video_only(CropRect {
+        x: 0.0,
+        y: 0.0,
+        w: 1080.0,
+        h: 1920.0,
+    });
+    let emoji = ImageKey::of_emoji;
+    list.cmds.extend([
+        image(emoji(EmojiId::Fire), (40.0, 60.0, 80.0), 1.0),
+        image(emoji(EmojiId::Laughing), (170.0, 40.0, 160.0), 1.0),
+        image(emoji(EmojiId::Rocket), (100.5, 330.25, 240.0), 1.0),
+        image(emoji(EmojiId::HeartEyes), (360.0, 260.0, 160.0), 0.5),
+        image(emoji(EmojiId::Trophy), (460.0, 700.0, 160.0), 1.0),
+        image(ImageKey::of_icon(IconId::Check), (60.0, 700.0, 120.0), 1.0),
+        DrawCmd::FillRect {
+            rect: Rect {
+                x: 250.0,
+                y: 120.0,
+                w: 120.0,
+                h: 40.0,
+            },
+            radius: 0.0,
+            color: offcut_render::scene::Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 128,
+            },
+        },
+    ]);
+    golden("image_basic", (&source, Rotation::R0), &list);
 }

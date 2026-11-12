@@ -49,7 +49,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
 | 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
 | 8 | (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P210 |
-| 9 | (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
+| 9 | **Done in P196 (Entry 58): no dark fringe at 0.5×, 1.37× or 1.5×, read as pixels; Vello premultiplies each texel before it filters.** Was: (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
 | 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
@@ -1779,3 +1779,53 @@ Nothing in `offcut-wasm-render` uses `ImageSet` until P197, so the linker drops 
 **Counts.** Rust **1005 / 0 / 7** by count (998 + 7); Vitest **744**. `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8 and 9 (P212, P210, P196). Not pushed (push 2 is P197). Next: P196 (the renderer draws images).
+
+## Entry 58 - 2026-11-12 - P196: the renderer draws images
+
+**P195 checked again first.** The script, run into a fresh folder, reproduced the committed bundle byte for byte. Its 7 tests pass. The commit holds its 86 files and nothing else.
+
+**What changed.**
+- **`vello_backend.rs`:**
+  - `decode` reads a bundle PNG into peniko's `ImageData` (`Rgba8`, straight alpha, as the file holds it).
+  - `Overlay::set_images` decodes each file once and replaces the set held before; on an error the old set is kept.
+  - The overlay's `Image` arm draws with `draw_image`: bilinear (`ImageQuality::Medium`), the command's opacity, scaled into its rect, in list order with the text.
+  - A key not held, or a rect or opacity that is not a number, is `Unsupported`, never a blank (§9.2). An empty rect or an opacity of 0 draws nothing.
+- **`lib.rs`:** `Renderer::set_images(&ImageSet)`; `render`'s signature is unchanged; `Unsupported`'s doc names the image cases.
+- **`composite.rs`:** `video_of` accepts `Image` after the video (D-473, DC-8's V6.2 part). `Compositor::draw` and `video_pass.rs` are untouched.
+- **`Cargo.toml`:** `png` becomes a normal dependency of `offcut-render` (D-472, §3.1), and its dev-dependency line goes. No package is added; `cargo deny check` is clean.
+- **Docs:**
+  - TS §5 rows (`vello_backend.rs`, `image_draw.rs`, `fixtures/golden/`);
+  - "As read (P196)" under D-472 and D-473;
+  - TE-30's P196 read in `experiments.md`.
+
+**Differs from the plan.** Nothing is premultiplied at decode (the prompt and §9.2 say "premultiply"). D-472's P183 note holds: Vello 0.11's shader premultiplies each texel before it filters, and an 8-bit premultiply would lose colour at soft edges. The pixel test proves the result, and marking the pixels premultiplied fails it by 127 levels.
+
+**Tests (+7).**
+- `vello_backend.rs` +3: a bundle file decodes to its straight-alpha pixels; a file that is not an RGBA PNG is refused; an image is scaled into its rect, then moved.
+- `tests/image_draw.rs` (new, 3, WARP):
+  - every pixel of an emoji at 1x is its file blended over grey (worst 0.50 of a level), and at opacity 0.5 (worst 0.74);
+  - a white icon at 0.5x, 1.37x and 1.5x between pixels has soft edges and no dark fringe (known issue 9, closed);
+  - a key not held is `Unsupported`: before any set, between the sets, past the icons, after an empty set. A NaN rect is `Unsupported`; an empty rect draws nothing.
+- `golden_frames.rs` +1, **`image_basic`**:
+  - three emoji at 0.5x, 1x and 1.5x (the last between pixels, over the disc), one at opacity 0.5, one across the right edge, a white icon, and a half-dark rectangle over one emoji (list order);
+  - written once on WARP, read at 200%: clean edges, no rim, the cut at the edge, the rectangle over the emoji.
+
+**Declared.**
+- D-440 (3): in `composite.rs`' `a_list_outside_v4s_rule_is_unsupported`, the case "an image" (`[video, image]`, `Unsupported`) is replaced by "an image before the video" and "an image and no video", both still `Unsupported`. `a_scenes_list_is_drawn_with_its_video` gains `[video, text, image, pop]`, drawn.
+- `golden_frames.rs` gains one line in `golden()`, so every golden is drawn with the bundle held, plus two `use` lines and the new test. No line is removed.
+
+**Every old frame unchanged.** All 16 old goldens read SSIM **1.0000** with the images held; parity 0.9996, 0.9997, 0.9998. Rewriting every golden to compare bytes:
+- 14 come out byte-identical;
+- `tech_list` has the same pixels with different PNG bytes (an older encoder);
+- `bold_number` differs in 0 to 2 pixels by 1 level from run to run. It does so **with and without P196** over five draws, so it is WARP's own variation, which the SSIM line allows.
+
+All restored; no golden of the base is modified.
+
+**Render binary.** 6,481,347 → **6,484,358** bytes (+3,011): the image arm makes Vello's image path reachable. The decoder and the 1.0 MB of images arrive with P197's `set_images` call.
+
+**Counts.**
+- Rust **1012 / 0 / 7** by count (1005 + 7). `offcut-render` 32 (9 + 3 + 20); `offcut-wasm-render` 12 and `offcut-scene` 102 / 0 / 4, both re-run.
+- Vitest **744** (no web code).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5 and 8 (P212, P210); 9 closed. Not pushed (push 2 is P197, waited on: CI's lavapipe must pass `image_basic`). Next: P197 (images in the browser, TE-30).

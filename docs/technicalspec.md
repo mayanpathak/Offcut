@@ -504,11 +504,12 @@ offcut/
 │   │   │   ├── lib.rs                 Renderer
 │   │   │   ├── gpu.rs                 device/queue/surface setup
 │   │   │   ├── video_pass.rs          external frame import, rotate, crop, scale
-│   │   │   ├── vello_backend.rs       DisplayList -> vello::Scene -> overlay texture
+│   │   │   ├── vello_backend.rs       DisplayList -> vello::Scene -> overlay texture; (V6.2) the images, decoded once by set_images, drawn in list order (v6.2implementation D-472)
 │   │   │   ├── composite.rs           video + overlay -> target
 │   │   │   └── shaders/video.wgsl
 │   │   └── tests/
 │   │       ├── golden_frames.rs       native wgpu, software adapter; reads fixtures/golden/
+│   │       ├── image_draw.rs          (V6.2) images read as pixels: exact at 1x and at half opacity, no dark fringe, a missing key Unsupported (D-472, §9.2)
 │   │       └── common/ssim.rs         the similarity measure of the goldens (v4implementation D-135)
 │   ├── offcut-entitlement/
 │   │   ├── Cargo.toml                 feature "sign" (server only)
@@ -1042,7 +1043,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135)
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh

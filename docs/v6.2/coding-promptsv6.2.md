@@ -499,6 +499,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 196 — The renderer draws images
 
+**Done 2026-11-12 (V6 CL Entry 58).** `image_basic` written once on WARP and read at 200%; every old golden SSIM 1.0000; `video_pass.rs` and `Compositor::draw` untouched.
+
 **Effort: High.**
 
 **Objective.** `DrawCmd::Image` drawn natively, with every existing frame unchanged.

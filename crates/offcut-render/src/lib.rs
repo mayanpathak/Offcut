@@ -12,7 +12,7 @@ mod video_pass;
 /// renderer its display lists, and depends on this crate only (D-61).
 pub use offcut_scene as scene;
 
-use offcut_scene::{CropRect, DisplayList, FontSet, Rect};
+use offcut_scene::{CropRect, DisplayList, FontSet, ImageSet, Rect};
 use offcut_types::{Px, Rotation};
 use thiserror::Error;
 
@@ -35,8 +35,9 @@ pub enum RenderError {
     FrameImport,
     #[error("the overlay could not be drawn")]
     Overlay,
-    /// A list this version cannot draw (D-133): an image, a mask, a video
-    /// that is not the first command or not opaque, or more than one.
+    /// A list this version cannot draw (D-133): a mask, a video that is not
+    /// the first command or not opaque, or more than one; an image before the
+    /// video, or one whose key `set_images` did not hand over (D-473, §9.2).
     #[error("the display list asks for what this renderer does not draw")]
     Unsupported,
 }
@@ -88,6 +89,14 @@ impl Renderer {
             overlay,
             compositor,
         })
+    }
+
+    /// The images a list may name from now on, each decoded once, in place
+    /// of those handed over before (D-472). Before the first call a list
+    /// with an image is `Unsupported`. `Overlay` when a file is not an 8-bit
+    /// RGBA PNG; the images held before are then kept.
+    pub fn set_images(&mut self, images: &ImageSet) -> Result<(), RenderError> {
+        self.overlay.set_images(images)
     }
 
     /// The output is `width` by `height` from now on. The same size again

@@ -15,6 +15,9 @@ vello = { workspace = true, features = ["wgpu"] }
 wgpu = { workspace = true, features = ["std", "webgpu", "wgsl"] }
 # The canvas a frame is drawn to, and the decoded frame that is drawn.
 web-sys = { workspace = true, features = ["OffscreenCanvas", "VideoFrame"] }
+# The image bundle's PNGs, decoded once by `set_images` (v6.2implementation
+# D-472, §3.1). Also the golden frames' reader and writer.
+png = { workspace = true }
 
 [dev-dependencies]
 # Tests only (v4implementation D-134): the native backends, so that the golden
@@ -22,7 +25,6 @@ web-sys = { workspace = true, features = ["OffscreenCanvas", "VideoFrame"] }
 # Vulkan). The normal dependency above keeps `webgpu` only: none of these
 # reaches the browser bundle.
 wgpu = { workspace = true, features = ["vulkan", "dx12", "wgsl"] }
-png = { workspace = true }
 # The golden frames draw the scenes of `offcut-scene`'s snapshot inputs, made
 # as the pipeline makes them: written sentences timed and normalized
 # (`offcut-text`), detected (`offcut-detect`) and validated (`offcut-plan`)
