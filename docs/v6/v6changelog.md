@@ -1444,3 +1444,17 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Counts.** `cargo test -p offcut-api` 307 (305 + 2). Rust 966 / 0 / 7 by count.
 
 **Open.** 35. Next: P188c (the founder's yes to a second prompt fix), then P191.
+
+## Entry 52 - 2026-11-12 - P188c: where a number's range ends
+
+**The founder's answer.** Yes to the second prompt fix P188b offered (about $0.02).
+
+**What changed.** `offcut-plan/src/prompt.rs`'s pointing paragraph now says where a number's range starts and ends. It starts on the number and ends on the number or on the one unit word just after it (hours, percent, dollars, users), never on `a`, `an`, `of`, `per` or `pm`. Both sides of a from-to are numbers the speaker says. **Snapshot changed:** `catalog_snapshot__system_prompt@v2.snap`, read and accepted; nothing ships on `@v2` yet.
+
+**Every real call (D-500's request).** 2026-11-12 08:03-08:04 UTC, peak hours: 16 calls to `deepseek-flash` on `a01` and `w01`-`w14`, never `a02`. All were HTTP 200 and `stop`, with no thinking tokens. One was a parse retry: `w14`'s first answer named `lock` as an emoji. The calls cost about $0.016 at peak prices; the balance read $1.85 before and after (two free balance reads).
+
+**Result: TE-15 passes on `deepseek-flash`.** Median item drops **0.0%** (mean 8.5%; P188b: 14.3%, 10.9%). Parse after one retry 15/15, p90 3.3 s. No zoom was dropped. Of the 9 drops left, 5 are from-tos whose sides still end on `a` or `an`, 2 are numbers that do not resolve (`3 sets`, `Version 2`), and 2 are icons over numbers. No further revision is proposed. The table is in `experiments.md`; the plans are in `~/v6.2-review/p188c/plans/` (outside git).
+
+**Counts.** `cargo test -p offcut-plan --all-features` green (75). Rust 966 / 0 / 7 by count, unchanged.
+
+**Open.** 35. Next: P191.

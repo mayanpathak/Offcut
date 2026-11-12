@@ -145,6 +145,24 @@ Recorded, redacted shapes for P190 (each request with message texts cut to their
 
 **Read.** The revision did what it was for: zoom drops 12 → 1, anchor drops 6 → 0, parse failures 2 → 0, mean drops 17.8% → 10.9%. The median line still fails at 14.3%, now on the number's range alone. Not acted on (the founder approved one revision): a second line in the pointing paragraph ("the range ends on the number or its unit word: never `a`, `an`, `of`, `per`"), or letting `validate` trim a trailing filler word, would take most of the rest. Item-level parsing (P190) does not change these numbers: no plan failed to parse here.
 
+### The second revision: where a number's range ends (P188c, 2026-11-12 08:03-08:04 UTC, d1)
+
+**The founder's yes (2026-11-12)** to the second fix P188b offered. The pointing paragraph now says a number's range starts on the number and ends on the number or on the one unit word just after it (hours, percent, dollars, users), never on `a`, `an`, `of`, `per` or `pm` ("`$12`" in "`$12 a month`"), and that both sides of a from-to are numbers the speaker says. System message: 16,366 characters. The same harness, request and 15 transcripts; `deepseek-flash` only; **16 calls** (one parse retry: `w14`'s first answer used the icon `lock` as an emoji, a case P190's item-level parsing now keeps without a retry). All HTTP 200, `stop`, no thinking tokens. Peak hours; about $0.016 at peak prices; the balance read $1.85 before and after.
+
+| `deepseek-flash` | P188 | P188b | **P188c** | Pass line |
+|---|---|---|---|---|
+| Parse, first try / after one retry | 13 / 15 | 15 / 15 | 14 / 15, 15 / 15 | ≥ 98% after one retry: pass |
+| Items written / kept | 128 / 104 | 111 / 98 | 103 / 94 | |
+| **Item drop rate, median (mean)** | 16.7% (17.8%) | 14.3% (10.9%) | **0.0% (8.5%)** | ≤ 10%: **pass** |
+| Plans with no drop / at or under 10% | 2 / 4 | 5 / 6 | 8 / 8 | |
+| Zooms written / dropped | 56 / 12 | 45 / 1 | 38 / 0 | |
+| Latency p50 / p90 / max | 2.8 / 3.3 / 6.0 s | 2.8 / 3.5 / 3.6 s | 2.8 / **3.3** / 3.6 s | p90 ≤ 10 s: pass |
+| Cost per plan at peak, median (no cache) | $0.0011 ($0.0022) | $0.0011 ($0.0023) | $0.0010 ($0.0023) | recorded |
+
+**Drops (9 items).** `from_to` number unresolved 5; `number_reveal` number unresolved 2; `icon_pop` zone taken 2. No extra was dropped. The from-to sides still end on `a` or `an` in three plans (`$12 a` to `$29 a`, `$2,800 a`, `$60 an`), as in P188b: the rule moved the number reveals, not the from-tos. The others: `3 sets` (`sets` is not a count noun `parse_quantity` knows), `Version 2`, and `twice` to `less`. The annotated plans are in `~/v6.2-review/p188c/plans/`.
+
+**Read.** TE-15's lines all pass on `deepseek-flash` with thinking off: parse after one retry 15/15, median drops 0.0%, p90 3.3 s. No further revision is proposed; `validate` drops the rest, at the cost of a fuller plan only.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 Not read yet (P197).

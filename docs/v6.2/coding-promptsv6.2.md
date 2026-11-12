@@ -284,6 +284,24 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ---
 
+## Prompt 188c — Where a number's range ends (added at the founder's yes)
+
+**Done 2026-11-12 (V6 CL Entry 52; `experiments.md` TE-15).**
+
+**Effort: Low.**
+
+**Objective.** The one cause of drops P188b left: a number's range one word too long.
+
+**Do.** One sentence in the pointing paragraph (the range starts on the number and ends on it or one unit word after it; never `a`, `an`, `of`, `per`, `pm`; a from-to's sides are numbers); `@v2` read and accepted; TE-15 on `deepseek-flash`, the same 15 transcripts, at most 20 calls.
+
+**Acceptance.**
+
+- [x] `cargo test -p offcut-plan --all-features` green; the snapshot read.
+- [x] Every call listed; the table beside P188b's.
+- [x] Commit `V6.2 P188c: where a number's range ends`.
+
+---
+
 ## Prompt 189 — The tables and the configuration
 
 **Effort: High.**

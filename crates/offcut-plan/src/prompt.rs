@@ -154,9 +154,12 @@ fn finished_short_text() -> String {
         "\nPointing at words: an item that marks one word (emphasis, keyword_pop, icon_pop, \
          emoji) is anchored to that word alone, written {{\"start\": w, \"end\": w + 1}} where w \
          is the word's index, never to its sentence. A number's value, and each side of a \
-         from-to, is the range of exactly the words that say the number and its unit, with no \
-         word before it: \"$2,400\", not \"cost $2,400\"; \"3000 hours\". A number_reveal is \
-         anchored to those words, or to at most {number_words} words around them."
+         from-to, is the range of exactly the words that say the number: it starts on the \
+         number, and ends on the number or on the one unit word just after it (hours, percent, \
+         dollars, users), never on a word such as a, an, of, per or pm: \"$2,400\", not \"cost \
+         $2,400\"; \"3000 hours\"; \"$12\" in \"$12 a month\". Both sides of a from-to are \
+         numbers the speaker says. A number_reveal is anchored to those words, or to at most \
+         {number_words} words around them."
     );
     let _ = writeln!(
         out,
