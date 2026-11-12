@@ -2154,3 +2154,56 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean; the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entry 63's): a punch word followed at once by speech is on screen only for its own word (about 0.4 to 0.5 s); Glow's halo and Mono's cursor grow with it. Not pushed (push 3 is P206). Next: P204 (emoji and icons).
+
+## Entry 65 - 2026-11-13 - P204: emoji and icons
+
+**What changed.**
+- **`events/emoji.rs`** (new; D-483): the track (word, image key, place, start) draws nothing in `events::draw`: the emoji belongs to the captions (the catalog's zone). `place` sets it once by its chunk's layout boxes into a `Placed`; `draw_placed` pops it in and stops at the chunk's end.
+  - Size: 1.6 times the capitals' height of its line, never above its 160 px.
+  - **`Under`:** below the chunk's lines, centred on the word. **Over the lines when that would reach the watermark's band or leave the safe area: at Bottom, the default, always.**
+  - **`Beside`:** at the end of the word's line, centred on the capitals, if it fits in the safe area and is clear of every word of the chunk; else as `Under`.
+  - Each place keeps the decoration, a 16 lp gap and a KeywordPop's growth off the words.
+- **`events/icon_pop.rs`** (new): a 168 lp disc in `Accent` with the 112 lp white icon, drawn through `events::draw`; `layout` centres it in the zone, `attach` sets it on its word (across, kept in the zone; down, on the zone's edge by the captions) and the chunk's end.
+- **`events/mod.rs`:** `EventTrack::{Emoji, IconPop}` and their arms; `image_pop` (0.6 → 1.0 over 120 ms on `OUT`) and `about_centre`. `HookTitle` is the last kind not drawn.
+- **`layout.rs`:** `cap_height`, parley's `cap_height` of "H" (0.7 of the size if a face says nothing).
+- **`lib.rs`:** `build_scene` places each emoji (into the scene's `emojis`) and attaches each icon by the chunk that shows its word; a word not shown, or an emoji with no place, has no track and no count. `frame_at` draws the emoji after the captions. **`testing::bounds` measures an `Image`** (D-440 (4)).
+- **Docs:** TS §5 rows (`events/emoji.rs`, `events/icon_pop.rs`, `layout.rs`, `tests/emoji_icon.rs`, the goldens); "As read (P204)" under D-483, D-471 and D-440 (4).
+
+**Differs from the plan.**
+- **`ImageSet` is not added to `SceneInput`** (D-471 planned it): the scene emits only keys, every key exists (`image_bundle.rs`), the renderer holds the set since P197, and a new field would change every test that builds `SceneInput`.
+- `Under` is below the chunk's lines, not the 280 lp block, and over them without room (D-483 had no fallback for `Under`).
+- The icon also leaves with its word's chunk (D-483 named the exit for both).
+
+**Found and fixed in the prompt.** The safe-area sweep's first run found 1,114 frames of an emoji over a caption word (three cases at Top): `Beside` beside a short first line sat over a wider second line. `Beside` now needs to be clear of every word of the chunk; the run after: 0.
+
+**Tests (+16).**
+- Unit +6:
+  - `emoji.rs` 2: the track draws nothing; the placed emoji pops on `OUT` about its centre and stops at its end;
+  - `icon_pop.rs` 2: disc and icon, their pop and times; `attach` centred on the word, kept in the zone, on the edge by the captions;
+  - `layout.rs` 1: Inter's and JetBrains Mono's capitals;
+  - `lib.rs` 1: `bounds` of an image.
+- `tests/emoji_icon.rs` (new, 6; four styles):
+  - under below the lines at Top and Middle, over them at Bottom, never on a word, in the safe area and off the band;
+  - beside when the line leaves room, else under;
+  - the pop, and shown exactly while the word's chunk is;
+  - the icon's circle in the accent, in the event zone, centred on the word, on the edge by the captions, leaving with the chunk;
+  - **only images and the disc are added to a frame**; hidden or switched off, every frame as without; two visual moments;
+  - on a punch word, 1.9 times as large, capped at 160.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, an emoji under, an emoji beside and an icon in turn every 2.7 s: 3,056 kept, 75,237 images drawn, none outside the safe area, on the watermark or on a caption word.**
+- `display_list_snapshots.rs` +1: **16 new snapshot files** (under at Middle, over at Bottom, beside, the icon; four styles). Three read command by command: Bold's fire under the second line centred on "BRUTAL", 97.8 lp; Bold's beside falling back under the full line; Clean's disc on the zone's bottom edge with key 1009.
+- `golden_frames.rs` +2, the list asserted first: **`emoji_under`** (Bold at Middle) and **`icon_pop`** (Clean at Bottom). Written once on WARP by exact name (only the two files appeared); read by eye, with the four styles at three placements from a scratch render at 200%.
+
+**Declared.** D-440 (4): `testing::bounds`. Other test files gain lines only.
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases and `image-parity.spec.ts`, 6 passed; TE-30 again 0.9995, the 72 images decoded in 19 ms. No browser flow can draw a plan's emoji or icon yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,512,492 → **7,522,176** bytes (+9,684).
+
+**Counts.**
+- Rust **1104 / 0 / 7** by count (1088 + 16; `offcut-scene` 182 / 0 / 4, `offcut-render` 43, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 and 64): at Bottom, the default, an emoji "under" its word is drawn over it; **the white icons on Clean's, Bold's and Glow's yellow disc are weak in contrast** (Mono's green is fine; a dark disc or an accent ring are the alternatives); at Bottom the icon sits about 120 lp above the captions. Not pushed (push 3 is P206). Next: P205 (the hook title).

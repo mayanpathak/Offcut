@@ -312,3 +312,86 @@ fn punch_word_in_each_style_while_said_and_next() {
         insta::assert_json_snapshot!(format!("punch_word_{}_next", style_name(style)), next);
     }
 }
+
+/// V6.2 (P204, D-483): the KeywordPop input's sentences with a model's plan
+/// of one emoji or one icon, in the four styles, 300 ms after its word
+/// starts (at rest): fire under "brutal" at Middle and at Bottom (over the
+/// lines: no room under them), fire beside "everyone.", a light bulb on a
+/// disc for "brutal". New files.
+#[test]
+fn emoji_and_icon_in_each_style() {
+    use offcut_types::{
+        CaptionPlacement, EmojiId, EmojiPlace, EventId, EventKind, IconId, ItemParams, PlanItem,
+        WordRange,
+    };
+    let input = &INPUTS[3];
+    let item = |word: u32, kind: EventKind, params: ItemParams| PlanItem {
+        id: EventId::new(9_300),
+        kind,
+        anchors: WordRange {
+            start: WordIdx::new(word),
+            end: WordIdx::new(word + 1),
+        },
+        params,
+        confidence: None,
+    };
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let base = case(input, style, BTreeMap::new());
+        let at = |text: &str| {
+            base.transcript
+                .words
+                .iter()
+                .position(|w| w.text == text)
+                .unwrap() as u32
+        };
+        let (brutal, everyone) = (at("brutal"), at("everyone."));
+        let emoji = |word: u32, place| {
+            let params = ItemParams::Emoji {
+                word: WordIdx::new(word),
+                emoji: EmojiId::Fire,
+                place,
+            };
+            item(word, EventKind::Emoji, params)
+        };
+        let icon = item(
+            brutal,
+            EventKind::IconPop,
+            ItemParams::IconPop {
+                word: WordIdx::new(brutal),
+                icon: IconId::Lightbulb,
+            },
+        );
+        let shots = [
+            (
+                "emoji_under",
+                0.55,
+                emoji(brutal, EmojiPlace::Under),
+                brutal,
+            ),
+            ("emoji_over", 1.0, emoji(brutal, EmojiPlace::Under), brutal),
+            (
+                "emoji_beside",
+                0.55,
+                emoji(everyone, EmojiPlace::Beside),
+                everyone,
+            ),
+            ("icon_pop", 1.0, icon.clone(), brutal),
+        ];
+        for (name, place, plan, word) in shots {
+            let mut case = case(input, style, BTreeMap::new());
+            case.edit.caption_position = CaptionPlacement::new(place).unwrap();
+            let case = model::with_model_items(case, vec![plan]);
+            assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+            let scene = scenes::build(&case, 1080);
+            let t = case.transcript.words[word as usize].start_ms.get() + 300;
+            let list = scene.frame_at(OutMs::new(t));
+            let drawn = list
+                .cmds
+                .iter()
+                .filter(|cmd| matches!(cmd, DrawCmd::Image { .. }))
+                .count();
+            assert_eq!(drawn, 1, "{name} {style:?}");
+            insta::assert_json_snapshot!(format!("{name}_{}", style_name(style)), list);
+        }
+    }
+}

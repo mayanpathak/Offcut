@@ -653,6 +653,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 204 — Emoji and icons
 
+**Done 2026-11-13 (V6 CL Entry 65).** `emoji_under` and `icon_pop` written once on WARP and read by eye; every old golden and snapshot unchanged; 16 new snapshots; every image inside the safe area, off the watermark and off the caption words at every placement.
+
 **Effort: High.**
 
 **Objective.** The first real lists with images: an emoji under or beside its word, an icon on a disc.

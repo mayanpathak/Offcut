@@ -465,3 +465,128 @@ fn no_punch_word_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_watermar
     let first: Vec<&String> = problems.iter().take(20).collect();
     assert!(problems.is_empty(), "{first:#?}");
 }
+
+/// `bounds`, and an image's rectangle (V6.2, P204: the scene draws images).
+fn bounds_with_images(cmd: &DrawCmd) -> Option<(Rect, bool)> {
+    if let DrawCmd::Image { rect, .. } = cmd {
+        Some((*rect, false))
+    } else {
+        bounds(cmd)
+    }
+}
+
+/// V6.2 (P204, D-483): the labeled scenes with a model's plan of emoji and
+/// icons: from the first word, the next starting at least 2.7 s after the
+/// last (D-451's window and each kind's gap are 2.5 s), an emoji under its
+/// word, an emoji beside it and an icon in turn, through every emoji and
+/// icon; in the four styles, at the three placements, watermark on, at every
+/// 33 ms. **No image, nor an icon's disc, leaves the safe area, meets the
+/// watermark, or covers a caption word.**
+#[test]
+fn no_emoji_or_icon_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_watermark() {
+    use offcut_types::{
+        EmojiId, EmojiPlace, EventId, IconId, ItemParams, PlanItem, WordIdx, WordRange,
+    };
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let (mut kept, mut images, mut frames, mut n) = (0usize, 0u64, 0u64, 0usize);
+    let mut problems: Vec<String> = Vec::new();
+    for style in styles {
+        let theme = Theme::default_for(style);
+        let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+        for name in &names() {
+            for p in PLACES {
+                let case = labeled::case(name, |edit, _| {
+                    edit.style = style;
+                    edit.caption_position = CaptionPlacement::new(p).unwrap();
+                });
+                let mut items = Vec::new();
+                let mut last: Option<u32> = None;
+                for (i, word) in case.transcript.words.iter().enumerate() {
+                    let start = word.start_ms.get();
+                    if last.is_some_and(|at| start < at + 2_700) {
+                        continue;
+                    }
+                    let at = WordIdx::new(i as u32);
+                    let (kind, params) = match n % 3 {
+                        0 | 1 => (
+                            EventKind::Emoji,
+                            ItemParams::Emoji {
+                                word: at,
+                                emoji: EmojiId::ALL[n % EmojiId::ALL.len()],
+                                place: if n % 3 == 0 {
+                                    EmojiPlace::Under
+                                } else {
+                                    EmojiPlace::Beside
+                                },
+                            },
+                        ),
+                        _ => (
+                            EventKind::IconPop,
+                            ItemParams::IconPop {
+                                word: at,
+                                icon: IconId::ALL[n % IconId::ALL.len()],
+                            },
+                        ),
+                    };
+                    n += 1;
+                    items.push(PlanItem {
+                        id: EventId::new(9_500 + i as u64),
+                        kind,
+                        anchors: WordRange {
+                            start: at,
+                            end: WordIdx::new(i as u32 + 1),
+                        },
+                        params,
+                        confidence: None,
+                    });
+                    last = Some(start);
+                }
+                let case = model::with_model_items(case, items);
+                kept += case.plan.items().len();
+                let scene = scenes::build_with(&case, 1080, true);
+                let mut t = 0;
+                while t < scene.duration().get() {
+                    frames += 1;
+                    let list = scene.frame_at(OutMs::new(t));
+                    // The caption words' runs (not a glow's clear strokes).
+                    let words: Vec<Rect> = list
+                        .cmds
+                        .iter()
+                        .filter(|cmd| {
+                            matches!(cmd, DrawCmd::GlyphRun { fill, text, .. }
+                                if fill.a > 0 && text != WATERMARK_TEXT)
+                        })
+                        .filter_map(|cmd| bounds(cmd).map(|(r, _)| r))
+                        .collect();
+                    for cmd in &list.cmds {
+                        let Some((r, is_mark)) = bounds_with_images(cmd) else {
+                            continue;
+                        };
+                        let what =
+                            || format!("{name} {style:?} at {p}, {t} ms: {r:?} of {}", kind(cmd));
+                        if !inside(r, SAFE_AREA) {
+                            problems.push(format!("outside the safe area: {}", what()));
+                        }
+                        if !is_mark && overlap(r, mark) {
+                            problems.push(format!("on the watermark: {}", what()));
+                        }
+                        if let DrawCmd::Image { .. } = cmd {
+                            images += 1;
+                            if words.iter().any(|w| overlap(*w, r)) {
+                                problems.push(format!("on a caption word: {}", what()));
+                            }
+                        }
+                    }
+                    t += STEP_MS;
+                }
+            }
+        }
+    }
+    println!(
+        "Emoji and icons: {kept} kept, {images} images drawn in {frames} frames, {} problems",
+        problems.len()
+    );
+    assert!(kept > 1_000 && images > 50_000, "{kept} {images}");
+    let first: Vec<&String> = problems.iter().take(20).collect();
+    assert!(problems.is_empty(), "{first:#?}");
+}

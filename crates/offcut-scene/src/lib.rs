@@ -88,6 +88,9 @@ pub struct Scene {
     emphasis: captions_draw::Emphasis,
     /// The plan's emphases (V6.2, D-481), drawn by the captions.
     marks: Vec<captions_draw::Mark>,
+    /// The plan's emoji, placed by their chunks (V6.2, D-483), drawn after
+    /// the captions.
+    emojis: Vec<events::emoji::Placed>,
     tracks: Vec<EventTrack>,
     /// Drawn over everything when the export profile asks (INV-9).
     watermark: Option<watermark::Track>,
@@ -139,13 +142,14 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         numbers: input.edit.highlight_numbers,
     };
     let mut marks = Vec::new();
+    let (mut emojis, mut cap) = (Vec::new(), None);
     for item in input.plan.items() {
         if !shown(&item.id) {
             continue;
         }
         let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;
         let (when, t) = ((span, event_zone), input.transcript);
-        let Some(track) = events::layout(item, when, t, map, &style, theme, fonts)? else {
+        let Some(mut track) = events::layout(item, when, t, map, &style, theme, fonts)? else {
             continue;
         };
         // A KeywordPop is drawn by the captions: its word, from its program
@@ -170,6 +174,34 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
                 start: mark.start,
             });
         }
+        // An emoji and an icon (V6.2, D-483) belong to the chunk that shows
+        // their word, and leave with it: a word not shown has neither, nor
+        // has an emoji with no room in the safe area. Neither is counted then.
+        if let EventTrack::Emoji(emoji) = &track {
+            let Some((chunk, _)) = chunk_holding(&chunks, emoji.word) else {
+                continue;
+            };
+            let cap = match cap {
+                Some(cap) => cap,
+                None => *cap.insert(layout::cap_height(
+                    theme.font(style.font),
+                    style.size,
+                    fonts,
+                )?),
+            };
+            let Some(placed) = events::emoji::place(emoji, chunk, &style, cap) else {
+                continue;
+            };
+            emojis.push(placed);
+        }
+        if let EventTrack::IconPop(icon) = track {
+            let Some((chunk, word)) = chunk_holding(&chunks, icon.word) else {
+                continue;
+            };
+            let zones = (event_zone, block);
+            track =
+                EventTrack::IconPop(events::icon_pop::attach(icon, word, zones, chunk.show.end));
+        }
         tracks.push(track);
     }
 
@@ -192,8 +224,17 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         chunks,
         emphasis,
         marks,
+        emojis,
         tracks,
         watermark,
+    })
+}
+
+/// The chunk that shows `word`, and the word's glyph box in it.
+fn chunk_holding(chunks: &[Chunk], word: WordIdx) -> Option<(&Chunk, Rect)> {
+    chunks.iter().find_map(|chunk| {
+        let mut boxes = hit::word_boxes(chunk).into_iter();
+        boxes.find(|(at, _)| *at == word).map(|(_, r)| (chunk, r))
     })
 }
 
@@ -252,6 +293,9 @@ impl Scene {
         if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
             let look = (&self.style, &self.theme);
             captions_draw::draw_marked(chunk, t, look, &self.emphasis, &self.marks, &mut cmds);
+        }
+        for emoji in &self.emojis {
+            events::emoji::draw_placed(emoji, t, &mut cmds);
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
@@ -465,7 +509,10 @@ pub(crate) mod testing {
                 vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
             }
             DrawCmd::FillPath { .. } => panic!("V2 draws no path"),
-            DrawCmd::Image { .. } => panic!("V4 draws no image"),
+            // V6.2 (P204, D-440 (4)): an emoji or an icon, its rectangle.
+            DrawCmd::Image { rect, .. } => {
+                vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
+            }
             DrawCmd::PushLayer { .. } | DrawCmd::PopLayer | DrawCmd::Video { .. } => return None,
         };
         let fold = |pick: fn(&(f32, f32)) -> f32, by: fn(f32, f32) -> f32, from: f32| {
@@ -893,5 +940,22 @@ mod tests {
         };
         let ranges = busy_with(&hidden, &identity).unwrap().chunk_ranges();
         assert_eq!(ranges[0].0.start, WordIdx::new(1));
+    }
+
+    #[test]
+    fn the_test_bounds_of_an_image_are_its_rectangle() {
+        // V6.2 (P204, D-440 (4)): the helper measured no image before.
+        let rect = Rect {
+            x: 10.0,
+            y: 20.0,
+            w: 30.0,
+            h: 40.0,
+        };
+        let image = DrawCmd::Image {
+            image: ImageKey(7),
+            rect,
+            opacity: 0.5,
+        };
+        assert_eq!(crate::testing::bounds(&image), Some(rect));
     }
 }

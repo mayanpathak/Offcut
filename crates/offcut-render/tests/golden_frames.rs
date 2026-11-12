@@ -739,3 +739,108 @@ fn punch_word() {
     assert!((runs[0].1 - 1.9).abs() < 1e-4, "{runs:?}");
     golden("punch_word", (&pattern(1080, 1920), Rotation::R0), &list);
 }
+
+/// The KeywordPop input in `style` at `place`, with a model's plan of one
+/// item on "brutal", 300 ms after it starts (its image at rest).
+fn image_frame(style: StyleId, place: f32, params: offcut_types::ItemParams) -> DisplayList {
+    let input = &INPUTS[3];
+    let mut case = case(input, style, BTreeMap::new());
+    case.edit.caption_position = offcut_types::CaptionPlacement::new(place).unwrap();
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap();
+    let start = words[brutal].start_ms.get();
+    let kind = if let offcut_types::ItemParams::Emoji { .. } = params {
+        EventKind::Emoji
+    } else {
+        EventKind::IconPop
+    };
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_300),
+        kind,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal as u32),
+            end: offcut_types::WordIdx::new(brutal as u32 + 1),
+        },
+        params,
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(case.plan.items().len(), 1, "the item passed validation");
+    let scene = scenes::build_with(&case, WIDTH, false);
+    scene.frame_at(OutMs::new(start + 300))
+}
+
+/// The images of a list, and the rectangles drawn after its last glyph run.
+fn images_of(list: &DisplayList) -> Vec<Rect> {
+    list.cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::Image { rect, .. } = cmd {
+                Some(*rect)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// An emoji under its word (V6.2, D-483): fire under "BRUTAL" in Bold, at
+/// the Middle snap point, where there is room under the lines.
+#[test]
+fn emoji_under() {
+    let word = offcut_types::WordIdx::new(4);
+    let list = image_frame(
+        StyleId::Bold,
+        0.55,
+        offcut_types::ItemParams::Emoji {
+            word,
+            emoji: offcut_types::EmojiId::Fire,
+            place: offcut_types::EmojiPlace::Under,
+        },
+    );
+    // The list before the pixels: one image, below every caption run, at
+    // 1.6 times Bold's capitals (half of it at the preview's 540).
+    let found = images_of(&list);
+    assert_eq!(found.len(), 1);
+    let lowest = list
+        .cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::GlyphRun { transform, .. } = cmd {
+                Some(transform.m[5])
+            } else {
+                None
+            }
+        })
+        .fold(f32::MIN, f32::max);
+    assert!(found[0].y > lowest, "{found:?} under {lowest}");
+    assert!((found[0].w - 97.75 / 2.0).abs() < 0.1, "{found:?}");
+    golden("emoji_under", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// An icon on its disc (V6.2, D-483): a light bulb for "brutal" in Clean at
+/// Bottom, the default placement, on an accent disc in the event zone.
+#[test]
+fn icon_pop() {
+    let list = image_frame(
+        StyleId::Clean,
+        1.0,
+        offcut_types::ItemParams::IconPop {
+            word: offcut_types::WordIdx::new(4),
+            icon: offcut_types::IconId::Lightbulb,
+        },
+    );
+    let found = images_of(&list);
+    assert_eq!(found.len(), 1);
+    let disc = list.cmds.iter().rev().find_map(|cmd| {
+        if let DrawCmd::FillRect { rect, radius, .. } = cmd {
+            Some((*rect, *radius))
+        } else {
+            None
+        }
+    });
+    let (disc, radius) = disc.unwrap();
+    assert!((radius - disc.w / 2.0).abs() < 1e-3 && (disc.w - 84.0).abs() < 1e-3);
+    assert!(found[0].x > disc.x && found[0].x + found[0].w < disc.x + disc.w);
+    golden("icon_pop", (&pattern(1080, 1920), Rotation::R0), &list);
+}
