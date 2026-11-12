@@ -189,7 +189,7 @@ async fn the_request_is_the_one_recorded() {
     assert_eq!(headers["authorization"], "Bearer test-plan-key");
     assert_eq!(headers["content-type"], "application/json");
     let sent: Value = serde_json::from_slice(body).unwrap();
-    // Every field as P188b sent it, the two texts aside.
+    // Every field as P188c sent it, the two texts aside.
     let mut recorded: Value = serde_json::from_str(REQUEST).unwrap();
     let mut sent_rest = sent.clone();
     for value in [&mut recorded, &mut sent_rest] {
@@ -202,7 +202,7 @@ async fn the_request_is_the_one_recorded() {
         json!({ "role": "user", "content": "the user message" })
     );
     // The system message is the prompt, the lead and the compact schema: the
-    // same 16,159 characters (UTF-16, as the recording counted) P188b sent.
+    // same 16,366 characters (UTF-16, as the recording counted) P188c sent.
     let system = sent["messages"][0]["content"].as_str().unwrap();
     assert_eq!(system, system_message(&request("")));
     assert!(system.starts_with(&system_prompt()));

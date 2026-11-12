@@ -528,6 +528,7 @@ offcut/
 │   │       ├── billing.rs
 │   │       ├── usage.rs
 │   │       ├── transcribe.rs          (cloud transcription) TranscribeResponse, CloudWord, HealthResponse
+│   │       ├── plan.rs                (V6.2) PlanRequest, PlanWord, PlanResponse (v6.2implementation §7.1)
 │   │       ├── analytics.rs           [ONLY] analytics allowlist: event names and prop types
 │   │       └── errors.rs              ApiError, ApiErrorCode
 │   ├── offcut-wasm-core/
@@ -627,6 +628,7 @@ offcut/
 │   │       └── platform_waitlist.rs
 │   └── tests/
 │       ├── common/mod.rs              test app, fake Mailer, fake BillingProvider
+│       ├── common/plan.rs             (V6.2) the plan tests' person, Creator, request and month's counts
 │       ├── auth_flow.rs
 │       ├── entitlement_rules.rs
 │       ├── usage_receipts.rs

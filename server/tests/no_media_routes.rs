@@ -29,7 +29,9 @@ const MEDIA_TYPES: [&str; 5] = [
 /// The POST routes that read a body. Each one must refuse more than 64 kB. A new
 /// POST route fails `every_post_route_refuses_a_body_over_the_limit` until it
 /// is named here or in `IGNORE_BODY`.
-const READ_BODY: [&str; 7] = [
+const READ_BODY: [&str; 8] = [
+    // V6.2 (D-460): its own limit is 64 kB, the most this test sends refused.
+    "/plan",
     "/billing/checkout",
     "/billing/webhook",
     "/auth/magic-link",

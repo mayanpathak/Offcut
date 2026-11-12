@@ -45,6 +45,8 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | # | Issue | Prompt |
 |---|---|---|
 | 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
+| 4 | (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
+| 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -1458,3 +1460,51 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Counts.** `cargo test -p offcut-plan --all-features` green (75). Rust 966 / 0 / 7 by count, unchanged.
 
 **Open.** 35. Next: P191.
+## Entry 53 - 2026-11-12 - P191: the route, quotas and the cap
+
+**What changed.**
+- `offcut-api-types/src/plan.rs`: `PlanRequest`, `PlanWord` and `PlanResponse` (§7.1), each `deny_unknown_fields`. `ApiErrorCode` gains `plan_quota`, `plan_catalog`, `plan_unavailable` and `plan_invalid`, placed before `internal`. `web/src/gen/api.ts` was regenerated, and `web/src/net/http.ts`' table of codes gains the four (the type requires it).
+- `server/src/plan/route.rs`: `POST /api/v1/plan` in §7.2's order (D-460 as read). The `PlanIp` layer and the 64 kB limit come first. The bearer is checked before the body, so a request without one is 401 even when its body is not JSON. Then `PlanUser`, the body, the catalog (409), the switch and the month's spend (502), the person's row (401), the quota (429) and the transcript (400). Then the provider, within 18 s for the whole request, and one parse retry with the parse error appended, made only with 4 s left. The answer is refused over 32 kB, a success is counted, and one log line of counts is written.
+- `plan/quota.rs`: Free 40 a month; Creator logs above 1,000 and stops at 3,000; the tier comes from `plan_now`.
+- `plan/spend.rs`: `SpendCap` prices each call at the cache-miss price, rounded up, charges blocked answers too, logs one 80% line a month, and refuses at 100%.
+- `plan/mod.rs`'s `PlanState` joins `AppState`. `main.rs` builds `DeepseekProvider` when `PLAN_ENABLED=true` and `UnconfiguredPlanProvider` otherwise.
+- `rate_limit.rs`: `PlanIp` and `PlanUser`, each 10 a minute.
+- `error.rs`: the five plan errors; a timeout is 504 with `plan_unavailable`.
+- `db/users.rs`: `exists`, with its query added to `server/.sqlx/`.
+- TS §5 rows for `offcut-api-types/src/plan.rs` and `server/tests/common/plan.rs`. `/healthz` is unchanged.
+
+**Tests.**
+- `plan_route.rs` (14): the plan as the model wrote it, with the server's source, counted and charged, and the system and user messages checked; the source set whatever the model claimed (catalog 1, the rules); no bearer is 401 before the body, with nothing sent, counted or spent; an unknown field, another catalog and a tab in a word are each refused before the provider; the switch off; a deleted account with a live token; the Free 41st, with last month's 40 not counting; a Creator's 3,001st; one parse retry with the error in the second message, counted once and charged twice; two bad answers are `plan_invalid`, charged and not counted; an unknown emoji leaves its item out with no retry; unavailable is 502, timeout 504, blocked 502 and charged, none retried; over 32 kB is `plan_invalid` and not counted; ten a minute per person across addresses, and ten per address before any bearer.
+- `ai_cap.rs` (+1): at the cap the 4th call is refused and not sent; last month's full spend does not close this month.
+- `ai_quota.rs` (2, new): only a plan that came back is counted; each month and each person counts alone.
+- `log_redaction.rs`: the plan case. A word of the request, the model's text and a parse error quoting it never appear in the log; the line shows `retried` and both calls' tokens; the 80% line appears exactly once.
+- `no_media_routes.rs`: `/plan` is in `READ_BODY`, so it is refused over 64 kB and with each media type.
+- Unit tests (9): `route.rs` 3 (the transcript checks, the buckets), `quota.rs` 2, `spend.rs` 2 (cost, once a month), `error.rs` 1 (the plan errors beside the table), `rate_limit.rs` 1 (the plan groups beside the table). `offcut-api-types` gains 1 (`plan.rs`).
+
+**DECLARED CHANGES (D-440 as read).** None of these deletes an assertion.
+- (7) needed no edit: a test beside the table, as V6.1 did.
+- (14) `errors.rs`: 14 codes → 18, and the test's name.
+- (15) `lib.rs`' TypeScript test: 43 → 46 names, with four imports added.
+- (16) `no_media_routes.rs`' `READ_BODY` gains `/plan`.
+- (17) `log_redaction.rs` gains the plan block.
+
+**Found, and fixed here: P188c broke a P190 test.** `deepseek_adapter.rs` pins the system message to the recorded request's length. P188c lengthened the prompt, and P188c was committed after only `offcut-plan`'s tests, so `the_request_is_the_one_recorded` failed from `031a9ec` until this commit. Its recorded request is now P188c's (16,366 characters).
+
+**Found.**
+1. A thread-local log subscriber missed the 80% line when its test ran beside others, though it passed alone (tracing's callsite cache). The check moved into `log_redaction.rs`, whose subscriber is the process's.
+2. The local `.env` cannot boot the full server: `MAIL_FROM` is not an address, and `BILLING_WEBHOOK_SECRET` lacks `whsec_`. Both are 14-character placeholders. The real call ran with stand-ins for those two, for that process only. `.env` was not changed.
+3. §14.2's deploy check expected `E_PLAN_UNAVAILABLE` for a bare request; with D-494 it is 401 first. Corrected in the plan.
+
+**The one real local call (F-9, step 4).**
+- 2026-11-12 08:23:31 UTC, peak hours. The real server on `offcut_dev` with `PLAN_ENABLED=true` (that process only) and DeepSeek's key.
+- A throwaway user, deleted after (its `ai_usage` row went with it), and an access token signed in-process with the local key, never printed.
+- The body was `a01`'s `PlanRequest` (157 words, 17 sentences, 11.6 kB, the repository's script).
+- **Result:** HTTP 200 in 3.8 s (provider bucket `lt5`); 9 items: 2 numbers, 3 zooms, 1 from-to, 1 list, 1 icon, 1 emphasis. Source `deepseek` / `deepseek-flash`, catalog 2, `plans_remaining` 39; a hook, a caption and 6 hashtags; counted once.
+- The log line: `{"message":"plan","kind":"ok","provider_s_bucket":"lt5","input_tokens":7303,"cached_input_tokens":7168,"output_tokens":668,"retried":false,"items":9,"items_skipped":0}`, inside the request's span (route, hashed user). No word of the transcript appears anywhere in the server's log.
+- The balance read $1.83 before and after (one call, about $0.003).
+
+**Counts.** Tier 3's server and Rust parts, run in full: `pnpm test` with `.env` loaded gives **Rust 993 / 0 / 7** (966 + 27: 26 in `offcut-api`, now 333, and 1 in `offcut-api-types`, now 32) and **Vitest 650**. `pnpm check` is clean (clippy on the workspace, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). The golden frames pass, 19. Browser e2e and `pnpm fixtures` were not run (no client change but the four codes; P192 runs the client).
+
+**Push 1.** `v6.2-build` pushed after this commit (not waited on, as the prompt says).
+
+**Open.** 35. Known issues 4 and 5 (P192, P212). Next: P192.

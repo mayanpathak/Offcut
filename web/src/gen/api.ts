@@ -3,6 +3,8 @@
 
 import type {
   AnonId,
+  DurMs,
+  EditPlan,
   ErrorCode,
   EventKind,
   ExportId,
@@ -12,8 +14,10 @@ import type {
   Plan,
   RejectReason,
   StyleId,
+  TimeMs,
   UnixSecs,
   UnsupportedReason,
+  WordRange,
 } from "./domain";
 
 export type MagicLinkRequest = { email: string, };
@@ -91,6 +95,42 @@ export type HealthResponse = { ok: boolean, version: string,
  */
 cloud_transcribe: boolean, };
 
+/**
+ * One word of the transcript, with how it was said.
+ */
+export type PlanWord = { text: string, start: TimeMs, end: TimeMs,
+/**
+ * How much louder than the speaker's average, in standard deviations.
+ */
+energy_z: number,
+/**
+ * How much higher than the speaker's average, in standard deviations.
+ */
+pitch_z: number, };
+
+/**
+ * The body of `POST /plan`: one clip's transcript.
+ */
+export type PlanRequest = {
+/**
+ * The client's `CATALOG_VERSION`; another than the server's is refused (409).
+ */
+catalog: number, duration: DurMs, words: Array<PlanWord>,
+/**
+ * Each sentence's words, in order.
+ */
+sentences: Array<WordRange>, };
+
+/**
+ * The answer of `POST /plan`: the model's plan as the server read it, not
+ * yet validated (the client validates it, INV-21).
+ */
+export type PlanResponse = { plan: EditPlan,
+/**
+ * The plans left this month on a quota that blocks (Free); `None` on Creator.
+ */
+plans_remaining: number | null, };
+
 export type HeroVariant = "outcome" | "privacy";
 
 export type CheckResult = "pass" | "fail";
@@ -140,7 +180,7 @@ export type ApiError = { code: ApiErrorCode, retry_after_secs: number | null, };
  * `payload_too_large`, `rate_limited` and `internal`. The other seven are
  * defined now so V6 adds handlers, not enum members (D-3).
  */
-export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "unsupported_media_type" | "payload_too_large" | "rate_limited" | "link_invalid" | "link_expired" | "session_expired" | "email_unavailable" | "billing_unavailable" | "transcribe_unavailable" | "internal";
+export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "unsupported_media_type" | "payload_too_large" | "rate_limited" | "link_invalid" | "link_expired" | "session_expired" | "email_unavailable" | "billing_unavailable" | "transcribe_unavailable" | "plan_quota" | "plan_catalog" | "plan_unavailable" | "plan_invalid" | "internal";
 
 export const ANALYTICS_EVENT_DOCS = [
   { name: "landing_view", description: "That the landing page was opened, and which of our headlines it showed." },

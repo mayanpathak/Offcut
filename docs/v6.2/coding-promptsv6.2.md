@@ -372,6 +372,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 191 — The route, quotas, the cap; push 1
 
+**Done 2026-11-12 (V6 CL Entry 53).** One real local call, DeepSeek Flash on `a01`: 200 in 3.8 s, 9 items.
+
 **Effort: High.**
 
 **Objective.** `POST /api/v1/plan` as §7.2, with every failure a test, and one real local call.

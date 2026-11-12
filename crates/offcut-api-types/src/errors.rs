@@ -30,6 +30,15 @@ pub enum ApiErrorCode {
     /// The cloud transcription release: the route is switched off, its budget
     /// is spent, or the provider failed (cloudimplementation D-354).
     TranscribeUnavailable,
+    /// V6.2 (v6.2implementation D-460, TS §40.7): the month's AI plans are used up (429).
+    PlanQuota,
+    /// The client's catalog is not the server's (409).
+    PlanCatalog,
+    /// The AI plan is switched off, its monthly spend cap is reached, or its
+    /// provider failed or did not answer in time (502, 504).
+    PlanUnavailable,
+    /// The model's answer did not read as a plan after one retry (502).
+    PlanInvalid,
     Internal,
 }
 
@@ -37,8 +46,8 @@ pub enum ApiErrorCode {
 mod tests {
     use super::*;
 
-    /// v1implementation §7.6, in its order.
-    const CODES: [&str; 14] = [
+    /// v1implementation §7.6, in its order; V6.2 adds the four plan codes before `internal`.
+    const CODES: [&str; 18] = [
         "bad_request",
         "unauthorized",
         "forbidden",
@@ -52,6 +61,10 @@ mod tests {
         "email_unavailable",
         "billing_unavailable",
         "transcribe_unavailable",
+        "plan_quota",
+        "plan_catalog",
+        "plan_unavailable",
+        "plan_invalid",
         "internal",
     ];
 
@@ -72,12 +85,16 @@ mod tests {
             ApiErrorCode::EmailUnavailable => 10,
             ApiErrorCode::BillingUnavailable => 11,
             ApiErrorCode::TranscribeUnavailable => 12,
-            ApiErrorCode::Internal => 13,
+            ApiErrorCode::PlanQuota => 13,
+            ApiErrorCode::PlanCatalog => 14,
+            ApiErrorCode::PlanUnavailable => 15,
+            ApiErrorCode::PlanInvalid => 16,
+            ApiErrorCode::Internal => 17,
         }
     }
 
     #[test]
-    fn api_error_code_has_14_snake_case_members() {
+    fn api_error_code_has_18_snake_case_members() {
         for (i, code) in CODES.iter().enumerate() {
             let json = format!("\"{code}\"");
             let parsed: ApiErrorCode = serde_json::from_str(&json).unwrap();

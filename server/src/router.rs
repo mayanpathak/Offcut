@@ -15,10 +15,13 @@ use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::plan::route::MAX_PLAN_BODY;
 use crate::rate_limit::{RouteGroup, by_ip};
 use crate::state::AppState;
 use crate::transcribe::route::{AUDIO_TYPE, MAX_AUDIO_BYTES};
-use crate::{account, analytics, auth, billing, entitlement, headers, log, transcribe, usage};
+use crate::{
+    account, analytics, auth, billing, entitlement, headers, log, plan, transcribe, usage,
+};
 use offcut_api_types::HealthResponse;
 
 const KB: usize = 1024;
@@ -85,6 +88,12 @@ pub fn build(state: AppState) -> Router {
             post(transcribe::route::transcribe)
                 // The address's bucket is checked in the handler, before the bearer (D-411).
                 .layer(body(MAX_AUDIO_BYTES)),
+        )
+        // V6.2 (D-460, D-461): the AI plan. `PlanIp` here, before the bearer;
+        // `PlanUser`, its other limit, in its handler.
+        .route(
+            "/plan",
+            post(plan::route::plan).layer((body(MAX_PLAN_BODY), ip(RouteGroup::PlanIp))),
         )
         // These two are limited per user in their handlers.
         .route(

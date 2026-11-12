@@ -281,6 +281,35 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response.text().await.unwrap().contains(spoken));
 
+    // V6.2 (D-464, P-14): the AI plan. A word of the request, the model's
+    // text, and a parse error that quotes it (sent back to the model on the
+    // retry) never reach the log; its line holds counts. The month's spend is
+    // set just under 80% of the cap, so the 80% line is logged once (D-463).
+    let plan_word = "markerplanword";
+    let model_text = "markermodelhook";
+    let model_field = "markermodelfield";
+    markers.push(("a word of a plan request", plan_word.to_owned()));
+    markers.push(("the model's text", model_text.to_owned()));
+    markers.push(("the model's text in a parse error", model_field.to_owned()));
+    let month = common::plan::this_month();
+    offcut_api::db::ai_spend::add(&app.pool, month, 4_000_000 - 1)
+        .await
+        .unwrap();
+    let answer = common::FAKE_PLAN.replace("A short hook", model_text);
+    app.plan.answers.lock().unwrap().extend([
+        Ok(format!("{{\"{model_field}\": 1}}")),
+        Ok(answer.clone()),
+        Ok(answer),
+    ]);
+    let mut plan_request = common::plan::request();
+    plan_request.words[1].text = plan_word.to_owned();
+    for _ in 0..2 {
+        let response = common::plan::post(&app, Some(&access), &plan_request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.text().await.unwrap().contains(model_text));
+    }
+    assert!(app.plan.received.lock().unwrap()[0].1.contains(plan_word));
+
     // Deleting the account.
     app.billing.fail.store(false, Ordering::SeqCst);
     let request = app.client.post(url("/account/delete")).bearer_auth(&access);
@@ -302,6 +331,21 @@ async fn no_flow_writes_a_secret_or_a_person_to_the_log() {
     assert!(text.contains("billing_event_ignored"), "{text}");
     assert!(
         text.contains("/api/v1/transcribe") && text.contains("\"kind\":\"ok\""),
+        "{text}"
+    );
+    // V6.2: the plan's lines are there, with counts, and the 80% line once.
+    assert!(
+        text.contains("/api/v1/plan") && text.contains("\"retried\":true"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\"input_tokens\":10930"),
+        "two calls' tokens: {text}"
+    );
+    assert_eq!(
+        text.matches("ai spend passed 80% of the monthly cap")
+            .count(),
+        1,
         "{text}"
     );
 }

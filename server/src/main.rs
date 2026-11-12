@@ -6,9 +6,13 @@ use std::sync::Arc;
 
 use offcut_api::billing::adapter::DodoBilling;
 use offcut_api::billing::provider::BillingError;
-use offcut_api::config::Config;
+use offcut_api::config::{Config, PlanSettings};
 use offcut_api::mail::MailError;
 use offcut_api::mail::smtp_mailer::SmtpMailer;
+use offcut_api::plan::PlanState;
+use offcut_api::plan::deepseek::{self, DeepseekProvider};
+use offcut_api::plan::provider::{PlanProvider, PlanProviderError, UnconfiguredPlanProvider};
+use offcut_api::plan::spend::SpendCap;
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
 use offcut_api::transcribe::groq::GroqTranscriber;
@@ -42,8 +46,8 @@ async fn main() -> ExitCode {
         }
     };
     // V6.2 (D-465): the AI plan's settings. Off by default; on without its key,
-    // cap or prices, the boot stops naming the variable. P191 hands them to the route.
-    let _plan = match offcut_api::config::plan_settings(|name| std::env::var(name).ok()) {
+    // cap or prices, the boot stops naming the variable.
+    let plan = match offcut_api::config::plan_settings(|name| std::env::var(name).ok()) {
         Ok(plan) => plan,
         Err(error) => {
             eprintln!("{error}");
@@ -52,7 +56,7 @@ async fn main() -> ExitCode {
     };
     log::init(config.log_level);
 
-    match serve(config, budget).await {
+    match serve(config, budget, plan).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "the server stopped");
@@ -76,11 +80,17 @@ enum ServeError {
     Billing(#[from] BillingError),
     #[error("cannot set up transcription: {0}")]
     Transcribe(#[from] TranscribeError),
+    #[error("cannot set up the AI plan: {0}")]
+    Plan(#[from] PlanProviderError),
     #[error("cannot listen or serve: {0}")]
     Io(#[from] std::io::Error),
 }
 
-async fn serve(config: Config, (hour_s, day_s): (u32, u32)) -> Result<(), ServeError> {
+async fn serve(
+    config: Config,
+    (hour_s, day_s): (u32, u32),
+    plan: PlanSettings,
+) -> Result<(), ServeError> {
     let pool = db::connect(&config.database_url)
         .await
         .map_err(|error| ServeError::Connect(offcut_api::error::db_error_kind(&error)))?;
@@ -98,6 +108,17 @@ async fn serve(config: Config, (hour_s, day_s): (u32, u32)) -> Result<(), ServeE
     } else {
         Arc::new(UnconfiguredTranscriber)
     };
+    // V6.2 (D-465): with `PLAN_ENABLED=false` the route refuses and nothing is sent.
+    let provider: Arc<dyn PlanProvider> = if plan.enabled {
+        Arc::new(DeepseekProvider::new(&plan)?)
+    } else {
+        Arc::new(UnconfiguredPlanProvider)
+    };
+    let plan = Arc::new(PlanState {
+        provider,
+        provider_id: deepseek::PROVIDER,
+        cap: SpendCap::new(&plan),
+    });
     let state = AppState {
         db: pool,
         config,
@@ -107,6 +128,7 @@ async fn serve(config: Config, (hour_s, day_s): (u32, u32)) -> Result<(), ServeE
         fair_use: Arc::default(),
         transcriber,
         transcribe_budget: Arc::new(offcut_api::transcribe::budget::Budget::new(hour_s, day_s)),
+        plan,
     };
     // The rate limiter needs the peer address of each connection.
     let app = router::build(state).into_make_service_with_connect_info::<SocketAddr>();

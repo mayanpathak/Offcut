@@ -40,6 +40,18 @@ pub async fn email(pool: &PgPool, user: UserId) -> Result<Option<String>, sqlx::
     Ok(row.map(|row| row.email))
 }
 
+/// Whether the user's row still exists. An access token lives 15 minutes and
+/// reads no database (D-261), so a route about to spend money asks (D-262).
+pub async fn exists(pool: &PgPool, user: UserId) -> Result<bool, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"SELECT EXISTS (SELECT 1 FROM users WHERE id = $1) AS "found!""#,
+        user.get()
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.found)
+}
+
 /// Removes the user. The foreign keys take the rows of `USER_TABLES` with it.
 pub async fn delete(conn: &mut PgConnection, user: UserId) -> Result<(), sqlx::Error> {
     sqlx::query!("DELETE FROM users WHERE id = $1", user.get())

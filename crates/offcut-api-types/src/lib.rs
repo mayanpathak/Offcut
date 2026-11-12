@@ -5,6 +5,7 @@ pub mod analytics;
 pub mod auth;
 pub mod billing;
 pub mod errors;
+pub mod plan;
 pub mod transcribe;
 pub mod usage;
 
@@ -13,6 +14,7 @@ pub use analytics::*;
 pub use auth::*;
 pub use billing::*;
 pub use errors::*;
+pub use plan::*;
 pub use transcribe::*;
 pub use usage::*;
 
@@ -56,6 +58,9 @@ mod typescript {
         v.visit::<CloudWord>();
         v.visit::<TranscribeResponse>();
         v.visit::<HealthResponse>();
+        v.visit::<PlanWord>();
+        v.visit::<PlanRequest>();
+        v.visit::<PlanResponse>();
         v.visit::<HeroVariant>();
         v.visit::<CheckResult>();
         v.visit::<GpuVendor>();
@@ -184,21 +189,25 @@ mod typescript {
             include_str!("billing.rs"),
             include_str!("usage.rs"),
             include_str!("transcribe.rs"),
+            include_str!("plan.rs"),
             include_str!("analytics.rs"),
             include_str!("errors.rs"),
         ];
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
-        // 42 types cross the API (the cloud transcription release adds four). `EventDoc`
-        // does not: its table is written as a constant.
-        assert_eq!(names.len(), 43);
+        // 45 types cross the API (the cloud transcription release adds four, V6.2's
+        // plan three). `EventDoc` does not: its table is written as a constant.
+        assert_eq!(names.len(), 46);
         for name in names.into_iter().filter(|name| *name != "EventDoc") {
             let declarations = ts.matches(&format!("\nexport type {name} = ")).count();
             assert_eq!(declarations, 1, "{name} is declared {declarations} times");
         }
 
         let imports = domain_imports(&Config::default());
+        // V6.2's plan types add DurMs, EditPlan, TimeMs and WordRange.
         let expected = [
             "AnonId",
+            "DurMs",
+            "EditPlan",
             "ErrorCode",
             "EventKind",
             "ExportId",
@@ -208,8 +217,10 @@ mod typescript {
             "Plan",
             "RejectReason",
             "StyleId",
+            "TimeMs",
             "UnixSecs",
             "UnsupportedReason",
+            "WordRange",
         ];
         assert_eq!(imports, expected);
 
