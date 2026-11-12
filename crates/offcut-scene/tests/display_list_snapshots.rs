@@ -19,6 +19,9 @@
 mod inputs;
 #[path = "common/scenes.rs"]
 mod scenes;
+// V6.2 (P202): a model's plan for the emphasis snapshots.
+#[path = "common/model.rs"]
+mod model;
 
 use std::collections::BTreeMap;
 
@@ -202,6 +205,66 @@ fn glow_with_each_kind_before_during_and_after_its_visual() {
         for (when, t) in ["before", "during", "after"].into_iter().zip(input.at) {
             let name = format!("{}_{}_{when}", style_name(style), input.name);
             insta::assert_json_snapshot!(name, scene.frame_at(OutMs::new(t)));
+        }
+    }
+}
+
+/// V6.2 (P202, D-481): the KeywordPop input's sentences with a model's plan
+/// of one `Emphasis` on "brutal" in each treatment, in the four styles,
+/// while the word is said, and 90 ms after it in Clean and Bold, whose chunk
+/// goes on after it. In Tech and Glow "brutal" ends its chunk, and with it
+/// the mark (D-481). New files.
+#[test]
+fn emphasis_each_treatment_in_each_style_while_said_and_after() {
+    use offcut_types::{
+        EmphasisSize, EventId, EventKind, ItemParams, PlanItem, Treatment, WordRange,
+    };
+    let input = &INPUTS[3];
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let treatments = [
+        (Treatment::Colour, "colour"),
+        (Treatment::Underline, "underline"),
+        (Treatment::Highlight, "highlight"),
+    ];
+    for style in styles {
+        for (treatment, treatment_name) in treatments {
+            let case = case(input, style, BTreeMap::new());
+            let words = &case.transcript.words;
+            let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+            let item = PlanItem {
+                id: EventId::new(9_200),
+                kind: EventKind::Emphasis,
+                anchors: WordRange {
+                    start: WordIdx::new(brutal),
+                    end: WordIdx::new(brutal + 1),
+                },
+                params: ItemParams::Emphasis {
+                    word: WordIdx::new(brutal),
+                    treatment,
+                    size: EmphasisSize::Normal,
+                },
+                confidence: None,
+            };
+            let case = model::with_model_items(case, vec![item]);
+            assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+            let scene = scenes::build(&case, 1080);
+            let after = case.transcript.words[brutal as usize].end_ms.get() + 90;
+            let goes_on = matches!(style, StyleId::Clean | StyleId::Bold);
+            let shown = |t: u32| {
+                scene
+                    .word_box(OutMs::new(t), WordIdx::new(brutal))
+                    .is_some()
+            };
+            assert_eq!(shown(after), goes_on, "{style:?}");
+            let mut instants = vec![("said", input.at[1])];
+            if goes_on {
+                instants.push(("after", after));
+            }
+            for (when, t) in instants {
+                assert!(shown(t), "{style:?} {t}");
+                let name = format!("emphasis_{treatment_name}_{}_{when}", style_name(style));
+                insta::assert_json_snapshot!(name, scene.frame_at(OutMs::new(t)));
+            }
         }
     }
 }

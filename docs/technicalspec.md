@@ -466,7 +466,7 @@ offcut/
 │   │   │   ├── captions.rs            caption chunking and line layout
 │   │   │   ├── readability.rs         [ONLY] break costs, CLAUSE_STARTERS, BINDERS, MIN_CHUNK_MS (D-167, D-168)
 │   │   │   ├── placement.rs           [ONLY] caption block and event zone from CaptionPlacement (D-171)
-│   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops; (V6.2) Glow's glow strokes (D-479)
+│   │   │   ├── captions_draw.rs       drawing a chunk: motion, the Tech panel and cursor, pops; (V6.2) Glow's glow strokes (D-479); the plan's emphasis: colour, underline, highlight (D-481)
 │   │   │   ├── hit.rs                 Scene::hit (D-174)
 │   │   │   ├── layout.rs              text shaping through parley
 │   │   │   ├── easing.rs              Easing, ease(); (V6.2) CubicBezier, bezier(), STANDARD, OUT, IN_OUT (D-475)
@@ -477,11 +477,12 @@ offcut/
 │   │   │   ├── events/from_to.rs
 │   │   │   ├── events/keyword_pop.rs
 │   │   │   ├── events/punch_in.rs     (V6.2) PunchIn: the plan's zoom, Snap or Push, released over 300 ms; drawn by the video track (v6.2implementation D-478)
+│   │   │   ├── events/emphasis.rs     (V6.2) Emphasis: a word, its treatment and program start, handed to the captions, which draw it (v6.2implementation D-481)
 │   │   │   ├── watermark.rs
 │   │   │   ├── framing.rs             [ONLY] crop rectangle from ClipInfo + CropOffset
 │   │   │   ├── video.rs               the per-frame Video command: crop, placement (v4implementation D-130); (V6.2) the camera's zoom, MAX_TOTAL_ZOOM (D-477)
 │   │   │   ├── display_list.rs        DisplayList, DrawCmd (backend-neutral)
-│   │   │   └── summary.rs             change_summary()
+│   │   │   └── summary.rs             change_summary(); (V6.2) an Emphasis counts as captions emphasized (D-481)
 │   │   └── tests/
 │   │       ├── display_list_snapshots.rs
 │   │       ├── layout_safe_area.rs
@@ -497,6 +498,7 @@ offcut/
 │   │       ├── hit.rs                 Scene::hit (D-174)
 │   │       ├── camera.rs              (V6.2) the drift's segments; motion off is today's scene, on changes only Video.src (D-476, D-477)
 │   │       ├── punch_in.rs            (V6.2) a model's zoom in a scene: held, released, with the drift, switched off, counted (D-478)
+│   │       ├── emphasis.rs            (V6.2) a model's emphasis in a scene: its start to its chunk's end, its own chunk only, a hidden word, switched off, only the captions change, counted (D-481)
 │   │       ├── image_bundle.rs        (V6.2) the manifest equals EmojiId and IconId; each file 160 px RGBA with its SHA-256; keys distinct; licences (D-447, D-470)
 │   │       ├── common/inputs.rs       each kind's written input and instants: the snapshots' and the goldens' scenes
 │   │       ├── common/labeled.rs      the labeled set's files as scene inputs; six of them, for parity.rs, scene_cache.rs, determinism.rs, layout_safe_area.rs
@@ -1053,7 +1055,7 @@ offcut/
 │   ├── speech/README.md               scripts read aloud, the clips as recognized, how each speech fixture is derived
 │   ├── labeled/                       >= 30 labeled transcripts (JSON), one file each, frozen before the rules (v3implementation D-87)
 │   ├── labeled/SCHEMA.md
-│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478)
+│   └── golden/                        PNG goldens per style x event kind; 16 at 540x960 from a synthetic source (v4implementation D-135); (V6.2) image_basic, the bundle's images (v6.2implementation §9.1); motion_mid, the camera drift (§10.1); punch_snap, punch_push, the plan's zoom (D-478); glow_style, the Glow style (D-479, D-480); emphasis_colour, emphasis_underline, emphasis_highlight, Bold (D-481)
 ├── corpus/
 │   ├── manifest.json                  clip id, sha256, tags (vfr, rotated, noisy, accent)
 │   ├── fetch_corpus.sh
@@ -1764,7 +1766,7 @@ pub struct ExportProfile { pub kind: ProfileKind, pub width: Px, pub height: Px,
 
 // summary.rs   ("What we changed", PS §10 J11)
 pub struct ChangeSummary { pub voice_cleaned: bool,          // the enhancement chain ran (§18)
-                           pub captions_emphasized: u32,     // enabled KeywordPop events
+                           pub captions_emphasized: u32,     // enabled KeywordPop events; (V6.2) and Emphasis items (v6.2implementation D-481)
                            pub visual_moments: u32 }         // enabled NumberReveal + ListReveal + FromTo
 // Lists only transformations that are performed. v1.2 adds pauses_shortened: u32 and time_removed: DurMs (V6.3),
 // music: bool (V6.7); with no cuts nothing about cuts is reported. (v1.3: no chapters at launch, §42.)

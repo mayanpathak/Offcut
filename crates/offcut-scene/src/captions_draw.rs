@@ -1,10 +1,11 @@
 //! Drawing a chunk (TS §5, v4implementation §8.6, §8.9): its glyph runs at a
 //! time, in the theme's colours, moving as the style's motion says, each
 //! word in the colour of its first layer of emphasis (D-169), with the
-//! style's panel, shadow, pill and cursor (D-139, D-170). Where each word is,
-//! is `captions`'; nothing drawn here changes a layout box.
+//! style's panel, shadow, pill and cursor (D-139, D-170), and a plan's
+//! emphasis: a word coloured, underlined or highlighted (V6.2, D-481). Where
+//! each word is, is `captions`'; nothing drawn here changes a layout box.
 
-use offcut_types::{OutMs, WordIdx};
+use offcut_types::{OutMs, Treatment, WordIdx};
 
 use crate::captions::{CaptionWord, Chunk};
 use crate::display_list::{Affine, DrawCmd, Rect, Rgba, Stroke};
@@ -14,7 +15,7 @@ use crate::motion::{
     ActiveTreatment, PILL_SLIDE_MS, ShadowSpec, enter_at, keyword_scale, pill, reflow, scaled_about,
 };
 use crate::safe_area::SAFE_AREA;
-use crate::styles::{CURSOR_WIDTH_EM, PILL_PADDING, PanelSpec, StyleSpec};
+use crate::styles::{CURSOR_WIDTH_EM, PILL_PADDING, PILL_RADIUS, PanelSpec, StyleSpec};
 use crate::theme::{Role, Theme};
 
 /// What a chunk's words are emphasized by besides the spoken word (D-169).
@@ -26,6 +27,46 @@ pub struct Emphasis {
     /// `EditState.highlight_numbers`: a caption word that shows a number is
     /// in `accent`.
     pub numbers: bool,
+}
+
+/// An `Emphasis` item the captions draw (V6.2, D-481): its word, how it is
+/// marked, and its program start. From then on, while its chunk is shown,
+/// the word is marked.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Mark {
+    pub word: WordIdx,
+    pub treatment: Treatment,
+    pub start: OutMs,
+}
+
+/// The treatment of the mark on `word` at `t`: the earliest started of the
+/// marks on it, `None` before it starts or without one.
+fn mark_at(marks: &[Mark], word: WordIdx, t: OutMs) -> Option<Treatment> {
+    marks
+        .iter()
+        .filter(|mark| mark.word == word && mark.start <= t)
+        .min_by_key(|mark| mark.start)
+        .map(|mark| mark.treatment)
+}
+
+/// `fill_role` with a mark (D-481). A highlighted word is drawn on the
+/// highlight's accent, in `OnAccent`, spoken or not, as the word on Clean's
+/// pill is (D-170). A coloured word is in `Accent` after the spoken word
+/// and a KeywordPop, before a number (D-169's first layer wins). An
+/// underline does not change the word's colour. Without a mark, `fill_role`.
+fn marked_role(
+    style: &StyleSpec,
+    (active, popped): (bool, bool),
+    mark: Option<Treatment>,
+    (number, numbers): (bool, bool),
+) -> Role {
+    match mark {
+        Some(Treatment::Highlight) => Role::OnAccent,
+        Some(Treatment::Colour) if !active && !popped => Role::Accent,
+        Some(Treatment::Colour | Treatment::Underline) | None => {
+            fill_role(style, active, popped, number, numbers)
+        }
+    }
 }
 
 /// The role a word is filled with: the first that applies of the spoken
@@ -142,17 +183,28 @@ pub(crate) struct Drawn<'a> {
     /// Its fill were it not spoken: the spoken word's look off the pill.
     quiet: Rgba,
     active: bool,
+    /// Its line's baseline, which it grows about.
+    baseline: f32,
+    /// Its emphasis at the time (D-481).
+    mark: Option<Treatment>,
+}
+
+impl Drawn<'_> {
+    /// On a highlight: ink, no outline, no shadow, no glow, as on the pill.
+    fn highlighted(&self) -> bool {
+        self.mark == Some(Treatment::Highlight)
+    }
 }
 
 /// Each word of `chunk` as it is drawn at `t`, in the order of its words:
 /// a word that grows scales about its centre on the baseline, and its line
-/// widens around it (`reflow`).
+/// widens around it (`reflow`). `marks` are the plan's emphases (D-481).
 pub(crate) fn lay_out<'a>(
     chunk: &'a Chunk,
     t: OutMs,
-    style: &StyleSpec,
-    theme: &Theme,
+    (style, theme): (&StyleSpec, &Theme),
     emphasis: &Emphasis,
+    marks: &[Mark],
 ) -> Vec<Drawn<'a>> {
     let mut drawn = Vec::new();
     for line in &chunk.lines {
@@ -192,8 +244,10 @@ pub(crate) fn lay_out<'a>(
                 .pops
                 .iter()
                 .any(|&(at, start)| at == word.word && start <= t);
-            let role = fill_role(style, active, popped, word.number, emphasis.numbers);
-            let quiet = fill_role(style, false, popped, word.number, emphasis.numbers);
+            let mark = mark_at(marks, word.word, t);
+            let number = (word.number, emphasis.numbers);
+            let role = marked_role(style, (active, popped), mark, number);
+            let quiet = marked_role(style, (false, popped), mark, number);
             let centre = laid_out.x + laid_out.w / 2.0;
             let moved = centre + shift;
             let mut runs = Vec::with_capacity(placed.runs.len());
@@ -221,6 +275,8 @@ pub(crate) fn lay_out<'a>(
                 fill: theme.color(role),
                 quiet: theme.color(quiet),
                 active,
+                baseline: line.baseline,
+                mark,
             });
         }
     }
@@ -239,7 +295,8 @@ fn glyph_run(run: &ShapedRun, fill: Rgba, stroke: Option<Stroke>, transform: Aff
     }
 }
 
-/// Every run but the spoken word's when `spoken` is false, again, moved by
+/// Every run but the spoken word's when `spoken` is false, and but a
+/// highlighted word's (D-481), again, moved by
 /// the offset, in the shadow's colour, inside one layer at its opacity:
 /// overlapping parts of a shadow do not darken each other.
 fn draw_shadow(
@@ -257,7 +314,10 @@ fn draw_shadow(
     else {
         return;
     };
-    let cast: Vec<&Drawn<'_>> = words.iter().filter(|w| spoken || !w.active).collect();
+    let cast: Vec<&Drawn<'_>> = words
+        .iter()
+        .filter(|w| (spoken || !w.active) && !w.highlighted())
+        .collect();
     if cast.is_empty() {
         return;
     }
@@ -285,7 +345,8 @@ fn draw_shadow(
 /// Glow's glow (V6.2, D-479): behind every word, `layers` strokes in the
 /// word's own colour at the glow's `alpha`, the widest first, each a glyph
 /// run with a clear fill. Where they overlap, near the letters, the glow is
-/// strongest. Nothing for a style without a glow.
+/// strongest. A highlighted word has none: its highlight sets it off
+/// (D-481). Nothing for a style without a glow.
 fn draw_glow(words: &[Drawn<'_>], style: &StyleSpec, out: &mut Vec<DrawCmd>) {
     let Some(glow) = style.glow else {
         return;
@@ -293,7 +354,7 @@ fn draw_glow(words: &[Drawn<'_>], style: &StyleSpec, out: &mut Vec<DrawCmd>) {
     let alpha = (glow.alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
     for layer in (1..=glow.layers).rev() {
         let width = style.stroke_width.max(0.0) + glow.spread * f32::from(layer);
-        for word in words {
+        for word in words.iter().filter(|word| !word.highlighted()) {
             let stroke = Some(Stroke {
                 width,
                 color: word.fill.with_alpha(alpha),
@@ -306,20 +367,93 @@ fn draw_glow(words: &[Drawn<'_>], style: &StyleSpec, out: &mut Vec<DrawCmd>) {
     }
 }
 
+/// Where an underline starts below the baseline and how thick it is, in
+/// ems of the word as drawn (D-481; assumption, tuned in the quality pass):
+/// its bottom, 0.18 em down, is above the descent of each style's font, so
+/// the bar stays inside the word's glyph box and no layout box changes.
+pub(crate) const UNDERLINE_GAP_EM: f32 = 0.10;
+pub(crate) const UNDERLINE_EM: f32 = 0.08;
+
+/// An underline's bar under `word`: as wide as its glyph box, growing with
+/// it, with round ends.
+fn underline(word: &Drawn<'_>, style: &StyleSpec) -> (Rect, f32) {
+    let em = style.size * word.scale;
+    let h = UNDERLINE_EM * em;
+    let rect = Rect {
+        x: word.rect.x,
+        y: word.baseline + UNDERLINE_GAP_EM * em,
+        w: word.rect.w,
+        h,
+    };
+    (rect, h / 2.0)
+}
+
+/// A highlight behind `word`: its glyph box padded as Clean's pill at rest
+/// (D-170), each side's padding no more than the room to the safe area, so
+/// that it stays inside it as the word grows. At rest the room is at least
+/// the style's decoration, so it stays inside the caption block too.
+fn highlight(word: &Drawn<'_>) -> (Rect, f32) {
+    let (r, area) = (word.rect, SAFE_AREA);
+    let (pad_x, pad_y) = PILL_PADDING;
+    let room = |pad: f32, room: f32| pad.min(room).max(0.0);
+    let left = room(pad_x, r.x - area.x);
+    let right = room(pad_x, area.x + area.w - (r.x + r.w));
+    let top = room(pad_y, r.y - area.y);
+    let bottom = room(pad_y, area.y + area.h - (r.y + r.h));
+    let rect = Rect {
+        x: r.x - left,
+        y: r.y - top,
+        w: r.w + left + right,
+        h: r.h + top + bottom,
+    };
+    (rect, PILL_RADIUS)
+}
+
+/// The plan's underlines and highlights (D-481), in the accent, behind the
+/// words: after the shadow and the glow, before the pill and the words.
+/// Nothing for a coloured word or a word without a mark.
+fn draw_marks(words: &[Drawn<'_>], style: &StyleSpec, theme: &Theme, out: &mut Vec<DrawCmd>) {
+    for word in words {
+        let (rect, radius) = match word.mark {
+            Some(Treatment::Underline) => underline(word, style),
+            Some(Treatment::Highlight) => highlight(word),
+            Some(Treatment::Colour) | None => continue,
+        };
+        out.push(DrawCmd::FillRect {
+            rect,
+            radius,
+            color: theme.color(Role::Accent),
+        });
+    }
+}
+
 /// `draw_with` and no emphasis besides the spoken word.
 pub fn draw(chunk: &Chunk, t: OutMs, style: &StyleSpec, theme: &Theme, out: &mut Vec<DrawCmd>) {
     draw_with(chunk, t, style, theme, &Emphasis::default(), out);
 }
 
-/// Adds the chunk as it looks at `t`, in this order: Tech's panel, the
-/// shadow, Glow's glow, Clean's pill, the words (each in the colour of its first layer of
-/// emphasis, each moving as the style's motion says), Tech's cursor.
+/// `draw_marked` with no mark of the plan's (V4's drawing, unchanged).
 pub fn draw_with(
     chunk: &Chunk,
     t: OutMs,
     style: &StyleSpec,
     theme: &Theme,
     emphasis: &Emphasis,
+    out: &mut Vec<DrawCmd>,
+) {
+    draw_marked(chunk, t, (style, theme), emphasis, &[], out);
+}
+
+/// Adds the chunk as it looks at `t`, in this order: Tech's panel, the
+/// shadow, Glow's glow, the plan's underlines and highlights (D-481),
+/// Clean's pill, the words (each in the colour of its first layer of
+/// emphasis, each moving as the style's motion says), Tech's cursor.
+pub fn draw_marked(
+    chunk: &Chunk,
+    t: OutMs,
+    (style, theme): (&StyleSpec, &Theme),
+    emphasis: &Emphasis,
+    marks: &[Mark],
     out: &mut Vec<DrawCmd>,
 ) {
     let treatment = style.motion.active;
@@ -347,7 +481,7 @@ pub fn draw_with(
         });
     }
 
-    let words = lay_out(chunk, t, style, theme, emphasis);
+    let words = lay_out(chunk, t, (style, theme), emphasis, marks);
     let spoken = words.iter().find(|word| word.active);
     let on_pill = matches!(treatment, ActiveTreatment::Pill);
     // The pill exists only while a word is spoken. It comes from the word
@@ -368,7 +502,9 @@ pub fn draw_with(
     let sliding = pill_now.is_some_and(|(_, _, sliding)| sliding);
     draw_shadow(&words, !on_pill || sliding, style, theme, out);
     draw_glow(&words, style, out);
+    draw_marks(&words, style, theme, out);
     if sliding && let Some(spoken) = spoken {
+        let stroke = if spoken.highlighted() { None } else { stroke };
         for &(run, transform) in &spoken.runs {
             out.push(glyph_run(run, spoken.quiet, stroke, transform));
         }
@@ -387,8 +523,13 @@ pub fn draw_with(
         if clip.is_some() {
             out.push(DrawCmd::PushLayer { opacity: 1.0, clip });
         }
-        // The word on the pill has no outline: the pill sets it off.
-        let stroke = if inked { None } else { stroke };
+        // The word on the pill has no outline: the pill sets it off; and
+        // nor has a highlighted word (D-481).
+        let stroke = if inked || word.highlighted() {
+            None
+        } else {
+            stroke
+        };
         for &(run, transform) in &word.runs {
             out.push(glyph_run(run, word.fill, stroke, transform));
         }
@@ -1019,5 +1160,309 @@ mod tests {
                 .any(|c| matches!(c, DrawCmd::GlyphRun { fill, .. } if fill.a == 0));
             assert!(!clear, "{style:?}");
         }
+    }
+
+    // V6.2 (P202, D-481): the plan's emphasis.
+
+    const FOUR: [StyleId; 4] = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+
+    fn marked(
+        chunk: &Chunk,
+        t: u32,
+        style: &StyleSpec,
+        theme: &Theme,
+        marks: &[Mark],
+    ) -> Vec<DrawCmd> {
+        let mut out = Vec::new();
+        let none = Emphasis::default();
+        draw_marked(chunk, OutMs::new(t), (style, theme), &none, marks, &mut out);
+        out
+    }
+
+    /// `treatment` on "made", from its start.
+    fn on_made(treatment: Treatment) -> [Mark; 1] {
+        [Mark {
+            word: WordIdx::new(1),
+            treatment,
+            start: OutMs::new(1_250),
+        }]
+    }
+
+    /// The run of `text` drawn over the shadow and the glow: the last.
+    fn run_of(cmds: &[DrawCmd], theme: &Theme, text: &str) -> (Rgba, Option<f32>, Affine) {
+        let words = words_of(cmds, theme);
+        let run = words
+            .into_iter()
+            .rfind(|w| w.0.eq_ignore_ascii_case(text) && w.1.a == 255)
+            .unwrap();
+        (run.1, run.2, run.3)
+    }
+
+    /// The accent's rectangles over the box `on`, with their place in the
+    /// list: the marks, and Clean's pill when it is there.
+    fn marks_of(cmds: &[DrawCmd], theme: &Theme, on: Rect) -> Vec<(usize, Rect, f32)> {
+        cmds.iter()
+            .enumerate()
+            .filter_map(|(i, cmd)| match cmd {
+                DrawCmd::FillRect {
+                    rect,
+                    radius,
+                    color,
+                } if *color == theme.accent && overlap(*rect, on) => Some((i, *rect, *radius)),
+                DrawCmd::FillRect { .. }
+                | DrawCmd::FillPath { .. }
+                | DrawCmd::GlyphRun { .. }
+                | DrawCmd::PushLayer { .. }
+                | DrawCmd::PopLayer
+                | DrawCmd::Video { .. }
+                | DrawCmd::Image { .. } => None,
+            })
+            .collect()
+    }
+
+    /// The place of the first word drawn over everything behind the words.
+    fn first_word(cmds: &[DrawCmd], theme: &Theme) -> usize {
+        cmds.iter()
+            .position(|c| {
+                matches!(c, DrawCmd::GlyphRun { fill, .. }
+                    if fill.a == 255 && *fill != theme.shadow)
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn a_mark_that_has_not_started_or_is_on_another_word_draws_as_before() {
+        for style in FOUR {
+            let (chunk, spec, theme) = chunk_of(style);
+            let later = [Mark {
+                start: OutMs::new(5_000),
+                ..on_made(Treatment::Highlight)[0]
+            }];
+            let elsewhere = [Mark {
+                word: WordIdx::new(7),
+                ..on_made(Treatment::Underline)[0]
+            }];
+            for t in (900..=1_900).step_by(10) {
+                let before = plain(&chunk, t, &spec, &theme);
+                let none = marked(&chunk, t, &spec, &theme, &[]);
+                assert_eq!(none, before, "{style:?} {t}");
+                let later = marked(&chunk, t, &spec, &theme, &later);
+                assert_eq!(later, before, "{style:?} {t}");
+                let elsewhere = marked(&chunk, t, &spec, &theme, &elsewhere);
+                assert_eq!(elsewhere, before, "{style:?} {t}");
+                // Before its start, a mark on "made" changes nothing either.
+                if t < 1_250 {
+                    for treatment in [
+                        Treatment::Colour,
+                        Treatment::Underline,
+                        Treatment::Highlight,
+                    ] {
+                        let now = marked(&chunk, t, &spec, &theme, &on_made(treatment));
+                        assert_eq!(now, before, "{style:?} {treatment:?} {t}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn colour_comes_after_the_spoken_word_and_a_keyword_pop_and_before_a_number() {
+        let mut style = StyleSpec {
+            active: Role::Panel,
+            pop: Role::AccentAlt,
+            fill: Role::Text,
+            ..spec(StyleId::Clean)
+        };
+        for treatment in [
+            ActiveTreatment::Highlight,
+            ActiveTreatment::Pill,
+            ActiveTreatment::Cursor,
+        ] {
+            style.motion.active = treatment;
+            // Every combination of the four layers, one bit each.
+            for bits in 0u8..16 {
+                let on = |bit: u8| bits & (1 << bit) != 0;
+                let (active, popped, number, numbers) = (on(0), on(1), on(2), on(3));
+                let old = fill_role(&style, active, popped, number, numbers);
+                let role = |mark| marked_role(&style, (active, popped), mark, (number, numbers));
+                // No mark, or an underline: D-169's layers as before.
+                assert_eq!(role(None), old);
+                assert_eq!(role(Some(Treatment::Underline)), old);
+                // On a highlight, ink, spoken or not.
+                assert_eq!(role(Some(Treatment::Highlight)), Role::OnAccent);
+                // Coloured: the spoken word and a pop win; then the accent.
+                let coloured = if active || popped { old } else { Role::Accent };
+                assert_eq!(role(Some(Treatment::Colour)), coloured);
+            }
+        }
+    }
+
+    #[test]
+    fn colour_fills_the_word_in_the_accent_from_its_start_until_its_chunk_ends() {
+        let (chunk, style, theme) = chunk_of(StyleId::Bold);
+        let marks = on_made(Treatment::Colour);
+        let at = |t| run_of(&marked(&chunk, t, &style, &theme, &marks), &theme, "made");
+        // Before it starts, white; spoken, the accent (Bold's own); after
+        // it, still the accent, with its outline, to the chunk's last frame.
+        assert_eq!(at(1_200).0, theme.text);
+        assert_eq!(at(1_320).0, theme.accent);
+        for t in [1_550, 1_700, chunk.show.end.get() - 1] {
+            let (fill, stroke, _) = at(t);
+            assert_eq!((fill, stroke), (theme.accent, Some(10.0)), "{t}");
+            // No rectangle: a colour is the word's fill alone.
+            assert!(rects(&marked(&chunk, t, &style, &theme, &marks)).is_empty());
+        }
+        // A KeywordPop on the word wins: its own colour, Bold's orange.
+        let pops = Emphasis {
+            pops: vec![(WordIdx::new(1), OutMs::new(1_250))],
+            numbers: true,
+        };
+        let mut out = Vec::new();
+        let look = (&style, &theme);
+        draw_marked(&chunk, OutMs::new(1_700), look, &pops, &marks, &mut out);
+        assert_eq!(run_of(&out, &theme, "made").0, theme.accent_alt);
+    }
+
+    #[test]
+    fn an_underline_is_a_bar_in_the_accent_under_the_word_inside_its_glyph_box() {
+        for style in FOUR {
+            let (chunk, spec, theme) = chunk_of(style);
+            let made = word_boxes(&chunk)[1].1;
+            let line = &chunk.lines[0];
+            // "it" spoken, every word at rest (Bold's pop of "IT" ends at +140 ms).
+            let cmds = marked(&chunk, 1_760, &spec, &theme, &on_made(Treatment::Underline));
+            let found = marks_of(&cmds, &theme, made);
+            assert_eq!(found.len(), 1, "{style:?}: {found:?}");
+            let (at, bar, radius) = found[0];
+            let em = spec.size * line.scale;
+            assert!(
+                near(bar.x, made.x) && near(bar.w, made.w),
+                "{style:?}: {bar:?}"
+            );
+            assert!(near(bar.y, line.baseline + 0.10 * em), "{style:?}: {bar:?}");
+            assert!(near(bar.h, 0.08 * em) && near(radius, bar.h / 2.0));
+            assert!(
+                bar.y + bar.h <= made.y + made.h,
+                "{style:?}: inside the glyph box"
+            );
+            // Behind the words, and the word keeps its colour and outline.
+            assert!(at < first_word(&cmds, &theme), "{style:?}");
+            assert_eq!(
+                run_of(&cmds, &theme, "made"),
+                run_of(&plain(&chunk, 1_760, &spec, &theme), &theme, "made"),
+                "{style:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_highlight_is_the_pills_box_behind_the_word_in_ink_with_no_outline_shadow_or_glow() {
+        for style in FOUR {
+            let (chunk, spec, theme) = chunk_of(style);
+            let boxes: Vec<Rect> = word_boxes(&chunk).into_iter().map(|(_, r)| r).collect();
+            let (we, made, it) = (boxes[0], boxes[1], boxes[2]);
+            let cmds = marked(&chunk, 1_760, &spec, &theme, &on_made(Treatment::Highlight));
+            let found = marks_of(&cmds, &theme, made);
+            assert_eq!(found.len(), 1, "{style:?}: {found:?}");
+            let (at, rect, radius) = found[0];
+            assert!(same(rect, padded(made)), "{style:?}: {rect:?}");
+            assert!(near(radius, 14.0));
+            assert!(
+                !overlap(rect, we) && !overlap(rect, it),
+                "{style:?}: clear of both"
+            );
+            assert!(at < first_word(&cmds, &theme), "{style:?}");
+            let (fill, stroke, _) = run_of(&cmds, &theme, "made");
+            assert_eq!((fill, stroke), (theme.on_accent, None), "{style:?}");
+            // No shadow and no glow: the one run of "made" is the word.
+            let made_runs = runs(&cmds)
+                .into_iter()
+                .filter(|r| r.0.eq_ignore_ascii_case("made"))
+                .count();
+            assert_eq!(made_runs, 1, "{style:?}");
+        }
+    }
+
+    #[test]
+    fn a_highlighted_spoken_word_stays_in_ink_on_bolds_pop_and_under_cleans_pill() {
+        // Bold: 70 ms into "MADE", at its pop's height: in ink, not in the
+        // accent it would vanish into, on a highlight grown with it.
+        let (chunk, style, theme) = chunk_of(StyleId::Bold);
+        let made = word_boxes(&chunk)[1].1;
+        let baseline = chunk.lines[0].baseline;
+        let cmds = marked(
+            &chunk,
+            1_320,
+            &style,
+            &theme,
+            &on_made(Treatment::Highlight),
+        );
+        let (fill, stroke, transform) = run_of(&cmds, &theme, "made");
+        assert_eq!((fill, stroke), (theme.on_accent, None));
+        assert!(near(transform.m[0], chunk.lines[0].scale * POP_SCALE));
+        let grown = scaled_about(made, (centre(made).0, baseline), POP_SCALE);
+        let (_, rect, _) = marks_of(&cmds, &theme, made)[0];
+        assert!(same(rect, padded(grown)), "{rect:?}");
+        // The underline grows with it too.
+        let cmds = marked(
+            &chunk,
+            1_320,
+            &style,
+            &theme,
+            &on_made(Treatment::Underline),
+        );
+        let (_, bar, _) = marks_of(&cmds, &theme, made)[0];
+        assert!(near(bar.x, grown.x) && near(bar.w, grown.w), "{bar:?}");
+        let em = style.size * chunk.lines[0].scale * POP_SCALE;
+        assert!(near(bar.h, 0.08 * em), "{bar:?}");
+        // Clean, while the pill slides onto it: its look off the pill is ink
+        // with no outline, over the highlight and under the pill.
+        let (chunk, style, theme) = chunk_of(StyleId::Clean);
+        let made = word_boxes(&chunk)[1].1;
+        let cmds = marked(
+            &chunk,
+            1_280,
+            &style,
+            &theme,
+            &on_made(Treatment::Highlight),
+        );
+        let found = marks_of(&cmds, &theme, made);
+        assert_eq!(found.len(), 2, "the highlight and the pill: {found:?}");
+        let (highlight, pill) = (found[0].0, found[1].0);
+        assert!(same(found[0].1, padded(made)), "the highlight first");
+        let DrawCmd::GlyphRun { fill, stroke, .. } = &cmds[pill - 1] else {
+            panic!("the word under the pill");
+        };
+        assert_eq!((*fill, *stroke), (theme.on_accent, None));
+        assert!(highlight < pill - 1);
+    }
+
+    #[test]
+    fn a_highlight_at_the_safe_areas_edge_keeps_inside_it() {
+        let (style, theme) = (spec(StyleId::Bold), Theme::default_for(StyleId::Bold));
+        let chunk = chunk_with(&[("internationalization", 1_000, 1_600)], &style, &theme);
+        let marks = [Mark {
+            word: WordIdx::new(0),
+            treatment: Treatment::Highlight,
+            start: OutMs::new(1_000),
+        }];
+        let r = word_boxes(&chunk)[0].1;
+        let area = SAFE_AREA;
+        for t in [1_000, 1_070, 1_300, 1_599] {
+            let cmds = marked(&chunk, t, &style, &theme, &marks);
+            let (_, rect, _) = marks_of(&cmds, &theme, r)[0];
+            assert!(rect.x >= area.x - 1e-3, "{t}: {rect:?}");
+            assert!(rect.x + rect.w <= area.x + area.w + 1e-3, "{t}: {rect:?}");
+        }
+        // At rest, inside the caption block (the safe area's width): its
+        // padding is at most the style's decoration, 5 lp a side for Bold.
+        let rest = marked(&chunk, 1_599, &style, &theme, &marks);
+        let (_, rect, _) = marks_of(&rest, &theme, r)[0];
+        assert!(rect.x >= r.x - 5.0 - 1e-3, "{rect:?} {r:?}");
+        assert!(rect.x + rect.w <= r.x + r.w + 5.0 + 1e-3, "{rect:?} {r:?}");
+        assert!(
+            rect.w < r.w + 24.0,
+            "less than the pill's padding: {rect:?}"
+        );
     }
 }

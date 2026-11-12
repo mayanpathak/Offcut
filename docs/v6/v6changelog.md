@@ -2068,3 +2068,45 @@ All restored; no golden of the base is modified.
 - `pnpm check` is clean (generated files staged first); the gate prints `gate: ok`.
 
 **Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). For CP 3: Glow's card line, and the style cards at 1280 × 800. Not pushed (push 3 is P206). Next: P202 (`Emphasis`).
+
+## Entry 63 - 2026-11-13 - P202: emphasis
+
+**What changed.**
+- **`events/emphasis.rs`** (new; D-481): `Track { word, treatment, size, start }`, `layout` (the word from its program start), and a `draw` that adds nothing, as `KeywordPop`'s. `events/mod.rs`: `EventTrack::Emphasis`, its `kind`, layout and `draw` arms; `Emphasis` leaves the "not drawn yet" arm.
+- **`lib.rs`:** `build_scene` hands each Emphasis to the captions as a `captions_draw::Mark` in the scene's new `marks` list, beside `Emphasis` (two V4 tests build that struct field by field, so it gains no field). **A word the captions do not show is not marked, has no track and is not counted** (a model's plan is kept on word edits, P193). `frame_at` and `caption_words` read the marks.
+- **`captions_draw.rs`** (559 lines above its tests): `Mark`, `mark_at`, `marked_role`, `underline`, `highlight`, `draw_marks`, and `draw_marked`; `draw_with` is `draw_marked` with no mark.
+  - **`Colour`:** the word in `Accent`, after the spoken word and a KeywordPop, before a number (D-169's first layer wins).
+  - **`Underline`:** a bar in `Accent`, 0.10 em below the baseline, 0.08 em thick, round ends, inside the glyph box.
+  - **`Highlight`:** the pill's box at rest (12 x 4 lp, radius 14) in `Accent`, padding shrunk at the safe area's edge; the word in `OnAccent`, with no outline, shadow or glow, spoken or not.
+  - Order: panel, shadow, glow, **underlines and highlights**, pill, words, cursor. Both grow with the word.
+- **`summary.rs`:** an Emphasis counts as **captions emphasized** ("N words emphasized"), not as a visual moment.
+- **Docs:** TS §5 rows (`events/emphasis.rs`, `tests/emphasis.rs`, `captions_draw.rs`, `summary.rs`, the goldens, with P201's `glow_style` that the row missed); TS §10.6's field comment; "As read (P202)" under D-481.
+
+**Differs from the plan.**
+- The marks are a list of their own, not a field of `Emphasis` (see above).
+- **`size: Punch` is drawn with its treatment at the captions' size**; P203 gives it its chunk and its size.
+- A mark ends with its chunk: in Mono and Glow "brutal" ends its chunk, so it is marked only while said.
+
+**Tests (+20).**
+- `events/emphasis.rs` +1: the track for each treatment and size; it draws nothing.
+- `captions_draw.rs` +7: a mark not started or on another word draws as before (four styles, every 10 ms); the role order over 16 layer combinations and three active treatments; colour from its start to the chunk's last frame, a KeywordPop winning; the underline's place, size and order in four styles; the highlight's box, ink, no outline, shadow or glow, clear of both neighbours, in four styles; a spoken highlighted word in ink on Bold's pop and under Clean's sliding pill, both marks growing with it; a highlight at the safe area's edge.
+- `summary.rs` +1: three emphases and a KeywordPop are 4 emphasized, a zoom 1 moment.
+- `tests/emphasis.rs` (new, 6; a model's plan on "The first week felt brutal for everyone." and the tail): marked exactly from its start while its chunk shows, **never the second "week" in another chunk** (four styles, every frame); coloured in the accent; **a word an edit hid is neither drawn nor counted** (every frame equals the plan without it); switched off it is gone, on it counts 1; **only the captions change** (the video and every run's place the same, new rectangles on the word, in the safe area); a punch word draws as a normal one.
+- `display_list_snapshots.rs` +1: **18 new snapshot files** (three treatments in four styles while "brutal" is said; and after it in Clean and Bold). `emphasis_highlight_bold_after` and `_underline_bold_after` read command by command.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, each with a model's plan of up to 12 emphases: 3,132 marks drawn, 316,236 frames, 0 problems.**
+- `golden_frames.rs` +3, Bold at 2,600 ms, the fill and the marks asserted first: **`emphasis_colour`, `emphasis_underline`, `emphasis_highlight`**. Written once on WARP by exact name (only the three files appeared); read beside the frame without the emphasis and at 200%, with the other three styles from a scratch render.
+
+**Declared.** No test of the base changed. `display_list_snapshots.rs`, `layout_safe_area.rs` and `golden_frames.rs` gain lines only (a module line and new tests).
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases, 5 passed. No browser flow can draw an Emphasis yet: model plans come through `/plan`, which the fake API lacks until P210.
+
+**Render binary.** 7,508,635 → **7,509,799** bytes (+1,164).
+
+**Counts.**
+- Rust **1076 / 0 / 7** by count (1056 + 20; `offcut-scene` 157 / 0 / 4, `offcut-render` 40, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744**. `pnpm e2e` (non-media) not re-run: no web file changed.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3:** in Clean a highlight looks like the spoken word's pill (both yellow); in Bold, Mono and Glow a coloured word is the spoken word's colour; in Mono the cursor joins a spoken word's highlight; in Bold a highlight sits close to a neighbour as it pops. Not pushed (push 3 is P206). Next: P203 (punch words).

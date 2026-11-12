@@ -86,6 +86,8 @@ pub struct Scene {
     caption_block: Rect,
     chunks: Vec<Chunk>,
     emphasis: captions_draw::Emphasis,
+    /// The plan's emphases (V6.2, D-481), drawn by the captions.
+    marks: Vec<captions_draw::Mark>,
     tracks: Vec<EventTrack>,
     /// Drawn over everything when the export profile asks (INV-9).
     watermark: Option<watermark::Track>,
@@ -110,6 +112,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         pops: Vec::new(),
         numbers: input.edit.highlight_numbers,
     };
+    let mut marks = Vec::new();
     for item in input.plan.items() {
         // The user's choice for this item, when there is one; every V4 item
         // is shown by default (TS §10.8, D-145).
@@ -136,6 +139,19 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
             }
             emphasis.pops.push((pop.word, pop.start));
         }
+        // An Emphasis too (V6.2, D-481): its word, treatment and program
+        // start. A word the captions do not show (an edit hid it after the
+        // plan was made) is not marked, and has no track, so is not counted.
+        if let EventTrack::Emphasis(mark) = &track {
+            if !words.iter().any(|shown| shown.word == mark.word) {
+                continue;
+            }
+            marks.push(captions_draw::Mark {
+                word: mark.word,
+                treatment: mark.treatment,
+                start: mark.start,
+            });
+        }
         tracks.push(track);
     }
 
@@ -157,6 +173,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         caption_block: block,
         chunks,
         emphasis,
+        marks,
         tracks,
         watermark,
     })
@@ -215,8 +232,8 @@ impl Scene {
     pub fn frame_at(&self, t: OutMs) -> DisplayList {
         let mut cmds = vec![self.video.cmd(t, self.canvas)];
         if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
-            let (style, theme) = (&self.style, &self.theme);
-            captions_draw::draw_with(chunk, t, style, theme, &self.emphasis, &mut cmds);
+            let look = (&self.style, &self.theme);
+            captions_draw::draw_marked(chunk, t, look, &self.emphasis, &self.marks, &mut cmds);
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
@@ -274,7 +291,8 @@ impl Scene {
         let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) else {
             return Vec::new();
         };
-        let drawn = captions_draw::lay_out(chunk, t, &self.style, &self.theme, &self.emphasis);
+        let look = (&self.style, &self.theme);
+        let drawn = captions_draw::lay_out(chunk, t, look, &self.emphasis, &self.marks);
         let text = |word: &captions_draw::Drawn<'_>| {
             word.runs.iter().map(|(run, _)| run.text.as_str()).collect()
         };

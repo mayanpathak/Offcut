@@ -16,6 +16,9 @@
 mod labeled;
 #[path = "common/scenes.rs"]
 mod scenes;
+// V6.2 (P202): a model's plan of emphases over the labeled files.
+#[path = "common/model.rs"]
+mod model;
 
 use std::path::PathBuf;
 
@@ -273,6 +276,95 @@ fn no_box_of_any_labeled_scene_in_glow_leaves_the_safe_area_or_meets_the_waterma
         problems.len()
     );
     assert!(glows > 1_000, "{glows} glow strokes");
+    let first: Vec<&String> = problems.iter().take(20).collect();
+    assert!(problems.is_empty(), "{first:#?}");
+}
+
+/// V6.2 (P202, D-481): the labeled scenes with a model's plan of emphases in
+/// place of their rules plans: from the first word, the next word at least
+/// 900 ms after the last marked one (the kind's gap is 800 ms), up to the
+/// kind's 12 a clip, colour, underline and highlight in turn; in the four
+/// styles, at the three placements, watermark on, at every 33 ms. No
+/// underline or highlight leaves the safe area or meets the watermark.
+#[test]
+fn no_emphasis_of_any_labeled_scene_leaves_the_safe_area_or_meets_the_watermark() {
+    use offcut_types::{
+        EmphasisSize, EventId, ItemParams, PlanItem, Treatment, WordIdx, WordRange,
+    };
+    let treatments = [
+        Treatment::Colour,
+        Treatment::Underline,
+        Treatment::Highlight,
+    ];
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let (mut marked, mut rects, mut frames) = (0u32, 0u64, 0u64);
+    let mut problems: Vec<String> = Vec::new();
+    for style in styles {
+        let theme = Theme::default_for(style);
+        let mark = watermark::bounds(&watermark::layout(&theme, &FontSet::embedded()).unwrap());
+        for name in &names() {
+            for p in PLACES {
+                let case = labeled::case(name, |edit, _| {
+                    edit.style = style;
+                    edit.caption_position = CaptionPlacement::new(p).unwrap();
+                });
+                let mut items = Vec::new();
+                let mut last: Option<u32> = None;
+                for (i, word) in case.transcript.words.iter().enumerate() {
+                    let start = word.start_ms.get();
+                    if items.len() == 12 || last.is_some_and(|at| start < at + 900) {
+                        continue;
+                    }
+                    let at = WordIdx::new(i as u32);
+                    items.push(PlanItem {
+                        id: EventId::new(9_300 + i as u64),
+                        kind: EventKind::Emphasis,
+                        anchors: WordRange {
+                            start: at,
+                            end: WordIdx::new(i as u32 + 1),
+                        },
+                        params: ItemParams::Emphasis {
+                            word: at,
+                            treatment: treatments[items.len() % 3],
+                            size: EmphasisSize::Normal,
+                        },
+                        confidence: None,
+                    });
+                    last = Some(start);
+                }
+                let case = model::with_model_items(case, items);
+                let scene = scenes::build_with(&case, 1080, true);
+                marked += scene.summary().captions_emphasized;
+                let mut t = 0;
+                while t < scene.duration().get() {
+                    frames += 1;
+                    for cmd in &scene.frame_at(OutMs::new(t)).cmds {
+                        let Some((r, is_mark)) = bounds(cmd) else {
+                            continue;
+                        };
+                        if matches!(cmd, DrawCmd::FillRect { color, .. } if *color == theme.accent)
+                        {
+                            rects += 1;
+                        }
+                        let what =
+                            || format!("{name} {style:?} at {p}, {t} ms: {r:?} of {}", kind(cmd));
+                        if !inside(r, SAFE_AREA) {
+                            problems.push(format!("outside the safe area: {}", what()));
+                        }
+                        if !is_mark && overlap(r, mark) {
+                            problems.push(format!("on the watermark: {}", what()));
+                        }
+                    }
+                    t += STEP_MS;
+                }
+            }
+        }
+    }
+    println!(
+        "Emphasis: {marked} marks drawn, {frames} frames, {rects} rectangles in the accent, {} problems",
+        problems.len()
+    );
+    assert!(marked > 500 && rects > 1_000, "{marked} {rects}");
     let first: Vec<&String> = problems.iter().take(20).collect();
     assert!(problems.is_empty(), "{first:#?}");
 }

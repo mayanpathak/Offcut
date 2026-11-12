@@ -606,3 +606,81 @@ fn glow_style() {
     assert!(glowing, "the glow's strokes are drawn");
     golden("glow_style", (&source, Rotation::R0), &list);
 }
+
+/// Emphasis (V6.2, D-481): the KeywordPop input's sentences in Bold with a
+/// model's plan of one `Emphasis` on "brutal" in `treatment`, at the input's
+/// "after" instant (2,600 ms): "brutal" said, its chunk shown, "FOR" spoken.
+fn emphasis_golden(name: &str, treatment: offcut_types::Treatment) {
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Bold, BTreeMap::new());
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_200),
+        kind: EventKind::Emphasis,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal),
+            end: offcut_types::WordIdx::new(brutal + 1),
+        },
+        params: offcut_types::ItemParams::Emphasis {
+            word: offcut_types::WordIdx::new(brutal),
+            treatment,
+            size: offcut_types::EmphasisSize::Normal,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(
+        case.plan.items().len(),
+        1,
+        "{name}: the emphasis passed validation"
+    );
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(OutMs::new(input.at[2]));
+    // What the list says before it is drawn: "BRUTAL"'s fill and the marks.
+    let theme = Theme::default_for(StyleId::Bold);
+    let fill = list
+        .cmds
+        .iter()
+        .rev()
+        .find_map(|cmd| {
+            if let DrawCmd::GlyphRun { text, fill, .. } = cmd
+                && text == "BRUTAL"
+            {
+                Some(*fill)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    let marks = list
+        .cmds
+        .iter()
+        .filter(|cmd| matches!(cmd, DrawCmd::FillRect { color, .. } if *color == theme.accent))
+        .count();
+    let want = match treatment {
+        offcut_types::Treatment::Colour => (theme.accent, 0),
+        offcut_types::Treatment::Underline => (theme.text, 1),
+        offcut_types::Treatment::Highlight => (theme.on_accent, 1),
+    };
+    assert_eq!((fill, marks), want, "{name}");
+    golden(name, (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// `Colour`: "BRUTAL" in the accent after it is said.
+#[test]
+fn emphasis_colour() {
+    emphasis_golden("emphasis_colour", offcut_types::Treatment::Colour);
+}
+
+/// `Underline`: a bar in the accent under "BRUTAL".
+#[test]
+fn emphasis_underline() {
+    emphasis_golden("emphasis_underline", offcut_types::Treatment::Underline);
+}
+
+/// `Highlight`: "BRUTAL" in ink on a rounded fill in the accent.
+#[test]
+fn emphasis_highlight() {
+    emphasis_golden("emphasis_highlight", offcut_types::Treatment::Highlight);
+}

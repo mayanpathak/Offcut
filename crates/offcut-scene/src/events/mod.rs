@@ -1,6 +1,7 @@
 //! The visuals of plan items (TS §19.5, §40.5): one file per kind of the
 //! catalog (INV-23), each laid out once and drawn per frame.
 
+pub mod emphasis;
 pub mod from_to;
 pub mod keyword_pop;
 pub mod list_reveal;
@@ -27,6 +28,8 @@ pub enum EventTrack {
     KeywordPop(keyword_pop::Track),
     /// V6.2 (D-478): the plan's zoom, drawn by the video track.
     PunchIn(punch_in::Track),
+    /// V6.2 (D-481): a word marked in the captions, drawn by them.
+    Emphasis(emphasis::Track),
 }
 
 impl EventTrack {
@@ -38,6 +41,7 @@ impl EventTrack {
             EventTrack::FromTo(_) => EventKind::FromTo,
             EventTrack::KeywordPop(_) => EventKind::KeywordPop,
             EventTrack::PunchIn(_) => EventKind::PunchIn,
+            EventTrack::Emphasis(_) => EventKind::Emphasis,
         }
     }
 }
@@ -83,11 +87,18 @@ pub fn layout(
         EventParams::PunchIn { scale, motion } => Ok(Some(EventTrack::PunchIn(punch_in::layout(
             *scale, *motion, span,
         )))),
-        // V6.2 (D-446): not drawn yet (P201-P205 draw them); no track, no command, no count.
-        EventParams::Emphasis { .. }
-        | EventParams::IconPop { .. }
-        | EventParams::Emoji { .. }
-        | EventParams::HookTitle { .. } => Ok(None),
+        // V6.2 (D-481): a word the captions mark, from its program start.
+        EventParams::Emphasis {
+            word,
+            treatment,
+            size,
+        } => Ok(Some(EventTrack::Emphasis(emphasis::layout(
+            *word, *treatment, *size, span,
+        )))),
+        // V6.2 (D-446): not drawn yet (P203-P205 draw them); no track, no command, no count.
+        EventParams::IconPop { .. } | EventParams::Emoji { .. } | EventParams::HookTitle { .. } => {
+            Ok(None)
+        }
     }
 }
 
@@ -99,6 +110,7 @@ pub fn draw(track: &EventTrack, t: OutMs, out: &mut Vec<DrawCmd>) {
         EventTrack::FromTo(track) => from_to::draw(track, t, out),
         EventTrack::KeywordPop(track) => keyword_pop::draw(track, t, out),
         EventTrack::PunchIn(track) => punch_in::draw(track, t, out),
+        EventTrack::Emphasis(track) => emphasis::draw(track, t, out),
     }
 }
 

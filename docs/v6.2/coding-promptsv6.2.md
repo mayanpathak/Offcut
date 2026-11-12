@@ -615,6 +615,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 202 — Emphasis
 
+**Done 2026-11-13 (V6 CL Entry 63).** `emphasis_colour`, `emphasis_underline` and `emphasis_highlight` written once on WARP and read beside the frame without the emphasis; every old golden 1.0000, no snapshot changed; 18 new snapshots; the four styles read by eye.
+
 **Effort: Medium** (D-499; guarded by the old goldens).
 
 **Objective.** Colour, underline and highlight on one word, drawn by the captions.
