@@ -1387,3 +1387,38 @@ Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0,
 **Counts.** `cargo test -p offcut-plan --all-features` green (75). Rust and Vitest otherwise unchanged: 948 / 0 / 7, 650.
 
 **Open.** 35, **38 (the rollback)**; 37 closed. Next: P190.
+
+## Entry 50 - 2026-11-12 - P190: the provider and the DeepSeek adapter
+
+**What changed.** `server/src/plan/` (new, `pub mod plan` in `lib.rs`):
+- `provider.rs`: `PlanProvider` (`enabled`, `complete`), `ProviderRequest { system, user, schema }`, `ProviderOutput { text, usage, model }` with `Usage { input_tokens, cached_input_tokens, output_tokens }`, `PlanProviderError` (`Unavailable`, `Timeout`, `Blocked(Usage)`), and `UnconfiguredPlanProvider`. No error holds provider text; `ProviderOutput`'s `Debug` shows the text's length only.
+- `deepseek.rs`, the only file that names the provider: D-500's request exactly (the system prompt, then `SCHEMA_LEAD` and the compact schema; `thinking` disabled, `json_object`, temperature 0.2, `max_tokens` 8000; bearer key). `PLAN_UPSTREAM_TIMEOUT` = 15 s (D-498). Any non-2xx (429 never retried, D-459), a body that is not the answer, no choice, or no usage → `Unavailable`; a timeout → `Timeout`; a `finish_reason` other than `stop` or `length` → `Blocked` with its usage, since it was billed. A blank or cut answer returns as text for the parse to refuse. Logs carry `kind` and `status` only.
+- `parse.rs`, **checkpoint 1's item-level parsing**: `parse_plan(text, source)` sets `format`, `catalog` and `source` itself (D-457, D-460), reads the plan outside `items` strictly, then each item alone. An unreadable item is left out and counted; the rest stands. A blank, non-JSON or non-plan answer is a `ParseFailure`: its `retry_note()` gives the parser's message to the model for the one retry (D-460); its `Debug` and `Display` show the kind alone.
+
+`server/Cargo.toml` gains `offcut-plan` with `prompt` (D-458). `check-file-tree.mjs` allows the edge. `cargo deny check bans` is ok: `offcut-plan` is already a wrapper of the `offcut-text` ban. TS §5 gains the rows for `deepseek.rs`, `parse.rs`, `deepseek_adapter.rs` and `fixtures/deepseek/`; `provider.rs`'s row is corrected. TS §7 notes the new edge.
+
+**Fixtures (`server/tests/fixtures/deepseek/`, no key or account identifier).** All are real; `id`, `system_fingerprint` and the request id are redacted:
+- two answers on `a01`: Flash from P188b and Pro from P188;
+- the recorded request, with the texts cut to their lengths;
+- the 400 that refused `json_schema` (P183b);
+- three first answers from P188 that each named one value outside the 72: the emoji `cat`, `lock` used as an emoji, and the icon `cloud`.
+
+**Tests.**
+- `deepseek_adapter.rs`, 7 tests, no real call:
+  - both recorded answers read with their exact token counts and parse whole;
+  - the three one-bad-name answers fail whole under serde, as in P188, but parse item by item with one item left out each;
+  - the request matches the recorded one field for field, and the system message is the same 16,159 characters P188b sent;
+  - 400, 401, 402, 429, 500 and 503 all map to `Unavailable`, with one request per call;
+  - malformed JSON and no choice map to `Unavailable`, a blocked answer to `Blocked` with its usage, a stall to `Timeout`;
+  - a blank answer comes back with its usage, and the parse refuses it as `Blank`;
+  - nothing listening maps to `Unavailable`;
+  - a captured log holds none of the model's text, the error body, the user message, the prompt or the key.
+- 9 unit tests: 2 in `provider.rs`, 3 in `deepseek.rs`, 4 in `parse.rs`.
+
+**Differs from the plan.** The Gemini names read as DeepSeek (D-500). `parse.rs` is new (CP 1). The timeout is D-498's 15 s, not the 25 s that D-500's note repeats from TS §40.7 (recorded in D-500). `ProviderOutput` carries a `Usage` with the cache hits, rather than D-458's two token fields.
+
+**Found.** On Windows, a connection to a closed local port takes about 2 s to be refused. A 2 s timeout races it and reads as `Timeout`, so the "nothing listening" case waits 10 s. `groq_adapter.rs` passes only because it maps both outcomes to one error.
+
+**Counts.** `cargo test -p offcut-api` **305** (289 + 16), with `.env` loaded for `DATABASE_URL`. Rust **964 / 0 / 7** by count (948 + the 16 new): only `offcut-api` changed, and only `offcut-api` and `offcut-plan` were re-run. Vitest 650, unchanged: no web change, not re-run. `clippy -D warnings`, `fmt` and the gate are clean.
+
+**Open.** 35, **38 (the rollback; the founder's yes still due before P212)**. Next: P191 (the route, quotas, the cap; push 1).

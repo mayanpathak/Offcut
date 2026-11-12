@@ -309,6 +309,8 @@ Counts never fall below the previous entry's; the floor is D-438's. Add an entry
 
 ## Prompt 190 — The provider and the Gemini adapter
 
+**Done 2026-11-12 as the DeepSeek adapter (D-500: read `deepseek.rs`, `fixtures/deepseek/`, `deepseek_adapter.rs` for the Gemini names below), with checkpoint 1's item-level parsing in `plan/parse.rs` (V6 CL Entry 50).**
+
 **Effort: High.**
 
 **Objective.** One file that knows Gemini, proven against a local fake built from real answers.

@@ -1,0 +1,161 @@
+{
+  "format": 1,
+  "catalog": 2,
+  "cuts": [],
+  "chapters": [],
+  "music": null,
+  "extras": {
+    "hook": "Rebuilt my home office from scratch",
+    "post_caption": "This year I finally rebuilt my home office from scratch. The standing desk alone cost $1,450, and it was worth every cent. I share the room with 2 cats, so every cable now sits in a tray under the desk. The biggest change was the chair, though. My back pain is gone, and I can work a full day again. Buy the chair first, then the desk.",
+    "hashtags": [
+      "#homeoffice",
+      "#standingdesk",
+      "#officesetup",
+      "#workspace",
+      "#desksetup",
+      "#homeofficeideas"
+    ]
+  },
+  "items": [
+    {
+      "id": "0",
+      "kind": "number_reveal",
+      "anchors": {
+        "start": 13,
+        "end": 16
+      },
+      "params": {
+        "kind": "number_reveal",
+        "params": {
+          "value": {
+            "words": {
+              "start": 15,
+              "end": 16
+            }
+          },
+          "label": "standing desk cost"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "1",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 13,
+        "end": 21
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "strong",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "2",
+      "kind": "number_reveal",
+      "anchors": {
+        "start": 26,
+        "end": 29
+      },
+      "params": {
+        "kind": "number_reveal",
+        "params": {
+          "value": {
+            "words": {
+              "start": 27,
+              "end": 28
+            }
+          },
+          "label": "cats in the room"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "3",
+      "kind": "emoji",
+      "anchors": {
+        "start": 27,
+        "end": 28
+      },
+      "params": {
+        "kind": "emoji",
+        "params": {
+          "word": 27,
+          "emoji": "cat",
+          "place": "under"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "4",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 40,
+        "end": 46
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "mild",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "5",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 51,
+        "end": 52
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 51,
+          "treatment": "highlight",
+          "size": "punch"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "6",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 47,
+        "end": 59
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "strong",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "7",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 62,
+        "end": 63
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 62,
+          "icon": "check"
+        }
+      },
+      "confidence": null
+    }
+  ]
+}

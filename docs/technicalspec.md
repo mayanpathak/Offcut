@@ -605,7 +605,9 @@ offcut/
 │   │   │   └── route.rs               the handler: auth, limits, type, body, Ogg, budget, provider
 │   │   ├── plan/                      (V6.2, V6.4, V6.9) the only code that calls the AI provider
 │   │   │   ├── mod.rs
-│   │   │   ├── provider.rs            PlanProvider trait and the TE-15 adapter
+│   │   │   ├── provider.rs            PlanProvider trait, UnconfiguredPlanProvider
+│   │   │   ├── deepseek.rs            (V6.2) the only file that names the AI provider (v6.2implementation D-500)
+│   │   │   ├── parse.rs               (V6.2) the model's answer to an EditPlan, item by item; the server sets format, catalog, source
 │   │   │   ├── route.rs               POST /plan
 │   │   │   ├── shorts.rs              POST /shorts
 │   │   │   ├── chat.rs                POST /chat-edit
@@ -648,6 +650,8 @@ offcut/
 │       ├── transcribe_window_log.rs   (V6.1) the log line says window: true or false, never the index; one test per binary (v6.1implementation D-411)
 │       ├── groq_adapter.rs            (cloud transcription) the adapter, from fixtures/groq/, against a local mock
 │       ├── fixtures/groq/             real Groq responses for the reference clip's audio, request ids replaced
+│       ├── deepseek_adapter.rs        (V6.2) the plan adapter, from fixtures/deepseek/, against a local mock
+│       ├── fixtures/deepseek/         real DeepSeek answers on the labelled scripts (P188, P188b), ids redacted
 │       ├── fixtures/ogg/              small Ogg Opus files: a tone from ffmpeg and one from the browser's encoder
 │       └── notify_me.rs               /healthz and /notify-me against a real Postgres
 ├── web/
@@ -1144,6 +1148,8 @@ offcut-wasm-render ─► offcut-render ─► offcut-scene ─┐              
         └──────────► offcut-entitlement ─────────────┘                 │
 offcut-api (server) ─► offcut-api-types, offcut-entitlement[sign] ─────┘
 ```
+
+`offcut-api` also depends on `offcut-plan` with its `prompt` feature from V6.2, for the catalog version, the prompt and the schema (§40.7; v6.2implementation D-458); `offcut-plan` is a wrapper of the `offcut-text` ban in `deny.toml`, so the server still reaches no media crate on its own.
 
 `offcut-scene` also depends on `offcut-text`, for `format_quantity` only (count-up values, §19.5). `check-file-tree.mjs` allows that pair, and the `offcut-text` ban in `deny.toml` lists `offcut-scene` as a wrapper (v2implementation D-28). It creates no cycle.
 

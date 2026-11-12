@@ -1,0 +1,192 @@
+{
+  "format": 1,
+  "catalog": 2,
+  "cuts": [],
+  "chapters": [],
+  "items": [
+    {
+      "id": "0",
+      "kind": "number_reveal",
+      "anchors": {
+        "start": 8,
+        "end": 11
+      },
+      "params": {
+        "kind": "number_reveal",
+        "params": {
+          "value": {
+            "words": {
+              "start": 9,
+              "end": 10
+            }
+          },
+          "label": "downloads"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "1",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 8,
+        "end": 11
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "strong",
+          "motion": "snap"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "2",
+      "kind": "list_reveal",
+      "anchors": {
+        "start": 15,
+        "end": 66
+      },
+      "params": {
+        "kind": "list_reveal",
+        "params": {
+          "header": "Five steps we followed",
+          "items": [
+            {
+              "at": 22,
+              "label": "Store page first"
+            },
+            {
+              "at": 31,
+              "label": "Private beta invites"
+            },
+            {
+              "at": 39,
+              "label": "Fixed every crash"
+            },
+            {
+              "at": 46,
+              "label": "Launch day and mailing list"
+            },
+            {
+              "at": 57,
+              "label": "Answered every review"
+            }
+          ]
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "3",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 26,
+        "end": 27
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 26,
+          "icon": "shopping_cart"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "4",
+      "kind": "emoji",
+      "anchors": {
+        "start": 37,
+        "end": 38
+      },
+      "params": {
+        "kind": "emoji",
+        "params": {
+          "word": 37,
+          "emoji": "lock",
+          "place": "under"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "5",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 43,
+        "end": 44
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 43,
+          "icon": "alert"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "6",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 55,
+        "end": 56
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 55,
+          "icon": "mail"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "7",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 61,
+        "end": 62
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 61,
+          "treatment": "highlight",
+          "size": "punch"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "8",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 57,
+        "end": 66
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "mild",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    }
+  ],
+  "extras": {
+    "hook": "25,000 downloads in the first week",
+    "post_caption": "Our habit tracker app hit 25,000 downloads in its first week. Here are the five steps we followed, from building the store page first to answering every review.",
+    "hashtags": [
+      "#applaunch",
+      "#habittracker",
+      "#startup",
+      "#productlaunch",
+      "#growth"
+    ]
+  },
+  "music": null
+}

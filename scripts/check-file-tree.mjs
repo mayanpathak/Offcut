@@ -65,7 +65,8 @@ const ALLOWED_CRATE_DEPS = {
   "offcut-wasm-core": ["offcut-mp4", "offcut-text", "offcut-dsp", "offcut-types"],
   // offcut-plan without default features: no schema code in the bundle (D-122).
   "offcut-wasm-render": ["offcut-render", "offcut-detect", "offcut-mp4", "offcut-entitlement", "offcut-types", "offcut-plan"],
-  "offcut-api": ["offcut-api-types", "offcut-entitlement", "offcut-types"],
+  // offcut-plan: the catalog, the prompt and the schema (TS §2, §40.7; v6.2implementation D-458).
+  "offcut-api": ["offcut-api-types", "offcut-entitlement", "offcut-plan", "offcut-types"],
 };
 
 /**
