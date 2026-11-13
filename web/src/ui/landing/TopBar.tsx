@@ -1,6 +1,6 @@
 // Section 0: the top bar (designimplementation §6). The wordmark, the links to
 // the page's sections, "Sign in" or "Account" (V6.2 P206a, D-501; kept on a
-// phone, where the section links go), "Start free", and the 2 px progress bar of a short
+// phone, where the section links go), "Start creating" (P211a), and the 2 px progress bar of a short
 // under it (D-317, M2). Also the playhead down the left gutter (M3).
 
 import { useMotionValueEvent, useScroll } from "motion/react";

@@ -12,6 +12,7 @@ import type {
   EditPlan,
   EditState,
   ErrorCode,
+  EventId,
   EventKind,
   ExportId,
   ExportProfile,
@@ -237,7 +238,12 @@ export type PlanCheck = { kept: number; dropped: Dropped[]; extras: PlanExtras }
 export type PlanExtras = { hook: string | null; post_caption: string | null; hashtags: string[] };
 
 /** What `setScene` answers: what the plan's validation left out (D-124), and the chunks of the captions (D-182). */
-export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };
+export type SceneReport = {
+  dropped: Dropped[];
+  chunks: SceneChunk[];
+  /** V6.2 (P211a, D-504): the ids of the plan's items the validation kept. Optional: a test's fake may leave it out. */
+  kept?: EventId[];
+};
 
 /**
  * A chunk of the captions, as the scene made it: the transcript words from

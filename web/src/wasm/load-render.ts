@@ -15,6 +15,7 @@ import type {
   Dropped,
   EditPlan,
   EditState,
+  EventId,
   ExportProfile,
   OutMs,
   Prosody,
@@ -94,7 +95,7 @@ export type RenderSession = Omit<
   | "video_mirror"
 > & {
   /** Builds the scene and keeps it in place of the one before; what the plan's validation left out, and its chunks. */
-  set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[] };
+  set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[]; kept: EventId[] };
   /** `null` before a scene is set. */
   summary(): ChangeSummary | null;
   read_video_sample(index: number): VideoSample;

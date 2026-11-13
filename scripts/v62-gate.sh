@@ -103,6 +103,9 @@ ALLOW=(
   # P208 (D-487): runChain gains `level?`, so the page, not the worker, says when to make lvl48.
   'web/src/workers/protocol.ts|^  /\*\* `out48` is kept in the worker; `out48.length === pcm48.length`. \*/$'
   'web/src/workers/protocol.ts|^  runChain\(p: \{ pcm48: Float32Array \}\): Promise<\{ loudness: Lufs \}>;$'
+  # P211a (D-504): set_scene's answer gains the ids the validation kept; SceneReport's one line becomes a block.
+  'web/src/workers/protocol.ts|^export type SceneReport = \{ dropped: Dropped\[\]; chunks: SceneChunk\[\] \};$'
+  'crates/offcut-wasm-render/src/scene_api.rs|^ +to_js\(&SceneReport \{ dropped, chunks \}\)$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

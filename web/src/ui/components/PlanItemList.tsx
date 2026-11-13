@@ -11,7 +11,7 @@ import { type ReactNode, useState } from "react";
 import { FEATURES } from "../../config/features";
 import { messages } from "../../copy/messages";
 import type { EventKind, PlanItem, Word } from "../../gen/domain";
-import { useClipStore } from "../../state/clip-store";
+import { listedItems, useClipStore } from "../../state/clip-store";
 import { usePlanStore } from "../../state/plan-store";
 import { usePreviewStore } from "../../state/preview-store";
 import { useUiStore } from "../../state/ui-store";
@@ -89,9 +89,16 @@ function wordsOf(words: readonly Word[], edits: Readonly<Record<number, string>>
   return shown.join(" ");
 }
 
-/** What a row says the visual shows: the detector's display text, or the item's words. */
-function figureOf(item: PlanItem, words: readonly Word[], edits: Readonly<Record<number, string>>): string {
+/**
+ * What a row says the visual shows: the detector's display text, or the
+ * item's words. V6.2 (P211a, D-506): the hook title's is the hook's own
+ * text, as drawn; its words are the whole clip.
+ */
+function figureOf(item: PlanItem, words: readonly Word[], edits: Readonly<Record<number, string>>, hook: string | null): string {
   const own = (): string => wordsOf(words, edits, item.anchors.start, item.anchors.end);
+  if (item.kind === "hook_title" && hook !== null) {
+    return hook;
+  }
   if (item.params.kind !== "detected") {
     // A plan of a model (V6.2) points at words.
     return own();
@@ -120,13 +127,16 @@ function figureOf(item: PlanItem, words: readonly Word[], edits: Readonly<Record
 
 export function PlanItemList() {
   const plan = useClipStore((state) => state.plan);
+  // V6.2 (P211a, D-504): with `ai_plan` on, only the items the scene kept.
+  const kept = useClipStore((state) => state.planKept);
+  const hook = useClipStore((state) => state.planExtras?.hook) ?? null;
   const words = useClipStore((state) => state.transcript?.words) ?? [];
   const edits = useClipStore((state) => state.edit.word_edits);
   const overrides = useClipStore((state) => state.edit.event_overrides);
   const locked = usePreviewStore((state) => state.status === "locked");
   const reason = locked ? { disabledReason: messages.editor.availableAfterExport } : {};
   // In time order; every V4 item is shown until the user says otherwise (D-145).
-  const items = [...(plan?.items ?? [])].sort((a, b) => a.anchors.start - b.anchors.start);
+  const items = [...listedItems(plan, kept, FEATURES.ai_plan)].sort((a, b) => a.anchors.start - b.anchors.start);
   const on = items.filter((item) => overrides[item.id] ?? true).length;
 
   if (items.length === 0) {
@@ -167,7 +177,7 @@ export function PlanItemList() {
                 <Switch
                   checked={overrides[item.id] ?? true}
                   label={messages.visuals.kind[item.kind]}
-                  hint={figureOf(item, words, edits)}
+                  hint={figureOf(item, words, edits, hook)}
                   disabled={locked}
                   {...reason}
                   onChange={(checked) => {

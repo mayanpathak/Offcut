@@ -141,6 +141,8 @@ async function apply(
       await whenFree(() => pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" })),
     );
     clipStore.setChunks(report.chunks);
+    // V6.2 (P211a, D-504): the items the list shows.
+    clipStore.setPlanKept(report.kept);
     if (mode === "plan") {
       clipStore.setEvents(events);
       clipStore.setPlan(plan);
@@ -235,6 +237,8 @@ export function undoFailedChange(): Promise<void> {
         await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
       );
       clipStore.setChunks(report.chunks);
+      // V6.2 (P211a, D-504): the items the list shows.
+      clipStore.setPlanKept(report.kept);
     } catch (error) {
       const failure = failureOf(error);
       if (failure === null) {
@@ -287,6 +291,8 @@ async function putPlan(plan: EditPlan): Promise<boolean> {
       await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
     );
     clipStore.setChunks(report.chunks);
+    // V6.2 (P211a, D-504): the items the list shows.
+    clipStore.setPlanKept(report.kept);
     clipStore.setPlan(plan);
   } catch (error) {
     const failure = failureOf(error);

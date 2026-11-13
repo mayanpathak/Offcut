@@ -2724,3 +2724,42 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
 - **Still to come after P211a and P211b:** the go, and the founder's read of known issue 8.
 
 **Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211a, then P211b, then the founder's go.
+
+## Entry 78 - 2026-11-13 - P211a: the founder's CP 4 fixes
+
+**Asked for at CP 4** (Entry 77): fixes 1, 2 and 3, and "Start creating" on the landing page. Recorded as D-504 to D-507 in the plan.
+
+**What changed.**
+- **Fix 1, the list shows what is drawn (D-504):**
+  - `set_scene` now also answers `kept`, the ids of the plan's items its validation kept. It reads its input a second time and validates it once more, so `scene_of` and the two tests that build `SceneReport` are unchanged; `KeptReport` flattens `SceneReport` and adds the field.
+  - Every caller of `setScene` stores the ids (`clip-store`'s `planKept`, `setPlanKept`): the pipeline, the three review updates and the preview's reload.
+  - `listedItems` is the one rule: with `ai_plan` on, only the kept items; with it off, or before a scene says, every item, as in V6.1. The Visuals tab uses it, and so does `export_done`'s `items_kept` / `items_disabled`.
+- **Fix 2, the hook row (D-506):** the Hook title row's description is the hook's own text (the plan's validated `extras.hook`), no longer its words, which are the whole clip.
+- **Fix 3, "Voice cleaned" (D-505):** `Scene` keeps whether the edit's voice is `Clean`, and `summary()` reports that as `voice_cleaned`. It is true for every V5 and V6.1 edit, so their summaries are unchanged; with Voice cleanup off (`Level`) "What we changed" no longer says "Voice cleaned".
+- **The landing page (D-507):** `landing.cta.startFree` reads "Start creating" in the top bar, the hero, pricing and the final call. The key keeps its name; two comments that quoted the old words are updated.
+- **The gate:** two ALLOW patterns for the lines this changes, `protocol.ts`' one-line `SceneReport` (now a block with an optional `kept`) and `scene_api.rs`' `to_js(&SceneReport { dropped, chunks })`.
+
+**Tests (+4).**
+- `scene_api.rs` +1: the ids kept, as many as `validate_plan` keeps with a word edit, none for a refused plan, and the answer's shape.
+- `offcut-scene`'s `lib.rs` +1: `voice_cleaned` false with `Level`, true with `Clean` and with `Enhance::v5()`, the items counted the same.
+- `start-export.test.ts` +1: an item the scene left out is not in `items_kept`; `listedItems`' three cases.
+- `ai-plan.spec.ts` +1: a plan with one more item that the validation leaves out (an emoji past the transcript's end). The list shows the 11 kept, "11 of 11 visuals on"; `plan_result` counts the drop; the Hook title row reads "I almost quit making videos" and none of the transcript.
+
+**Declared.** No existing test case changed. `SceneReport`'s `kept` is optional in `protocol.ts`, so the Vitest fakes that answer `{ dropped, chunks }` are unchanged.
+
+**Browser runs** (D1, keyed builds):
+- **`dist-flags/`:** `ai-plan.spec.ts` 12 of 12, the new case in 4.9 s; `enhance-panel.spec.ts` 1 of 1 (Motion 18 ms, Voice 57 ms, inside the 150 ms budget with the second validation); `flags-identity.spec.ts` 2 of 2.
+- **Read along the way:** `flags-identity`'s case 1 failed once, because the run had a fresh `dist-flags/` and a stale `dist/`. The render-cache key holds `RENDERER_VERSION`, a hash of the render WASM, so two builds of different WASM give two keys by design. It passed on the two builds made from the same tree.
+- **`dist/`:** `pnpm e2e` 59 passed (the landing page with "Start creating"); `review-edit.spec.ts` and `export-free.spec.ts`, 30 passed with setup (the flags-off list and summary unchanged).
+
+**Tier 3** (D1):
+- Rust **1147 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **767**;
+- the browser runs as above;
+- `pnpm check` exit 0; the gate `gate: ok`.
+
+**The local CP 4 stack** serves the rebuilt `dist-flags/`, so the founder sees these fixes on a reload. Its API now runs from a copy of the binary in the scratchpad, so the workspace tests could rebuild `target/debug/offcut-api.exe` (Windows locks a running file); cloud transcription is on.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211b (the post caption at most 150 characters; a re-read of about $0.02), then the founder's go.

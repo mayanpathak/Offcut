@@ -11,7 +11,7 @@ import type { CacheInputs } from "../persistence/render-cache-repo";
 import { cacheKey, canonicalJson, RENDERER_VERSION } from "../persistence/render-cache-repo";
 import { useAuthStore } from "../state/auth-store";
 import { useCapabilityStore } from "../state/capability-store";
-import { useClipStore } from "../state/clip-store";
+import { listedItems, setPlanKept, useClipStore } from "../state/clip-store";
 import { useEntitlementStore } from "../state/entitlement-store";
 import * as exportStore from "../state/export-store";
 import { answerPostExport } from "./answer-post-export";
@@ -1244,5 +1244,21 @@ describe("the export's voice and export_done's V6.2 fields", () => {
     expect(has("voice.programOn:level")).toBe(true);
     expect(has("opfs.readProgram")).toBe(false);
     expect(named("export_done")[0]?.props).not.toHaveProperty("items_kept");
+  });
+
+  it("V6.2 (P211a, D-504): with ai_plan on, an item the scene left out is not counted; with it off, every item is", async () => {
+    flags.ai_plan = true;
+    useClipStore.setState({ plan: ITEMS });
+    setPlanKept(["a", "b"] as unknown as EditPlan["items"][number]["id"][]);
+    editIs({ event_overrides: { b: false } } as unknown as Partial<EditState>);
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ items_kept: 1, items_disabled: 1 });
+    // The list's own rule: before a scene says, or with the flag off, every item.
+    const ids = (on: boolean, kept?: string[]) =>
+      listedItems(ITEMS, kept as EditPlan["items"][number]["id"][] | undefined, on).map((item) => item.id);
+    expect(ids(true, ["a", "b"])).toEqual(["a", "b"]);
+    expect(ids(true)).toEqual(["a", "b", "c"]);
+    expect(ids(false, ["a"])).toEqual(["a", "b", "c"]);
+    setPlanKept(undefined);
   });
 });

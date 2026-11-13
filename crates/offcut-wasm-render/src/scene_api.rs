@@ -76,6 +76,16 @@ struct SceneReport {
     chunks: Vec<ChunkValue>,
 }
 
+/// V6.2 (P211a, D-504): `set_scene`'s answer, `SceneReport` and the ids of
+/// the plan's items the validation kept, so the visuals list shows what the
+/// scene can draw and nothing it left out.
+#[derive(Serialize)]
+struct KeptReport {
+    #[serde(flatten)]
+    report: SceneReport,
+    kept: Vec<EventId>,
+}
+
 fn chunks_of(scene: &Scene) -> Vec<ChunkValue> {
     let chunk = |(range, at): (WordRange, OutMs)| ChunkValue {
         start: range.start.get(),
@@ -334,6 +344,23 @@ fn scene_of(
     Ok((scene, dropped))
 }
 
+/// V6.2 (P211a, D-504): the ids of `input`'s plan items that its validation
+/// keeps, validated as `scene_of` validates them; none when the plan or the
+/// edits are refused (`scene_of` then fails too).
+fn kept_ids(input: SceneInputValue) -> Vec<EventId> {
+    let Some(edits) = word_edits(input.edit.word_edits) else {
+        return Vec::new();
+    };
+    validate(
+        input.plan,
+        &input.transcript,
+        &edits,
+        &PlanConfig::default(),
+    )
+    .map(|(plan, _)| plan.items().iter().map(|item| item.id).collect())
+    .unwrap_or_default()
+}
+
 #[wasm_bindgen]
 impl RenderSession {
     /// `input` is `{ transcript, plan, edit, profile, timeMap }`; the clip is
@@ -341,12 +368,15 @@ impl RenderSession {
     /// transcript as edited, builds the scene and keeps it in place of the
     /// one before, and answers `{ dropped }`. The renderer is not touched.
     pub fn set_scene(&mut self, input: JsValue) -> Result<JsValue, JsValue> {
+        // V6.2 (P211a, D-504): the input is read twice, so `scene_of` stays as it was.
+        let kept = kept_ids(from_js(input.clone(), "SceneInput")?);
         let input: SceneInputValue = from_js(input, "SceneInput")?;
         let (scene, dropped) =
             scene_of(input, &self.clip).map_err(|detail| failure(ErrorCode::Internal, detail))?;
         let chunks = chunks_of(&scene);
         self.scene = Some(scene);
-        to_js(&SceneReport { dropped, chunks })
+        let report = SceneReport { dropped, chunks };
+        to_js(&KeptReport { report, kept })
     }
 
     /// Where the main video's source is at the program time `t_out_ms`;
@@ -721,6 +751,46 @@ mod tests {
         assert_eq!(
             serde_json::to_value(video_mirror_of(&off, 0).unwrap()).unwrap()["crop"]["w"],
             json!(1080.0)
+        );
+    }
+
+    #[test]
+    fn set_scene_reports_the_ids_of_the_items_its_validation_keeps() {
+        // V6.2 (P211a, D-504): item 1 on a word is kept, item 2 past the last word is dropped.
+        let with = |plan: EditPlan| {
+            input(|v| {
+                v["transcript"] = json!(four_words());
+                v["plan"] = json!(plan);
+            })
+        };
+        assert_eq!(kept_ids(with(model_plan(&[1, 9]))), vec![EventId::new(1)]);
+        // With a word edit: as many as `validate_plan` keeps of the same plan and edits.
+        let edited = input(|v| {
+            v["transcript"] = json!(four_words());
+            v["plan"] = json!(model_plan(&[1, 2]));
+            v["edit"]["word_edits"] = json!({ "2": "edited" });
+        });
+        let PlanCheck::Valid { kept, .. } =
+            check(model_plan(&[1, 2]), json!({ "2": "edited" })).unwrap()
+        else {
+            panic!("refused");
+        };
+        assert_eq!(u32::try_from(kept_ids(edited).len()).unwrap(), kept);
+        // A plan refused whole keeps nothing.
+        let mut newer = model_plan(&[1]);
+        newer.catalog = offcut_plan::CATALOG_VERSION + 1;
+        assert_eq!(kept_ids(with(newer)), Vec::<EventId>::new());
+        // The answer is V4's report with `kept` beside it.
+        let report = KeptReport {
+            report: SceneReport {
+                dropped: Vec::new(),
+                chunks: Vec::new(),
+            },
+            kept: vec![EventId::new(3)],
+        };
+        assert_eq!(
+            serde_json::to_value(report).unwrap(),
+            json!({ "dropped": [], "chunks": [], "kept": [EventId::new(3)] })
         );
     }
 }

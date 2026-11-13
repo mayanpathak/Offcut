@@ -65,6 +65,23 @@ export function regeneratedAnswer(): PlanResponse {
   };
 }
 
+/**
+ * P211a (D-504): the recorded plan with one more item the validation leaves
+ * out, an emoji on a word past the transcript's end (`anchors_out_of_range`):
+ * the list must not show it.
+ */
+export function withDroppedItem(): PlanResponse {
+  const word = HEARD_WORDS + 50;
+  const dropped = {
+    id: "12",
+    kind: "emoji",
+    anchors: { start: word, end: word + 1 },
+    params: { kind: "emoji", params: { word, emoji: "rocket", place: "beside" } },
+    confidence: null,
+  } as unknown as PlanResponse["plan"]["items"][number];
+  return { ...PLAN_ANSWER, plan: { ...PLAN_ANSWER.plan, items: [...PLAN_ANSWER.plan.items, dropped] } };
+}
+
 /** Signed in, the cloud on and answering with `markedAnswer()`, and `/plan` as `plan` says. */
 export function signedInPlan(plan: FakePlan | undefined = { response: PLAN_ANSWER }): FakeApiOptions {
   return {

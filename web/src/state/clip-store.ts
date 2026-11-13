@@ -12,7 +12,9 @@ import type {
   EditPlan,
   EditState,
   Enhance,
+  EventId,
   PipelineStage,
+  PlanItem,
   Prosody,
   RouteReject,
   TimeMap,
@@ -50,6 +52,13 @@ export type ClipState = {
    * its validation kept them; absent on a rules plan, which has none.
    */
   planExtras?: PlanExtras;
+  /**
+   * V6.2 (P211a, D-504): the ids of the plan's items the scene built last
+   * kept, its validation against the words as edited. With `ai_plan` on the
+   * visuals list shows only these: an item left out draws nothing. Absent
+   * before a scene, and from a worker that does not say.
+   */
+  planKept?: readonly EventId[];
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
@@ -237,6 +246,30 @@ export function setPlanExtras(extras: PlanExtras | undefined): void {
     next.planExtras = extras;
   }
   useClipStore.setState(next, true);
+}
+
+/** V6.2 (P211a, D-504): the ids of the plan's items the scene built last kept; `undefined` when the worker did not say. */
+export function setPlanKept(kept: readonly EventId[] | undefined): void {
+  const next = { ...useClipStore.getState() };
+  if (kept === undefined) {
+    delete next.planKept;
+  } else {
+    next.planKept = kept;
+  }
+  useClipStore.setState(next, true);
+}
+
+/**
+ * V6.2 (P211a, D-504): the plan's items the visuals list shows, and
+ * `export_done` counts. With `ai_plan` on, only those the last scene kept;
+ * otherwise, or before a scene says, every item, as in V6.1.
+ */
+export function listedItems(plan: EditPlan | undefined, kept: readonly EventId[] | undefined, aiPlan: boolean): readonly PlanItem[] {
+  const items = plan?.items ?? [];
+  if (!aiPlan || kept === undefined) {
+    return items;
+  }
+  return items.filter((item) => kept.includes(item.id));
 }
 
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */

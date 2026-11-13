@@ -5,7 +5,7 @@
 
 import { track } from "../analytics/client";
 import { LIMITS, type OutMs } from "../gen/domain";
-import { clearFailure, noteFailure, setChunks, useClipStore } from "../state/clip-store";
+import { clearFailure, noteFailure, setChunks, setPlanKept, useClipStore } from "../state/clip-store";
 import * as previewStore from "../state/preview-store";
 import { type Cancelled, pool, WorkerCallError, whenFree, whenReleased } from "../workers/pool";
 import type { ClockSync, PreviewStats } from "../workers/protocol";
@@ -450,6 +450,8 @@ async function reload(): Promise<void> {
     answered(await pool.render.detect({ transcript, prosody, wordEdits: edit.word_edits }));
     const report = answered(await pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" }));
     setChunks(report.chunks);
+    // V6.2 (P211a, D-504): the items the list shows.
+    setPlanKept(report.kept);
   } catch (error) {
     // The reload's own failure is the one to show now.
     clearFailure();

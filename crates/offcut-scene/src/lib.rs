@@ -31,7 +31,7 @@ pub mod watermark;
 use offcut_plan::ValidPlan;
 use offcut_types::{
     ChangeSummary, ClipInfo, DurMs, EditState, EmphasisSize, EventId, EventParams, ExportProfile,
-    OUTPUT_FPS, OutMs, SrcPos, TimeMap, Transcript, WordIdx, WordRange,
+    OUTPUT_FPS, OutMs, SrcPos, TimeMap, Transcript, VoiceMode, WordIdx, WordRange,
 };
 use thiserror::Error;
 
@@ -98,6 +98,9 @@ pub struct Scene {
     tracks: Vec<EventTrack>,
     /// Drawn over everything when the export profile asks (INV-9).
     watermark: Option<watermark::Track>,
+    /// V6.2 (P211a, D-505): whether the program's voice is the clean chain's;
+    /// with Voice cleanup off it is only levelled (D-487).
+    voice_cleaned: bool,
 }
 
 pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
@@ -238,6 +241,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         }),
         tracks,
         watermark,
+        voice_cleaned: input.edit.enhance.voice == VoiceMode::Clean,
     })
 }
 
@@ -410,9 +414,13 @@ impl Scene {
         &self.fonts
     }
 
-    /// What was changed (D-144): the items drawn, by kind.
+    /// What was changed (D-144): the items drawn, by kind. V6.2 (P211a,
+    /// D-505): the voice counts as cleaned only with Voice cleanup on.
     pub fn summary(&self) -> ChangeSummary {
-        summary::change_summary(&self.tracks)
+        ChangeSummary {
+            voice_cleaned: self.voice_cleaned,
+            ..summary::change_summary(&self.tracks)
+        }
     }
 }
 
@@ -902,6 +910,30 @@ mod tests {
             theme: &Theme::default_for(StyleId::Clean),
             fonts: &FontSet::embedded(),
         })
+    }
+
+    #[test]
+    fn the_summary_counts_the_voice_cleaned_only_with_voice_cleanup_on() {
+        // V6.2 (P211a, D-505): Level is the voice only levelled (D-487), not cleaned.
+        let identity = TimeMap::identity(DurMs::new(10_000));
+        let cleaned = |voice: VoiceMode| {
+            let mut edit = EditState::default();
+            edit.enhance.voice = voice;
+            busy_with(&edit, &identity).unwrap().summary()
+        };
+        let clean = cleaned(VoiceMode::Clean);
+        let level = cleaned(VoiceMode::Level);
+        assert!(clean.voice_cleaned);
+        assert!(!level.voice_cleaned);
+        // The items are counted the same either way.
+        assert_eq!(
+            (clean.captions_emphasized, clean.visual_moments),
+            (level.captions_emphasized, level.visual_moments)
+        );
+        // V5's settings: cleaned, as every summary before V6.2.
+        let mut v5 = EditState::default();
+        v5.enhance = offcut_types::Enhance::v5();
+        assert!(busy_with(&v5, &identity).unwrap().summary().voice_cleaned);
     }
 
     #[test]

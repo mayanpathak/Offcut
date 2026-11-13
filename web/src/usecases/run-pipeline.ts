@@ -492,6 +492,8 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     signal,
   );
   clipStore.setChunks(report.chunks);
+  // V6.2 (P211a, D-504): the items the list shows.
+  clipStore.setPlanKept(report.kept);
   track({
     name: "stage_timing",
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },

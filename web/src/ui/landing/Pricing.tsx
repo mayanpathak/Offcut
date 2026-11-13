@@ -1,6 +1,6 @@
 // Section 8: pricing (designimplementation §6, D-329). The plans, from
 // `PRICES_USD` and `LIMITS`, with the same test id, heading id and sources
-// as before. Free has a way in, "Start free"; Creator is not on sale yet
+// as before. Free has a way in, "Start creating" (was "Start free" until P211a); Creator is not on sale yet
 // (v6implementation D-303), so the section offers no way to buy.
 
 import { m } from "motion/react";

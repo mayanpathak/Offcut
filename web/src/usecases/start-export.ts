@@ -22,7 +22,7 @@ import { enqueue, flushOutbox } from "../persistence/receipt-outbox";
 import * as renderCacheRepo from "../persistence/render-cache-repo";
 import type { RenderCacheRecord } from "../persistence/schema";
 import { type BlockerCode, effectiveNow, forExport } from "../state/blockers";
-import { type ClipState, useClipStore } from "../state/clip-store";
+import { type ClipState, listedItems, useClipStore } from "../state/clip-store";
 import { setToken, useEntitlementStore } from "../state/entitlement-store";
 import * as exportStore from "../state/export-store";
 import { EXPORT_MACHINE } from "../state/machines/export-machine";
@@ -425,7 +425,8 @@ function editValues(clip: ClipState) {
 
 /** V6.2 (D-490): the plan's items the clip shows and those switched off, as the Visuals tab counts them. */
 function itemValues(clip: ClipState): { items_kept: number; items_disabled: number } {
-  const items = clip.plan?.items ?? [];
+  // V6.2 (P211a, D-504): the items the list shows, not those the validation left out.
+  const items = listedItems(clip.plan, clip.planKept, FEATURES.ai_plan);
   const kept = items.filter((item) => clip.edit.event_overrides[item.id] ?? true).length;
   return { items_kept: Math.min(MAX_COUNT, kept), items_disabled: Math.min(MAX_COUNT, items.length - kept) };
 }

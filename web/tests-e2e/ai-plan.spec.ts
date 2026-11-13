@@ -41,7 +41,7 @@ import {
   trackSaves,
   wordField,
 } from "./helpers/fixtures";
-import { HEARD_WORDS, MARKERS, markedAnswer, PLAN_ANSWER, PLAN_KINDS, regeneratedAnswer, signedInPlan } from "./helpers/plan-fixtures";
+import { HEARD_WORDS, MARKERS, markedAnswer, PLAN_ANSWER, PLAN_KINDS, regeneratedAnswer, signedInPlan, withDroppedItem } from "./helpers/plan-fixtures";
 
 const CLIP = genFixture("speech/speech_60s_portrait.mp4");
 const READY_TIMEOUT_MS = patient(240_000);
@@ -365,6 +365,32 @@ test.describe("signed in, the switch on: the model's plan", () => {
     await expect(page.getByTestId("extra-caption")).toContainText(next.plan.extras.post_caption ?? "");
     expect(await axe(page)).toEqual([]);
   });
+});
+
+// --- What the list shows (P211a) ------------------------------------------------------
+
+test("the list shows what the scene draws: an item the validation leaves out has no row; the hook's row says the hook", async ({ browser }, info) => {
+  test.setTimeout(patient(600_000));
+  // CP 4 (P211a, D-504, D-506): the founder saw rows for items that were never drawn, and the hook's row holding the whole transcript.
+  const context = await newContext(browser, info.project.use.baseURL, { model: false });
+  const { page, api } = await openApp(context, signedInPlan({ response: withDroppedItem() }));
+  await dropClip(page, CLIP);
+  await ready(page);
+
+  const total = PLAN_KINDS.length;
+  expect(await planResult(page, api)).toEqual([
+    {
+      name: "plan_result",
+      props: { source: "model", outcome: "ok", latency_bucket: expect.any(String), items: total, dropped_by_reason: { anchors_out_of_range: 1 } },
+    },
+  ]);
+  expect(await listedKinds(page)).toEqual(kindsInTime(PLAN_ANSWER.plan.items));
+  await expect(page.getByText(messages.visuals.count(total, total), { exact: true })).toBeVisible();
+  const hookRow = page.getByTestId("plan-items").locator("li[data-kind=hook_title]");
+  await expect(hookRow).toContainText(PLAN_ANSWER.plan.extras.hook ?? "");
+  // A word of the transcript the hook does not hold.
+  await expect(hookRow).not.toContainText("watched");
+  await context.close();
 });
 
 // --- No request ------------------------------------------------------------------------
