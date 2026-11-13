@@ -2444,3 +2444,30 @@ Written into `coding-promptsv6.2.md`, D-501 to D-503, §17's prompt table, and t
 - Not pushed (push 4 is P209).
 - Offered: a third prompt revision on the hook item's counting (about $0.02, the founder's call).
 - Next: P207 (the levelled voice in the DSP).
+
+## Entry 72 - 2026-11-13 - P206c, second commit: the hook item counted right
+
+**What changed.** The third prompt revision Entry 71 offered, with the founder's yes. `prompt.rs`' extras line now spells out the hook item:
+- its accent counts the hook's own words from 0, not the transcript's ("We cut our bill": "bill" is 3; the last of n words is n - 1);
+- its anchors are every word of the transcript, start 0, end one past the last word's index.
+
+The system message is 16,500 characters (16,261).
+
+**The re-read** (15 Flash calls, $0.0175, balance $1.81 just after; `experiments.md`, TE-15, "The hook item's counting"):
+- **The model's own hook item kept in 14 of 15 plans** (10 of 15 in Entry 71); the one miss, `w04`'s accent 4 on a 4-word hook, was replaced by `validate`'s item. Every clip opens on its hook.
+- Parse 15 / 15 first try; p90 3.0 s.
+- **The median drop rate is 11.1%, over TE-15's 10% line** (mean 10.7%, down from 13.1%). The drops over the line are all outside this revision:
+  - numbers that do not resolve (9);
+  - two visuals V-9 kept apart;
+  - one zoom too close.
+- Their paragraphs are unchanged since P188c, and the drops moved between transcripts from run to run. Read as the variance of 15 plans, not a regression; no further revision proposed.
+
+**Declared.** Changed by design:
+- `catalog_snapshot__system_prompt@v2.snap` (the extras line);
+- `request.recorded.json`'s system length (16,261 → 16,500) and its test's comment.
+
+**Tests.** No new or changed case. `offcut-plan` 80, `offcut-api` 334, `pnpm check` exit 0.
+
+**Docs.** TE-15's new section; D-503's "As read (P206c)" gains (5).
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P207 (the levelled voice in the DSP).

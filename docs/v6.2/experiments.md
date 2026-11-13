@@ -192,6 +192,42 @@ No extra was dropped, and no visual was dropped by V-9 after a hook. The annotat
 
 **Read.** The instruction works: the model writes the hook item every time, where it wrote it once in 15 before. A third of those items count wrong, so the median drop rate sits at the 10% line, but `validate`'s guarantee shows the hook in every clip either way. Left out, the replaced hook items leave the rest as P188c had them. **Not done (needs the founder's yes, about $0.02):** a third revision telling the model that the accent counts the hook's words from 0, and that the item spans every word of the clip. It would only lower the drop count: what the viewer sees is the same.
 
+### The hook item's counting (P206c's second re-read, 2026-11-13 08:09 UTC, d1)
+
+**The founder's yes (2026-11-13)** to the third revision offered above. The extras line now spells out the hook item:
+- its accent counts the hook's own words from 0, not the transcript's ("We cut our bill": "bill" is 3; the last of n words is n - 1);
+- its anchors are every word of the transcript, from 0 to one more than the last word's index.
+
+System message: **16,500 characters**. The same harness, request and transcripts; 15 Flash calls, all HTTP 200, `stop`, no thinking tokens. **$0.0175** at peak prices; the balance read $1.81 just after (it may not show the charge yet).
+
+| `deepseek-flash` | P206c | **P206c, second** | Pass line |
+|---|---|---|---|
+| Parse, first try | 15 / 15 | **15 / 15** | pass |
+| Items written / kept | 109 / 100 | 118 / 106 | |
+| **The model's own hook item kept** | 10 / 15 | **14 / 15** | |
+| Clips that open on the hook | 15 / 15 | 15 / 15 (1 by `validate`) | D-503 |
+| **Item drop rate, median (mean)** | 10.0% (13.1%) | **11.1% (10.7%)** | ≤ 10%: **over, by the median** |
+| Without the hook items, median (mean) | 0.0% (9.5%) | 12.5% (11.4%) | |
+| Plans with no drop / at or under 10% | 7 / 8 | 6 / 6 | |
+| Zooms written / dropped | 39 / 0 | 42 / 1 | |
+| Latency p50 / p90 / max | 2.6 / 2.9 / 4.5 s | 2.7 / **3.0** / 4.2 s | pass |
+| Cost per plan at peak, median (no cache) | $0.0010 ($0.0022) | $0.0011 ($0.0023) | recorded |
+
+**Drops (13 items).**
+- **`hook_title` 1** (`w04`: "My newsletter turned two", 4 words, accent 4, as in the first re-read; `validate`'s own item replaced it).
+- **The rest, 12:**
+  - `from_to` number unresolved 5;
+  - `number_reveal` number unresolved 4;
+  - V-9 density 2 (`w04` an icon, `w10` an emoji);
+  - `punch_in` too close 1.
+
+The annotated plans are in `~/v6.2-review/p206c2/plans/`.
+
+**Read.**
+- **The revision does what it was for:** the model's own hook item is right 14 times in 15, against 10 before, and the one miss is the same transcript's.
+- **Why the median is over the line:** the median drop rate moved to 11.1%, over TE-15's 10% line. Every extra drop is outside what this revision touched: numbers that do not resolve (9, against 7 and P188c's 7), two visuals V-9 kept apart, one zoom too close. Their paragraphs are unchanged since P188c, and the drops moved between transcripts from run to run (`w04`, `w10`, `w13` new; `a01`, `w08` gone). The mean fell (13.1% → 10.7%).
+- **Conclusion:** this reads as the variance of 15 plans at temperature 0.2, not a regression. A drop costs a fuller plan only. **No further revision is proposed;** the number drops are the next thing to read if the full-clip runs of P210 show them.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 **Read 2026-11-12 (P197), d1: passes.** `image-parity.spec.ts` on a keyed `pnpm build:e2e`, Chrome's WebGPU on the Intel "gen-12lp" adapter: the render worker drew `image_basic`'s frame (the definition the native golden asserts is its own, `offcut_render::check`) over a `VideoFrame` of the goldens' synthetic source; the canvas read back against `fixtures/golden/image_basic.png` (WARP) by the golden test's SSIM: **0.9995** (line 0.98). Read by eye at 200%: the same placement, edges, half opacity, list order and cut at the edge as the golden. The 72 images decoded in **24 ms** in the WASM (once per renderer, at `attach_canvas`). The TypeScript SSIM gives Rust's numbers to 10 decimals on three golden pairs. CI's lavapipe: see P197's push below.

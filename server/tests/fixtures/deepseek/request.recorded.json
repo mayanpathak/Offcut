@@ -3,7 +3,7 @@
   "messages": [
     {
       "role": "system",
-      "content": "<16261 chars: system_prompt@v2 + schema>"
+      "content": "<16500 chars: system_prompt@v2 + schema>"
     },
     {
       "role": "user",
