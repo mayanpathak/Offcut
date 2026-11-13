@@ -7,6 +7,13 @@
 // counted. A second change waits for the one in flight, and each of its
 // calls waits for the render worker to be free. Nothing here awaits the
 // network.
+//
+// V6.2 (v6.2implementation D-488, P208): an Enhance switch is a change
+// like any other, one step of the history, with no `review_action` of its
+// own (`export_done`'s `enhance_off` counts the choice, D-490). When the
+// voice differs between the edit before and the new one (the switch, its
+// undo or its redo), the program's audio on the new voice takes the
+// preview's place at the paused position.
 
 import { track } from "../analytics/client";
 import type { ReviewActionKind } from "../gen/api";
@@ -19,7 +26,8 @@ import { usePreviewStore } from "../state/preview-store";
 import { useUiStore } from "../state/ui-store";
 import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
-import { pause, play } from "./control-preview";
+import { pause, play, swapAudio } from "./control-preview";
+import { programOn, voiceOf } from "./voice-program";
 
 /** What `review_action` names a change: one of the server's list, which holds every review control since Prompt 120 (§13). */
 export type ReviewAction = ReviewActionKind;
@@ -93,7 +101,7 @@ let inFlight: Promise<void> = Promise.resolve();
 async function apply(
   change: (edit: EditState) => EditState,
   mode: "plan" | "scene",
-  action: ReviewAction,
+  action: ReviewAction | null,
   detail: ReviewDetail | undefined,
   joinsLastStep: ((previous: EditState) => boolean) | undefined,
 ): Promise<void> {
@@ -137,6 +145,13 @@ async function apply(
       clipStore.setEvents(events);
       clipStore.setPlan(plan);
     }
+    // 5b. V6.2 (D-488): another voice, another program's audio, swapped in where the preview paused.
+    const voice = voiceOf(next.enhance);
+    if (voice !== voiceOf(previous.enhance)) {
+      const prog48 = await programOn(clipId, voice, timeMap);
+      clipStore.setProgram(prog48);
+      swapAudio(prog48);
+    }
     // 6. The save state shows while the write is pending (D-184).
     ui.setSave("saving");
     try {
@@ -174,8 +189,10 @@ async function apply(
   if (action !== "undo" && action !== "redo" && joinsLastStep?.(previous) !== true) {
     history.push(previous);
   }
-  // 8.
-  track({ name: "review_action", props: { action, ...detail } });
+  // 8. Not for an Enhance switch (D-490: `export_done` says what was switched off).
+  if (action !== null) {
+    track({ name: "review_action", props: { action, ...detail } });
+  }
 }
 
 /**
@@ -186,11 +203,12 @@ async function apply(
  * thrown; a fault of this file is thrown. `joinsLastStep`, given the edit
  * before the change, says whether the change belongs to the history's last
  * step: then no step of its own is pushed, and one undo takes both back.
+ * `action` `null` (V6.2, an Enhance switch) sends no `review_action`.
  */
 export function update(
   change: (edit: EditState) => EditState,
   mode: "plan" | "scene",
-  action: ReviewAction,
+  action: ReviewAction | null,
   detail?: ReviewDetail,
   joinsLastStep?: (previous: EditState) => boolean,
 ): Promise<void> {

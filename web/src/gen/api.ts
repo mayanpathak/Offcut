@@ -172,11 +172,24 @@ export type PlanOutcome = "ok" | "off" | "signed_out" | "offline" | "quota" | "u
 
 export type LatencyBucket = "lt2" | "lt5" | "lt10" | "lt20" | "gte20";
 
+export type EnhanceRow = "voice" | "motion";
+
 /**
  * One variant per row of TS §22.6. A variant without props serializes as
  * `{"name":"preview_played"}`, with no `props` key.
  */
-export type AnalyticsEvent = { "name": "landing_view", "props": { hero_variant: HeroVariant, } } | { "name": "capability_check", "props": { result: CheckResult, unsupported_reason?: UnsupportedReason | null, gpu_vendor: GpuVendor, memory_bucket: MemoryBucket, platform: Platform, } } | { "name": "clip_accepted", "props": { duration_bucket: DurationBucket, orientation: Orientation, source: ClipSource, } } | { "name": "clip_rejected", "props": { reject_reason: RejectReason, } } | { "name": "model_download", "props": { outcome: DownloadOutcome, duration_ms: number, resumed: boolean, } } | { "name": "stage_timing", "props": { stage: PipelineStage, duration_ms: number, asr_backend?: AsrBackend | null, } } | { "name": "pipeline_done", "props": { total_ms: number, n_number: number, n_list: number, n_from_to: number, n_keyword: number, } } | { "name": "preview_played" } | { "name": "review_action", "props": { action: ReviewActionKind, event_kind?: EventKind | null, enabled?: boolean | null, } } | { "name": "export_started", "props": { profile: ExportedAs, } } | { "name": "export_done", "props": { total_ms: number, profile: ExportedAs, word_edits: number, events_kept: number, events_disabled: number, style: StyleId, crop_adjusted: boolean, from_cache: boolean, } } | { "name": "export_failed", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "job_cancelled", "props": { stage: FailureStage, } } | { "name": "post_export_answer", "props": { answer: PostExportAnswer, } } | { "name": "upgrade_prompt", "props": { placement: PromptPlacement, action: PromptAction, } } | { "name": "signin_step", "props": { step: SigninStep, } } | { "name": "checkout_step", "props": { step: CheckoutStep, } } | { "name": "client_error", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "local_data_cleared" } | { "name": "asr_cloud", "props": { outcome: CloudOutcome, duration_ms: number, } } | { "name": "plan_result", "props": { source: PlanResultSource, outcome: PlanOutcome, latency_bucket?: LatencyBucket | null, items: number, dropped_by_reason: { [key in DropReason]?: number }, } };
+export type AnalyticsEvent = { "name": "landing_view", "props": { hero_variant: HeroVariant, } } | { "name": "capability_check", "props": { result: CheckResult, unsupported_reason?: UnsupportedReason | null, gpu_vendor: GpuVendor, memory_bucket: MemoryBucket, platform: Platform, } } | { "name": "clip_accepted", "props": { duration_bucket: DurationBucket, orientation: Orientation, source: ClipSource, } } | { "name": "clip_rejected", "props": { reject_reason: RejectReason, } } | { "name": "model_download", "props": { outcome: DownloadOutcome, duration_ms: number, resumed: boolean, } } | { "name": "stage_timing", "props": { stage: PipelineStage, duration_ms: number, asr_backend?: AsrBackend | null, } } | { "name": "pipeline_done", "props": { total_ms: number, n_number: number, n_list: number, n_from_to: number, n_keyword: number, } } | { "name": "preview_played" } | { "name": "review_action", "props": { action: ReviewActionKind, event_kind?: EventKind | null, enabled?: boolean | null, } } | { "name": "export_started", "props": { profile: ExportedAs, } } | { "name": "export_done", "props": { total_ms: number, profile: ExportedAs, word_edits: number, events_kept: number, events_disabled: number, style: StyleId, crop_adjusted: boolean, from_cache: boolean,
+/**
+ * V6.2 (v6.2implementation D-490): the plan's items the clip shows
+ * and those switched off, sent with `ai_plan` on; absent from a
+ * page without it, which sends `export_done` as V6.1 did.
+ */
+items_kept?: number | null, items_disabled?: number | null,
+/**
+ * V6.2 (D-490): the Enhance rows switched off, sent with `motion`
+ * on; each at most once.
+ */
+enhance_off?: Array<EnhanceRow> | null, } } | { "name": "export_failed", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "job_cancelled", "props": { stage: FailureStage, } } | { "name": "post_export_answer", "props": { answer: PostExportAnswer, } } | { "name": "upgrade_prompt", "props": { placement: PromptPlacement, action: PromptAction, } } | { "name": "signin_step", "props": { step: SigninStep, } } | { "name": "checkout_step", "props": { step: CheckoutStep, } } | { "name": "client_error", "props": { error_code: ErrorCode, stage: FailureStage, } } | { "name": "local_data_cleared" } | { "name": "asr_cloud", "props": { outcome: CloudOutcome, duration_ms: number, } } | { "name": "plan_result", "props": { source: PlanResultSource, outcome: PlanOutcome, latency_bucket?: LatencyBucket | null, items: number, dropped_by_reason: { [key in DropReason]?: number }, } };
 
 export type EventsBatch = { anon_id: AnonId, events: Array<AnalyticsEvent>, };
 
@@ -200,7 +213,7 @@ export const ANALYTICS_EVENT_DOCS = [
   { name: "preview_played", description: "That the preview was played." },
   { name: "review_action", description: "That you changed something while reviewing, and what kind of change it was, never the words themselves." },
   { name: "export_started", description: "That an export started, and whether it was a free or a Creator export." },
-  { name: "export_done", description: "That an export finished, with how long it took, how many words you edited, how many visual moments you kept or turned off, the caption style and whether you moved the crop." },
+  { name: "export_done", description: "That an export finished, with how long it took, how many words you edited, how many visual moments you kept or turned off, the caption style, whether you moved the crop, and which Enhance switches you turned off." },
   { name: "export_failed", description: "That an export failed, with the error code and the stage it failed in." },
   { name: "job_cancelled", description: "That you cancelled a job, and at which stage." },
   { name: "post_export_answer", description: "Your answer to the one question we ask after an export." },

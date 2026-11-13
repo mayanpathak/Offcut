@@ -35,6 +35,8 @@ export const paths = {
   clipSource: (id: ClipId): string => `clips/${id}/source`,
   clipOut48: (id: ClipId): string => `clips/${id}/out48.f32`,
   clipProg48: (id: ClipId): string => `clips/${id}/prog48.f32`,
+  /** V6.2 (D-487): the levelled voice, beside `out48.f32`, with `motion` on. */
+  clipLvl48: (id: ClipId): string => `clips/${id}/lvl48.f32`,
   exportsRoot: (): string => "exports",
   exportTmp: (id: ExportId): string => `exports/tmp/${id}.mp4`,
   exportFinal: (id: ExportId): string => `exports/${id}.mp4`,
@@ -246,6 +248,19 @@ export function writeProgram(id: ClipId, prog48: Float32Array<ArrayBuffer>): Pro
 /** What `writeProgram` wrote. */
 export function readProgram(id: ClipId): Promise<Float32Array<ArrayBuffer>> {
   return guarded(async () => new Float32Array(await (await getFile(paths.clipProg48(id))).arrayBuffer()));
+}
+
+/** V6.2 (D-487): the levelled voice, in the same form, beside `out48.f32`. */
+export function writeLevel(id: ClipId, lvl48: Float32Array<ArrayBuffer>): Promise<void> {
+  return guarded(async () => {
+    const handle = await fileHandle(paths.clipLvl48(id), { create: true });
+    await write(handle, false, (writable) => writable.write(lvl48));
+  });
+}
+
+/** What `writeLevel` wrote. */
+export function readLevel(id: ClipId): Promise<Float32Array<ArrayBuffer>> {
+  return guarded(async () => new Float32Array(await (await getFile(paths.clipLvl48(id))).arrayBuffer()));
 }
 
 /** What `writeAudio` wrote (D-51). */

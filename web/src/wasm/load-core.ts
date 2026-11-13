@@ -19,13 +19,16 @@ import {
   type Sentence,
   type TimeMap,
   type Transcript,
+  type VoiceMode,
   type Word,
 } from "../gen/domain";
 import type { Entry, RouteFlags, RouteReject, SourceInfo, VideoDetail } from "../gen/domain";
 import initCore, {
   assemble,
+  assemble_voice,
   core_version,
   type DemuxerHandle,
+  level_only,
   open_demuxer_reader,
   route_probe,
   type SourceDemuxerHandle,
@@ -119,6 +122,15 @@ export type CoreApi = {
    */
   assemble(
     out48: Float32Array,
+    timeMap: TimeMap,
+    speech: readonly OutSpan[],
+  ): { prog48: Float32Array<ArrayBuffer>; loudness: Lufs };
+  /** V6.2 (D-487): `pcm48` brought to the loudness target under the ceiling, nothing else: `lvl48`. */
+  levelOnly(pcm48: Float32Array): { lvl48: Float32Array<ArrayBuffer>; loudness: Lufs };
+  /** V6.2 (D-487): `assemble` on the voice `voice` names: `voice48` is `out48` ("clean") or `lvl48` ("level"). */
+  assembleVoice(
+    voice48: Float32Array,
+    voice: VoiceMode,
     timeMap: TimeMap,
     speech: readonly OutSpan[],
   ): { prog48: Float32Array<ArrayBuffer>; loudness: Lufs };
@@ -251,6 +263,9 @@ const api: CoreApi = {
   measureProsody: (out48, words, sentences) => measure_prosody(out48, words, sentences) as Prosody,
   assemble: (out48, timeMap, speech) =>
     assemble(out48, timeMap, [...speech]) as { prog48: Float32Array<ArrayBuffer>; loudness: Lufs },
+  levelOnly: (pcm48) => level_only(pcm48) as { lvl48: Float32Array<ArrayBuffer>; loudness: Lufs },
+  assembleVoice: (voice48, voice, timeMap, speech) =>
+    assemble_voice(voice48, voice, timeMap, [...speech]) as { prog48: Float32Array<ArrayBuffer>; loudness: Lufs },
   openDemuxerReader(reader) {
     try {
       return wrapSource(open_demuxer_reader(reader));

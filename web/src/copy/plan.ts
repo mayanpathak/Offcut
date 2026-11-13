@@ -98,6 +98,9 @@ export const planCopy = {
       help: "A slow camera move on every shot. Off: the shot stays still; the plan's zooms stay.",
     },
     reset: "Back to recommended",
+    /** Settings' line above the button, and the line once it is pressed (P208; drafts beside §12's). */
+    resetHint: "Each new clip starts with the Enhance switches as you last set them.",
+    resetDone: "Done. Your next clip starts with Voice cleanup and Motion on.",
   },
   glow: "Glow",
   /** The Glow card's line (P201; a draft for checkpoint 3). */

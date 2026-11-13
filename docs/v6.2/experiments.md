@@ -228,6 +228,25 @@ The annotated plans are in `~/v6.2-review/p206c2/plans/`.
 - **Why the median is over the line:** the median drop rate moved to 11.1%, over TE-15's 10% line. Every extra drop is outside what this revision touched: numbers that do not resolve (9, against 7 and P188c's 7), two visuals V-9 kept apart, one zoom too close. Their paragraphs are unchanged since P188c, and the drops moved between transcripts from run to run (`w04`, `w10`, `w13` new; `a01`, `w08` gone). The mean fell (13.1% → 10.7%).
 - **Conclusion:** this reads as the variance of 15 plans at temperature 0.2, not a regression. A drop costs a fuller plan only. **No further revision is proposed;** the number drops are the next thing to read if the full-clip runs of P210 show them.
 
+## D-488 - The Enhance switch's time (P208, 2026-11-13, d1)
+
+**How.** Chrome on D1, the keyed flags-on build (`dist-flags/`), the reference clip (74.7 s) processed signed in, then the Style tab's Enhance switches clicked in turn. Each time is the page's own `performance` measure, from `setEnhance`'s call to the change shown (`offcut:enhance:voice`, `offcut:enhance:motion`), read by a scratch Playwright case (not committed).
+
+| Switch | Times (ms) | Budget |
+|---|---|---|
+| Voice, paused (to Level, then back to Clean, alternating) | 72, 34, 83, 32, 72, 41 | 150: pass |
+| Motion, paused | 12, 20, 11, 14, 16, 13 | 150: pass |
+| Voice, while playing (pause, swap, play) | 135, 86, 139, 115 | 150: pass, closest |
+
+**Read.**
+- **To Level** reads `lvl48.f32` (14.3 MB) and assembles it: about 70-80 ms.
+- **Back to Clean** reads `prog48.f32` only: about 35 ms.
+- **While playing,** the pause and the play around the change add 50-60 ms.
+- **The same run's other checks:**
+  - `lvl48.f32` has `out48.f32`'s size;
+  - undo (Ctrl+Z) takes a Voice switch back;
+  - an export with Voice cleanup off finished, its `export_done` carrying `enhance_off: ["voice"]` and the item counts.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 **Read 2026-11-12 (P197), d1: passes.** `image-parity.spec.ts` on a keyed `pnpm build:e2e`, Chrome's WebGPU on the Intel "gen-12lp" adapter: the render worker drew `image_basic`'s frame (the definition the native golden asserts is its own, `offcut_render::check`) over a `VideoFrame` of the goldens' synthetic source; the canvas read back against `fixtures/golden/image_basic.png` (WARP) by the golden test's SSIM: **0.9995** (line 0.98). Read by eye at 200%: the same placement, edges, half opacity, list order and cut at the edge as the golden. The 72 images decoded in **24 ms** in the WASM (once per renderer, at `attach_canvas`). The TypeScript SSIM gives Rust's numbers to 10 decimals on three golden pairs. CI's lavapipe: see P197's push below.

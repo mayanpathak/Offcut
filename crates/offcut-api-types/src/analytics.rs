@@ -53,6 +53,7 @@ prop_enums! {
     PlanResultSource: Rules, Model;
     PlanOutcome: Ok, Off, SignedOut, Offline, Quota, Unavailable, Invalid, Timeout, Catalog;
     LatencyBucket: Lt2, Lt5, Lt10, Lt20, Gte20;
+    EnhanceRow: Voice, Motion;
 }
 
 /// One variant per row of TS §22.6. A variant without props serializes as
@@ -118,6 +119,17 @@ pub enum AnalyticsEvent {
         style: StyleId,
         crop_adjusted: bool,
         from_cache: bool,
+        /// V6.2 (v6.2implementation D-490): the plan's items the clip shows
+        /// and those switched off, sent with `ai_plan` on; absent from a
+        /// page without it, which sends `export_done` as V6.1 did.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        items_kept: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        items_disabled: Option<u32>,
+        /// V6.2 (D-490): the Enhance rows switched off, sent with `motion`
+        /// on; each at most once.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        enhance_off: Option<Vec<EnhanceRow>>,
     },
     ExportFailed {
         error_code: ErrorCode,
@@ -225,7 +237,7 @@ pub const ANALYTICS_EVENT_DOCS: &[EventDoc] = &[
     doc("preview_played", "That the preview was played."),
     doc("review_action", "That you changed something while reviewing, and what kind of change it was, never the words themselves."),
     doc("export_started", "That an export started, and whether it was a free or a Creator export."),
-    doc("export_done", "That an export finished, with how long it took, how many words you edited, how many visual moments you kept or turned off, the caption style and whether you moved the crop."),
+    doc("export_done", "That an export finished, with how long it took, how many words you edited, how many visual moments you kept or turned off, the caption style, whether you moved the crop, and which Enhance switches you turned off."),
     doc("export_failed", "That an export failed, with the error code and the stage it failed in."),
     doc("job_cancelled", "That you cancelled a job, and at which stage."),
     doc("post_export_answer", "Your answer to the one question we ask after an export."),
@@ -400,8 +412,10 @@ mod tests {
             (PlanResultSource::inline(&cfg), "rules, model"),
             (PlanOutcome::inline(&cfg), "ok, off, signed_out, offline, quota, unavailable, invalid, timeout, catalog"),
             (LatencyBucket::inline(&cfg), "lt2, lt5, lt10, lt20, gte20"),
+            // V6.2 P208 (D-490, D-440 (5)): `export_done`'s `enhance_off`.
+            (EnhanceRow::inline(&cfg), "voice, motion"),
         ];
-        assert_eq!(table.len(), 20);
+        assert_eq!(table.len(), 21);
         for (union, values) in table {
             assert_eq!(union.replace('"', "").replace(" | ", ", "), values);
         }
@@ -474,5 +488,35 @@ mod tests {
         ] {
             assert!(parse(bad).is_err(), "{bad} was accepted");
         }
+    }
+
+    /// V6.2 P208 (D-490): a page without the V6.2 flags sends `export_done` as
+    /// V6.1 did, and it is read and written back the same; with them, the
+    /// item counts and the Enhance rows switched off ride along.
+    #[test]
+    fn export_done_reads_v6_1s_props_and_v6_2s_three() {
+        let old = r#"{"name":"export_done","props":{"total_ms":88000,"profile":"creator","word_edits":2,"events_kept":4,"events_disabled":1,"style":"bold","crop_adjusted":true,"from_cache":false}}"#;
+        let event: AnalyticsEvent = serde_json::from_str(old).unwrap();
+        assert_eq!(serde_json::to_string(&event).unwrap(), old);
+        let new = r#"{"name":"export_done","props":{"total_ms":88000,"profile":"free","word_edits":0,"events_kept":4,"events_disabled":1,"style":"glow","crop_adjusted":false,"from_cache":false,"items_kept":7,"items_disabled":2,"enhance_off":["voice","motion"]}}"#;
+        let event: AnalyticsEvent = serde_json::from_str(new).unwrap();
+        assert_eq!(serde_json::to_string(&event).unwrap(), new);
+        let AnalyticsEvent::ExportDone {
+            items_kept,
+            items_disabled,
+            enhance_off,
+            ..
+        } = event
+        else {
+            panic!("not an export_done: {event:?}");
+        };
+        assert_eq!((items_kept, items_disabled), (Some(7), Some(2)));
+        assert_eq!(
+            enhance_off,
+            Some(vec![EnhanceRow::Voice, EnhanceRow::Motion])
+        );
+        // A row this build does not know is refused, as any unknown value is.
+        let colour = new.replace(r#"["voice","motion"]"#, r#"["colour"]"#);
+        assert!(serde_json::from_str::<AnalyticsEvent>(&colour).is_err());
     }
 }

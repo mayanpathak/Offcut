@@ -39,6 +39,8 @@ export const META_KEYS = {
   persistRequested: "persistRequested",
   transcription: "transcription",
   aiPlan: "aiPlan",
+  /** V6.2 (D-486, P208): the Enhance panel's last state, the start of the next clip. */
+  enhanceDefault: "enhanceDefault",
 } as const;
 
 /**

@@ -195,6 +195,11 @@ vi.mock("../persistence/opfs", () => {
       m.calls.push("opfs.readProgram");
       return Promise.resolve(new Float32Array(4));
     },
+    // V6.2 (P208): `lvl48.f32`, read through the voice program below.
+    readLevel: () => {
+      m.calls.push("opfs.readLevel");
+      return Promise.resolve(new Float32Array(4));
+    },
     freeBytes: () => Promise.resolve(m.device.free),
   };
 });
@@ -1181,5 +1186,63 @@ describe("the upgrade offer (PS §11)", () => {
     void exportNow();
     await until(() => store().status === "gating");
     expect(store().upgradeOffer).toBe(false);
+  });
+});
+
+// --- V6.2: the export's voice and export_done's three fields (P208, D-487, D-490) ---
+// Every case before this block runs with the flags' defaults: `ai_plan` and
+// `motion` off, so the export reads `prog48.f32` and `export_done` is V6.1's.
+
+const flags = vi.hoisted(() => ({ cloud_transcribe: true, long_video: false, high_res: false, ai_plan: false, motion: false }));
+vi.mock("../config/features", () => ({ FEATURES: flags }));
+vi.mock("./voice-program", async () => {
+  const actual = await vi.importActual<typeof import("./voice-program")>("./voice-program");
+  return {
+    voiceOf: actual.voiceOf,
+    programOn: (_clipId: unknown, voice: string) => {
+      m.calls.push(`voice.programOn:${voice}`);
+      return Promise.resolve(new Float32Array(4).fill(2));
+    },
+  };
+});
+
+describe("the export's voice and export_done's V6.2 fields", () => {
+  const ITEMS = { ...PLAN, items: [{ id: "a" }, { id: "b" }, { id: "c" }] } as unknown as EditPlan;
+
+  afterEach(() => {
+    Object.assign(flags, { ai_plan: false, motion: false });
+  });
+
+  it("with the flags off: export_done carries V6.1's props and no others, and prog48.f32 is read", async () => {
+    await exportNow();
+    const props = named("export_done")[0]?.props as Record<string, unknown>;
+    expect(Object.keys(props).sort()).toEqual(
+      ["crop_adjusted", "events_disabled", "events_kept", "from_cache", "profile", "style", "total_ms", "word_edits"],
+    );
+    expect(has("opfs.readProgram")).toBe(true);
+    expect(m.calls.some((call) => call.startsWith("voice."))).toBe(false);
+  });
+
+  it("with ai_plan on: the plan's items kept and switched off, as the Visuals tab counts them", async () => {
+    flags.ai_plan = true;
+    useClipStore.setState({ plan: ITEMS });
+    editIs({ event_overrides: { b: false, c: true } } as unknown as Partial<EditState>);
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ items_kept: 2, items_disabled: 1 });
+    expect(named("export_done")[0]?.props).not.toHaveProperty("enhance_off");
+  });
+
+  it("with motion on: the rows switched off, and the levelled voice encoded when Voice cleanup is off", async () => {
+    flags.motion = true;
+    editIs({ enhance: { voice: "clean", motion: true } });
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ enhance_off: [] });
+    expect(has("opfs.readProgram")).toBe(true);
+    editIs({ enhance: { voice: "level", motion: false } });
+    await exportNow();
+    expect(named("export_done")[0]?.props).toMatchObject({ enhance_off: ["voice", "motion"] });
+    expect(has("voice.programOn:level")).toBe(true);
+    expect(has("opfs.readProgram")).toBe(false);
+    expect(named("export_done")[0]?.props).not.toHaveProperty("items_kept");
   });
 });

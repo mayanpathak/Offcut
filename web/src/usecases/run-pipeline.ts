@@ -38,7 +38,9 @@ import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { failureShown, signalFor } from "./cancel-job";
 import { choosePlan, startPlan } from "./choose-plan";
+import { startEnhance } from "./set-enhance";
 import { transcribeInCloud } from "./transcribe-cloud";
+import { programOn, voiceOf } from "./voice-program";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -335,6 +337,15 @@ async function hearOnDevice(
  * settled, as a failure is.
  */
 async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortSignal): Promise<void> {
+  // 1a. V6.2 (D-486, P208): with `motion` on, a clip's Enhance settings are
+  //     set once, before its first scene: the remembered state, else the
+  //     recommended one. A run that starts again keeps the clip's own.
+  if (clipStore.useClipStore.getState().edit.enhance === undefined) {
+    const start = await startEnhance();
+    if (start !== undefined) {
+      clipStore.setStartEnhance(start);
+    }
+  }
   const { clipInfo, edit } = clipStore.useClipStore.getState();
   if (clipInfo === undefined) {
     throw new Error("runPipeline: the clip has no ClipInfo");
@@ -363,7 +374,9 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   const chainAt = performance.now();
   run.audioStarted = true;
   const chain = settle(
-    pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain", signal)),
+    pool.audio
+      .runChain({ pcm48, ...(FEATURES.motion && { level: true }) }, { transfer: [pcm48.buffer] })
+      .then((r) => answered(r, "audio_chain", signal)),
   ).then((c) => {
     if ("ok" in c) {
       track({ name: "stage_timing", props: { stage: "audio_chain", duration_ms: capMs(c.at - chainAt) } });
@@ -490,6 +503,14 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   run.stage = "storage";
   await opfs.writeAudio(clipId, out48);
   goOn(signal);
+  // 13b. V6.2 (D-487): the levelled voice the chain's worker made, beside it.
+  if (FEATURES.motion) {
+    const { lvl48 } = answered(await pool.audio.takeLevel(), "audio_chain", signal);
+    if (lvl48 !== null) {
+      await opfs.writeLevel(clipId, owned(lvl48));
+      goOn(signal);
+    }
+  }
   run.stage = "audio_chain";
   const program = answered(
     await pool.audio.assemble({ out48, timeMap, speech: [] }, { transfer: [out48.buffer] }),
@@ -503,9 +524,14 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   await transcriptRepo.put(clipId, { transcript, prosody });
   await editsRepo.put(clipId, { editState: edit });
   goOn(signal);
+  // 13c. V6.2 (D-487): a clip that starts on the levelled voice previews its
+  //      program; `prog48.f32` stays the clean one, as the export reads it.
+  const voice = voiceOf(edit.enhance);
+  const preview = voice === "clean" ? prog48 : await programOn(clipId, voice, timeMap);
+  goOn(signal);
 
   // 14.
-  clipStore.ready({ transcript, prosody, events, timeMap, prog48 });
+  clipStore.ready({ transcript, prosody, events, timeMap, prog48: preview });
   const count = (kind: EventKind): number =>
     Math.min(MAX_COUNT, events.filter((event) => event.kind === kind).length);
   track({

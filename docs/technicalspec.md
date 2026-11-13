@@ -796,6 +796,9 @@ offcut/
 │   │   │   ├── regenerate-plan.test.ts  (V6.2) success; each failure leaves the clip as it was; a clip that went; not ready or flag off asks nothing
 │   │   │   ├── set-ai-plan.ts         (V6.2) the settings switch "AI edit plan", for the page and the next visit
 │   │   │   ├── set-ai-plan.test.ts    (V6.2) on by default and when unreadable; kept under `aiPlan`; a failed write
+│   │   │   ├── set-enhance.ts         (V6.2) the Enhance switches: a review change each (one undo step), remembered under `enhanceDefault`; a new clip's start; "Back to recommended" (v6.2implementation §11, D-486, D-488)
+│   │   │   ├── set-enhance.test.ts    (V6.2) undo and redo swap the voice; remembered; flags off ignore the memory; a failed swap restores
+│   │   │   ├── voice-program.ts       (V6.2) the program's audio on a voice: `prog48.f32` for Clean (today's read), `lvl48.f32` assembled for Level (D-487)
 │   │   │   ├── prepare-short.ts       (V6.3, V6.4) one ShortSpec → a ready virtual clip (§45.7)
 │   │   │   ├── request-shorts.ts      (V6.4) POST /shorts and its fallback
 │   │   │   ├── open-short.ts          (V6.4) load a short into the editor
@@ -974,6 +977,7 @@ offcut/
 │   │       │   ├── PlanItemList.tsx       the Visuals tab: one row per plan item; (V6.2) the five kinds' icons and "Regenerate plan"
 │   │       │   ├── TextExtrasPanel.tsx    (V6.2) "Text for your post": the hook, caption and hashtags that passed, each with Copy (v6.2implementation D-454)
 │   │       │   ├── StylePanel.tsx         the style cards (four since V6.2: Glow) and Highlight numbers
+│   │       │   ├── EnhancePanel.tsx       (V6.2) Voice cleanup and Motion under the Style tab's cards, with `motion` on (v6.2implementation §11)
 │   │       │   ├── StylePicker.tsx
 │   │       │   ├── FramingPanel.tsx       caption position and crop
 │   │       │   ├── CropOffsetControl.tsx
@@ -3175,7 +3179,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 | `preview_played` | none | AHA reach |
 | `review_action` | `action: word_edit \| event_toggle \| style \| crop_offset`, `event_kind?`, `enabled?: bool` | Edit behaviour |
 | `export_started` | `profile: free \| creator` | Funnel |
-| `export_done` | `total_ms`, `profile`, `word_edits`, `events_kept`, `events_disabled`, `style`, `crop_adjusted: bool`, `from_cache: bool` | Activation (PS §10); E-7 keep rate; E-10 edit count; P1 promotion triggers (PS §9.5) |
+| `export_done` | `total_ms`, `profile`, `word_edits`, `events_kept`, `events_disabled`, `style`, `crop_adjusted: bool`, `from_cache: bool`; (V6.2, each optional, sent only with its flag on) `items_kept`, `items_disabled` (`ai_plan`), `enhance_off` (`motion`; a list of `EnhanceRow`, each at most once) | Activation (PS §10); E-7 keep rate; E-10 edit count; P1 promotion triggers (PS §9.5) |
 | `export_failed` | `error_code`, `stage` | Stabilization |
 | `job_cancelled` | `stage` | Abandonment |
 | `post_export_answer` | `answer: yes \| small_edits \| no` | PS §20.5 "would you post this" |
@@ -3231,6 +3235,7 @@ Every property is an enum, a boolean or a bounded integer. No variant has a `Str
 | `clips/<clipId>/source` | The imported file, byte-identical | `media.worker` |
 | `clips/<clipId>/out48.f32` | Enhanced audio (raw f32, 48 kHz mono), same length as the decoded source audio | main, after `measureProsody` |
 | `clips/<clipId>/prog48.f32` | The program's audio, what the export encodes (v5implementation D-213). `out48.f32` stays: V6.3 and V6.7 rebuild this from it | main, after `assemble` |
+| `clips/<clipId>/lvl48.f32` | (V6.2, with `motion` on) The levelled voice: loudness and the limiter only, same length as `out48.f32` (v6.2implementation D-487). `prog48.f32` stays the clean program; a clip on `VoiceMode::Level` assembles its program from this | main, after `writeAudio` |
 | `exports/tmp/<exportId>.mp4` | Export in progress | `render.worker` |
 | `exports/<exportId>.mp4` | Finished export (render cache) | `render.worker` |
 | `models/<modelId>/<file>.part`, `models/<modelId>/<file>` | Model download in progress / verified | `models/download.ts` |

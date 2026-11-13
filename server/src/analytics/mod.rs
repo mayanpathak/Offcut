@@ -70,11 +70,19 @@ fn within_bounds(event: &AnalyticsEvent) -> bool {
             style: _,
             crop_adjusted: _,
             from_cache: _,
+            items_kept,
+            items_disabled,
+            enhance_off,
         } => {
             ms(total_ms)
                 && [word_edits, events_kept, events_disabled]
                     .into_iter()
                     .all(count)
+                // V6.2 (D-490): the item counts as the others; a row switched off at most once.
+                && [items_kept, items_disabled].into_iter().flatten().all(count)
+                && enhance_off.as_ref().is_none_or(|rows| {
+                    rows.iter().enumerate().all(|(i, row)| !rows.iter().take(i).any(|r| r == row))
+                })
         }
         // V6.2 (v6.2implementation D-490): each count of drops is at most 99.
         AnalyticsEvent::PlanResult {
@@ -140,6 +148,9 @@ mod tests {
             style: StyleId::Clean,
             crop_adjusted: false,
             from_cache: false,
+            items_kept: None,
+            items_disabled: None,
+            enhance_off: None,
         }
     }
 
@@ -209,5 +220,45 @@ mod tests {
             props(&stage).unwrap(),
             json!({"stage": "asr", "duration_ms": 1200})
         );
+    }
+
+    /// V6.2 P208 (D-490): the item counts are capped as the others are, and an
+    /// Enhance row is named at most once.
+    #[test]
+    fn export_done_s_v6_2_fields_are_within_bounds_or_refused() {
+        use offcut_api_types::EnhanceRow::{Motion, Voice};
+        let with = |kept: u32, off: Vec<offcut_api_types::EnhanceRow>| {
+            let AnalyticsEvent::ExportDone {
+                total_ms,
+                profile,
+                word_edits,
+                events_kept,
+                events_disabled,
+                style,
+                crop_adjusted,
+                from_cache,
+                ..
+            } = export_done(1_000, [0, 1, 0])
+            else {
+                panic!("export_done");
+            };
+            AnalyticsEvent::ExportDone {
+                total_ms,
+                profile,
+                word_edits,
+                events_kept,
+                events_disabled,
+                style,
+                crop_adjusted,
+                from_cache,
+                items_kept: Some(kept),
+                items_disabled: Some(0),
+                enhance_off: Some(off),
+            }
+        };
+        assert!(within_bounds(&with(MAX_COUNT, vec![Voice, Motion])));
+        assert!(within_bounds(&with(3, Vec::new())));
+        assert!(!within_bounds(&with(MAX_COUNT + 1, Vec::new())));
+        assert!(!within_bounds(&with(3, vec![Voice, Voice])));
     }
 }

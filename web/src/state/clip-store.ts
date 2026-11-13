@@ -11,6 +11,7 @@ import type {
   DetectedEvent,
   EditPlan,
   EditState,
+  Enhance,
   PipelineStage,
   Prosody,
   RouteReject,
@@ -257,6 +258,24 @@ export function ready(result: {
 /** The plan the scene is built from now. The clip's state does not change. */
 export function setPlan(plan: EditPlan): void {
   useClipStore.setState({ plan });
+}
+
+/**
+ * V6.2 (D-487, P208): the program's audio after a voice switch, for a
+ * preview attached later. The clip's state does not change.
+ */
+export function setProgram(prog48: Float32Array): void {
+  useClipStore.setState({ prog48 });
+}
+
+/**
+ * V6.2 (D-485, D-486, P208): a new clip's Enhance settings, set before its
+ * first scene. Not a review change: nothing to undo. The clip's state does
+ * not change.
+ */
+export function setStartEnhance(enhance: Enhance): void {
+  const { edit } = useClipStore.getState();
+  useClipStore.setState({ edit: { ...edit, enhance } });
 }
 
 /** The chunks of the scene built last (D-182). The clip's state does not change. */

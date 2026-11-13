@@ -100,6 +100,9 @@ ALLOW=(
   'crates/offcut-wasm-render/src/scene_api.rs|^ +assert_eq!\(checked\["kept"\], json!\(1\)\);$'
   # P207 (D-487): ProgramConfig's empty one-line struct gains the field `voice` (default Clean).
   'crates/offcut-dsp/src/program.rs|^pub struct ProgramConfig \{\}$'
+  # P208 (D-487): runChain gains `level?`, so the page, not the worker, says when to make lvl48.
+  'web/src/workers/protocol.ts|^  /\*\* `out48` is kept in the worker; `out48.length === pcm48.length`. \*/$'
+  'web/src/workers/protocol.ts|^  runChain\(p: \{ pcm48: Float32Array \}\): Promise<\{ loudness: Lufs \}>;$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

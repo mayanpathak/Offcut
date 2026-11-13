@@ -196,3 +196,9 @@ export async function metaSet<T>(key: string, value: T): Promise<void> {
   const stored: Versioned<T> = { schemaVersion: DB_VERSION, value };
   await db.put(STORES.meta, stored, key);
 }
+
+/** V6.2 (D-486): removes what is stored under `key`; nothing stored is not an error. */
+export async function metaDelete(key: string): Promise<void> {
+  const db = await openDb();
+  await db.delete(STORES.meta, key);
+}

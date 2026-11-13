@@ -223,6 +223,22 @@ const layerPolicies = [
     from: fromFile("usecases", "regenerate-plan.ts"),
     allow: { to: to("usecases", "review-update.ts") },
   },
+  // V6.2, Enhance (v6.2implementation §11, P208): a switch is a review change
+  // (D-488); the pipeline starts a clip on the remembered settings (D-486);
+  // the program on a voice is made in one place for the review, the
+  // pipeline and the export (D-487).
+  {
+    from: fromFile("usecases", "set-enhance.ts"),
+    allow: { to: to("usecases", "review-update.ts") },
+  },
+  {
+    from: fromFile("usecases", "run-pipeline.ts"),
+    allow: { to: to("usecases", "set-enhance.ts") },
+  },
+  {
+    from: fromFile("usecases", "review-update.ts", "run-pipeline.ts", "start-export.ts"),
+    allow: { to: to("usecases", "voice-program.ts") },
+  },
 ];
 
 // --- Network access (TS §7, §24.1) -------------------------------------------

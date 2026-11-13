@@ -6,18 +6,26 @@
 // (`out48.length === pcm48.length`, INV-10). `assemble` applies a time map it
 // is given; in V4 the only map is the identity. It touches no storage and
 // sends nothing.
+//
+// V6.2 (v6.2implementation D-487, P208): asked with `level` (the page does so
+// with `motion` on), `runChain` also makes the levelled voice `lvl48` from the
+// same `pcm48` (loudness and the limiter only), kept until `takeLevel` hands
+// it over; `assembleVoice` builds the program on the voice it is told.
 
-import type { Lufs, OutSpan, Prosody, Sentence, TimeMap, Word } from "../gen/domain";
+import type { Lufs, OutSpan, Prosody, Sentence, TimeMap, VoiceMode, Word } from "../gen/domain";
 import { loadCore } from "../wasm/load-core";
 import type { AudioWorkerApi } from "./protocol";
 import { CANCELLED, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The cleaned voice of the clip in work, from `runChain` until `measureProsody` hands it over.
 let kept: Float32Array<ArrayBuffer> | null = null;
+// V6.2: the levelled voice of the same clip, from `runChain` until `takeLevel`.
+let keptLevel: Float32Array<ArrayBuffer> | null = null;
 
-async function runChain(p: { pcm48: Float32Array }, ctx: JobContext): Promise<{ loudness: Lufs } | typeof CANCELLED> {
+async function runChain(p: { pcm48: Float32Array; level?: boolean }, ctx: JobContext): Promise<{ loudness: Lufs } | typeof CANCELLED> {
   // A buffer left by a clip that ended before `measureProsody` is dropped (D-90).
   kept = null;
+  keptLevel = null;
   const core = await loadCore();
   const total = p.pcm48.length;
   const result = core.runChain(p.pcm48, (done) => {
@@ -28,6 +36,10 @@ async function runChain(p: { pcm48: Float32Array }, ctx: JobContext): Promise<{ 
     return CANCELLED;
   }
   kept = result.out48;
+  if (p.level === true) {
+    // The chain copied `pcm48` and left it as it was: the levelled voice reads the same samples.
+    keptLevel = core.levelOnly(p.pcm48).lvl48;
+  }
   return { loudness: result.loudness };
 }
 
@@ -62,8 +74,27 @@ async function assemble(p: {
 /** One-way: the clip ended early, and the cleaned voice it left is let go (D-128). */
 function release(): void {
   kept = null;
+  keptLevel = null;
 }
 
-const handlers: Handlers<AudioWorkerApi> = { runChain, measureProsody, assemble, release };
+/** V6.2: the levelled voice `runChain` made, transferred out; `null` when none was made. */
+function takeLevel(): Promise<{ lvl48: Float32Array<ArrayBuffer> | null }> {
+  const lvl48 = keptLevel;
+  keptLevel = null;
+  return Promise.resolve({ lvl48 });
+}
+
+/** V6.2 (D-487): the program on the voice `voice` names. Nothing is kept: `prog48` is transferred out. */
+async function assembleVoice(p: {
+  voice48: Float32Array;
+  voice: VoiceMode;
+  timeMap: TimeMap;
+  speech: OutSpan[];
+}): Promise<{ prog48: Float32Array<ArrayBuffer>; loudness: Lufs }> {
+  const core = await loadCore();
+  return core.assembleVoice(p.voice48, p.voice, p.timeMap, p.speech);
+}
+
+const handlers: Handlers<AudioWorkerApi> = { runChain, measureProsody, assemble, release, takeLevel, assembleVoice };
 
 serveWorker(handlers, { stage: "audio_chain", oneWay: ["release"], duringPreview: [] });

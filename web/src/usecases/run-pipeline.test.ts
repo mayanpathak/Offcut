@@ -42,6 +42,9 @@ const m = vi.hoisted(() => {
       runChain: method("audio.runChain"),
       measureProsody: method("audio.measureProsody"),
       assemble: method("audio.assemble"),
+      // V6.2 (P208): the levelled voice, asked for only with `motion` on.
+      takeLevel: method("audio.takeLevel"),
+      assembleVoice: method("audio.assembleVoice"),
       notify: (name: string) => calls.push(`audio.notify:${name}`),
     },
     render: {
@@ -97,6 +100,15 @@ vi.mock("../persistence/opfs", () => ({
   writeAudio: () => {
     m.calls.push("opfs.writeAudio");
     return Promise.resolve();
+  },
+  // V6.2 (P208): `lvl48.f32`, with `motion` on.
+  writeLevel: () => {
+    m.calls.push("opfs.writeLevel");
+    return Promise.resolve();
+  },
+  readLevel: () => {
+    m.calls.push("opfs.readLevel");
+    return Promise.resolve(new Float32Array(48).fill(0.5));
   },
   remove: (path: string) => {
     m.calls.push(`opfs.remove:${path}`);
@@ -894,5 +906,65 @@ describe("runPipeline, the plan's text extras (P194)", () => {
     await runPipeline(CLIP);
     expect(clip()).toMatchObject({ status: "ready", plan: RULES_ITEMS });
     expect(clip().planExtras).toBeUndefined();
+  });
+});
+
+// --- V6.2: the Enhance settings and the levelled voice (P208, D-486, D-487) ---
+// Every case before this block runs with `motion` off: no `lvl48`, no Enhance.
+
+const enhanceSeams = vi.hoisted((): { remembered: unknown } => ({ remembered: undefined }));
+vi.mock("../persistence/prefs-repo", async () => {
+  const actual = await vi.importActual<typeof import("../persistence/prefs-repo")>("../persistence/prefs-repo");
+  return { ...actual, getEnhanceDefault: () => Promise.resolve(enhanceSeams.remembered) };
+});
+
+describe("runPipeline, Enhance and the levelled voice (P208)", () => {
+  beforeEach(() => {
+    Object.assign(cloud.flags, { motion: true, ai_plan: false });
+    useCloudStore.setState({ availability: "available", choice: "device" });
+    enhanceSeams.remembered = undefined;
+    answer("audio.takeLevel", { lvl48: new Float32Array(48).fill(0.25) });
+    answer("audio.assembleVoice", { prog48: new Float32Array(48).fill(0.75), loudness: -14 });
+  });
+
+  afterEach(() => {
+    Object.assign(cloud.flags, { motion: false });
+  });
+
+  it("with motion on: the recommended start, lvl48 written beside out48, the clean program as today", async () => {
+    await runPipeline(CLIP);
+    expect(clip().status).toBe("ready");
+    expect(clip().edit.enhance).toEqual({ voice: "clean", motion: true });
+    const at = (name: string) => m.calls.indexOf(name);
+    expect(at("audio.takeLevel")).toBe(at("opfs.writeAudio") + 1);
+    expect(at("opfs.writeLevel")).toBe(at("audio.takeLevel") + 1);
+    expect(at("audio.assemble")).toBeGreaterThan(at("opfs.writeLevel"));
+    expect(m.calls).not.toContain("audio.assembleVoice");
+    // The preview plays the clean program `assemble` made, as with motion off.
+    expect(clip().prog48?.[0]).toBe(0);
+  });
+
+  it("a clip that starts on the remembered levelled voice previews its program; prog48.f32 stays the clean one", async () => {
+    enhanceSeams.remembered = { voice: "level", motion: false };
+    await runPipeline(CLIP);
+    expect(clip().edit.enhance).toEqual({ voice: "level", motion: false });
+    const at = (name: string) => m.calls.indexOf(name);
+    expect(at("opfs.writeProgram")).toBeGreaterThan(at("audio.assemble"));
+    expect(at("opfs.readLevel")).toBeGreaterThan(at("opfs.writeProgram"));
+    expect(at("audio.assembleVoice")).toBe(at("opfs.readLevel") + 1);
+    expect(clip().prog48?.[0]).toBe(0.75);
+  });
+
+  it("a run that starts again keeps the clip's own Enhance", async () => {
+    enhanceSeams.remembered = { voice: "level", motion: true };
+    fail("audio.assemble", "E_DSP", "audio_chain");
+    await runPipeline(CLIP);
+    expect(clip().status).toBe("failed");
+    enhanceSeams.remembered = { voice: "clean", motion: false };
+    script();
+    answer("audio.takeLevel", { lvl48: new Float32Array(48) });
+    answer("audio.assembleVoice", { prog48: new Float32Array(48), loudness: -14 });
+    await runPipeline(CLIP);
+    expect(clip()).toMatchObject({ status: "ready", edit: { enhance: { voice: "level", motion: true } } });
   });
 });

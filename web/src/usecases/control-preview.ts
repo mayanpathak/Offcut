@@ -157,6 +157,21 @@ export async function attach(canvas: HTMLCanvasElement, prog48: Float32Array): P
   previewStore.at(toOutMs(0));
 }
 
+/**
+ * V6.2 (D-488, P208): the voice switched, so the clip's audio is `prog48` from
+ * now on. The preview is paused for the change (review-update.ts), so the
+ * next play starts from where it was paused, in the new audio. Nothing is
+ * attached: nothing to swap.
+ */
+export function swapAudio(prog48: Float32Array): void {
+  if (player === undefined) {
+    return;
+  }
+  const buffer = new AudioBuffer({ numberOfChannels: 1, length: prog48.length, sampleRate: AUDIO_RATE });
+  buffer.getChannelData(0).set(prog48);
+  player.buffer = buffer;
+}
+
 /** What a play does when the worker's loop has returned: the clip's end, or a failure. */
 async function afterPlay(p: Player, turn: number, loop: Promise<PreviewStats | Cancelled>): Promise<void> {
   try {

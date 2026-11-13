@@ -81,6 +81,7 @@ mod typescript {
         v.visit::<PlanResultSource>();
         v.visit::<PlanOutcome>();
         v.visit::<LatencyBucket>();
+        v.visit::<EnhanceRow>();
         v.visit::<AnalyticsEvent>();
         v.visit::<EventsBatch>();
         v.visit::<ApiError>();
@@ -199,8 +200,9 @@ mod typescript {
         let names: Vec<&str> = sources.iter().flat_map(|s| declared_names(s)).collect();
         // 45 types cross the API (the cloud transcription release adds four, V6.2's
         // plan three). `EventDoc` does not: its table is written as a constant.
-        // V6.2's `plan_result` adds three prop enums (P193, D-440 (15) widened).
-        assert_eq!(names.len(), 49);
+        // V6.2's `plan_result` adds three prop enums (P193, D-440 (15) widened),
+        // and `export_done`'s `enhance_off` one (P208, D-440 (15) again).
+        assert_eq!(names.len(), 50);
         for name in names.into_iter().filter(|name| *name != "EventDoc") {
             let declarations = ts.matches(&format!("\nexport type {name} = ")).count();
             assert_eq!(declarations, 1, "{name} is declared {declarations} times");

@@ -11,7 +11,8 @@
 // API are a token that has expired, before anything begins, and the receipt, after.
 
 import { track } from "../analytics/client";
-import type { ExportedAs } from "../gen/api";
+import { FEATURES } from "../config/features";
+import type { EnhanceRow, ExportedAs } from "../gen/api";
 import type { ChangeSummary, ClipId, DetectedEvent, ExportId, ExportProfile, ProfileKind } from "../gen/domain";
 import { getEntitlement } from "../net/api-client";
 import * as clipsRepo from "../persistence/clips-repo";
@@ -30,6 +31,7 @@ import { type Cancelled, pool, WorkerCallError, whenFree, whenReleased } from ".
 import type { AppFailure } from "../workers/protocol";
 import { signalFor } from "./cancel-job";
 import { lockForExport, reloadPreview, unlockAfterExport } from "./control-preview";
+import { programOn, voiceOf } from "./voice-program";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -313,8 +315,12 @@ async function renderAndDeliver(
 
   // The export reads its own copy of the program's audio: a buffer that is
   // handed to a worker is gone from this thread, and the preview keeps its
-  // own (D-51; TS §40.9 S-8).
-  const prog48 = await opfs.readProgram(clipId);
+  // own (D-51; TS §40.9 S-8). V6.2 (D-487, §11): on the clip's voice. `Clean`
+  // is today's read of `prog48.f32`; `Level` assembles `lvl48.f32`.
+  const { edit, timeMap } = useClipStore.getState();
+  const voice = voiceOf(edit.enhance);
+  const prog48 =
+    voice === "clean" || timeMap === undefined ? await opfs.readProgram(clipId) : await programOn(clipId, voice, timeMap);
   goOn(signal);
 
   const result = await pool.render.exportClip(
@@ -411,7 +417,23 @@ function editValues(clip: ClipState) {
     events_disabled: Math.min(MAX_COUNT, clip.events.length - kept),
     style: clip.edit.style,
     crop_adjusted: clip.edit.crop_offset !== 0,
+    // V6.2 (D-490): each only with its flag on, so a page without them sends V6.1's event.
+    ...(FEATURES.ai_plan ? itemValues(clip) : {}),
+    ...(FEATURES.motion ? { enhance_off: enhanceOff(clip) } : {}),
   };
+}
+
+/** V6.2 (D-490): the plan's items the clip shows and those switched off, as the Visuals tab counts them. */
+function itemValues(clip: ClipState): { items_kept: number; items_disabled: number } {
+  const items = clip.plan?.items ?? [];
+  const kept = items.filter((item) => clip.edit.event_overrides[item.id] ?? true).length;
+  return { items_kept: Math.min(MAX_COUNT, kept), items_disabled: Math.min(MAX_COUNT, items.length - kept) };
+}
+
+/** V6.2 (D-490): the Enhance rows switched off, in the panel's order. */
+function enhanceOff(clip: ClipState): EnhanceRow[] {
+  const enhance = clip.edit.enhance ?? { voice: "clean", motion: false };
+  return [...(enhance.voice === "level" ? (["voice"] as const) : []), ...(enhance.motion ? [] : (["motion"] as const))];
 }
 
 /** The export is over and its file was handed over: analytics says so. */

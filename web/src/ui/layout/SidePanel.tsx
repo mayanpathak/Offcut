@@ -6,9 +6,11 @@
 // the transcript editor (D-182), the style cards (D-186), the suggested
 // visuals and the framing (D-187).
 
+import { FEATURES } from "../../config/features";
 import { messages } from "../../copy/messages";
 import { type Tab, useUiStore } from "../../state/ui-store";
 import { CaptionEditor } from "../components/CaptionEditor";
+import { EnhancePanel } from "../components/EnhancePanel";
 import { ExportOutcome } from "../components/ChangeSummary";
 import { ExportFailure } from "../components/ExportProgress";
 import { FramingPanel } from "../components/FramingPanel";
@@ -38,7 +40,13 @@ function TabContent({ tab }: { tab: Tab }) {
     case "captions":
       return <CaptionEditor />;
     case "style":
-      return <StylePanel />;
+      // V6.2 (P208, §11): the Enhance switches under the cards, with `motion` on.
+      return (
+        <>
+          <StylePanel />
+          {FEATURES.motion ? <EnhancePanel /> : null}
+        </>
+      );
     case "visuals":
       // V6.2 (P194): the text extras of an AI plan under its visuals.
       return (

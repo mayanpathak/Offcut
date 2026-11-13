@@ -31,6 +31,8 @@ import type {
   WordIdx,
 } from "../gen/domain";
 import type { Entry, RouteFlags, RouteReject, SourceErrorCode, SourceInfo } from "../gen/domain";
+// V6.2 (D-487): the voice a program is assembled on.
+import type { VoiceMode } from "../gen/domain";
 
 export type { FailureStage } from "../gen/domain";
 
@@ -132,14 +134,31 @@ export type WindowWord = { text: string; startMs: number; endMs: number; confide
 // The audio worker has no method that detects silence or plans a cut. Only
 // `assemble` applies a time map, and in V4 the only map is the identity.
 export interface AudioWorkerApi {
-  /** `out48` is kept in the worker; `out48.length === pcm48.length`. */
-  runChain(p: { pcm48: Float32Array }): Promise<{ loudness: Lufs }>;
+  /**
+   * `out48` is kept in the worker; `out48.length === pcm48.length`. V6.2
+   * (D-487): with `level`, the levelled voice of the same `pcm48` is kept
+   * too, for `takeLevel`; the page sets it with `motion` on.
+   */
+  runChain(p: { pcm48: Float32Array; level?: boolean }): Promise<{ loudness: Lufs }>;
   /** `out48` is transferred out, unmodified. */
   measureProsody(p: { words: Word[]; sentences: Sentence[] }): Promise<{ out48: Float32Array; prosody: Prosody }>;
   /** `out48` is transferred in and `prog48` out; the worker keeps nothing (D-127). */
   assemble(p: { out48: Float32Array; timeMap: TimeMap; speech: OutSpan[] }): Promise<{ prog48: Float32Array; loudness: Lufs }>;
   /** Fire-and-forget: drops any audio the worker holds (D-128). */
   release(): void;
+  /**
+   * V6.2 (D-487): `lvl48`, made by `runChain` from the same `pcm48` when the
+   * build has `motion` on, transferred out; `null` when none was made. The
+   * worker keeps nothing after.
+   */
+  takeLevel(): Promise<{ lvl48: Float32Array | null }>;
+  /** V6.2 (D-487): `assemble` on the voice `voice` names; `voice48` is transferred in and `prog48` out. */
+  assembleVoice(p: {
+    voice48: Float32Array;
+    voice: VoiceMode;
+    timeMap: TimeMap;
+    speech: OutSpan[];
+  }): Promise<{ prog48: Float32Array; loudness: Lufs }>;
 }
 
 export interface RenderWorkerApi {

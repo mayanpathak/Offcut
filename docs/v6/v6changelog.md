@@ -2516,3 +2516,70 @@ The system message is 16,500 characters (16,261).
 - `pnpm check` exit 0.
 
 **Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P208 (the Enhance panel, `lvl48` in the audio worker, the export's voice).
+
+## Entry 74 - 2026-11-13 - P208: the Enhance panel
+
+**What changed** (all behind `motion`; with it off, every path is V6.1's).
+- **`lvl48`** (D-487):
+  - The audio worker's `runChain` makes the levelled voice from the same `pcm48` when the page asks with `level: true`. The page asks with `motion` on; the worker reads no flag.
+  - `takeLevel()` hands it over, and `assembleVoice()` builds a program on a named voice.
+  - `run-pipeline.ts` writes `clips/<id>/lvl48.f32` after `out48.f32`; `prog48.f32` stays the clean program, written as before.
+- **`voice-program.ts`** (new): the program on a voice, in one place for the review, the pipeline and the export. Clean reads `prog48.f32`, as the export always did; Level reads `lvl48.f32` and assembles it.
+- **`set-enhance.ts`** (new):
+  - `setEnhance` is a review change in mode `scene`, one history step, with no `review_action`;
+  - it is remembered under `meta.enhanceDefault` once the clip shows it;
+  - `startEnhance` gives a new clip the remembered state, else the recommended `{ clean, motion: true }`;
+  - `resetEnhance` is settings' "Back to recommended".
+  - With the flag off, nothing is read, written or switched.
+- **The voice swap** (`review-update.ts`): when the voice differs between the edit before and the new one (the switch, its undo, its redo), the program on the new voice replaces the paused preview's buffer (`control-preview.ts`' `swapAudio`) and the clip's `prog48`. A failure restores the edit before.
+- **`EnhancePanel.tsx`** (new): "Enhance" under the Style tab's cards, Voice cleanup and Motion with §12's lines, disabled during an export. **Settings:** "Enhance", a line, "Back to recommended" and a line once pressed. The two lines are new drafts.
+- **The export** reads `prog48.f32` for Clean, unchanged, and assembles `lvl48.f32` for Level.
+- **`export_done`** (D-490): `items_kept`, `items_disabled` (with `ai_plan`, counted as the Visuals tab counts) and `enhance_off` (with `motion`).
+  - They are optional on the server: a V6.1 page's event is read and stored as before. The server caps the counts and refuses a row named twice.
+  - The event's description in "What leaves your device" gains "which Enhance switches you turned off".
+- **Docs:**
+  - TS §5 rows (four files), the OPFS row for `lvl48.f32`, the `export_done` row;
+  - "As read (P208)" under D-440, D-486, D-487, D-488, D-490;
+  - `experiments.md`, D-488's switch time.
+
+**The switch time on D1** (D-488, Chrome, the flags-on keyed build, the reference clip; read from the page's own `performance` measures):
+- paused, Voice 32-83 ms (to Level about 75, back to Clean about 35) and Motion 11-20 ms;
+- while playing, Voice 86-139 ms, its pause and play included;
+- **all inside the 150 ms budget**, the playing switch closest.
+
+The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a switch back; an export with Voice cleanup off finished, its `export_done` carrying `enhance_off: ["voice"]`, `items_kept: 4`, `items_disabled: 0`. The scratch case was not committed. P209's `enhance-panel.spec.ts` is the lasting proof, reading the exported voice through a dev hook.
+
+**Differs from the plan.**
+- `export_done`'s fields are sent only with their flags. Otherwise a flags-off export would differ from V6.1's, and `export-creator.spec.ts` pins its props key for key.
+- The switch sends no `review_action`: its kinds are the server's closed list, and D-490 counts the choice in `export_done`.
+- `runChain`'s parameter gains `level?` rather than the worker reading the flag.
+- "Back to recommended" has a heading and two lines; §12 drafted only its button.
+
+**Declared.**
+- `v62-gate.sh` ALLOW: `protocol.ts`' two `runChain` lines (D-487).
+- `eslint.config.js` edges:
+  - `set-enhance.ts` → `review-update.ts`;
+  - `run-pipeline.ts` → `set-enhance.ts`;
+  - `review-update.ts`, `run-pipeline.ts`, `start-export.ts` → `voice-program.ts`.
+- D-440:
+  - (5) the prop-enum table 20 → 21 rows;
+  - (15) the TypeScript test 49 → 50 names;
+  - the server test helper gains the three fields as `None`;
+  - the fakes of `run-pipeline.test.ts` and `start-export.test.ts` gain the new methods, and `start-export.test.ts` mocks the flags at their defaults.
+- No existing case changed.
+
+**Known issue 10 (P209), wider.** `flags-identity.spec.ts`' flags-on clip now starts with the recommended Enhance, so its edit and export differ from the flags-off build's by design, as well as by the IndexedDB version. P209's dev hook sets `Enhance::v5()` for case 1, as planned.
+
+**Tests (+17).**
+- `set-enhance.test.ts` 9 (a new clip's start, a bad stored value, flags off, Motion, Voice, undo and redo, no change, a failed swap, Back to recommended).
+- `run-pipeline.test.ts` +3 (`lvl48` written beside `out48`; a clip starting on Level previews its program; a run again keeps the clip's own).
+- `start-export.test.ts` +3 (flags off: V6.1's keys and `prog48.f32`; the item counts; `enhance_off` and the Level program).
+- `analytics.rs` +1, `server/src/analytics` +1.
+
+**Tier 3** (D1):
+- Rust **1144 / 0 / 5** (`cargo test --workspace`, `.env` loaded; `offcut-api` 335 again after the clippy fix);
+- Vitest **764**; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- `pipeline-preview.spec.ts` (media, flags off) 17 passed: the clip's folder still holds exactly `out48.f32`, `prog48.f32`, `source`;
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). For the founder: the panel's place (Style tab) and the two settings lines, with a capture in `~/v6.2-review/look-fixes/p208-enhance-panel-1280x800.png`. Next: P209 (Enhance end to end, DC-16; push 4).
