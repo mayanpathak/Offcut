@@ -819,7 +819,9 @@ fn emoji_under() {
 }
 
 /// An icon on its disc (V6.2, D-483): a light bulb for "brutal" in Clean at
-/// Bottom, the default placement, on an accent disc in the event zone.
+/// Bottom, the default placement, on a dark disc ringed in the accent in the
+/// event zone (D-502, P206b; D-440 (22): the check widened from one disc to
+/// the ring and the disc inside it).
 #[test]
 fn icon_pop() {
     let list = image_frame(
@@ -832,16 +834,19 @@ fn icon_pop() {
     );
     let found = images_of(&list);
     assert_eq!(found.len(), 1);
-    let disc = list.cmds.iter().rev().find_map(|cmd| {
+    let mut circles = list.cmds.iter().rev().filter_map(|cmd| {
         if let DrawCmd::FillRect { rect, radius, .. } = cmd {
             Some((*rect, *radius))
         } else {
             None
         }
     });
-    let (disc, radius) = disc.unwrap();
+    let (inner, inner_radius) = circles.next().unwrap();
+    let (disc, radius) = circles.next().unwrap();
     assert!((radius - disc.w / 2.0).abs() < 1e-3 && (disc.w - 84.0).abs() < 1e-3);
-    assert!(found[0].x > disc.x && found[0].x + found[0].w < disc.x + disc.w);
+    assert!((inner_radius - inner.w / 2.0).abs() < 1e-3 && (inner.w - 76.0).abs() < 1e-3);
+    assert!((inner.x + inner.w / 2.0 - (disc.x + disc.w / 2.0)).abs() < 1e-3);
+    assert!(found[0].x > inner.x && found[0].x + found[0].w < inner.x + inner.w);
     golden("icon_pop", (&pattern(1080, 1920), Rotation::R0), &list);
 }
 

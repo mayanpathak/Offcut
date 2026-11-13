@@ -26,7 +26,7 @@ use offcut_scene::layout::cap_height;
 use offcut_scene::placement::{SNAP_BOTTOM, SNAP_MIDDLE, SNAP_TOP, WATERMARK_BAND, event_zone};
 use offcut_scene::safe_area::SAFE_AREA;
 use offcut_scene::styles::spec;
-use offcut_scene::{DisplayList, DrawCmd, FontSet, ImageKey, Rect, Scene, Theme};
+use offcut_scene::{DisplayList, DrawCmd, FontSet, ImageKey, Rect, Rgba, Scene, Theme};
 use offcut_types::{
     CaptionPlacement, EmojiId, EmojiPlace, EmphasisSize, EventId, EventKind, IconId, ItemParams,
     OutMs, PlanItem, StyleId, Treatment, WordIdx, WordRange,
@@ -306,16 +306,21 @@ fn an_icon_is_on_an_accent_disc_in_the_event_zone_centred_on_its_word() {
     }
 }
 
-/// `list` without its images and an icon's disc (an accent circle 100 lp
-/// across or more).
-fn without_images(list: &DisplayList, accent: offcut_scene::Rgba) -> Vec<DrawCmd> {
+/// `list` without its images and an icon's discs (an accent or a panel
+/// circle 100 lp across or more). D-440 (22), P206b: widened by the panel's
+/// disc inside the accent ring (D-502); nothing else changed.
+fn without_images(list: &DisplayList, (accent, panel): (Rgba, Rgba)) -> Vec<DrawCmd> {
     let added = |cmd: &&DrawCmd| match cmd {
         DrawCmd::Image { .. } => false,
         DrawCmd::FillRect {
             rect,
             radius,
             color,
-        } => !(*color == accent && rect.w >= 100.0 && (radius - rect.w / 2.0).abs() < 1e-3),
+        } => {
+            !((*color == accent || *color == panel)
+                && rect.w >= 100.0
+                && (radius - rect.w / 2.0).abs() < 1e-3)
+        }
         DrawCmd::FillPath { .. }
         | DrawCmd::GlyphRun { .. }
         | DrawCmd::PushLayer { .. }
@@ -328,7 +333,8 @@ fn without_images(list: &DisplayList, accent: offcut_scene::Rgba) -> Vec<DrawCmd
 #[test]
 fn only_images_and_the_disc_are_added_and_hidden_or_switched_off_nothing_is() {
     for style in STYLES {
-        let accent = Theme::default_for(style).accent;
+        let theme = Theme::default_for(style);
+        let discs = (theme.accent, theme.panel);
         // The icon on "see", over 2.5 s after "brutal" (D-451's window
         // for the visual kinds, and each kind's gap).
         let items = vec![emoji(WORD, EmojiPlace::Under), icon(SEE)];
@@ -351,7 +357,7 @@ fn only_images_and_the_disc_are_added_and_hidden_or_switched_off_nothing_is() {
         for t in (0..with.duration().get()).step_by(33) {
             let t = OutMs::new(t);
             let (a, b) = (with.frame_at(t), none.frame_at(t));
-            assert_eq!(without_images(&a, accent), b.cmds, "{style:?} {t:?}");
+            assert_eq!(without_images(&a, discs), b.cmds, "{style:?} {t:?}");
             drawn += images(&a).len();
             assert_eq!(off.frame_at(t), b, "{style:?} {t:?}: switched off");
             assert_eq!(

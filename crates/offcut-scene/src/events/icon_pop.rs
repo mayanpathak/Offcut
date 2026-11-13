@@ -1,5 +1,7 @@
-//! IconPop: a word that names a thing an icon shows plainly, its icon on an
-//! accent disc in the event zone (v6.2implementation D-483, TS §47.3). The
+//! IconPop: a word that names a thing an icon shows plainly, its white icon
+//! on a dark disc ringed in the accent, in the event zone (v6.2implementation
+//! D-483; D-502, P206b: the founder's change at CP 3, as the white icon on
+//! the accent itself read poorly on yellow and green). The
 //! icon pops in on `OUT` at its word's program start and leaves with the
 //! word's chunk. `layout` centres the disc in the zone; `build_scene` then
 //! `attach`es it to its word: across, centred on the word; down, on the
@@ -15,20 +17,26 @@ use crate::theme::{Role, Theme};
 /// drawn under its 160 px, so never enlarged).
 pub const ICON_DISC: f32 = 168.0;
 pub const ICON_SIZE: f32 = 112.0;
+/// The accent ring's width: the dark disc is inset by it (D-502), 152 lp across.
+pub const ICON_RING: f32 = 8.0;
 
-/// The word, its icon, the disc at rest, and when it is shown.
+/// The word, its icon, the disc at rest, its ring's and its inside's
+/// colours, and when it is shown.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Track {
     pub word: WordIdx,
     pub image: ImageKey,
     pub disc: Rect,
+    /// The ring: the accent.
     pub color: Rgba,
+    /// The disc inside the ring: the panel (D-502).
+    pub panel: Rgba,
     pub start: OutMs,
     pub until: OutMs,
 }
 
-/// The item's icon over its program span, its disc in the accent centred in
-/// `zone`.
+/// The item's icon over its program span, its disc (ringed in the accent,
+/// the panel inside) centred in `zone`.
 pub fn layout(word: WordIdx, icon: IconId, span: OutSpan, zone: Rect, theme: &Theme) -> Track {
     Track {
         word,
@@ -40,6 +48,7 @@ pub fn layout(word: WordIdx, icon: IconId, span: OutSpan, zone: Rect, theme: &Th
             h: ICON_DISC,
         },
         color: theme.color(Role::Accent),
+        panel: theme.color(Role::Panel),
         start: span.start,
         until: span.end,
     }
@@ -63,25 +72,35 @@ pub fn attach(track: Track, word: Rect, (zone, block): (Rect, Rect), until: OutM
     }
 }
 
-/// The disc and its icon while shown, popping in about the disc's centre.
+/// `rect` shrunk by `by` on every side, about its centre.
+fn inset(rect: Rect, by: f32) -> Rect {
+    Rect {
+        x: rect.x + by,
+        y: rect.y + by,
+        w: rect.w - 2.0 * by,
+        h: rect.h - 2.0 * by,
+    }
+}
+
+/// While shown: the accent disc, the panel's disc inside it (leaving the
+/// ring), and the icon, all three popping in about the disc's centre.
 pub fn draw(track: &Track, t: OutMs, out: &mut Vec<DrawCmd>) {
     if t < track.start || t >= track.until {
         return;
     }
     let k = image_pop(t.get() - track.start.get());
-    let disc = about_centre(track.disc, k);
-    out.push(DrawCmd::FillRect {
-        rect: disc,
-        radius: disc.w / 2.0,
-        color: track.color,
-    });
-    let inset = (ICON_DISC - ICON_SIZE) / 2.0;
-    let icon = Rect {
-        x: track.disc.x + inset,
-        y: track.disc.y + inset,
-        w: ICON_SIZE,
-        h: ICON_SIZE,
-    };
+    for (rect, color) in [
+        (track.disc, track.color),
+        (inset(track.disc, ICON_RING), track.panel),
+    ] {
+        let rect = about_centre(rect, k);
+        out.push(DrawCmd::FillRect {
+            rect,
+            radius: rect.w / 2.0,
+            color,
+        });
+    }
+    let icon = inset(track.disc, (ICON_DISC - ICON_SIZE) / 2.0);
     out.push(DrawCmd::Image {
         image: track.image,
         rect: about_centre(icon, k),
@@ -109,11 +128,14 @@ mod tests {
         layout(WordIdx::new(2), IconId::Lightbulb, span, ZONE, &theme)
     }
 
+    // D-440 (22), P206b: widened from one accent disc to the accent ring
+    // and the panel's disc inside it; every other assertion kept.
     #[test]
-    fn the_disc_is_in_the_accent_centred_in_the_zone_with_the_icon_on_it() {
+    fn the_disc_is_ringed_in_the_accent_dark_inside_centred_in_the_zone_with_the_icon_on_it() {
         let track = track();
         assert_eq!(track.image, ImageKey::of_icon(IconId::Lightbulb));
         assert_eq!(track.color, Theme::default_for(StyleId::Clean).accent);
+        assert_eq!(track.panel, Theme::default_for(StyleId::Clean).panel);
         assert_eq!(track.disc.x + ICON_DISC / 2.0, 540.0);
         assert_eq!(track.disc.y + ICON_DISC / 2.0, 960.0);
         let mut out = Vec::new();
@@ -123,6 +145,11 @@ mod tests {
                 rect,
                 radius,
                 color,
+            },
+            DrawCmd::FillRect {
+                rect: inner,
+                radius: inner_radius,
+                color: inner_color,
             },
             DrawCmd::Image {
                 image,
@@ -134,6 +161,13 @@ mod tests {
             panic!("{out:?}");
         };
         assert_eq!((*rect, *radius, *color), (track.disc, 84.0, track.color));
+        // The panel's disc, 8 lp inside the ring, on the same centre.
+        assert_eq!((inner.w, inner.h, *inner_radius), (152.0, 152.0, 76.0));
+        assert_eq!(*inner_color, track.panel);
+        assert_eq!(
+            (inner.x + inner.w / 2.0, inner.y + inner.h / 2.0),
+            (540.0, 960.0)
+        );
         assert_eq!((*image, *opacity), (track.image, 1.0));
         assert_eq!((icon.w, icon.h), (ICON_SIZE, ICON_SIZE));
         assert_eq!(icon.x + icon.w / 2.0, 540.0);
@@ -143,17 +177,20 @@ mod tests {
             draw(&track, OutMs::new(t), &mut none);
             assert!(none.is_empty(), "{t}");
         }
-        // At its start, at 0.6 about the disc's centre, icon and disc alike.
+        // At its start, at 0.6 about the disc's centre, icon and discs alike.
         let mut first = Vec::new();
         draw(&track, OutMs::new(1_000), &mut first);
         if let [
             DrawCmd::FillRect { rect, .. },
+            DrawCmd::FillRect { rect: inner, .. },
             DrawCmd::Image { rect: icon, .. },
         ] = first.as_slice()
         {
             assert!((rect.w - ICON_DISC * IMAGE_POP_FROM).abs() < 1e-3);
+            assert!((inner.w - (ICON_DISC - 2.0 * ICON_RING) * IMAGE_POP_FROM).abs() < 1e-3);
             assert!((icon.w - ICON_SIZE * IMAGE_POP_FROM).abs() < 1e-3);
             assert!((rect.x + rect.w / 2.0 - 540.0).abs() < 1e-3);
+            assert!((inner.x + inner.w / 2.0 - 540.0).abs() < 1e-3);
         } else {
             panic!("{first:?}");
         }
