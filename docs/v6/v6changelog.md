@@ -2793,3 +2793,16 @@ The annotated plans are in `~/v6.2-review/p211b/plans/`.
 **Not pushed** (push 5 is P212).
 
 **Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: the founder's go at CP 4, then P212.
+
+## Entry 80 - 2026-11-14 - P211: the founder's go at checkpoint 4
+
+**The founder's go (2026-11-14):** "go i have verified everything". They ran it on the local stack (the rebuilt `dist-flags/` with P211a's fixes, and the API with P211b's prompt and cloud transcription on).
+
+**P211's acceptance:**
+- the readings recorded, every call listed (Entry 77, `experiments.md`);
+- the founder's go recorded (here);
+- the commits `371c935`, `ddf5a92` (P211a) and `d2be873` (P211b).
+
+**Known issue 8** ("Planning the edit" not shown; the plan's 4 to 5 s wait inside "Finding visual moments") had no separate word from the founder, so it stays open.
+
+**Open.** 35, 39. Known issues 5, 8, 11. Next: P212 (copy-back, the full runs, push 5, merge, tag).
