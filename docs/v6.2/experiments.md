@@ -228,6 +228,43 @@ The annotated plans are in `~/v6.2-review/p206c2/plans/`.
 - **Why the median is over the line:** the median drop rate moved to 11.1%, over TE-15's 10% line. Every extra drop is outside what this revision touched: numbers that do not resolve (9, against 7 and P188c's 7), two visuals V-9 kept apart, one zoom too close. Their paragraphs are unchanged since P188c, and the drops moved between transcripts from run to run (`w04`, `w10`, `w13` new; `a01`, `w08` gone). The mean fell (13.1% → 10.7%).
 - **Conclusion:** this reads as the variance of 15 plans at temperature 0.2, not a regression. A drop costs a fuller plan only. **No further revision is proposed;** the number drops are the next thing to read if the full-clip runs of P210 show them.
 
+### TE-15's product read (P211, 2026-11-13, d1)
+
+**How.** The whole product on this machine, with the real key:
+- the local API (debug build) with `PLAN_ENABLED=true`, `deepseek-flash`, thinking off, at 0.30 / 1.20 USD per 1M tokens;
+- `dist-flags/` (keyed `build:e2e:flags`) behind a scratch proxy, so the app and `/api/v1` share one origin as in production;
+- transcription on the device (`TRANSCRIBE_ENABLED=false`), so the only outside calls were DeepSeek's;
+- signed in as a local test address, `p211-agent@example.com`, through a magic link written into the local database (no mail sent);
+- the reference clip (`testclips/speech_scriptA_landscape_720p.mp4`, Script A, 74.5 s) dropped five times from a throwaway Playwright driver, deleted afterwards.
+
+Latency is the browser's, from `POST /plan` sent to answered. The other columns are the server's log line (counts only, D-464), its `ai_spend` counter and `plan_result` in the local sink.
+
+**Every call** (six: a first attempt of the driver made one call before it hung on its own bug, so it was stopped and run again):
+
+| # | Time (UTC) | Latency | Server bucket | Input (cached) | Output | Items answered → kept | Drops | Spend (µ$) |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 16:25:25 | not timed | lt5 | 7,433 (4,224) | 1,153 | 12 → 9 | zone taken 1, number unresolved 2 | 3,614 |
+| 1 | 16:56:17 | 4,899 ms | lt5 | 7,433 (7,296) | 1,049 | 10 → 8 | zone taken 1, number unresolved 1 | 3,489 |
+| 2 | 16:58:30 | 4,213 ms | lt5 | 7,433 (7,296) | 1,164 | 11 → 9 | zone taken 1, anchor rule 1 | 3,627 |
+| 3 | 17:00:40 | 5,121 ms | lt10 | 7,433 (7,296) | 1,035 | 10 → 9 | zone taken 1 | 3,472 |
+| 4 | 17:02:18 | 5,255 ms | lt10 | 7,433 (7,296) | 1,167 | 11 → 10 | zone taken 1 | 3,631 |
+| 5 | 17:04:01 | 3,964 ms | lt5 | 7,433 (7,296) | 902 | 9 → 8 | number unresolved 1 | 3,313 |
+
+Every call answered 200 on the first try, with no retry and no item skipped by the server's parse. Each plan had a hook title, and every run used the model's plan with no fallback line.
+
+**Read.**
+- **Latency:** 4.0 to 5.3 s in the browser (median 4.9 s, five timed), well inside D-498's 10 s target.
+- **Cost:** the server counted 21,146 µ$ for the six calls, about $0.0035 a plan. It prices cached input at the full input price, so it counts high: DeepSeek's balance moved $1.80 → $1.79 for all six.
+- **Tokens:** the prompt is 7,433 input tokens every time, 7,296 of them a cache hit after the first call; the output was 902 to 1,167 tokens.
+- **Drops (E-11, `dropped_by_reason`):** 10 of 63 items.
+  - per plan 25.0%, 20.0%, 18.2%, 10.0%, 9.1%, 11.1%: median 14.6%, over TE-15's 10% line (the five timed runs alone: 11.1%);
+  - `zone_taken` 5, one a run: an icon on a word inside the list's span, where the list holds the event zone (read in run 1's capture at "laptop");
+  - `number_unresolved` 4: the device transcript writes "$12 ,000", two words, which the number does not resolve from;
+  - `anchor_rule` 1.
+  
+  TE-15's labelled transcripts had neither the device's split number nor, as often, an icon inside a list.
+- **What the person sees of a drop:** the Visuals tab lists every item of the model's plan, the dropped ones included, each with its switch on ("10 of 10 visuals on" in run 1, where 8 are drawn). `export_done`'s `items_kept` counts the same way (10 in run 1). The export's "What we changed" counts what was drawn (2 words emphasized, 6 visual moments = 8). Recorded for CP 4.
+
 ## D-488 - The Enhance switch's time (P208, 2026-11-13, d1)
 
 **How.** Chrome on D1, the keyed flags-on build (`dist-flags/`), the reference clip (74.7 s) processed signed in, then the Style tab's Enhance switches clicked in turn. Each time is the page's own `performance` measure, from `setEnhance`'s call to the change shown (`offcut:enhance:voice`, `offcut:enhance:motion`), read by a scratch Playwright case (not committed).
@@ -278,4 +315,14 @@ The worst per-frame ratio is Mono's 1.23×, under §10.5's 1.5× line; every fra
 
 ## E-11 - Instrumentation
 
-Not read yet. P193 and P211.
+**Read in P211 (2026-11-13, d1), the local sink (`analytics_events`), rows after id 213.**
+
+**`plan_result`:** six rows, one per run that asked, each with exactly `source`, `outcome`, `latency_bucket`, `items` and `dropped_by_reason`. For example: `{"items": 8, "source": "model", "outcome": "ok", "latency_bucket": "lt5", "dropped_by_reason": {"zone_taken": 1, "number_unresolved": 1}}`.
+
+**`export_done`:** two rows, each with `items_kept`, `items_disabled` and `enhance_off` beside V6.1's fields:
+- run 1, the defaults: `items_kept 10`, `items_disabled 0`, `enhance_off []`;
+- run 2, Voice cleanup and Motion off: `items_kept 11`, `items_disabled 0`, `enhance_off ["voice", "motion"]`.
+
+**Content:** none in either event, only enums and counts (INV-18). **Pass.**
+
+**Caveat:** `items_kept` counts the plan's items as the Visuals tab does, so it includes items the validation dropped (TE-15's product read above). Recorded for CP 4.

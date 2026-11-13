@@ -2681,3 +2681,46 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
 **Not pushed** (push 5 is P212).
 
 **Open.** 35, 39. Known issues 5, 8, 11 (P212, P211, watch). Next: P211 (the real product, CP 4; five real calls, about $0.01, at the founder's word).
+
+## Entry 77 - 2026-11-13 - P211: the real product, checkpoint 4 (readings)
+
+**The real product on D1, read for speed, cost and look** (TE-15's product read, E-11; both in `docs/v6.2/experiments.md`). The setup:
+- the local API with the real DeepSeek key, `PLAN_ENABLED=true`, `deepseek-flash`;
+- `dist-flags/` behind a scratch proxy, so the app and the API share one origin;
+- transcription on the device for the agent's runs;
+- signed in as a local test address through a magic link written into the local database (no mail sent);
+- the reference clip five times, from a throwaway Playwright driver (deleted, never committed).
+
+**Every call** (six, listed one by one in `experiments.md`):
+- **What happened:** all six answered 200 on the first try, with no retry, no item skipped by the parse, a hook title in every plan and no fallback.
+- **Speed:** 4.0 to 5.3 s in the browser.
+- **Size:** 7,433 input tokens each (7,296 cached after the first) and 902 to 1,167 output tokens.
+- **Cost:** the server's spend counter says 21,146 µ$ (about $0.0035 a plan, cached input counted at the full price); DeepSeek's balance went $1.80 → $1.79.
+- **The extra call:** the first attempt of the driver hung on its own bug after one call (a locator read with no timeout), so it was stopped and run again; that call is call 0.
+
+**Drops** (10 of 63 items, median 14.6%, over TE-15's 10% line):
+- `zone_taken` 5, an icon placed on a word inside the list's span;
+- `number_unresolved` 4, the device transcript writes "$12 ,000";
+- `anchor_rule` 1.
+
+**E-11:** `plan_result` and `export_done` arrive in the local sink with every V6.2 field (`items_kept`, `items_disabled`, `enhance_off ["voice", "motion"]` with both off) and no content. Pass.
+
+**Captures and exports** are in `~/v6.2-review/product/`, with a README for the founder: the two exports (the defaults; Voice cleanup and Motion off), the editor, settings, and each item of run 1 at its time.
+
+**Four findings, put to the founder:**
+1. The Visuals tab lists items the validation left out, with their switch on ("10 of 10 visuals on" with 8 drawn), and `items_kept` counts them.
+2. The Hook title row's description is the whole transcript (its words are the clip's).
+3. "What we changed" says "Voice cleaned" with Voice cleanup off (`summary.rs` always said true).
+4. The drop rate above.
+
+**A mistake of the agent's.** The local stack was left for the founder with cloud transcription off (`TRANSCRIBE_ENABLED=false`, set for the agent's runs), and the message did not say so. The founder found no Cloud option. The API was restarted with it on (17:15 UTC). A stack handed over for a checkpoint now runs the product's own settings, and the message says what differs.
+
+**The founder's answers (CP 4, 2026-11-13).**
+- **Fix 1, 2 and 3:** P211a.
+- **The hook title:** fix 2 only, the row; nothing else about the hook.
+- **The post caption:** shorter: one or two sentences, at most 150 characters, asked in the prompt; the 2,200-character check stays. The founder had read it as a caption for Instagram and other social sites. P211b, with a re-read of about $0.02.
+- **The landing page:** "Start free" becomes "Start creating". P211a.
+- **Finding 4:** not asked for.
+- **Still to come after P211a and P211b:** the go, and the founder's read of known issue 8.
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211a, then P211b, then the founder's go.
