@@ -83,7 +83,15 @@ export type SceneHit =
  */
 export type RenderSession = Omit<
   ModuleSession,
-  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize" | "hit" | "caption_mirror"
+  | "set_scene"
+  | "summary"
+  | "read_video_sample"
+  | "source_at"
+  | "render_frame"
+  | "resize"
+  | "hit"
+  | "caption_mirror"
+  | "video_mirror"
 > & {
   /** Builds the scene and keeps it in place of the one before; what the plan's validation left out, and its chunks. */
   set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[] };
@@ -100,6 +108,14 @@ export type RenderSession = Omit<
   hit(tOut: OutMs, x: number, y: number): SceneHit | null;
   /** The caption shown at `tOut` as drawn, for development builds' tests (D-155); `null` when none is shown. */
   caption_mirror(tOut: OutMs): { text: string; colors: string[] } | null;
+  /** V6.2 (P209, DC-16): the main video's `src` at `tOut` and the clip's crop, for development builds' tests. */
+  video_mirror(tOut: OutMs): VideoMirror | null;
+};
+
+/** V6.2 (P209): what the main video shows; `src` equals `crop` with motion off. Display pixels. */
+export type VideoMirror = {
+  src: { x: number; y: number; w: number; h: number };
+  crop: { x: number; y: number; w: number; h: number };
 };
 
 /** The module's MP4 writer. `finalize()` returns the size of the file in bytes and frees the writer. */

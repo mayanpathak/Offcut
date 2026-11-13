@@ -203,6 +203,8 @@ export interface RenderWorkerApi {
   styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
   /** The caption shown at `at` as drawn; asked by development and test builds only (D-155). */
   captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;
+  /** V6.2 (P209, DC-16): the main video's `src` at `at` and the clip's crop; asked by development and test builds only. */
+  videoMirror(p: { atMs: number }): Promise<VideoMirror | null>;
   /** The profile a token gives now, verified here (INV-9, v5implementation D-220). Keeps nothing. */
   exportProfile(p: { entitlementToken: string }): Promise<ExportProfile>;
   exportClip(p: {
@@ -267,5 +269,7 @@ export type Hit =
 
 /** The caption shown at a time: its words joined by spaces, and each word's fill as `#rrggbbaa` (D-155). */
 export type CaptionMirror = { text: string; colors: string[] };
+/** V6.2 (P209): what the main video shows; `src` equals `crop` with motion off. Display pixels. */
+export type VideoMirror = { src: { x: number; y: number; w: number; h: number }; crop: { x: number; y: number; w: number; h: number } };
 
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };

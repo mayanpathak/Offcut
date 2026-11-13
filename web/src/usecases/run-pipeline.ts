@@ -38,7 +38,7 @@ import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { failureShown, signalFor } from "./cancel-job";
 import { choosePlan, startPlan } from "./choose-plan";
-import { startEnhance } from "./set-enhance";
+import { isV5, startEnhance } from "./set-enhance";
 import { transcribeInCloud } from "./transcribe-cloud";
 import { programOn, voiceOf } from "./voice-program";
 
@@ -340,9 +340,10 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   // 1a. V6.2 (D-486, P208): with `motion` on, a clip's Enhance settings are
   //     set once, before its first scene: the remembered state, else the
   //     recommended one. A run that starts again keeps the clip's own.
+  //     V5's settings leave the edit as V6.1 wrote it (DC-16).
   if (clipStore.useClipStore.getState().edit.enhance === undefined) {
     const start = await startEnhance();
-    if (start !== undefined) {
+    if (start !== undefined && !isV5(start)) {
       clipStore.setStartEnhance(start);
     }
   }

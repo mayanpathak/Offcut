@@ -7,7 +7,7 @@
 // `motion` flag off there is no panel, and no memory is read or written.
 
 import { FEATURES } from "../config/features";
-import type { Enhance } from "../gen/domain";
+import type { EditState, Enhance } from "../gen/domain";
 import { clearEnhanceDefault, getEnhanceDefault, setEnhanceDefault } from "../persistence/prefs-repo";
 import { useClipStore } from "../state/clip-store";
 import { update } from "./review-update";
@@ -17,6 +17,25 @@ export const ENHANCE_MEASURE = { voice: "offcut:enhance:voice", motion: "offcut:
 
 /** V5's output: the full voice chain, no camera motion (`Enhance::v5()`). */
 export const ENHANCE_V5: Enhance = { voice: "clean", motion: false };
+
+/** Whether `enhance` is V5's output (`Enhance::is_v5`). */
+export function isV5(enhance: Enhance): boolean {
+  return enhance.voice === "clean" && !enhance.motion;
+}
+
+/**
+ * `edit` with `enhance`, left out when it is V5's (DC-16, P209): the edit is
+ * then written, stored and hashed for the render cache as V6.1 wrote it, as
+ * Rust's `EditState` leaves it out of its JSON.
+ */
+export function withEnhance(edit: EditState, enhance: Enhance): EditState {
+  if (!isV5(enhance)) {
+    return { ...edit, enhance };
+  }
+  const plain = { ...edit };
+  delete plain.enhance;
+  return plain;
+}
 
 /** A new clip's settings with nothing remembered: every shipped enhancement on (`Enhance::defaults`). */
 export const ENHANCE_RECOMMENDED: Enhance = { voice: "clean", motion: true };
@@ -48,11 +67,11 @@ export async function setEnhance(change: Partial<Enhance>): Promise<void> {
     return;
   }
   const startedAt = performance.now();
-  await update((edit) => ({ ...edit, enhance: next }), "scene", null);
+  await update((edit) => withEnhance(edit, next), "scene", null);
   // D-488's budget, read on this device only (P208, P209): how long the switch took to show.
   performance.measure(next.voice === current.voice ? ENHANCE_MEASURE.motion : ENHANCE_MEASURE.voice, { start: startedAt });
-  const shown = useClipStore.getState().edit.enhance;
-  if (shown?.voice === next.voice && shown.motion === next.motion) {
+  const shown = useClipStore.getState().edit.enhance ?? ENHANCE_V5;
+  if (shown.voice === next.voice && shown.motion === next.motion) {
     await setEnhanceDefault(next);
   }
 }

@@ -1045,6 +1045,7 @@ offcut/
 │       ├── api-cold-start.spec.ts
 │       ├── privacy-network.spec.ts
 │       ├── flags-identity.spec.ts     (V6.1, as built) one clip on both builds: the same records, render-cache key and export (INV-26)
+│       ├── enhance-panel.spec.ts      (V6.2) the Enhance switches on the flags-on build: Motion off shows the crop, Voice off plays lvl48, the edit budget, undo, the memory, Back to recommended
 │       ├── route-long.spec.ts         (V6.1, as built) the two ways in, the gate, a 12-minute video through the fake windows, the refusals
 │       ├── high-res.spec.ts           (V6.1)
 │       ├── image-parity.spec.ts       (V6.2) TE-30: the browser's image_basic against its golden, D1 only (D-474)

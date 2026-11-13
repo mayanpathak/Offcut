@@ -3,8 +3,10 @@
 // scene that fails to build once. Only `ui/dev-hooks.ts` calls these, and a
 // production build has neither it nor the workers' halves (rpc-worker.ts).
 
-import { pool } from "../workers/pool";
-import type { ImageCheckResult, WorkerKind } from "../workers/protocol";
+import { setAiPlanSwitch, setEnhanceDefault } from "../persistence/prefs-repo";
+import { setPlanSwitch } from "../state/plan-store";
+import { pool, whenFree } from "../workers/pool";
+import type { ImageCheckResult, VideoMirror, WorkerKind } from "../workers/protocol";
 
 /** Worker `kind` throws where nothing catches it: the page sees its crash (D-153). */
 export function crashWorker(kind: WorkerKind): void {
@@ -30,6 +32,25 @@ export function failNextSetScene(): void {
  * V6.2 (TE-30, v6.2implementation D-474): the render worker draws the frame of
  * the `image_basic` golden and reads it back, for `image-parity.spec.ts`.
  */
+/** V6.2 (P209, DC-16): the main video at `at`, for `enhance-panel.spec.ts`; `null` before a scene. */
+export async function videoMirror(at: number): Promise<VideoMirror | null> {
+  const result = await whenFree(() => pool.render.videoMirror({ atMs: at }));
+  if (result !== null && "cancelled" in result) {
+    throw new Error("the video mirror was cancelled");
+  }
+  return result;
+}
+
+/**
+ * V6.2 (P209, DC-16): the next clip is made as V5 made it: `Enhance::v5()`
+ * as its start and the AI plan switch off, for `flags-identity.spec.ts`.
+ */
+export async function startAsV5(): Promise<void> {
+  setPlanSwitch(false);
+  await setAiPlanSwitch(false);
+  await setEnhanceDefault({ voice: "clean", motion: false });
+}
+
 export async function imageCheck(): Promise<ImageCheckResult> {
   const result = await pool.render.devImageCheck();
   if ("cancelled" in result) {

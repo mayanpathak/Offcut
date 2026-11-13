@@ -2583,3 +2583,55 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
 - `pnpm check` exit 0.
 
 **Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). For the founder: the panel's place (Style tab) and the two settings lines, with a capture in `~/v6.2-review/look-fixes/p208-enhance-panel-1280x800.png`. Next: P209 (Enhance end to end, DC-16; push 4).
+
+## Entry 75 - 2026-11-13 - P209: Enhance end to end, DC-16; push 4
+
+**The founder's answers (2026-11-13).** The Enhance panel's place, under the Style tab's cards, and the two settings lines of P208 are approved for now; the founder will ask for changes after using them.
+
+**What changed.**
+- **DC-16, in the page.** `set-enhance.ts`' `withEnhance` and `isV5`: an Enhance equal to `Enhance::v5()` leaves `EditState` without `enhance`, at a clip's start (`run-pipeline.ts`) and on a switch. Rust already leaves it out of its JSON (D-485). Before this, a flags-on clip on V5's settings would have stored and hashed `"enhance":{…}`, unlike V6.1.
+- **The video mirror** (development and test builds only, as the caption mirror):
+  - `Scene::video_crop` and `video::Track::crop`;
+  - `RenderSession::video_mirror(t)` answering `{ src, crop }` (`scene_api.rs`, additive);
+  - the render worker's `videoMirror` (`atMs` in, the worker makes it an `OutMs`), `load-render.ts`' type, `dev-faults.ts`' `videoMirror`.
+- **Three dev hooks:**
+  - `startAsV5()`: the next clip is made as V5 made it, the AI plan switch off and `Enhance::v5()` as its start (`dev-faults.ts`);
+  - `videoMirror(at)`;
+  - `programSamples(at)`, the preview's program samples.
+- **`flags-identity.spec.ts`** (D-440 (8)):
+  - case 1's flags-on clip is made through `startAsV5()`;
+  - the version pin reads 3 with `ai_plan` (the `plans` store, D-469), else 2;
+  - the flags-off run is made once for both cases;
+  - **case 2** is new: with the defaults, the clip record, the transcript, the voice (audio packets) and the frames' count and size are V5's; the edit differs by `enhance` (`{ clean, motion: true }`) alone, and so the cache key; the mirror shows V5's crop at every time read and the drift moving `src` off it at some.
+  - **Known issue 10 closed.**
+- **`enhance-panel.spec.ts`** (new), one clip and a second:
+  - `lvl48.f32` beside `out48.f32`;
+  - the recommended start;
+  - Motion off: every time read shows the crop again;
+  - Voice off: the preview's program is `lvl48.f32`'s, sample for sample at 31 places, and `prog48.f32`'s again after undo; redo brings `lvl48` back;
+  - each switch within the edit budget, by the page's own measure;
+  - the memory `{ level, motion: false }`;
+  - the next clip starts with both off, previewing its `lvl48`;
+  - settings' "Back to recommended" says so and forgets the memory.
+- **`FLAG_SUITES`** gains `enhance-panel.spec.ts`, so CI's media job runs it. `openClipSignedIn` gains an optional `before` step.
+- **Docs:** TS §5 row; "As read (P209)" under D-440 ((8), (24)).
+
+**Both on `dist-flags/`, twice each** (D1, keyed builds, `--project=media-flags`, two separate runs):
+- 5 passed and 5 passed: `enhance-panel` 2.0 min, `flags-identity` case 1 2.9 min, case 2 1.5 min;
+- the switches: Motion 15 ms and 15 ms, Voice 74 ms and 67 ms.
+
+**Declared.**
+- D-440 (8) as above.
+- D-440 (24): `set-enhance.test.ts`' two P208 cases that read `{ clean, motion: false }` in the edit now read no `enhance` (the normalisation), every other assertion kept; two cases are added for it.
+
+**Tests (+5).** `scene_api.rs` +1 (the mirror: the crop with motion off, the drift with it on); `set-enhance.test.ts` +2; `flags-identity.spec.ts` +1; `enhance-panel.spec.ts` 1.
+
+**Tier 3** (D1):
+- Rust **1145 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **766**; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- the two flags suites as above;
+- `pnpm check` exit 0.
+
+**Push 4** (not waited on): P206a to P209, read at P210's start. Known issue 11 (the lavapipe SIGSEGV) applies: one re-run of the failed job if it shows.
+
+**Open.** 35, 39. Known issues 5, 8, 11 (P212, P210, watch). Next: P210.

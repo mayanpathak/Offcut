@@ -10,6 +10,8 @@ use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
 use offcut_render::scene::{FontSet, Hit, Rect, Rgba, Scene, SceneInput, Theme, build_scene};
+// V6.2 (P209, DC-16): the video mirror.
+use offcut_render::scene::{CropRect, DrawCmd, VideoSlot};
 use offcut_types::Enhance;
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
@@ -147,6 +149,34 @@ fn hit_of(scene: &Scene, t_out_ms: u32, x: f32, y: f32) -> Option<HitValue> {
 struct CaptionMirror {
     text: String,
     colors: Vec<String>,
+}
+
+/// V6.2 (P209, DC-16): what the main video shows at a time, for development
+/// and test builds: `src`, the part of the source the frame shows, and
+/// `crop`, the clip's crop, which `src` equals with motion off.
+#[derive(Debug, PartialEq, Serialize)]
+struct VideoMirror {
+    src: CropRect,
+    crop: CropRect,
+}
+
+fn video_mirror_of(scene: &Scene, t_out_ms: u32) -> Option<VideoMirror> {
+    let list = scene.frame_at(OutMs::new(t_out_ms));
+    list.cmds.iter().find_map(|cmd| {
+        if let DrawCmd::Video {
+            slot: VideoSlot::Main,
+            src,
+            ..
+        } = cmd
+        {
+            Some(VideoMirror {
+                src: *src,
+                crop: scene.video_crop(),
+            })
+        } else {
+            None
+        }
+    })
 }
 
 fn mirror_of(scene: &Scene, t_out_ms: u32) -> Option<CaptionMirror> {
@@ -358,6 +388,20 @@ impl RenderSession {
             .as_ref()
             .and_then(|scene| mirror_of(scene, t_out_ms));
         // A string and a list of strings always serialize.
+        mirror
+            .and_then(|mirror| to_plain(&mirror).ok())
+            .unwrap_or(JsValue::NULL)
+    }
+
+    /// V6.2 (P209, DC-16): `{ src, crop }` of the main video at `t_out_ms`
+    /// (`src` equals `crop` with motion off); `null` before a scene is set.
+    /// Only development and test builds of the page ask (D-155).
+    pub fn video_mirror(&self, t_out_ms: u32) -> JsValue {
+        let mirror = self
+            .scene
+            .as_ref()
+            .and_then(|scene| video_mirror_of(scene, t_out_ms));
+        // Two plain rectangles always serialize.
         mirror
             .and_then(|mirror| to_plain(&mirror).ok())
             .unwrap_or(JsValue::NULL)
@@ -651,5 +695,32 @@ mod tests {
         // D-440 (23), P206c: the valid hook with no hook item gains one (D-503).
         assert_eq!(checked["kept"], json!(2));
         assert_eq!(checked["dropped"].as_array().map(Vec::len), Some(1));
+    }
+
+    /// V6.2 (P209, DC-16): the video mirror. With motion off every frame's
+    /// main video shows the clip's crop; with it on, the camera's drift moves
+    /// `src` off the crop, and the crop answered stays the clip's.
+    #[test]
+    fn the_video_mirror_shows_the_crop_with_motion_off_and_the_drift_with_it_on() {
+        let times = (0..10_000).step_by(250);
+        let (off, _) = scene_of(input(|_| {}), &clip()).unwrap();
+        let crop = off.video_crop();
+        for t in times.clone() {
+            let mirror = video_mirror_of(&off, t).unwrap();
+            assert_eq!((mirror.src, mirror.crop), (crop, crop), "{t}");
+        }
+        let (on, _) = scene_of(
+            input(|v| v["edit"]["enhance"] = json!({ "voice": "clean", "motion": true })),
+            &clip(),
+        )
+        .unwrap();
+        let moved = times
+            .filter(|&t| video_mirror_of(&on, t).is_some_and(|m| m.src != crop && m.crop == crop))
+            .count();
+        assert!(moved > 0, "the drift moved no frame");
+        assert_eq!(
+            serde_json::to_value(video_mirror_of(&off, 0).unwrap()).unwrap()["crop"]["w"],
+            json!(1080.0)
+        );
     }
 }

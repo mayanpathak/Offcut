@@ -296,6 +296,13 @@ impl Scene {
         u32::try_from(frames).unwrap_or(u32::MAX)
     }
 
+    /// The clip's crop, which every frame's main video shows with motion off;
+    /// with motion on a frame shows it zoomed about its centre (V6.2, D-477).
+    /// For the page's development mirror (DC-16, P209).
+    pub fn video_crop(&self) -> CropRect {
+        self.video.crop()
+    }
+
     /// Whether the plan's hook is shown at `t` (V6.2, D-484).
     fn hooked(&self, t: OutMs) -> bool {
         self.hook_until.is_some_and(|until| t < until)

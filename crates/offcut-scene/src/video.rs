@@ -63,6 +63,11 @@ impl Track {
         (self.camera.scale_at(t) * punch).clamp(1.0, MAX_TOTAL_ZOOM)
     }
 
+    /// The clip's crop: every frame's `src` with motion off (V6.2, DC-16).
+    pub fn crop(&self) -> CropRect {
+        self.crop
+    }
+
     /// The part of the source shown at `t`: the crop itself at a scale of
     /// exactly 1.0 (bit for bit), else the crop shrunk by the scale about
     /// its centre and moved back inside the source frame.

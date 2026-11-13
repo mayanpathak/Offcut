@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClipInfo, EditPlan, EditState, Enhance, Prosody, TimeMap, Transcript } from "../gen/domain";
 import * as clipStore from "../state/clip-store";
 import * as history from "../state/history";
-import { ENHANCE_RECOMMENDED, resetEnhance, setEnhance, startEnhance } from "./set-enhance";
+import { ENHANCE_RECOMMENDED, isV5, resetEnhance, setEnhance, startEnhance, withEnhance } from "./set-enhance";
 import { redo, undo } from "./undo-redo";
 
 type Fakes = {
@@ -166,8 +166,9 @@ describe("setEnhance (§11, D-488)", () => {
   it("Motion: one step of the history, the scene built with it, no audio touched, remembered, no review_action", async () => {
     ready();
     await setEnhance({ motion: false });
-    expect(clip().edit.enhance).toEqual({ voice: "clean", motion: false });
-    expect(m.scenes.map((edit) => edit.enhance)).toEqual([{ voice: "clean", motion: false }]);
+    // P209 (DC-16): V5's settings leave the edit without `enhance`, as V6.1 wrote it.
+    expect(clip().edit).not.toHaveProperty("enhance");
+    expect(m.scenes.map((edit) => "enhance" in edit)).toEqual([false]);
     expect(m.programs).toEqual([]);
     expect(m.swapped).toEqual([]);
     expect(history.useHistoryStore.getState().past).toHaveLength(1);
@@ -228,7 +229,26 @@ describe("setEnhance (§11, D-488)", () => {
     await setEnhance({ motion: false });
     await resetEnhance();
     expect(m.meta.has("enhanceDefault")).toBe(false);
-    expect(clip().edit.enhance).toEqual({ voice: "clean", motion: false });
+    // P209 (DC-16): the clip keeps V5's settings, written as V6.1 wrote them.
+    expect(clip().edit).not.toHaveProperty("enhance");
     expect(await startEnhance()).toEqual(ENHANCE_RECOMMENDED);
+  });
+});
+
+describe("V5's settings are written as V6.1 wrote them (DC-16, P209)", () => {
+  it("withEnhance leaves V5 out and keeps every other state", () => {
+    const edit = { ...clipStore.useClipStore.getInitialState().edit, enhance: START };
+    expect(withEnhance(edit, { voice: "clean", motion: false })).toEqual(clipStore.useClipStore.getInitialState().edit);
+    expect(withEnhance(edit, { voice: "level", motion: false }).enhance).toEqual({ voice: "level", motion: false });
+    expect(isV5({ voice: "clean", motion: false })).toBe(true);
+    expect(isV5(START)).toBe(false);
+  });
+
+  it("a switch back to the start keeps the field; one to V5 drops it, and its undo brings it back", async () => {
+    ready();
+    await setEnhance({ motion: false });
+    expect(clip().edit).not.toHaveProperty("enhance");
+    await undo();
+    expect(clip().edit.enhance).toEqual(START);
   });
 });

@@ -41,7 +41,15 @@ const MEDIA_SUITES = [
 // there unchanged, less the three cases whose file the flags-on clip page
 // takes: 4K (DC-2, now `high-res.spec.ts`), "start over" (its refused file is
 // that 4K one) and the 500 MB size limit (DC-3: 16 GB with `high_res`).
-const FLAG_SUITES = ["route-long.spec.ts", "high-res.spec.ts", "long-resume.spec.ts", "flags-identity.spec.ts", "rejections.spec.ts"];
+// V6.2 (P209): `enhance-panel.spec.ts`, the Enhance panel on the flags-on build.
+const FLAG_SUITES = [
+  "route-long.spec.ts",
+  "high-res.spec.ts",
+  "long-resume.spec.ts",
+  "flags-identity.spec.ts",
+  "rejections.spec.ts",
+  "enhance-panel.spec.ts",
+];
 const FLAGS_TAKE = /REJECT_RESOLUTION: rej_4k\.mp4 |REJECT_FILE_SIZE: a file over the size limit|start over: from a refusal/;
 // On a machine without a graphics processor a case may take this many times
 // longer (`patient` of tests-e2e/helpers/fixtures.ts stretches its waits the same way).

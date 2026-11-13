@@ -13,7 +13,7 @@ import type { EditPlan, ErrorCode, EventKind, PlanItem } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
-import { crashWorker, failEncoderAt, failNextSetScene, hangWorker, imageCheck } from "../usecases/dev-faults";
+import { crashWorker, failEncoderAt, failNextSetScene, hangWorker, imageCheck, startAsV5, videoMirror } from "../usecases/dev-faults";
 import { wordAt } from "../usecases/replace-all";
 
 type WorkerKind = Parameters<typeof crashWorker>[0];
@@ -61,6 +61,15 @@ export type DevHooks = {
    * and how long the images took to decode.
    */
   imageCheck(): ReturnType<typeof imageCheck>;
+  /**
+   * V6.2 (P209, DC-16): the next clip is made as V5 made it, `Enhance::v5()`
+   * as its start and the AI plan switch off, for `flags-identity.spec.ts`.
+   */
+  startAsV5(): Promise<void>;
+  /** V6.2 (P209): the main video's `src` at `at` ms and the clip's crop; `null` before a scene. */
+  videoMirror(at: number): ReturnType<typeof videoMirror>;
+  /** V6.2 (P209): the clip's program audio at these sample indexes, as the preview plays it; `[]` without a clip. */
+  programSamples(at: number[]): number[];
 };
 
 /** The five kinds of V6.2, each on the word at that share of the transcript. */
@@ -151,5 +160,11 @@ export function installDevHooks(): void {
       useClipStore.setState({ planFallback: why });
     },
     imageCheck,
+    startAsV5,
+    videoMirror,
+    programSamples: (at) => {
+      const { prog48 } = useClipStore.getState();
+      return prog48 === null ? [] : at.map((i) => prog48[i] ?? Number.NaN);
+    },
   };
 }
