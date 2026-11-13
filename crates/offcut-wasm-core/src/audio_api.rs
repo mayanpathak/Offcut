@@ -2,11 +2,14 @@
 //! prosody measure (v3implementation §10.1) and the program's audio
 //! (v4implementation §11.2). The chain runs with `ChainConfig::default()`;
 //! the binding takes no configuration (D-110). PCM crosses by copy.
+//! V6.2 (D-487): the levelled voice, `level_only`, and the program on a
+//! chosen voice, `assemble_voice`; the entries above are unchanged.
 
 use std::cell::Cell;
 
 use js_sys::{Float32Array, Function, Object, Reflect};
 use offcut_dsp::{ChainConfig, DspError, Flow, ProgramConfig};
+use offcut_types::VoiceMode;
 use offcut_types::{ErrorCode, OutSpan, Sentence, TimeMap, Word};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -62,6 +65,52 @@ pub fn assemble(out48: &[f32], time_map: JsValue, speech: JsValue) -> Result<JsV
     let program = offcut_dsp::assemble(out48, &map, &speech, None, &ProgramConfig::default())
         .map_err(|error| failure(ErrorCode::Dsp, dsp_detail(error)))?;
     // A new array with its own buffer, so the worker can transfer it.
+    let prog48 = Float32Array::from(program.samples.as_slice());
+    object(&[
+        ("prog48", prog48.into()),
+        (
+            "loudness",
+            JsValue::from_f64(f64::from(program.loudness.get())),
+        ),
+    ])
+}
+
+/// V6.2 (D-487): `{ lvl48: Float32Array, loudness: number, peak: number }`,
+/// `pcm48` brought to the loudness target under the ceiling and nothing else
+/// (`offcut_dsp::level_only` with `ChainConfig::default()`). Fast enough to
+/// need no progress callback: one meter pass, one gain and the limiter.
+#[wasm_bindgen]
+pub fn level_only(pcm48: &[f32]) -> Result<JsValue, JsValue> {
+    let out = offcut_dsp::level_only(pcm48, &ChainConfig::default())
+        .map_err(|error| failure(ErrorCode::Dsp, dsp_detail(error)))?;
+    // A new array with its own buffer, so the worker can transfer it.
+    let lvl48 = Float32Array::from(out.samples.as_slice());
+    object(&[
+        ("lvl48", lvl48.into()),
+        ("loudness", JsValue::from_f64(f64::from(out.loudness.get()))),
+        ("peak", JsValue::from_f64(f64::from(out.peak.get()))),
+    ])
+}
+
+/// V6.2 (D-487): `assemble` on the voice `voice` names (`"clean"` or
+/// `"level"`): `voice48` is `out48` for `"clean"` and `lvl48` for `"level"`.
+/// Answers as `assemble` does; a `voice` that is neither is `E_INTERNAL`
+/// `Voice`.
+#[wasm_bindgen]
+pub fn assemble_voice(
+    voice48: &[f32],
+    voice: JsValue,
+    time_map: JsValue,
+    speech: JsValue,
+) -> Result<JsValue, JsValue> {
+    let voice: VoiceMode =
+        serde_wasm_bindgen::from_value(voice).map_err(|_| failure(ErrorCode::Internal, "Voice"))?;
+    let map: TimeMap = serde_wasm_bindgen::from_value(time_map)
+        .map_err(|_| failure(ErrorCode::Internal, "TimeMap"))?;
+    let speech: Vec<OutSpan> = serde_wasm_bindgen::from_value(speech)
+        .map_err(|_| failure(ErrorCode::Internal, "Speech"))?;
+    let program = offcut_dsp::assemble(voice48, &map, &speech, None, &ProgramConfig { voice })
+        .map_err(|error| failure(ErrorCode::Dsp, dsp_detail(error)))?;
     let prog48 = Float32Array::from(program.samples.as_slice());
     object(&[
         ("prog48", prog48.into()),

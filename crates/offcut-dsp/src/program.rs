@@ -4,6 +4,7 @@
 //! is given (INV-10). In V4 it never does: the only map is the identity and
 //! there is no music, and anything else is refused (D-164).
 
+pub use offcut_types::VoiceMode;
 use offcut_types::{Lufs, OutSpan, TimeMap};
 
 use crate::DspError;
@@ -12,8 +13,12 @@ use crate::loudness::integrated;
 
 /// How a program is put together. Empty in V4: V6.3 adds the cross-fade at a
 /// join, V6.7 the ducking of music under speech.
+/// V6.2 (D-487): which voice the program is built on. `Clean` (the default,
+/// V5's) is `run_chain`'s `out48`; `Level` is `level_only`'s `lvl48`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ProgramConfig {}
+pub struct ProgramConfig {
+    pub voice: VoiceMode,
+}
 
 /// A music bed (V6.7): mono 48 kHz, with its measured loudness.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -34,6 +39,10 @@ pub struct ProgramAudio {
 /// with its loudness; any other map or a music input is `Unsupported`. The
 /// map's length is not compared with `out48`'s: the identity plays the
 /// recording as it is, whatever its length.
+///
+/// V6.2 (D-487): `out48` is the voice `cfg.voice` names, `out48` for
+/// `Clean` and `lvl48` for `Level`. Both are as long as the recording and
+/// are read the same way, so the program is that voice on the map.
 pub fn assemble(
     out48: &[f32],
     map: &TimeMap,

@@ -98,6 +98,8 @@ ALLOW=(
   'web/src/persistence/schema.ts|^export const META_KEYS = \{ anonId: "anonId", persistRequested: "persistRequested", transcription: "transcription" \} as const;$'
   # P206c (D-503, D-440 (23)): a model plan with a valid hook gains the hook item, so the extras case keeps two.
   'crates/offcut-wasm-render/src/scene_api.rs|^ +assert_eq!\(checked\["kept"\], json!\(1\)\);$'
+  # P207 (D-487): ProgramConfig's empty one-line struct gains the field `voice` (default Clean).
+  'crates/offcut-dsp/src/program.rs|^pub struct ProgramConfig \{\}$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

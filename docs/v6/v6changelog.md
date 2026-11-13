@@ -2471,3 +2471,48 @@ The system message is 16,500 characters (16,261).
 **Docs.** TE-15's new section; D-503's "As read (P206c)" gains (5).
 
 **Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P207 (the levelled voice in the DSP).
+
+## Entry 73 - 2026-11-13 - P207: the levelled voice
+
+**What changed.**
+- **`offcut-dsp/src/level.rs`** (new, D-487): `level_only(pcm48, &ChainConfig) -> Result<ChainOutput, DspError>`, the voice with Enhance's voice switched off.
+  - It is loudness to the target, the limiter at the ceiling and one corrective pass: `run_chain`'s steps 4 to 7, written out again so that `run_chain` stays as it is.
+  - No high-pass, denoise or compressor, and no progress callback.
+  - It refuses what the chain refuses. The +24 dB gain cap is the chain's.
+- **`assemble`'s voice.** `ProgramConfig` gains `voice: VoiceMode` (re-exported from `offcut_dsp::program`), `Clean` by default.
+  - `assemble`'s signature is unchanged: its first argument is the voice the config names, `out48` for `Clean` and `lvl48` for `Level`.
+  - `ProgramConfig`'s one-line empty struct is the one line `program.rs` loses; `v62-gate.sh`'s ALLOW names it.
+- **WASM** (`offcut-wasm-core/src/audio_api.rs`, additive):
+  - `level_only(pcm48)` answers `{ lvl48, loudness, peak }`;
+  - `assemble_voice(voice48, voice, time_map, speech)` answers as `assemble` does; an unknown voice is `E_INTERNAL` `Voice`.
+  - `run_chain`, `assemble` and `measure_prosody` are unchanged. Nothing in the page calls the new entries until P208.
+  - **Read from Node on the built module:**
+    - a -30 dBFS sine levelled to -14.00 LUFS;
+    - the Level program bit for bit `lvl48`;
+    - `"clean"` bit for bit the old `assemble`;
+    - an empty input `E_DSP` `Empty`.
+  - The core binary grew 3,917 bytes (804,508 → 808,425).
+- **Docs:** TS §5 rows (`level.rs`, `tests/level_only.rs`, `program_identity.rs`' new line); "As read (P207)" under D-487.
+
+**Differs from the plan.** D-487 names `chain::level_only`; the prompt and the build guide name `level.rs`, which keeps `chain.rs` without a diff. Followed the prompt.
+
+**Acceptance.**
+- `git diff -- crates/offcut-dsp/src/chain.rs` is empty.
+- `program_identity.rs`' three old cases pass unchanged: no line of the file is removed, only an import and the new case added.
+
+**Tests (+8).**
+- `level.rs` 2 (what it refuses; silence stays at the floor).
+- `tests/level_only.rs` 5, on two derived recordings and synthetic signals:
+  - the length is the input's;
+  - the loudness is the target as the meter reads it, and the gain cap holds;
+  - no sample passes the ceiling;
+  - where the limiter does not act, the output is the input times one gain, so nothing else is done;
+  - `run_chain` on the same input is unchanged, bit for bit, and the input is untouched.
+- `program_identity.rs` +1: with `voice: Level` the program on the identity map is `lvl48` bit for bit, at its loudness, and music is refused as before.
+
+**Tier 3** (D1):
+- Rust **1142 / 0 / 5** (`cargo test --workspace`, `.env` loaded; 1134 + 8);
+- Vitest 749; `pnpm e2e` 59 passed (keyed `build:e2e`, the new WASM in it);
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P208 (the Enhance panel, `lvl48` in the audio worker, the export's voice).

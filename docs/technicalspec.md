@@ -395,6 +395,7 @@ offcut/
 │   │   │   ├── limiter.rs
 │   │   │   ├── loudness.rs
 │   │   │   ├── chain.rs               run_chain() (length-preserving)
+│   │   │   ├── level.rs               (V6.2) level_only(): loudness and the limiter only, lvl48 (v6.2implementation D-487)
 │   │   │   ├── prosody.rs             measure_prosody()
 │   │   │   ├── program.rs             [ONLY place that changes duration] assemble(); identity in V4 (v4implementation D-127)
 │   │   │   ├── regions.rs             [ONLY] (V6.3) concat_parts: a short's audio from its parts (§44.5)
@@ -405,7 +406,8 @@ offcut/
 │   │       ├── duration_preserved.rs
 │   │       ├── stream_resample.rs     (V6.1) StreamResampler in pieces equals resample_mono, sample for sample (v6.1implementation D-401)
 │   │       ├── prosody.rs
-│   │       └── program_identity.rs    the program audio equals the cleaned voice (S-6)
+│   │       ├── level_only.rs          (V6.2) length, loudness at the target, the ceiling, one gain only; run_chain unchanged (D-487)
+│   │       └── program_identity.rs    the program audio equals the cleaned voice (S-6); (V6.2) or the levelled one
 │   ├── offcut-vision/                 (V6.5) pure: shot boundaries, kinds, face tracking; depends only on offcut-types (§46)
 │   │   ├── Cargo.toml
 │   │   ├── src/
