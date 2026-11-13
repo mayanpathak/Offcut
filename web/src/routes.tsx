@@ -24,7 +24,17 @@ export const ROUTES = {
 } as const;
 
 export const router = createBrowserRouter([
-  { path: ROUTES.landing, element: <LandingPage settingsPath={ROUTES.settings} appPath={ROUTES.app} legalPath={(doc) => generatePath(ROUTES.legal, { doc })} /> },
+  {
+    path: ROUTES.landing,
+    element: (
+      <LandingPage
+        settingsPath={ROUTES.settings}
+        appPath={ROUTES.app}
+        accountPath={ROUTES.account}
+        legalPath={(doc) => generatePath(ROUTES.legal, { doc })}
+      />
+    ),
+  },
   {
     path: ROUTES.app,
     element: (

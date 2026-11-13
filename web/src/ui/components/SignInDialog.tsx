@@ -190,10 +190,11 @@ export function GateDialog({ title, testId, onClose, children }: { title: string
   );
 }
 
-export function SignInDialog({ onClose }: { onClose: () => void }) {
+/** `title` is the export gate's unless a caller names its own (V6.2 P206a: the AI plan's toast). */
+export function SignInDialog({ onClose, title = messages.signIn.title }: { onClose: () => void; title?: string }) {
   return (
     <GateDialog
-      title={messages.signIn.title}
+      title={title}
       testId="sign-in-dialog"
       onClose={() => {
         stopWaitingForLink();

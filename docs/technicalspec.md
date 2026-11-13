@@ -910,6 +910,8 @@ offcut/
 │   │       │   └── LegalPage.tsx
 │   │       ├── landing/               the landing page's sections (designimplementation D-322); the only files that may import GSAP and Motion (D-319)
 │   │       │   ├── TopBar.tsx         section 0: wordmark, anchors, "Start free", the progress bar
+│   │       │   ├── account-link.ts    (V6.2, D-501) the top bar's "Sign in", or "Account" once signed in, to /account
+│   │       │   ├── account-link.test.ts  (V6.2) the link's words in each account state
 │   │       │   ├── Hero.tsx           section 1: the headline, the way in, the capability line, the hero clip
 │   │       │   ├── CaptionedHeadline.tsx  the captioned headline and the final call's pill (M1, M10)
 │   │       │   ├── Marquee.tsx        section 2
@@ -961,6 +963,8 @@ offcut/
 │   │       │   ├── ModelDownloadPanel.tsx
 │   │       │   ├── ProcessingFeed.tsx
 │   │       │   ├── ProcessingCard.tsx     the processing state's card (v4implementation D-188)
+│   │       │   ├── plan-fallback.ts       (V6.2, D-501) the AI plan's fallback toast; signed out, its "Sign in" opens SignInDialog over the editor
+│   │       │   ├── plan-fallback.test.ts  (V6.2) the toast and its action for each reason
 │   │       │   ├── PreviewPlayer.tsx
 │   │       │   ├── PreviewGestures.tsx    the gestures and their chrome over the preview (v4implementation D-183)
 │   │       │   ├── CaptionEditor.tsx

@@ -18,6 +18,7 @@ import { Check } from "../icons";
 import { Button } from "../primitives/Button";
 import { Spinner } from "../primitives/Spinner";
 import styles from "../styles/components.module.css";
+import { planFallbackToast } from "./plan-fallback";
 import { ProcessingFeed } from "./ProcessingFeed";
 
 type Step = keyof typeof messages.processing.steps;
@@ -123,13 +124,14 @@ export function useCloudFallbackToast(): void {
 /**
  * V6.2 (§8.2, D-494, P194): one toast when a run asked for an AI plan and uses
  * the built-in rules, and why; signed out, the line says that signing in gives
- * one. Called by `Stage`, as the cloud's: told once a run.
+ * one, and its "Sign in" opens the dialog over the editor (P206a). Called by
+ * `Stage`, as the cloud's: told once a run.
  */
 export function usePlanFallbackToast(): void {
   const fallback = useClipStore((state) => state.planFallback);
   useEffect(() => {
     if (fallback !== undefined) {
-      useUiStore.getState().pushToast({ id: "plan-fallback", message: messages.plan.fallbackLine(fallback) });
+      useUiStore.getState().pushToast(planFallbackToast(fallback));
     }
   }, [fallback]);
 }

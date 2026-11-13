@@ -53,6 +53,10 @@ export const planCopy = {
   /** `plan.processing`: not shown yet; the wait is inside "Finding visual moments" (V6 CL known issue 8). */
   processing: "Planning the edit",
   fallback,
+  /** The signed-out fallback toast's action (P206a, D-501): opens the sign-in dialog over the editor. A draft. */
+  signIn: "Sign in",
+  /** That dialog's title, in place of the export gate's "Sign in to export". A draft. */
+  signInTitle: "Sign in for an AI-planned edit",
   /** The fallback line for a reason of the clip's `planFallback`: invalid, timeout and catalog read as unavailable. */
   fallbackLine: (why: string): string =>
     why === "signed_out" ? fallback.signedOut : why === "quota" ? fallback.quota : why === "offline" ? fallback.offline : fallback.unavailable,

@@ -343,3 +343,56 @@ for (const size of WIDTHS) {
     await expect(page.getByTestId("ai-plan-switch")).toHaveAttribute("aria-checked", "false");
   });
 }
+
+// --- V6.2, P206a: a way to sign in (D-501) -------------------------------------
+// The landing page's top bar, signed out and signed in, at the review width
+// and a phone's; and the plan's signed-out toast, whose "Sign in" opens the
+// dialog over the editor: the page stays at /app and the clip stays ready.
+// The editor's half needs `OFFCUT_FEATURES_ON=ai_plan pnpm screens --grep "P206a"`.
+
+const LOOK_FIXES_SIZES = [
+  { width: 1280, height: 800 },
+  { width: 390, height: 844 },
+];
+
+for (const size of LOOK_FIXES_SIZES) {
+  test(`V6.2, P206a: the landing top bar signed out and signed in, ${String(size.width)} x ${String(size.height)}`, async ({ page }) => {
+    await page.setViewportSize(size);
+    const link = page.getByRole("banner").getByTestId("landing-account");
+    await installFakeApi(page);
+    await page.goto("/");
+    await expect(link).toHaveText(messages.landing.account.signIn);
+    await picture(page, "p206a-landing-signed-out");
+    await noSeriousViolation(page, "the landing page signed out");
+
+    await installFakeApi(page, { session: {} });
+    await page.reload();
+    await expect(link).toHaveText(messages.landing.account.open);
+    await picture(page, "p206a-landing-signed-in");
+  });
+}
+
+test("V6.2, P206a: the plan's signed-out toast opens sign-in over the editor, 1280 x 800", async ({ page, context }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await ensureModelCached(context);
+  await openEditor(page);
+  test.skip(!(await planHooks(page).flags()), "a build with ai_plan on: OFFCUT_FEATURES_ON=ai_plan pnpm screens");
+
+  await dropClip(page, referenceClip());
+  const toast = page.getByTestId("toasts");
+  await expect(toast.getByText(messages.plan.fallback.signedOut)).toBeVisible({ timeout: patient(240_000) });
+  await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled({ timeout: patient(240_000) });
+  await picture(page, "p206a-plan-toast-sign-in", false);
+
+  await toast.getByRole("button", { name: messages.plan.signIn, exact: true }).click();
+  await expect(page.getByTestId("sign-in-dialog")).toBeVisible();
+  await expect(page.getByRole("heading", { name: messages.plan.signInTitle, exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/app$/);
+  await picture(page, "p206a-plan-sign-in-dialog");
+  await noSeriousViolation(page, "the sign-in dialog over the editor");
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("sign-in-dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole("button", { name: messages.preview.play, exact: true })).toBeEnabled();
+});

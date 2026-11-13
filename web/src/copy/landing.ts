@@ -51,6 +51,8 @@ export const landingCopy = {
   homeLink: "Offcut, back to the top",
   nav: { label: "Sections", features: "Features", how: "How it works", pricing: "Pricing", soon: "Coming soon" },
   cta: { startFree: "Start free", howItWorks: "See how it works" },
+  /** V6.2 (P206a, D-501): the top bar's way to the account page. Drafts for the founder. */
+  account: { signIn: "Sign in", open: "Account" },
   eyebrows: {
     hero: eyebrow(0, "Raw take in"),
     beforeAfter: eyebrow(4, "Before → after"),
