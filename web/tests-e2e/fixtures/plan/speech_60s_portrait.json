@@ -1,0 +1,29 @@
+{
+  "plan": {
+    "format": 1,
+    "catalog": 2,
+    "source": { "kind": "model", "provider": "deepseek", "model": "deepseek-flash" },
+    "cuts": [],
+    "items": [
+      { "id": "1", "kind": "hook_title", "anchors": { "start": 0, "end": 127 }, "params": { "kind": "hook_title", "params": { "accent": 3 } }, "confidence": null },
+      { "id": "2", "kind": "emoji", "anchors": { "start": 13, "end": 14 }, "params": { "kind": "emoji", "params": { "word": 13, "emoji": "eyes", "place": "under" } }, "confidence": null },
+      { "id": "3", "kind": "emphasis", "anchors": { "start": 25, "end": 26 }, "params": { "kind": "emphasis", "params": { "word": 25, "treatment": "underline", "size": "normal" } }, "confidence": null },
+      { "id": "4", "kind": "emphasis", "anchors": { "start": 30, "end": 31 }, "params": { "kind": "emphasis", "params": { "word": 30, "treatment": "highlight", "size": "normal" } }, "confidence": null },
+      { "id": "5", "kind": "emoji", "anchors": { "start": 31, "end": 32 }, "params": { "kind": "emoji", "params": { "word": 31, "emoji": "fire", "place": "beside" } }, "confidence": null },
+      { "id": "6", "kind": "punch_in", "anchors": { "start": 31, "end": 32 }, "params": { "kind": "punch_in", "params": { "scale": "strong", "motion": "snap" } }, "confidence": null },
+      { "id": "7", "kind": "punch_in", "anchors": { "start": 50, "end": 60 }, "params": { "kind": "punch_in", "params": { "scale": "strong", "motion": "push" } }, "confidence": null },
+      { "id": "8", "kind": "emphasis", "anchors": { "start": 65, "end": 66 }, "params": { "kind": "emphasis", "params": { "word": 65, "treatment": "colour", "size": "normal" } }, "confidence": null },
+      { "id": "9", "kind": "emphasis", "anchors": { "start": 72, "end": 73 }, "params": { "kind": "emphasis", "params": { "word": 72, "treatment": "colour", "size": "punch" } }, "confidence": null },
+      { "id": "10", "kind": "icon_pop", "anchors": { "start": 86, "end": 87 }, "params": { "kind": "icon_pop", "params": { "word": 86, "icon": "bar_chart" } }, "confidence": null },
+      { "id": "11", "kind": "icon_pop", "anchors": { "start": 94, "end": 95 }, "params": { "kind": "icon_pop", "params": { "word": 94, "icon": "laptop" } }, "confidence": null }
+    ],
+    "chapters": [],
+    "extras": {
+      "hook": "I almost quit making videos",
+      "post_caption": "I almost quit making videos. Then my rough cut went from 90 minutes to 10, and I got my evenings back.",
+      "hashtags": ["#videoediting", "#workflow", "#contentcreator"]
+    },
+    "music": null
+  },
+  "plans_remaining": 7
+}

@@ -1022,6 +1022,7 @@ offcut/
 │       ├── helpers/long-windows.ts    (V6.1) each window's answer from the cloud fixture (D-431); the long page's helpers
 │       ├── helpers/fixtures.ts
 │       ├── helpers/ssim.ts            (V6.2) the golden frames' SSIM, a copy of offcut-render/tests/common/ssim.rs (D-474)
+│       ├── helpers/plan-fixtures.ts   (V6.2) the AI plan's fixtures: the cloud answer with marker words planted, the recorded plan, the regenerated one (D-468)
 │       ├── media.setup.ts             fills fixtures/.cache/ for the media suites and the bench (v2buildguide item 6b)
 │       ├── landing.spec.ts
 │       ├── capability.spec.ts
@@ -1039,6 +1040,7 @@ offcut/
 │       ├── cancel.spec.ts
 │       ├── cloud-transcribe.spec.ts   (cloud transcription) the cloud path, fallbacks, the card, identity with the switch on
 │       ├── fixtures/cloud/            the TranscribeResponse the real adapter gave for speech_60s_portrait's audio (P163)
+│       ├── fixtures/plan/             (V6.2) a model's PlanResponse for that transcript, made by hand from TE-15's DeepSeek Flash answers (P210)
 │       ├── screens.spec.ts            D1-only screen capture for the design reviews; never in CI (v4implementation D-191)
 │       ├── restore.spec.ts
 │       ├── failure-recovery.spec.ts
@@ -1046,6 +1048,7 @@ offcut/
 │       ├── privacy-network.spec.ts
 │       ├── flags-identity.spec.ts     (V6.1, as built) one clip on both builds: the same records, render-cache key and export (INV-26)
 │       ├── enhance-panel.spec.ts      (V6.2) the Enhance switches on the flags-on build: Motion off shows the crop, Voice off plays lvl48, the edit budget, undo, the memory, Back to recommended
+│       ├── ai-plan.spec.ts            (V6.2) the AI plan on the flags-on build through the fake /plan: drawn, switched, copied, run again, regenerated; signed out, the switch off, the fallbacks; the network rules (D-468)
 │       ├── route-long.spec.ts         (V6.1, as built) the two ways in, the gate, a 12-minute video through the fake windows, the refusals
 │       ├── high-res.spec.ts           (V6.1)
 │       ├── image-parity.spec.ts       (V6.2) TE-30: the browser's image_basic against its golden, D1 only (D-474)

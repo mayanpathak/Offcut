@@ -49,7 +49,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
 | 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
 | 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
-| 8 | (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P210 |
+| 8 | **Moved to P211 by P210 (Entry 76):** the fake API answers at once, so no wait can be read here; P211 reads the real API's wait and the founder judges it at CP 4. Was: (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P211 |
 | 9 | **Done in P196 (Entry 58): no dark fringe at 0.5×, 1.37× or 1.5×, read as pixels; Vello premultiplies each texel before it filters.** Was: (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
 | 10 | (P199) `flags-identity.spec.ts` line 130, `expect(on.version).toBe(2)`, fails since P192: with `ai_plan` on, the flags-on build opens the `plans` store at structure version 3 (D-469), as designed. Every other check of the case passes with the pin read as 3 (P199's temporary probe: the same records, the same export). Widen it with D-440 (8)'s edit of the spec: version 3 when the build has `ai_plan`, else 2, declared | P209 |
 | 11 | **The lavapipe SIGSEGV in `golden_frames`** (carried from V5 CL known issue 9 and the cloud release's known issue 2): the test process dies on CI's software GPU partway through the goldens, after the ones read so far passed. Seen in V6.2 at push 1 (run 43185400050 on `6078648`, a server-only commit; not read at the time) and push 3 (run 43329295884 on `1c94d83`, attempt 1: 14 of 33 goldens passed, each 0.9997, then the crash; attempt 2 passed in full). The rule stands: read the log, re-run the failed job once. **Two of V6.2's three pushes so far**, where V5 saw one in 26 runs: if it stops a re-run too, or keeps this rate past push 4, look into it (one thread per golden, or a fresh device per test) | Watch |
@@ -2613,7 +2613,7 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
   - the memory `{ level, motion: false }`;
   - the next clip starts with both off, previewing its `lvl48`;
   - settings' "Back to recommended" says so and forgets the memory.
-- **`FLAG_SUITES`** gains `enhance-panel.spec.ts`, so CI's media job runs it. `openClipSignedIn` gains an optional `before` step.
+- **`FLAG_SUITES`** gains `enhance-panel.spec.ts`. ~~so CI's media job runs it~~ **Corrected in P210 (Entry 76):** CI runs the flags suites with `--grep @no-gpu` only, and this spec has no such case, so it runs on D1 only, as `flags-identity.spec.ts` does. `openClipSignedIn` gains an optional `before` step.
 - **Docs:** TS §5 row; "As read (P209)" under D-440 ((8), (24)).
 
 **Both on `dist-flags/`, twice each** (D1, keyed builds, `--project=media-flags`, two separate runs):
@@ -2635,3 +2635,49 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
 **Push 4** (not waited on): P206a to P209, read at P210's start. Known issue 11 (the lavapipe SIGSEGV) applies: one re-run of the failed job if it shows.
 
 **Open.** 35, 39. Known issues 5, 8, 11 (P212, P210, watch). Next: P210.
+
+## Entry 76 - 2026-11-13 - P210: the AI plan end to end
+
+**Push 4's CI** (run 43412796622 on `0dd99db`, P206a to P209): attempt 1 failed only on the lavapipe SIGSEGV in `golden_frames` (known issue 11); one re-run of the failed jobs passed everything: 33 goldens (23 at 0.9997, 3 at 0.9999, llvmpipe LLVM 21.1.8), Vitest 766, Playwright 59, the media cases 25 passed with 1 flaky (the first-run model download, known issue 3) and 1 skipped, the flags cases all passed with 1 skipped. Known issue 11 has now shown on 3 of V6.2's 4 pushes (1, 3, 4), each time cleared by one re-run.
+
+**A correction to Entry 75.** It said `FLAG_SUITES` gaining `enhance-panel.spec.ts` makes CI's media job run it. It does not: CI runs the flags suites with `--grep @no-gpu`, and neither `enhance-panel.spec.ts` nor `flags-identity.spec.ts` has such a case (the run's log names neither). Both run on D1 only, as planned for their acceptance. Entry 75's line is struck through and points here.
+
+**What changed.**
+- **`fake-api.ts`' `plan` option** (D-444): absent by default, so `/plan` still answers 404 and every existing suite is unchanged. With it, a request without the fake's bearer is 401 (as the server, D-494), and one with it gets `response` after `delayMs`, or `failure`. `api.setPlan` changes it later (for "Regenerate plan").
+- **`web/tests-e2e/fixtures/plan/speech_60s_portrait.json`**, a model's `PlanResponse` for the reference clip's cloud transcript. It was made by hand from TE-15's DeepSeek Flash answers for `a01-scriptA` on the items of P206's `all_kinds.rs`, whose word indexes are the cloud transcript's: the hook ("I almost quit making videos", accent "making"), two emoji, four emphases (one a punch word), two zooms and two icons. That is 11 items, and the browser's validation keeps all of them. It sits beside `fixtures/cloud/`, where the e2e fixtures live. The build guide's "a plan from P211's first run if available" was not available: P211 comes after.
+- **`helpers/plan-fixtures.ts`:** the cloud answer with three marker words planted at words no item points at (`Zorblax`, `Quintessa`, `Vexmoor`); the recorded plan and its kinds; the regenerated plan (3 of its items, a new post caption); and `signedInPlan()`.
+- **`ai-plan.spec.ts`** (new, in `FLAG_SUITES`), 11 cases:
+  - *Signed in, the switch on, one clip transcribed in the cloud:*
+    1. One `POST /plan`, its words the transcript as heard, markers included. `plan_result` is `{ model, ok, items 11, dropped_by_reason {} }`. No fallback line. Only `POST /api/v1/plan` carries a marker word, and no request carries any of 20 pieces of 32 bytes of the clip. The list shows the model's 11 items in time order, "11 of 11 visuals on", the text for the post and "Regenerate plan". axe 0.
+    2. Each Copy puts its text on the clipboard.
+    3. At the emoji's word ("nobody") the caption shows it, and the pointer finds a caption word with the emoji drawn over the block.
+    4. Each of the 11 items switched off (10 of 11), then undone (11 of 11).
+    5. The export says "4 words emphasized" and "7 visual moments", and `export_done` carries `items_kept: 11, items_disabled: 0`.
+    6. Run again: a new clip whose scene is refused once after its plan was kept (`failNextSetScene`); "Try again" makes no request, shows the same 11 items and sends no second `plan_result`.
+    7. "Regenerate plan": one request, the 3-item plan and its new caption; then a 429 `plan_quota` makes a second request, says "…this month's AI plans are used…" and changes nothing. axe 0.
+  - *Signed out* (transcribed on the device): no `/plan` request, only V4's kinds, the sign-in line once, and `plan_result` `{ rules, signed_out }`. No request carries the media.
+  - *The switch off* (Settings, then the clip): no `/plan` request, the rules plan, no "Regenerate plan", no fallback line, `plan_result` `{ rules, off }`. No request carries a marker word or the media.
+  - *Fallbacks:* 502 `plan_unavailable` and 429 `plan_quota`. Each makes one request, gives the rules plan and no text for the post, and shows its line once.
+- **Read in the first run:** case 6 first used `failClip` on the ready clip. A ready clip forced to `failed` keeps its files open, so its run again failed `E_STORAGE_IO` ("Offcut could not save on this device"). That is a fault of the hook, which skips the clip machine on purpose, not of a real failure. The case now uses a failure during processing.
+- **Known issue 8** ("Planning the edit" not shown) moves to P211: the fake answers at once, so the wait can only be read on the real API, and the founder judges it at CP 4.
+- **Docs:** TS §5 rows for the spec, the helper and `fixtures/plan/`. "As read (P210)" under D-444, D-468, §13.4's row and §14.1.
+
+**`ai-plan.spec.ts` twice on `dist-flags/`** (D1, keyed `build:e2e:flags`, `--project=media-flags`):
+- Run 1 (spec alone): 9 of the 11 cases passed. Case 6 failed as read above, and case 7 did not run after it. After the fix, the signed-in group's 7 cases passed (44.5 s with setup).
+- Run 2, inside the whole of `FLAG_SUITES`: all 11 passed. Signed-in cases 5.8 s, 0.2 s, 0.7 s, 2.1 s, 17.6 s (export), 5.7 s, 0.9 s. Signed out 1.1 min (device transcription). Switch off 5.1 s; 502 5.7 s; 429 4.7 s.
+
+**V6.1's flags suites in `dist-flags/`** (D-444), the same run: 47 passed and 1 skipped (`rejections.spec.ts`' standing skip), in 13.5 min. That covers route-long 9, rejections 13, long-resume 6, high-res 4, flags-identity 2 and enhance-panel 1, besides `ai-plan`'s 11 and setup's 2. The Enhance switches took 17 ms (Motion) and 81 ms (Voice).
+
+**Declared.** No existing test case changed. `fake-api.ts` only gains an option and a method. `FLAG_SUITES` gains one name.
+
+**Tests (+11).** `ai-plan.spec.ts` 11.
+
+**Tier 3** (D1):
+- Rust **1145 / 0 / 5** (`cargo test --workspace`, `.env` loaded; no Rust changed);
+- Vitest **766**; `pnpm e2e` **59** passed on a rebuilt keyed `build:e2e` (`dist/` unchanged);
+- the flags suites as above;
+- `pnpm check` exit 0; the gate `gate: ok`.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8, 11 (P212, P211, watch). Next: P211 (the real product, CP 4; five real calls, about $0.01, at the founder's word).

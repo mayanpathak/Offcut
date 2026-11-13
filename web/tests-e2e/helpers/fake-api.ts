@@ -21,7 +21,16 @@ export type FakeApi = {
   forget(): void;
   /** The raw bytes of every `POST /transcribe`, in order (cloud transcription). */
   transcribeBodies: Buffer[];
+  /** V6.2 (P210): how `POST /plan` answers from now on; `undefined`: 404, as without the option. */
+  setPlan(plan: FakePlan | undefined): void;
 };
+
+/**
+ * V6.2 (P210): how `POST /plan` answers a request that carries the fake's
+ * bearer: `response` after `delayMs`, or `failure`. A request without the
+ * bearer is 401 whatever this says, as the server answers (D-494).
+ */
+export type FakePlan = { response: unknown; delayMs?: number } | { failure: FakeFailure };
 
 /** The account the fake holds. `null`: nobody is signed in, and `/auth/refresh` answers 401. */
 export type FakeSession = {
@@ -60,6 +69,12 @@ export type FakeApiOptions = {
      */
     windows?: (index: number, total: number) => unknown;
   };
+  /**
+   * V6.2 (P210): how `POST /plan` answers. Absent by default: it answers 404,
+   * so every existing suite on `dist-flags/` meets a failed request and the
+   * rules plan, as before (v6.2implementation D-444).
+   */
+  plan?: FakePlan;
   /** Signed in from the start. The default is nobody: `/auth/refresh` answers 401 (v6implementation §15.4). */
   session?: FakeSession;
   /** Another page's `api.account`, in place of a new one. */
@@ -224,6 +239,7 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
   const transcribeBodies: Buffer[] = [];
   const notifyMe = options.notifyMe ?? { status: 204 };
   const account: FakeAccount = options.account ?? { session: options.session === undefined ? null : { ...options.session }, receipts: new Set<string>() };
+  let plan = options.plan;
 
   await page.route(`**${API_PREFIX}/**`, async (route) => {
     const request = route.request();
@@ -257,6 +273,19 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
             ? options.transcribe.windows(Number(window[1]), Number(window[2]))
             : options.transcribe.response;
         await route.fulfill({ status: 200, contentType: JSON_TYPE, body: JSON.stringify(heard) }).catch(() => undefined);
+      }
+    } else if (path === "/plan" && plan !== undefined) {
+      // V6.2 (P210): the bearer before anything else, as `plan/route.rs` reads it.
+      const answering = plan;
+      if (request.headers().authorization !== `Bearer ${FAKE_ACCESS_TOKEN}`) {
+        await route.fulfill({ status: 401, contentType: JSON_TYPE, body: JSON.stringify({ code: "unauthorized", retry_after_secs: null }) });
+      } else if ("failure" in answering) {
+        const failure = errorAnswer(answering.failure.status, answering.failure.code, answering.failure.retryAfterSecs);
+        await route.fulfill({ status: failure.status, contentType: JSON_TYPE, body: JSON.stringify(failure.json) });
+      } else {
+        await wait(answering.delayMs ?? 0);
+        // The page may have stopped waiting (its own timer, a cancel).
+        await route.fulfill({ status: 200, contentType: JSON_TYPE, body: JSON.stringify(answering.response) }).catch(() => undefined);
       }
     } else if (path === "/events") {
       await route.fulfill({ status: 204 });
@@ -292,6 +321,9 @@ export async function installFakeApi(page: Page, options: FakeApiOptions = {}): 
       transcribeBodies.length = 0;
     },
     transcribeBodies,
+    setPlan: (next) => {
+      plan = next;
+    },
   };
 }
 
