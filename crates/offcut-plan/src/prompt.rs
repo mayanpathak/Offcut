@@ -17,6 +17,11 @@ use crate::validate::{
     MAX_PUNCH, POST_CAPTION_MAX_CHARS, PUNCH_GAP_MS,
 };
 
+/// V6.2 (P211b, D-508): the post caption the prompt asks for, one or two
+/// sentences at most this long (the founder at CP 4). The validation still
+/// keeps one up to `POST_CAPTION_MAX_CHARS`, so a longer one is not dropped.
+pub const POST_CAPTION_TARGET_CHARS: usize = 150;
+
 /// A pause at least this long is marked in the user message (assumption, V6.2).
 pub const PAUSE_MARK_MS: u32 = 300;
 
@@ -184,8 +189,8 @@ fn finished_short_text() -> String {
          from 0, not the transcript's: in \"We cut our bill\", \"bill\" is 3, and in a hook of n \
          words the last is n - 1. Its anchors are every word of the transcript: start 0, and \
          end one more than the index of the transcript's last word. post_caption: the text to \
-         post with the short, at most \
-         {POST_CAPTION_MAX_CHARS} characters. hashtags: at most {MAX_HASHTAGS}, each # followed \
+         post with the short, one or two sentences and at most \
+         {POST_CAPTION_TARGET_CHARS} characters. hashtags: at most {MAX_HASHTAGS}, each # followed \
          by 1 to {HASHTAG_MAX_CHARS} letters, digits or underscores."
     );
     out

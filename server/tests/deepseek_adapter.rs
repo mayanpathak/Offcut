@@ -202,9 +202,10 @@ async fn the_request_is_the_one_recorded() {
         json!({ "role": "user", "content": "the user message" })
     );
     // The system message is the prompt, the lead and the compact schema: the
-    // same 16,500 characters (UTF-16, as the recording counted) P206c's
-    // second re-read sent (16,366 in P188c, 16,261 in P206c's first; D-503's
-    // hook lines, declared in V6 CL Entries 71 and 72).
+    // same 16,524 characters (UTF-16, as the recording counted) P211b's
+    // re-read sent (16,366 in P188c, 16,261 and 16,500 in P206c's two; D-503's
+    // hook lines and D-508's post caption, declared in V6 CL Entries 71, 72
+    // and 79).
     let system = sent["messages"][0]["content"].as_str().unwrap();
     assert_eq!(system, system_message(&request("")));
     assert!(system.starts_with(&system_prompt()));

@@ -265,6 +265,28 @@ Every call answered 200 on the first try, with no retry and no item skipped by t
   TE-15's labelled transcripts had neither the device's split number nor, as often, an icon inside a list.
 - **What the person sees of a drop:** the Visuals tab lists every item of the model's plan, the dropped ones included, each with its switch on ("10 of 10 visuals on" in run 1, where 8 are drawn). `export_done`'s `items_kept` counts the same way (10 in run 1). The export's "What we changed" counts what was drawn (2 words emphasized, 6 visual moments = 8). Recorded for CP 4.
 
+### TE-15's re-read for the post caption (P211b, 2026-11-14, D-508)
+
+**The change.** One line of the prompt's extras paragraph: `post_caption` is "one or two sentences and at most 150 characters" (it said "at most 2200 characters"). The system message is 16,524 characters (16,500 before); the user messages are unchanged.
+
+**The run.** The founder's yes at CP 4. Flash, thinking off, TE-15's 15 transcripts, with P206c's harness:
+- 16 calls (one parse retry on `w10`), $0.0171;
+- 2.1 to 4.0 s a call.
+
+**The captions:**
+- **Length:** every one 79 to 148 characters (median 103, none over 150), against 300 to 450 before.
+- **Sentences:** one or two each.
+- **Kept:** 15 of 15 by the validation.
+- **Examples:** a01 "I spent 3000 hours editing by hand. Then my rough cut went from 90 minutes to 10, and I got my evenings back." w01 "I doubled my price and almost nobody left. Charge for the value, not the hours."
+
+**The rest of the plan:**
+- **The hook:** kept 15 of 15 (the model's own 13, `validate`'s two).
+- **Drops:** 16 of 120 items; median 12.5% (11.1% at P206c's second re-read), mean 13.6%.
+  - The reasons moved: `number_reveal` anchor rule 4 (new), `from_to` number unresolved 5 (5), `number_reveal` number unresolved 3 (4), `icon_pop` zone taken 2 (new), `hook_title` params mismatch 2 (1), density 2 (2), zoom too close 0 (1).
+  - None of these paragraphs changed. Read as the run-to-run variance of 15 plans at temperature 0.2, as at P206c.
+
+The annotated plans are in `~/v6.2-review/p211b/plans/`.
+
 ## D-488 - The Enhance switch's time (P208, 2026-11-13, d1)
 
 **How.** Chrome on D1, the keyed flags-on build (`dist-flags/`), the reference clip (74.7 s) processed signed in, then the Style tab's Enhance switches clicked in turn. Each time is the page's own `performance` measure, from `setEnhance`'s call to the change shown (`offcut:enhance:voice`, `offcut:enhance:motion`), read by a scratch Playwright case (not committed).

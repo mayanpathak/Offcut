@@ -2763,3 +2763,33 @@ The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a
 **Not pushed** (push 5 is P212).
 
 **Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211b (the post caption at most 150 characters; a re-read of about $0.02), then the founder's go.
+
+## Entry 79 - 2026-11-14 - P211b: a shorter post caption
+
+**Asked for at CP 4** (Entry 77): a shorter post caption, one or two sentences of at most 150 characters, to post on Instagram and other social sites. Recorded as D-508.
+
+**What changed.**
+- **The prompt:**
+  - `prompt.rs`' extras line asks for the post caption in "one or two sentences and at most 150 characters" (`POST_CAPTION_TARGET_CHARS`, new);
+  - the output schema's `maxLength` and the validation's `POST_CAPTION_MAX_CHARS` stay 2,200, so a longer answer is still kept, not dropped;
+  - the system message grows from 16,500 to 16,524 characters.
+- **`system_prompt@v2.snap`:** that one line changes ("one or two sentences and", 2200 → 150). It was new in P186, so it is not a snapshot of the gate's base.
+- **The recorded request:** `request.recorded.json` holds the new length, 16,524, from this re-read's record, and `deepseek_adapter.rs`' comment says so; every other field is as recorded before.
+
+**The re-read** (TE-15, `experiments.md`; the founder's yes at CP 4):
+- **Calls:** 16 Flash calls on the 15 transcripts (one parse retry), $0.0171.
+- **Captions:** every one 79 to 148 characters (median 103), one or two sentences, all 15 kept by the validation.
+- **The hook:** kept 15 of 15.
+- **Drops:** median 12.5% (11.1% at P206c's second re-read). The reasons moved between kinds whose paragraphs did not change; read as variance.
+
+The annotated plans are in `~/v6.2-review/p211b/plans/`.
+
+**Declared.** `deepseek_adapter.rs`' recorded length (16,500 → 16,524) and its comment, as in P206c (Entries 71, 72). No assertion changed.
+
+**Tests.** `offcut-plan` and `offcut-api` 415 passed, 0 failed (`.env` loaded); clippy clean.
+
+**The local CP 4 stack** gets a rebuilt API with this prompt, so the founder's runs show the short caption.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: the founder's go at CP 4, then P212.
