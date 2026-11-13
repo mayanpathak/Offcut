@@ -524,6 +524,12 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 
 **(V6.1, as built; dark in production.)** L0 to L4 exist behind `long_video`, and V6.1 ends at the master transcript: "Your video is transcribed", its length and its sentences at their times, and "Shorts from it come next." (V6.4 replaces that screen with L5). As built: the gate (L1) asks in order for an account, then whether transcription is on ("Checking that transcription is available…", at most 45 s), then the disk, then says what is sent and offers Start; no limit line yet (the Free plan's one long video a month comes with V6.4). L2 shows the amount needed but no way to clear older clips (V7). L3 has two stages, "Reading the sound" and "Transcribing N of M", each with its bar, the time left once a tenth is done, and Cancel; there is no user Pause button (the job pauses itself with a reason: off right now, busy, signed out, offline, or the computer slept). L4 is as written: transcription continues without the file; the sound step asks for the same file and refuses another. The landing page is unchanged in V6.1 (D-425).
 
+**(V6.2, as built: D-494, D-501, D-507.)**
+- **The AI plan needs an account.** Signed out, a clip gets the built-in rules' plan with no request, and one toast: "Sign in to get an AI-planned edit. Using the built-in rules for now." Its "Sign in" opens the sign-in dialog over the editor, so the clip is not lost.
+- **The landing page:** its top bar offers "Sign in" (or "Account"), and its calls to action read "Start creating" (was "Start free").
+- **Signed in with "AI edit plan" on** (the default), the plan's wait sits inside "Finding visual moments" (4 to 5 s on the reference clip).
+- **On a failure** (the service down, this month's plans used, offline, a timeout), the clip finishes on the rules with one toast that says why.
+
 ---
 
 ## 11. Monetization
@@ -549,6 +555,8 @@ This list may be large; that is acceptable. It exists to make the P0 capabilitie
 **Upgrade trigger design.** (1) Visible export counter before every export. (2) After the first watermarked export, one dismissible prompt framed as removing the watermark and getting 1080p. (As built in V6, read with J12's "On a free export": after each watermarked export, once, until it is dismissed.) (3) At export #3 on Free, "this is your last free export this month" before the click. (4) No upgrade popups during processing or editing.
 
 **Target plan mix.** At MVP, 100% of paid users are on Creator. Billing mix (ASSUMPTION): 75% monthly / 25% annual in the base case, giving a blended revenue per paid user of 0.75 × $15 + 0.25 × $12 = **$14.25/month** (§13.2). Pro is excluded from all numbers in this document.
+
+**(V6.2, as built: D-461, D-494.)** AI plans are counted per signed-in account: Free 40 a month, Creator up to 3,000 (a log line above 1,000). There is no anonymous allowance.
 
 ---
 
@@ -651,6 +659,11 @@ It also shows: processing mode ("Local rendering; AI edit plan on/off" with the 
 
 **Measured by.** E-11: plan items kept versus switched off in review, cuts restored, and the "Would you post this?" answer for AI plans versus rule plans (§19).
 
+**(V6.2, as built: D-454, D-500, D-504, D-506, D-508.)**
+- **The model:** DeepSeek's `deepseek-flash` writes the plan; the settings line says the transcript's words and timings go to DeepSeek, in China, never the audio or video.
+- **The Visuals tab** lists the plan's items that are drawn, each with its own icon and switch, and "Regenerate plan" under them. A row for the hook title shows the hook's text.
+- **"Text for your post"** under the list holds the hook, a post caption of one or two sentences (at most 150 characters asked) and up to 8 hashtags, each with Copy. Nothing there is sent anywhere.
+
 ### 12.9 From a long video to finished shorts (v1.3, V6.1, V6.3, V6.4; v1.4)
 
 **Its own page (v1.4).** "Make shorts from a long video" is a separate page from "Edit a clip" (L0); both open the same editor.
@@ -728,6 +741,12 @@ Each edit teaches the next plan: which kinds of visual and short the creator kee
 **Not at launch (founder, 2026-11-09):** HDR input (rejected with advice, §9.2), a bundled music library (the person's own track only), colour looks and LUTs (§21 item 16), sliders of any kind.
 
 **Measured by.** E-16 (a blind test against Submagic before the founding release), E-15 (the quality pass), and E-11 (which switches people turn off).
+
+**(V6.2, as built: D-480 to D-488, D-497, D-505.)**
+- **V6.2 draws** the hook lockup (2 s), emphasis (colour, underline, highlight), punch words, emoji, icons, zooms, the camera drift and a fourth style, Glow.
+- **The Enhance panel** sits under the Style tab's cards with two switches, Voice cleanup and Motion, each one undo step. A new clip starts with them as last set, and settings' "Back to recommended" resets them.
+- **Motion stays off in production until V6.5.**
+- **"What we changed"** says "Voice cleaned" only with Voice cleanup on.
 
 ---
 

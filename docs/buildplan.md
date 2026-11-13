@@ -33,7 +33,7 @@
 | **V5** | Export that an independent tool accepts | M1.6 | Week 5, first half: 9-11 Nov | All 11 verifier checks pass |
 | **V6** | Accounts, limits, payments: the MVP features complete | M1.7, M1.8 | Week 5, second half: 12-15 Nov | **M1 gate** (Sun 15 Nov): all v1.1 P0 features work |
 | **V6.1** | Long source (v1.4): its own page, 45 minutes read in place, 4K, HEVC, cloud transcription in resumable windows | M1.16 | After V6; dated when V6 closes | Master transcript survives a killed tab; flags off equals V5. **As built:** P171-P182 on `v6.1-build` (2026-11-08/09), merged dark (`long_video` and `high_res` off in production); tag `v6.1` on the merge commit |
-| **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap; (v1.5) hook lockup, caption glow, punch words, motion by rules, the Enhance panel | M1.9 | | AI plans validate and render; fallback works; privacy test revised; `Enhance::v5()` equals V5 |
+| **V6.2** | AI edit plan (backbone) + emphasis, emoji, text extras; spend cap; (v1.5) hook lockup, caption glow, punch words, motion by rules, the Enhance panel | M1.9 | | AI plans validate and render; fallback works; privacy test revised; `Enhance::v5()` equals V5. **As built:** Setup and P183-P212 (with P183b, P188b-c, P189b, P206a-c, P211a-b) on `v6.2-build` (2026-11-11 to 14), DeepSeek Flash in place of Gemini (D-500), merged dark (`ai_plan` and `motion` off, `PLAN_ENABLED=false`); tag `v6.2` on the merge commit |
 | **V6.3** | Pause and silence cuts; the `Assembly` (stitched parts) | M1.10 | | Cut and stitched exports pass the verifier at the map's duration |
 | **V6.4** | Director: a long video becomes 5-10 shorts; list; batch export | M1.17 | | A long fixture gives 5 exported shorts, API up or down. **Private alpha after this** |
 | **V6.5** | Local vision and face-tracked framing; (v1.5) following the speaker in two-person shots | M1.18 | | A moving speaker stays framed; the person speaking is on screen (TE-27); no frame leaves; `FramePath::none` equals V5 |
@@ -797,6 +797,18 @@ V7-V10 keep their five weeks, so public launch is about **February to early Marc
 - [ ] E-11 instrumentation live; TE-15 recorded; `AI_MONTHLY_CAP_USD` set by the founder.
 - [ ] (v1.5) `motion.rs` (segments, alternation, no motion on `Screen` shots, the zoom cap), `easing.rs`, `lockup.rs`, `enhance.rs` (each switch off equals the stage absent), goldens for glow, punch, emoji under, the hook and a motion frame; `enhance-panel.spec.ts` (each switch flips the preview within the edit budget; the choice is remembered); `flags_identity.spec.ts` under `Enhance::v5()` (DC-16).
 - [ ] Goldens for existing styles unchanged. Tagged `v6.2`.
+
+**As built (V6.2, `docs/v6.2/v6.2implementation.md` and V6 CL Entries 40 to 81).**
+- **The prompts:** Setup and P183-P212 (P187 inside P186 and P198 inside P199), with nine prompts added on the way (P183b, P188b, P188c, P189b, P206a, P206b, P206c, P211a and P211b), by hand, with four checkpoints with the founder:
+  - CP 1, the model;
+  - CP 2a and 2b, the image names and the images;
+  - CP 3, the design review, which asked for P206a-c;
+  - CP 4, the real product, which asked for P211a-b.
+- **DeepSeek Flash with thinking off replaced Gemini** (D-500).
+- **The plan:** `plan_result` replaces the planned stage timing, and the plans store is IndexedDB structure version 3.
+- **Where things live:** the drift is in `camera.rs`, the images are embedded in the WASM, Enhance has two fields (`voice`, `motion`), and the post caption is asked short (D-508).
+- **Not in V6.2:** the privacy page's own text naming DeepSeek waits for `ai_plan` to go on (open item 35), and `motion` waits for V6.5.
+- **The browser specs:** `ai-plan`, `enhance-panel` and `flags-identity` run on D1 only (no `@no-gpu` case), with `image-parity` in the media project.
 
 ---
 

@@ -1247,6 +1247,7 @@ everything ─► gen (types only)
 - **Edges added in V6.** `start-app.ts` to `restore-session.ts`: `connectAccount()` runs first in `start-app.ts` and hands `api-client.ts` its `connectAuth` links and `receipt-outbox.ts` its `connectOutbox` links, so `net` and `persistence` import no store (v6implementation D-306). `blockers.ts` to `entitlement.ts`, as §12.5 asks `effective()` (D-309). `offcut-api` uses `getrandom` directly, as a wrapper in `deny.toml`, for the 32 random bytes of a link and a refresh token (D-257).
 - **Edges added in the cloud transcription release.** `run-pipeline.ts` to `transcribe-cloud.ts` (cloudimplementation D-372): the pipeline hands the clip's sound to the one use-case that sends it.
 - **Edges added in V6.1 (as built, the V6.1 plan §4.1).** `run-source-pipeline.ts` to `transcribe-source.ts`, the second use-case that sends audio (a long source's windows); `import-source.ts` and `continue-source.ts` to `run-source-pipeline.ts`; `import-clip.ts` to `import-source.ts` (the hand-over of a too-long clip's `File`, D-421); `start-app.ts` to `continue-source.ts` (D-419). The UI may name `transcribe-source.ts`' `windowCount` (the long page's progress).
+- **Edges added in V6.2 (V6.2, as built: the V6.2 plan §4.1, D-458, D-487).** `run-pipeline.ts` to `choose-plan.ts`, which asks through `request-plan.ts`, the one use-case that sends transcript text (P-1, P-14); `regenerate-plan.ts` to `request-plan.ts` and to `review-update.ts` ("Regenerate plan" goes through the update rule's queue); `set-enhance.ts` to `review-update.ts` (a switch is a review change, D-488); `run-pipeline.ts` to `set-enhance.ts` (a clip starts on the remembered Enhance); `review-update.ts`, `run-pipeline.ts` and `start-export.ts` to `voice-program.ts` (the program on a voice, made in one place). `offcut-api` depends on `offcut-plan` with its `prompt` feature (as planned above); `offcut-render` gains `png` as a normal dependency, to decode the embedded image bundle (P196).
 
 ---
 
@@ -3070,7 +3071,7 @@ All routes are under `/api/v1`, JSON only, `Cache-Control: no-store`. Default bo
 | `POST /events` | none | Analytics batch, at most 50 events | 16 kB | 60 requests/min per IP | None; duplicates tolerated |
 | `POST /notify-me` | none | Waitlist / unsupported-platform email | 1 kB | 5/h per IP | Primary key (email, wanted) |
 | `POST /transcribe` (cloud transcription release) | bearer | One clip's compressed sound (`audio/ogg`, Opus, mono, at most 92 s) to its words with times, from the transcription provider; checks before the body is read; never stored or logged (P-16) | **1 MiB** (DC-14) | 20 per 24 h per user; 60/h per IP; a global audio budget of 7,000 s an hour and 27,000 s a day (`transcribe/budget.rs`). **v1.4, windows of a long source** (header `X-Offcut-Window: <index>/<total>`, §43.6): instead of the 20, `LONG_AUDIO_PER_USER_DAY = 3 h` of audio per user per 24 h, and 200/h per IP (assumptions; the founder sets them). A client that marks clips as windows gains at most that budget. The global budget's values come from `TRANSCRIBE_BUDGET_HOUR_S` and `TRANSCRIBE_BUDGET_DAY_S`, defaulting to the values above, so the Dev tier raises them without a code change (§52). **(V6.1, as built: D-411, D-412.)** `0 ≤ index < total ≤ MAX_SOURCE_WINDOWS = 35`; a malformed header is 400 before the body is read. A request with the header is counted by `TranscribeWindowUser` (120 windows per 24 h, at most 3 hours of 90 s windows) and `TranscribeWindowIp` (200/h); one without it by `TranscribeUser` and `TranscribeIp` as before. The IP check moved from the route's layer into the handler, at the same place (before the body is read; an unauthenticated request still spends the address's token), so the header chooses the group. The log line gains `window: true/false`, never the index. `config::transcribe_budget()` reads the two budget variables apart from `Config`; `budget.rs`' constants stay the defaults | None; each success counts against the budget |
-| `POST /plan` (v1.2, V6.2) | bearer optional | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
+| `POST /plan` (v1.2, V6.2) | bearer optional; **(V6.2, as built: D-494) bearer required, a request without one is 401 before its body is read** | Edit plan: forward the transcript to the AI provider, return `PlanResponse` (§40.7); body never stored or logged | 64 kB | 10/min per IP; plan quotas of §40.7 | None; each success counts once against the quota |
 | `POST /shorts` (v1.3, V6.4) | bearer | Director: sentences → `ShortsPlan` (§45.3); body never stored or logged | **160 kB** (DC-15, v1.4) | 6/min per user | A repeat for the same prefix in a month uses no new grant |
 | `POST /broll/search` (v1.4, V6.8) | bearer | Stock B-roll search: one query → at most 12 Pixabay results (§48.6); the query is never stored or logged; the cache is keyed by its hash | 1 kB | 20/min per user; 90 per 60 s for the whole server | Cached 24 h by query hash |
 | `POST /chat-edit` (v1.3, V6.9) | bearer | Chat: message and context → `ChatReply` (§49.3); body never stored or logged | 64 kB | 30/min per user | none |
@@ -4282,6 +4283,7 @@ These are open, not contradictions. Each (assumption) is listed with what will m
 32. (v1.3) The launch date: V6.1-V6.11 sit before V7; the founder re-sets M2 when V6.11 closes (PS A-2).
 33. (v1.2) Colour emoji: the embedded emoji font is monochrome (§19.6); whether V6.2's emoji items need a colour font (and whether Vello draws its colour tables) is decided in V6.2.
 34. (V6.1, measured) The long path's assumptions as read: `CLOUD_LONG_CONCURRENCY = 2` meets Groq's free tier's per-minute limit on every long source (open item 24; Groq's Dev tier, or one in flight, before `long_video` goes on); `CLOUD_OVERLAP_S` 10, not 5 (TE-18's first read); the read cache of 8 blocks of 1 MiB and in-place reading hold 34-37 MB for 45 minutes (TE-17); `LONG_SCRATCH = 2 GB` is kept, not measured (`pcm16.f32` is 173 MB for 45 minutes); the window group of 120 a day and the global budget's 7,000 s an hour and 27,000 s a day are unchanged; `MAX_SOURCE_DURATION` is exact, so a file a fraction of a second over 45:00 is refused (the founder decides on a tolerance).
+35. (V6.2, measured) The plan's assumptions as read: `deepseek-flash` at 0.30 / 1.20 USD per 1M tokens, about $0.0035 a plan with a 7,433-token prompt; latency 4 to 5 s against the 10 s target; the median drop rate over TE-15's 10% line on several reads (numbers that do not resolve, an icon on a word inside a list), accepted by the founder for V6.2 and to be read again on real clips in V6.3; Free 40 plans a month and Creator 1,000 / 3,000 kept as assumptions; DeepSeek's terms say nothing of keeping or training, so the privacy page and the settings table name DeepSeek, in China, and claim neither (V6 CL open item 35) before `ai_plan` goes on.
 
 ---
 
@@ -4360,6 +4362,8 @@ pub struct MusicCue { pub fits: bool, pub energy: MusicEnergy }   // MusicEnergy
 
 The rules producer (`offcut-plan::from_rules(&[DetectedEvent], &Transcript) -> EditPlan`) emits the four V4 kinds, converting each `Quantity` of a `DetectedEvent` into a `QuantityRef` to the `NormalizedSpan` it came from (the n-th span inside the event's anchors). `DetectedEvent`, `offcut-detect` and its tests are unchanged. From V6.6 the rules producer may map its kinds onto `ListBuilder` and `NumberMoment`; codes 0-3 stay reserved.
 
+**(V6.2, as built: D-446, D-447, D-453; the V6.2 plan §6.1.)** `ItemKind` is `EventKind` in the code. It gains `Emphasis`, `IconPop`, `PunchIn`, `Emoji` and `HookTitle` at the end (codes 4 to 8). `ItemParams` gains their five wire arms, and `EventParams` (`offcut-types/src/params.rs`) their five resolved arms, which the detector never makes; `ValidItem.params` stays `EventParams`. **`HookTitle { accent: u8 }`, not `WordIdx`:** the accent is the index of a word of the hook (`extras.hook`), counted from 0, and its anchors are `ClipWide`, exactly `0..word count`. `IconId` (24 names) and `EmojiId` (48 names) are closed enums in `offcut-types/src/assets.rs`, equal to the image bundle's manifest (a test). `DropReason` gains `Density` and `HookMissing` at the end. `CATALOG_VERSION = 2`, with two new zones, `video` and `hook`, and `ParamTy::Index { max }` for the hook's accent (D-448).
+
 ### 40.3 The capability catalog (the renderer's menu)
 
 ```rust
@@ -4421,6 +4425,20 @@ pub struct KindLimits { pub max_per_clip: u8, pub min_gap: DurMs, pub label_char
 - **`marks`** are the recording times a visual steps at, read from the words: a FromTo's second value, which a `DetectedEvent` has no time for.
 - **V4's limits** (`catalog.rs`, (assumption, V6.2, E-11)): NumberReveal 8 per clip, min gap 1,500 ms; ListReveal 3, 10,000 ms; FromTo 4, 3,000 ms; KeywordPop 12, 800 ms; labels 32 characters, list headers 24. Every rules plan of the 31 labeled files validates with nothing dropped (`validate_rules_plans.rs`).
 - In V4, V-7 and V-8 drop every cut, chapter and text extra: no producer makes them yet.
+
+**(V6.2, as built: D-449 to D-455, D-503, D-508.)**
+- **V-1 (DC-7 as one rule):** `catalog <= CATALOG_VERSION` for every plan, so a stored catalog-1 plan stays valid; only the server requires a fresh model answer to equal `CATALOG_VERSION`.
+- **V-3, zooms:** two `PunchIn`s never overlap and at most one starts in a sentence (`TooClose`); a `Snap` spans 1 to 3 words and a `Push` 2 to 40, inside one sentence.
+- **V-9, density, model plans only:** at most one visual item starts in any 2.5 s window. The visual kinds are `NumberReveal`, `ListReveal`, `FromTo`, `IconPop`, `Emoji` and `HookTitle` (read first); `Emphasis`, `KeywordPop` and `PunchIn` do not count. A dropped item is `Density`; rules plans are exempt.
+- **Punch words:** at most one per 6 s, counted from the previous punch word's end, and 4 a clip.
+- **The hook:** a `HookTitle` without `extras.hook` is `HookMissing`; its accent must be a word of the hook. A model plan whose hook passed and that kept no `HookTitle` gains one: the accent is the hook's longest word, the id the largest plus one, added before V-9 (D-503).
+- **Text extras, validated and kept** in `ValidPlan.extras`:
+  - the hook, a `Label` of at most 48 characters and 2 to 9 words, with V-4's digit rule;
+  - `post_caption`, at most 2,200 characters, with no digit rule (the person edits it before posting). The prompt asks for one or two sentences of at most 150 (D-508);
+  - `hashtags`, at most 8, each `#` then 1 to 30 letters, digits or `_`.
+  
+  A bad extra is dropped alone (`LabelTooLong`, `LabelDigits`, `ParamsMismatch`, `OverLimit`).
+- **Chapters, cuts and music** stay `NotInThisBuild`.
 
 ### 40.5 Scene and renderer contracts
 
@@ -4496,6 +4514,27 @@ pub struct ProgramAudio { pub samples: Vec<f32>, pub loudness: Lufs }   // sampl
 
 `server` may depend on `offcut-plan` (a pure crate: catalog, prompt, schema, types), added to the §2 row for `server`.
 
+**(V6.2, as built: D-458, D-460, D-461, D-464, D-494, D-498, D-500.)**
+- **The provider is DeepSeek, not Gemini** (D-500):
+  - `server/src/plan/deepseek.rs` is the one adapter behind `PlanProvider`;
+  - the request is `POST https://api.deepseek.com/chat/completions` with `deepseek-flash`, thinking disabled, `response_format: json_object` and temperature 0.2;
+  - the canonical `output_schema()` goes in the system message as text (DeepSeek refuses `json_schema`), and `validate` stays the gate;
+  - the answer is parsed item by item (`plan/parse.rs`), so an unknown emoji or icon name drops that item, not the plan;
+  - the server sets `format`, `catalog` and `source` itself, never from the model.
+- **`plan/route.rs`, in order:**
+  1. `PlanIp` and the 64 kB body limit;
+  2. the bearer, before the body (D-494; there is no anonymous quota), then `PlanUser`;
+  3. the JSON body;
+  4. the catalog (409 `plan_catalog`);
+  5. `PLAN_ENABLED` and the month's spend (502 `plan_unavailable`);
+  6. the person's row still there (401);
+  7. the quota (429 `plan_quota`);
+  8. the transcript checked (400).
+- **Deadlines:** the provider gets `PLAN_DEADLINE` = 18 s for the whole request and 15 s a call. One retry follows a parse failure, only with 4 s left. A provider failure is 502 `plan_unavailable` and a timeout 504; neither is retried.
+- **Size:** an answer over 32 kB is 502 `plan_invalid`.
+- **Logs:** one line per call, with a kind, a seconds bucket, the input, cached-input and output tokens, `retried`, `items` and `items_skipped`. Never a word (D-464).
+- **The client:** one attempt, 20 s in all (`PLAN_CLIENT_TIMEOUT_MS`). Every failure is the rules plan with its reason (D-466).
+
 ### 40.8 Client flow (C-4 from V6.2)
 
 ```text
@@ -4509,6 +4548,18 @@ ASR → audio chain → prosody → [AI plan on?] request-plan.ts: POST /plan (P
 - The plan is stored in the IndexedDB `plans` store (schema version 2; the migration removes the unused `events` store, closing §39.3 item 28's `events` entry). Restore uses the stored plan and never re-requests. "Regenerate plan" is the only re-request; overrides keyed by `EventId` survive where ids match.
 - `PipelineStage::Plan` joins `stage_timing`. New analytics (enum and count properties only): `plan_result { source, outcome, latency_bucket, items, dropped_by_reason, cuts }`; `export_done` gains `items_kept`, `items_disabled`, `cuts_kept`, `cuts_restored`, `music_on`, `brand_kit_on`.
 - Settings: the "AI edit plan" switch (default on), provider name and data-use summary; with the switch off, no plan request is sent and no transcript word appears in any request (`privacy-network.spec.ts` case "plan off").
+
+**(V6.2, as built: D-466, D-467, D-469, D-490, D-504.)**
+- **The call sequence:** with `ai_plan` off, the worker calls are those of `b73fea5`, in order (a `run-pipeline.test.ts` case). With it on:
+  - step 11b, `choose-plan.ts`' `startPlan`, asks once the prosody is measured, or reuses the plan kept for the clip;
+  - step 12b, `choosePlan`, checks a model plan with the stateless binding `validate_plan` and uses it when it keeps at least one item, else the rules plan with its reason, told once in a toast;
+  - `setScene` is then called once.
+- **No stage:** `PipelineStage::Plan` is not added; the wait sits inside `detect_scene`.
+- **The store:** `plans` at IndexedDB structure version 3, opened only by `plans-repo.ts`, holding `{ plan, source, requestedAt, catalog }`. The unused `events` store is kept, and a build with `ai_plan` off never upgrades.
+- **Run again, before V7:** no clip is restored on a reload; a clip's run again (Retry, Process again) uses its kept plan with no request. "Regenerate plan" is the only re-request.
+- **Word edits:** a word edit keeps a model plan, which the scene validates against the edited words.
+- **What is shown:** `set_scene` also answers `kept`, the ids its validation kept, and with `ai_plan` on the visuals list and `export_done`'s item counts use only those (D-504).
+- **Analytics:** `plan_result` is sent once per run that chose a plan.
 
 ### 40.9 Seams V4, V5 and V6 must build (so V6.2 starts without rework)
 
@@ -4607,6 +4658,11 @@ A protected behaviour changes only here. Each row names what changes, when, what
 | DC-17 | V6.5, flag `speaker_framing` (v1.5) | `FrameKey` gains `layout: FrameLayout { Single, Split { top_cx, bottom_cx } }` (`#[serde(default)]`: `Single`). A `Split` key puts two `Video { Main }` commands in the list, the two faces stacked, from one decoded frame; `composite.rs` gets its second path here (DC-8) | `FramePath::none()` gives V5's crop; a shot with one face gives §46.4's path, unchanged; `is_simple_list` lists take the old path, byte for byte | `framing.rs`, `speaker.rs`, `composite.rs` (simple path identical) |
 | DC-18 | V6.6a, flag `picture` (v1.5) | `DrawCmd::Video` gains `grade: Option<Grade>` (`#[serde(default)]`: `None`). `None` takes the existing video pipeline, byte for byte; `Some` draws through a graded variant of the same pass: one pass, one uniform per frame (§47.4) | Every list with `grade: None`; goldens; `is_simple_list` (a graded `Video` is still simple: no second path) | `golden_frames.rs`, `grade.rs` |
 | DC-19 | V6.7, flag `voice_tune` (v1.5) | Inside "Voice cleanup", the chain gains a measured-need step: the denoiser's wet share set from the measured noise floor, and a bounded three-band voice EQ (§47.1). `out48` changes for clips prepared with it | `Enhance::v5()` runs V5's chain exactly; `program_identity.rs` (`assemble` over any `out48`) | `voice_tune.rs`, `program_identity.rs`, `flags_identity.spec.ts` |
+
+**(V6.2, as built: D-473, D-440, D-485.)**
+- **DC-8's V6.2 part:** `composite::video_of` accepts `Image` commands after the video; a list without one takes the old path unchanged.
+- **DC-16:** `EditState.enhance` is skipped when it equals `Enhance::v5()`, so a V5 edit stores and hashes as at `b73fea5` (`flags-identity.spec.ts` case 1). The page leaves it out too (P209).
+- **Existing tests changed** (24 entries, each widened, none deleted): listed in the V6.2 plan's D-440. The release's only ignore (`catalog_complete.rs`) was removed in P206.
 
 ### 41.3 How each release is made safe
 
@@ -5320,6 +5376,11 @@ impl MotionTrack { pub fn none() -> MotionTrack; pub fn scale_at(&self, t: OutMs
 **Easing curves (v1.5).** `offcut-scene/src/easing.rs`: `CubicBezier { x1, y1, x2, y2 }` evaluated in pure Rust (Newton's method with a bisection fallback), with named curves `Standard` (0.4, 0, 0.2, 1), `Out` (0, 0, 0.2, 1) and `InOut` (0.65, 0, 0.35, 1) (assumptions). Zooms, pans, the motion track and caption entries use them in place of the fixed `ease_in_out`; existing styles keep their curves, so goldens do not move. Learned from Tooscut's keyframe evaluator (bezier interpolation per keyframe); ours is a function of time inside `frame_at`, with no keyframe store.
 - **The bar.** Quality is judged in the quality pass after V6.11 (`buildplan.md` §8A.12) against the founder's benchmark: Submagic-made shorts and caption references, kept outside git (the repository is public). The references point at three caption families that V6.6 part C weighs: **typographic lockups** (words of mixed size and weight stacked into one block, one accent colour, the camera pushing through the block as it grows); **mixed-font pairs beside the speaker's head** (a bold sans with an italic serif, which needs an OFL serif italic in the font registry and the face position of V6.5); and **glass cards** with the video blurred behind them (§48.4's reduced-resolution blur, brought forward to V6.6 if kept). Each is a §41.4 cost check by name, as part D is.
 
+**(V6.2, as built: D-476, D-477, D-497.)**
+- **The drift is `offcut-scene/src/camera.rs`** (`motion.rs` is V4's caption motion): `CameraTrack`, built from the clip's start and the hook's end. Segments over 4 s are split at the sentence start nearest their middle, those under 0.8 s are held; the drift alternates 1.00 to 1.05 and back on `STANDARD`, held across short segments. TE-31: 0.019 px of the steepest frame-to-frame change, no stepping.
+- **One zoom for the frame:** `video::Track`'s scale is the drift times the strongest `PunchIn` at that time, never a product of zooms, capped at `MAX_TOTAL_ZOOM = 1.35`; `Track::fixed` gives V5's `src` bit for bit.
+- **Motion off** gives the fixed track, and the plan's zooms stay. `motion` stays off in production until V6.5 brings shots (D-497).
+
 ### 47.3 Captions (v1.5: V6.2 and V6.6b)
 
 The benchmark's captions are plainer than expected: one word, or two to four, in a heavy white sans with a soft glow; the keyword coloured, glowing, with an emoji under it; punch words about twice the size in capitals; hard swaps rather than bounces. Bold (Inter 800, yellow keyword) is already near that; these close the rest.
@@ -5333,6 +5394,17 @@ The benchmark's captions are plainer than expected: one word, or two to four, in
 | **Word pages** | V6.6b | `StyleSpec.paging: Lines(u8) \| Words { max: u8 }` (`#[serde(default)]`: the style's lines). `Words { max: 1 }` and `Words { max: 3 }` break at punctuation and at pauses of at least 250 ms and keep §17's reading floor; words swap hard, with no transition unless the preset names one |
 | **Display fonts** | V6.6b | Four OFL fonts join the registry, subset to Latin (at most 400 kB together, assumption): a heavy geometric sans (Montserrat Black class), a condensed (Anton or Bebas Neue class), a comic display (Bangers class), and an italic serif for mixed pairs. TE-28 picks each and records its licence |
 | **Presets** | V6.6b | Six new presets, beside Clean, Bold and Mono: rows of `StyleSpec` data on the four fonts, glow, paging and the kinetic rows of part C. **Named by us,** never after a creator. The benchmark sets which is the default for new clips (the quality pass) |
+
+**(V6.2, as built: D-480 to D-484, D-502, D-503.)**
+- **Glow:** `StyleId::Glow` is a fourth style, appended; the default stays Clean. It is Inter 800 white with a glow of 4 layers, 6 lp spread and 0.16 alpha, each word glowing in its own colour, the keyword in the accent.
+- **Emphasis is drawn by the captions:**
+  - `Colour` fills the word in the accent;
+  - `Underline` is a bar 0.10 em under the baseline, 0.08 em thick;
+  - `Highlight` is a pill (`OnAccent` word on the accent).
+- **Punch words:** a chunk of their own, in capitals at `PUNCH_SCALE = 1.9`.
+- **Emoji belong to the captions:** placed by their chunk, drawn after them, `Under` (over the lines at Bottom) or `Beside` when the line leaves room.
+- **Icons belong to the event zone:** an accent disc with a `Panel` disc inside and a white icon (D-502). The images are 160 px, embedded like the fonts (`assets/images/`, about 1 MB), drawn in Vello with straight alpha; TE-30's SSIM is 0.9995 on D1 and at least 0.9996 on CI's lavapipe.
+- **The hook (`lockup.rs`):** each line takes its own size, from 140 lp down to 48 in steps of 4, the accent word at twice its line's, over `[0, min(2 s, length))`. No caption is drawn or hit under it, and every model plan with a valid hook shows one (D-503).
 
 ### 47.4 Picture: the blur, colour and light (v1.5, V6.6a, flag `picture`)
 
@@ -5390,6 +5462,13 @@ pub struct EnhanceReport { pub noise_floor: DbBucket, pub voice_tuned: bool, pub
 - **Instant in the preview.** Both voices are made when a clip is prepared: `out48` (Clean) and `lvl48` (Level, the cheap path), side by side in OPFS. Switching voice re-runs `assemble` only; motion, colour and sound go through the existing `review-update` path. Every switch is one undo step within the 150 ms edit budget.
 - **Remembered.** The panel's last state is stored in this browser (IndexedDB `meta`, key `enhanceDefault`) and becomes the start of the next clip; settings has "Back to recommended". Nothing is sent.
 - **Kept honest.** The export reads `EditState.enhance`, which joins the render-cache key (S-9) as part of `EditState`. `export_done` gains `enhance_off`, a list of the rows switched off (an enum list, INV-18), for E-11.
+
+**(V6.2, as built: D-485 to D-489, D-505.)**
+- **The type:** `Enhance { voice: VoiceMode (Clean | Level), motion: bool }`; `picture` and `sfx` come with V6.6a and V6.7. There is no `EnhanceReport` yet (D-489).
+- **Voice cleanup off:** `offcut-dsp/src/level.rs`' `level_only`, loudness and the limiter only, writes `lvl48.f32` beside `out48.f32` when the build has `motion`. `run_chain` and `program_identity.rs` are unchanged.
+- **A switch is one undo step** through `review-update.ts`, measured at 11 to 20 ms (Motion) and 32 to 139 ms (Voice) against the 150 ms budget (P208 to P211a).
+- **Memory:** a new clip starts with the switches as last set (`meta.enhanceDefault`); settings' "Back to recommended" forgets them. The panel sits under the Style tab's cards (the founder's choice).
+- **The summary:** "What we changed" says "Voice cleaned" only with Voice cleanup on (D-505).
 
 ### 47.6 The quality check (v1.5, V6.8)
 
@@ -5721,6 +5800,14 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 
 **Provider rules.** The `PlanProvider` trait gets `complete(request: ProviderRequest) -> ProviderOutput` with token counts. One adapter per candidate. A provider whose terms train on this data is not used. The settings page names the provider and its data terms (P-1, P-14).
 
+**(V6.2, as built: D-461 to D-465, D-494, D-500, P189b.)**
+- **The provider:** DeepSeek, `PLAN_PROVIDER=deepseek`, `PLAN_MODEL` `deepseek-flash`, prices 0.30 / 1.20 USD per 1M tokens (the founder at CP 1; cached input is counted at the full price, so the spend counts high).
+- **Quotas, signed in only:** Free 40 plans a month; Creator logs a line above 1,000 and is blocked at 3,000. There is no anonymous quota.
+- **The cap:** `AI_MONTHLY_CAP_USD`, with a warn line at 80% and every AI route `plan_unavailable` at 100%.
+- **Configuration:** `PLAN_ENABLED` (default false), `PLAN_PROVIDER`, `PLAN_MODEL`, `PLAN_API_KEY`, `PLAN_API_BASE_URL`, `AI_MONTHLY_CAP_USD`, `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK`; on without a key, a cap or a price stops the boot.
+- **The migration:** `0002_ai_usage.sql` creates its tables `IF NOT EXISTS`. From V6.2, `db::migrate` ignores a version it does not know, so a later rollback boots; the one from V6.2 to V6.1 needs `DELETE FROM _sqlx_migrations WHERE version = 2` first (§14.4 of the V6.2 plan).
+- **Measured on the real product (P211):** 4.0 to 5.3 s a plan, about $0.0035 by the server's count.
+
 ---
 
 ## 53. New Experiments, Invariants and Reads (v1.3)
@@ -5753,6 +5840,16 @@ All are assumptions, set by TE-15 and §39.3. Counted only on success. `FREE_PLA
 TE-15 now also covers the paid provider: price, the `/shorts` and `/chat-edit` latency, data terms. Its "free tier" pass line becomes "free tier for development; the cost model of §52 fits the cap".
 
 E-12 and E-13 are PS §19's. Their instrument is §45.9's analytics plus `scripts/metrics.sql`.
+
+**(V6.2, as built: readings in `docs/v6.2/experiments.md`.)**
+- **TE-15** (DeepSeek Flash, thinking off, 15 labelled transcripts):
+  - parse 15 of 15 and p90 3.3 s at P188;
+  - the drop rate's median 0% after P188c's prompt fixes, then 10 to 12.5% across the later re-reads (variance: numbers that do not resolve, an icon inside a list);
+  - on the real product, 4.0 to 5.3 s and 9 to 12 items a plan.
+- **TE-30:** the browser's images against their golden, SSIM 0.9995 on D1; decode 19 to 24 ms.
+- **TE-31:** the drift is smooth, with no stepping.
+- **§10.5:** a frame with every kind costs 0.78 to 1.23 times V4's.
+- **E-11:** `plan_result` and `export_done`'s V6.2 fields arrive with no content.
 
 ### 53.2 Invariants
 

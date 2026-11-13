@@ -2806,3 +2806,35 @@ The annotated plans are in `~/v6.2-review/p211b/plans/`.
 **Known issue 8** ("Planning the edit" not shown; the plan's 4 to 5 s wait inside "Finding visual moments") had no separate word from the founder, so it stays open.
 
 **Open.** 35, 39. Known issues 5, 8, 11. Next: P212 (copy-back, the full runs, push 5, merge, tag).
+
+## Entry 81 - 2026-11-14 - P212: copy-back and close
+
+**Copy-back (§20).** Each edit is marked "(V6.2, as built)":
+- **TS:** §7 (the V6.2 lint edges, `png` in `offcut-render`), §22.1's `POST /plan` row (bearer required), §39.3 item 35 (the plan's assumptions as measured), §40.2 (the five kinds, `HookTitle.accent` an index into the hook, the closed `IconId` and `EmojiId`, `Density` and `HookMissing`), §40.4 (V-1 as one rule, the zoom rules, V-9, punch words, the hook, the extras, D-508), §40.7 (DeepSeek, the route's order, the deadlines, the logs), §40.8 (the call sequence, the plans store, run again, `kept`), §41.2 (DC-8's V6.2 part, DC-16, D-440), §47.2, §47.3, §47.5, §52 and §53.1. TS §5's rows were added as the files appeared.
+- **PS:** §10 (the account, the sign-in toast, "Start creating"), §11 (the quotas), §12.8 (the Visuals tab and "Text for your post"), §12.16 (the look and the Enhance panel).
+- **BP:** §0's V6.2 row and §8A.2's as-built paragraph.
+
+**Tier 4** (D1, keyed builds of the final code, both rebuilt):
+- Rust **1147 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **767**; `pnpm e2e` **59**;
+- the media run on `dist/`: **113 passed, 1 skipped** (50.8 min, none flaky);
+- `FLAG_SUITES` on `dist-flags/`: **48 passed, 1 skipped** (14.1 min): ai-plan 12, enhance-panel 1 (Motion 18 ms, Voice 58 ms), flags-identity 2, high-res 4, long-resume 6, rejections 13, route-long 9, setup 2;
+- the verifier self-test **16**;
+- every count at or above D-438's floor.
+
+**Goldens and snapshots:** 13 new goldens and 75 new snapshots; none of `b73fea5`'s changed (the gate's rule 6).
+
+**§19:** every box ticked with its evidence but two, which are the founder's: `AI_MONTHLY_CAP_USD` on Render (open item 1; not read while `PLAN_ENABLED` is false), and the merge, the deploy, §14.2's checks (the agent's, after the merge) and the tag.
+
+**Push 5** (P210 to P212), waited on: its CI read follows in the closing note after the merge.
+
+**For the founder, in order:**
+1. **Render:** `PLAN_ENABLED` unset or `false` (unset, nothing else of the plan is read). The other plan variables may wait for the turn-on (§14.3).
+2. Mark PR #17 ready and merge.
+3. After the agent's §14.2 checks, tag `v6.2` (or tell the agent to).
+
+**Open after V6.2:**
+- 35: the privacy page names DeepSeek before `ai_plan` goes on in production;
+- 39: CP 3's points left for the quality pass;
+- open item 1 (the cap);
+- known issues 5 (§14.2's plan check reads the 401 or uses a bearer, as read in P191), 8 ("Planning the edit"), 11 (lavapipe, 3 of 4 pushes, each cleared by one re-run).
