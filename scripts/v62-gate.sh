@@ -96,6 +96,8 @@ ALLOW=(
   'web/src/config/features.ts|^  return \{ cloud_transcribe: value\("cloud_transcribe"\), long_video: value\("long_video"\), high_res: value\("high_res"\) \};$'
   # P193 (Step 0.4): META_KEYS' one line gains `aiPlan`, the settings switch, and is written one key a line.
   'web/src/persistence/schema.ts|^export const META_KEYS = \{ anonId: "anonId", persistRequested: "persistRequested", transcription: "transcription" \} as const;$'
+  # P206c (D-503, D-440 (23)): a model plan with a valid hook gains the hook item, so the extras case keeps two.
+  'crates/offcut-wasm-render/src/scene_api.rs|^ +assert_eq!\(checked\["kept"\], json!\(1\)\);$'
 )
 for file in "${ADDITIVE[@]}"; do
   while IFS= read -r line; do

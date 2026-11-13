@@ -24,9 +24,9 @@ punch_in: Zoom on the claim, the number or the punchline, never on filler: `snap
 
 emoji: A word an emoji says better: put it under the word, or beside it. Anchors: exactly one word. Params: word (required): the index of one word; emoji (required): one of laughing, heart_eyes, star_struck, mind_blown, thinking, shocked, crying, cool, partying, skeptical, eyes, angry, nervous, thumbs_up, thumbs_down, clap, raised_hands, muscle, folded_hands, handshake, money_bag, banknote, money_wings, gem, chart_up, chart_down, trophy, light_bulb, brain, target, crown, rocket, fire, hundred, sparkles, lightning, star, collision, party_popper, check, cross, warning, question, exclamation, alarm_clock, hourglass, heart, broken_heart; place (required): one of beside, under. Zone: caption. At most 6 in a clip, at least 2500 ms apart.
 
-hook_title: Only if the first sentence does not already hook: a title over the first two seconds, written in `extras.hook`; `accent` is the index of its strongest word. Anchors: the whole clip, written {"start": 0, "end": the number of words}. Params: accent (required): a whole number from 0 to 8. Zone: hook. At most 1 in a clip, at least 0 ms apart.
+hook_title: Always, with the hook: a title over the first two seconds, written in `extras.hook`; `accent` is the index of its strongest word. Anchors: the whole clip, written {"start": 0, "end": the number of words}. Params: accent (required): a whole number from 0 to 8. Zone: hook. At most 1 in a clip, at least 0 ms apart.
 
-A finished short: open with a hook title only if the first sentence does not already hook; zoom only on the sentences that land hardest, so most sentences have no zoom; never stack two visuals, so at most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) starts in any 2.5 seconds; end on the payoff, not a call to action, unless the speaker asks for one.
+A finished short: open with the hook title; zoom only on the sentences that land hardest, so most sentences have no zoom; never stack two visuals, so at most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) starts in any 2.5 seconds; end on the payoff, not a call to action, unless the speaker asks for one.
 
 Zooms: zoom on the claim, the number or the punchline, never on filler, and only where it earns it: about one sentence in three. A zoom covers only the words of its claim, not its whole sentence: a snap covers one strong word (1 to 3 words); a push covers the few words that build to it (2 to 40 words). A zoom stays inside one sentence, and a sentence has at most one. Two zooms never overlap, and a zoom starts at least 1.5 seconds after the last one ends, so two sentences in a row are never both zoomed.
 
@@ -36,7 +36,7 @@ The event zone: number_reveal, list_reveal, from_to and icon_pop share it, and e
 
 Emphasis and emoji: emphasis marks the one word that carries a sentence. Give size punch only to the line that lands hardest: at most one punch word in any 6 seconds, and at most 4 in a clip. Put an emoji under its word, or beside it, only where it says the word better than text. Use only the icon and emoji names listed above.
 
-Text extras, under extras: hook, a title for the short in the speaker's voice, 2 to 9 words and at most 48 characters, with no digit the speaker did not say. Write it always; add a hook_title item, whose accent is the index of the hook's strongest word counting from 0, only if the first sentence does not already hook. post_caption: the text to post with the short, at most 2200 characters. hashtags: at most 8, each # followed by 1 to 30 letters, digits or underscores.
+Text extras, under extras: hook, a title for the short in the speaker's voice, 2 to 9 words and at most 48 characters, with no digit the speaker did not say. Write it always, and always add a hook_title item with it, whose accent is the index of the hook's strongest word counting from 0. post_caption: the text to post with the short, at most 2200 characters. hashtags: at most 8, each # followed by 1 to 30 letters, digits or underscores.
 
 Rules:
 - Never write a number: point at the words that say it.

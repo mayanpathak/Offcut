@@ -133,8 +133,7 @@ fn finished_short_text() -> String {
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "A finished short: open with a hook title only if the first sentence does not \
-         already hook; zoom only on the sentences that land hardest, so most sentences have no \
+        "A finished short: open with the hook title; zoom only on the sentences that land hardest, so most sentences have no \
          zoom; never stack two visuals, so at most one visual (a number, a list, a from-to, an \
          icon, an emoji or the hook title) starts in any {density} seconds; end on the payoff, \
          not a call to action, unless the speaker asks for one."
@@ -180,9 +179,8 @@ fn finished_short_text() -> String {
         out,
         "\nText extras, under extras: hook, a title for the short in the speaker's voice, \
          {hook_min} to {hook_max} words and at most {HOOK_MAX_CHARS} characters, with no digit \
-         the speaker did not say. Write it always; add a hook_title item, whose accent is the \
-         index of the hook's strongest word counting from 0, only if the first sentence does \
-         not already hook. post_caption: the text to post with the short, at most \
+         the speaker did not say. Write it always, and always add a hook_title item with it, \
+         whose accent is the index of the hook's strongest word counting from 0. post_caption: the text to post with the short, at most \
          {POST_CAPTION_MAX_CHARS} characters. hashtags: at most {MAX_HASHTAGS}, each # followed \
          by 1 to {HASHTAG_MAX_CHARS} letters, digits or underscores."
     );

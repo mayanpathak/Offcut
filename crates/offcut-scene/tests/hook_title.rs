@@ -154,3 +154,51 @@ fn a_clip_shorter_than_2_s_shows_the_hook_throughout() {
         }
     }
 }
+
+/// `case` with a model's plan that has the hook `text` but no `HookTitle`
+/// (the founder's clip at CP 3): `validate` adds the item (D-503, P206c).
+fn with_hook_text_only(mut case: scenes::Case, text: &str) -> scenes::Case {
+    use offcut_plan::{CATALOG_VERSION, PlanConfig, validate};
+    use offcut_types::{EditPlan, Label, PlanSource};
+    let mut plan = EditPlan::empty_rules(CATALOG_VERSION);
+    plan.source = PlanSource::Model {
+        provider: "deepseek".to_owned(),
+        model: "test".to_owned(),
+    };
+    let label: Label = serde_json::from_value(serde_json::json!(text)).unwrap();
+    plan.extras.hook = Some(label);
+    let (valid, _) = validate(
+        plan,
+        &case.transcript,
+        &case.edit.word_edits,
+        &PlanConfig::default(),
+    )
+    .unwrap();
+    case.plan = valid;
+    case
+}
+
+/// D-503 (P206c), the founder's clip at CP 3: a model wrote the hook and no
+/// hook title. `validate` adds it, on the hook's longest word ("nobody",
+/// word 3), so every frame is the frame of the same hook written as an item:
+/// the lockup over the first 2 s, then the clip as before.
+#[test]
+fn a_hook_with_no_hook_item_is_drawn_as_if_the_item_were_written() {
+    for style in STYLES {
+        let text_only = with_hook_text_only(plain(style, &SENTENCES), HOOK);
+        assert_eq!(text_only.plan.items().len(), 1, "{style:?}: the hook added");
+        let written = hooked(style, &SENTENCES, (HOOK, 3));
+        let (a, b) = (
+            scenes::build(&text_only, 1080),
+            scenes::build(&written, 1080),
+        );
+        for t in frames(&a) {
+            let at = OutMs::new(t);
+            assert_eq!(a.frame_at(at), b.frame_at(at), "{style:?} at {t}");
+            if t < HOOK_DUR_MS {
+                assert!(a.caption_words(at).is_empty(), "{style:?} at {t}");
+            }
+        }
+        assert_eq!(a.summary(), b.summary(), "{style:?}");
+    }
+}

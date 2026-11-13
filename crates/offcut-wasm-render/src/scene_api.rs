@@ -648,7 +648,8 @@ mod tests {
             checked["extras"],
             json!({ "hook": "We grew ten times", "post_caption": "How we grew, in one minute.", "hashtags": ["#growth"] })
         );
-        assert_eq!(checked["kept"], json!(1));
+        // D-440 (23), P206c: the valid hook with no hook item gains one (D-503).
+        assert_eq!(checked["kept"], json!(2));
         assert_eq!(checked["dropped"].as_array().map(Vec::len), Some(1));
     }
 }

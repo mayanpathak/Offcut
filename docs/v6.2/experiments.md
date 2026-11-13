@@ -163,6 +163,35 @@ Recorded, redacted shapes for P190 (each request with message texts cut to their
 
 **Read.** TE-15's lines all pass on `deepseek-flash` with thinking off: parse after one retry 15/15, median drops 0.0%, p90 3.3 s. No further revision is proposed; `validate` drops the rest, at the cost of a fuller plan only.
 
+### The hook line (P206c, 2026-11-13 07:26-07:27 UTC, d1)
+
+**The founder's yes (2026-11-13)** to the re-read D-503 asks for. On the founder's own clip at CP 3, DeepSeek wrote `extras.hook` but no `hook_title` item, as the prompt then allowed ("only if the first sentence does not already hook"). The prompt now asks for the item always, in three places: the "finished short" line, the extras line and the catalog row's purpose. System message: **16,261 characters** (16,366 before). The same harness, request and 15 transcripts as P188b and P188c, with `deepseek-flash` only and today's `validate` (D-503's guarantee in). The harness also records whether the model wrote the item itself and whether its own item was kept.
+
+**15 calls**, all HTTP 200, `stop`, no thinking tokens. Peak hours: about **$0.017** at peak prices. The balance read **$1.81** after (shown to the cent).
+
+| `deepseek-flash` | P188c | **P206c** | Pass line |
+|---|---|---|---|
+| Parse, first try | 14 / 15 | **15 / 15** | ≥ 98% after one retry: pass |
+| Items written / kept | 103 / 94 | 109 / 100 (with 5 hooks added) | |
+| **Item drop rate, median (mean)** | 0.0% (8.5%) | **10.0% (13.1%)**; 0.0% (9.5%) without the hook items | ≤ 10%: pass, at the line |
+| Plans with no drop / at or under 10% | 8 / 8 | 7 / 8 | |
+| Zooms written / dropped | 38 / 0 | 39 / 0 | |
+| **Hook item written by the model** | (1 / 15 at P188) | **15 / 15** | |
+| The model's own hook item kept | | 10 / 15 | |
+| **Clips that open on the hook** | | **15 / 15** (5 by `validate`'s added item) | D-503 |
+| Latency p50 / p90 / max | 2.8 / 3.3 / 3.6 s | 2.6 / **2.9** / 4.5 s | p90 ≤ 10 s: pass |
+| Cost per plan at peak, median (no cache) | $0.0010 ($0.0023) | $0.0010 ($0.0022) | recorded |
+
+**Drops (14 items).**
+- **`hook_title` 5:** `params_mismatch` 3, `anchor_rule` 2. Each was replaced by `validate`'s own item:
+  - the accent indexes past the hook's last word, as if counting from 1 or one too far (`w04`: 4 words, accent 4; `w06` and `w14`: accent 8 on 8 and 7 words);
+  - the anchors end short of the clip's last word (`w05`: 65; `w08`: 49).
+- **The rest, 9, as at P188c:** `from_to` number unresolved 4, anchor rule 1; `number_reveal` number unresolved 3; `icon_pop` zone taken 1.
+
+No extra was dropped, and no visual was dropped by V-9 after a hook. The annotated plans are in `~/v6.2-review/p206c/plans/`.
+
+**Read.** The instruction works: the model writes the hook item every time, where it wrote it once in 15 before. A third of those items count wrong, so the median drop rate sits at the 10% line, but `validate`'s guarantee shows the hook in every clip either way. Left out, the replaced hook items leave the rest as P188c had them. **Not done (needs the founder's yes, about $0.02):** a third revision telling the model that the accent counts the hook's words from 0, and that the item spans every word of the clip. It would only lower the drop count: what the viewer sees is the same.
+
 ## TE-30 - Images drawn the same in the browser and natively
 
 **Read 2026-11-12 (P197), d1: passes.** `image-parity.spec.ts` on a keyed `pnpm build:e2e`, Chrome's WebGPU on the Intel "gen-12lp" adapter: the render worker drew `image_basic`'s frame (the definition the native golden asserts is its own, `offcut_render::check`) over a `VideoFrame` of the goldens' synthetic source; the canvas read back against `fixtures/golden/image_basic.png` (WARP) by the golden test's SSIM: **0.9995** (line 0.98). Read by eye at 200%: the same placement, edges, half opacity, list order and cut at the edge as the golden. The 72 images decoded in **24 ms** in the WASM (once per renderer, at `attach_canvas`). The TypeScript SSIM gives Rust's numbers to 10 decimals on three golden pairs. CI's lavapipe: see P197's push below.

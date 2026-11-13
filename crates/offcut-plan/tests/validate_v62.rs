@@ -515,3 +515,123 @@ fn v9_a_plan_of_the_rules_is_exempt() {
         [(Some(EventKind::NumberReveal), DropReason::Density)]
     );
 }
+
+// --- D-503 (P206c): a model's valid hook is always shown ----------------------
+
+/// The plan's hook titles: (id, anchors, text, accent).
+fn hooks(valid: &offcut_plan::ValidPlan) -> Vec<(u64, WordRange, String, u8)> {
+    valid
+        .items()
+        .iter()
+        .filter_map(|item| {
+            if let EventParams::HookTitle { text, accent } = &item.params {
+                Some((item.id.get(), item.anchors, text.clone(), *accent))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn d503_a_models_valid_hook_with_no_item_gains_one_on_its_longest_word() {
+    let t = three_sentences();
+    let one = |items: Vec<PlanItem>, hook: &str| run_on(&t, plan_of(items, Some(hook)));
+    // The whole clip's words, an id no item has (one more than the largest),
+    // nothing reported as dropped.
+    let (valid, dropped) = one(
+        vec![emphasis(7, 13, EmphasisSize::Normal)],
+        "One simple trick saves hours",
+    );
+    assert_eq!(dropped, []);
+    assert_eq!(
+        hooks(&valid),
+        [(8, at(0, 18), "One simple trick saves hours".to_owned(), 1)]
+    );
+    assert_eq!(valid.items().len(), 2);
+    // The longest word by letters and digits; the first of equal ones.
+    for (hook, accent) in [
+        ("One trick saves hours", 1),
+        ("Saved hours, weekly!", 2),
+        ("Hours saved", 0),
+    ] {
+        assert_eq!(hooks(&one(Vec::new(), hook).0)[0].3, accent, "{hook}");
+    }
+    // An empty plan: the first id.
+    assert_eq!(hooks(&one(Vec::new(), "Hours saved").0)[0].0, 1);
+}
+
+#[test]
+fn d503_the_added_hook_opens_the_clip_and_v9_drops_a_visual_after_it() {
+    let t = three_sentences();
+    // As `v9_a_models_visuals_start_2_5_s_apart`, without the model's hook
+    // item: the added one drops the icon 1.4 s later, not the zoom or emphasis.
+    let items = vec![
+        icon(2, 2),
+        zoom(3, at(2, 3), ZoomMotion::Snap),
+        emphasis(4, 3, EmphasisSize::Normal),
+    ];
+    let (valid, dropped) = run_on(&t, plan_of(items, Some("One trick saves hours")));
+    assert_eq!(valid.items().len(), 3);
+    assert_eq!(hooks(&valid).len(), 1);
+    assert_eq!(
+        reasons(&dropped),
+        [(Some(EventKind::IconPop), DropReason::Density)]
+    );
+    // A visual on the first word sorts before the hook, and gives way to it.
+    let (valid, dropped) = run_on(
+        &t,
+        plan_of(vec![emoji(1, 0)], Some("One trick saves hours")),
+    );
+    assert_eq!(hooks(&valid).len(), 1);
+    assert_eq!(
+        reasons(&dropped),
+        [(Some(EventKind::Emoji), DropReason::Density)]
+    );
+}
+
+#[test]
+fn d503_a_plan_with_its_own_valid_hook_item_is_unchanged() {
+    let t = three_sentences();
+    let own = hook_title(1, 3, at(0, 18));
+    let (valid, dropped) = run_on(&t, plan_of(vec![own], Some("One trick saves hours")));
+    assert_eq!(dropped, []);
+    assert_eq!(
+        hooks(&valid),
+        [(1, at(0, 18), "One trick saves hours".to_owned(), 3)]
+    );
+}
+
+#[test]
+fn d503_a_models_hook_item_that_fails_is_dropped_and_replaced() {
+    // TE-15 (P206c): the model wrote the item, with an accent past the hook's
+    // last word or anchors short of the clip's end.
+    let t = three_sentences();
+    for (bad, reason) in [
+        (hook_title(5, 4, at(0, 18)), DropReason::ParamsMismatch),
+        (hook_title(5, 0, at(0, 17)), DropReason::AnchorRule),
+    ] {
+        let (valid, dropped) = run_on(&t, plan_of(vec![bad], Some("One trick saves hours")));
+        assert_eq!(reasons(&dropped), [(Some(EventKind::HookTitle), reason)]);
+        assert_eq!(
+            hooks(&valid),
+            [(6, at(0, 18), "One trick saves hours".to_owned(), 1)]
+        );
+    }
+}
+
+#[test]
+fn d503_no_hook_is_added_without_a_valid_hook_or_to_a_rules_plan() {
+    let t = three_sentences();
+    // No hook, or one dropped as an extra: nothing to show.
+    let (valid, dropped) = run_on(&t, plan_of(vec![icon(1, 12)], None));
+    assert_eq!((hooks(&valid).len(), dropped.len()), (0, 0));
+    let (valid, dropped) = run_on(&t, plan_of(vec![icon(1, 12)], Some("Hours")));
+    assert!(hooks(&valid).is_empty());
+    assert_eq!(reasons(&dropped), [(None, DropReason::LabelTooLong)]);
+    // A plan of the rules is never given one.
+    let mut rules = EditPlan::empty_rules(CATALOG_VERSION);
+    rules.extras.hook = Some(label("One trick saves hours"));
+    let (valid, _) = run_on(&t, rules);
+    assert!(hooks(&valid).is_empty());
+}

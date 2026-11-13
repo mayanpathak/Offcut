@@ -13,7 +13,7 @@ use offcut_types::{
     Transcript, WordIdx, WordRange,
 };
 pub use offcut_types::{DropReason, Dropped};
-use offcut_types::{EmphasisSize, Label, TextExtras};
+use offcut_types::{EmphasisSize, ItemParams, Label, PlanItem, TextExtras};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -139,7 +139,12 @@ pub fn validate(
     let extras = check_extras(extras, &tokens, &mut dropped);
 
     // 4. V-2 to V-5, each item on its own, in the plan's order.
-    let mut checked = Vec::with_capacity(items.len());
+    let next_id = items
+        .iter()
+        .map(|item| item.id.get())
+        .max()
+        .map_or(1, |id| id.saturating_add(1));
+    let mut checked = Vec::with_capacity(items.len() + 1);
     for item in items {
         let kind = item.kind;
         match check_item(item, &source, &tokens, t, cfg, extras.hook.as_deref()) {
@@ -149,6 +154,21 @@ pub fn validate(
                 reason,
             }),
         }
+    }
+    // V6.2 (D-503): a model's valid hook is always shown. A plan whose hook
+    // passed and that kept no HookTitle gains one, checked like any item.
+    if let (PlanSource::Model { .. }, Some(hook)) = (&source, extras.hook.as_deref())
+        && !checked.iter().any(|item| item.kind == EventKind::HookTitle)
+        && let Ok(added) = check_item(
+            hook_item(hook, t, next_id),
+            &source,
+            &tokens,
+            t,
+            cfg,
+            Some(hook),
+        )
+    {
+        checked.push(added);
     }
 
     // 5. V-6: the limits of each kind and of the screen.
@@ -171,6 +191,32 @@ pub fn validate(
         },
         dropped,
     ))
+}
+
+/// D-503: the `HookTitle` a model left out: the whole clip's words, the
+/// hook's longest word as its accent (by letters and digits, the first of
+/// equal ones), and `id`, which no item of the plan has.
+fn hook_item(hook: &str, t: &Transcript, id: u64) -> PlanItem {
+    let letters = |word: &str| word.chars().filter(|c| c.is_alphanumeric()).count();
+    let (mut accent, mut longest) = (0_usize, 0_usize);
+    for (i, word) in hook.split_whitespace().enumerate() {
+        if letters(word) > longest {
+            (accent, longest) = (i, letters(word));
+        }
+    }
+    let words = u32::try_from(t.words.len()).unwrap_or(u32::MAX);
+    PlanItem {
+        id: EventId::new(id),
+        kind: EventKind::HookTitle,
+        anchors: WordRange {
+            start: WordIdx::new(0),
+            end: WordIdx::new(words),
+        },
+        params: ItemParams::HookTitle {
+            accent: u8::try_from(accent).unwrap_or(u8::MAX),
+        },
+        confidence: None,
+    }
 }
 
 /// How long the zone of `kind` stays taken after the item's last word.
@@ -422,19 +468,28 @@ fn is_visual(kind: EventKind) -> bool {
 }
 
 /// V-9 (D-451), for a model's plan: at most one visual starts in any 2.5 s;
-/// a later one is dropped (`Density`), the earlier anchor winning.
+/// a later one is dropped (`Density`), the earlier anchor winning. The hook
+/// title is read first (D-503): it opens the clip, so a visual on the first
+/// word, which sorts before it, gives way to it.
 fn density_rule(items: Vec<ValidItem>, dropped: &mut Vec<Dropped>) -> Vec<ValidItem> {
-    keep_where(items, dropped, |item, kept| {
-        if !is_visual(item.kind) {
-            return None;
-        }
-        let start = item.span.start.get();
-        let crowded = kept.iter().filter(|k| is_visual(k.kind)).any(|k| {
-            let other = k.span.start.get();
-            start.abs_diff(other) < DENSITY_WINDOW_MS
-        });
-        crowded.then_some(DropReason::Density)
-    })
+    let (hooks, rest): (Vec<_>, Vec<_>) = items
+        .into_iter()
+        .partition(|item| item.kind == EventKind::HookTitle);
+    keep_where(
+        hooks.into_iter().chain(rest).collect(),
+        dropped,
+        |item, kept| {
+            if !is_visual(item.kind) {
+                return None;
+            }
+            let start = item.span.start.get();
+            let crowded = kept.iter().filter(|k| is_visual(k.kind)).any(|k| {
+                let other = k.span.start.get();
+                start.abs_diff(other) < DENSITY_WINDOW_MS
+            });
+            crowded.then_some(DropReason::Density)
+        },
+    )
 }
 
 #[cfg(test)]
@@ -685,7 +740,11 @@ mod tests {
             energy: MusicEnergy::Calm,
         });
         let (valid, dropped) = run(plan);
-        assert_eq!(valid.items().len(), 1);
+        // D-440 (23), P206c: the valid hook with no hook item gains one
+        // (D-503); the number is kept as before.
+        let kinds: Vec<EventKind> = valid.items().iter().map(|item| item.kind).collect();
+        assert_eq!(kinds.len(), 2, "{kinds:?}");
+        assert!(kinds.contains(&EventKind::NumberReveal) && kinds.contains(&EventKind::HookTitle));
         assert_eq!(dropped.len(), 4);
         let extras = valid.extras();
         assert_eq!(extras.hook.as_deref(), Some("I almost quit"));

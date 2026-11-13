@@ -39,7 +39,7 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 36 | **Closed 2026-11-12 (Entry 48): renamed with the founder's yes.** Was: **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
 | 37 | **Closed 2026-11-12 (Entry 49): the founder chose `deepseek-flash`, thinking off, at 0.30 / 1.20 USD per 1M tokens; yes to the revision (done in P188b) and to item-level parsing (P190).** Was: **Checkpoint 1 (P188): choose the model, confirm the prices, and say yes or no to the prompt revision and item-level parsing.** Read `~/v6.2-review/plans/README.md`'s ten plans first, then `docs/v6.2/experiments.md` TE-15's full read. Recommended: `deepseek-flash`, thinking off; one prompt revision and Flash re-read (15 calls, about $0.02); item-level parsing in P190. P189 was built with `deepseek-flash` as the default model (the founder, 2026-11-12) | Founder, before P190 | Entry 47 |
 | 38 | **Closed 2026-11-12 (Entry 51): the founder said yes; done in P189b.** Was: **A rollback to V6.1 after V6.2's migration would not boot.** sqlx refuses a database holding a migration the binary does not know (`VersionMissing(2)`, reproduced locally). Recommended: (a) V6.2's `db::migrate` sets `ignore_missing(true)`, so later rollbacks (V6.3 → V6.2) work; and (b) §14.4 and the merge's rollback note gain one step: before booting V6.1 on a migrated database, `DELETE FROM _sqlx_migrations WHERE version = 2` (the three tables stay, unused). Nothing was changed; the founder decides, before P212 | Founder, before P212 | Entry 48 |
-| 39 | **Checkpoint 3's points, open after the founder's go (2026-11-13, no change asked).** Each is the founder's, for the quality pass (BP §8A.12) or earlier: (1) Clean: a highlight looks like the spoken word's pill; (2) Bold, Mono, Glow: a coloured word is the spoken word's colour; (3) Mono: the cursor joins a spoken word's highlight; (4) Bold: a highlight close to a popping neighbour; (5) a punch word followed at once by speech shows about 0.4-0.5 s; (6) Glow's halo and Mono's cursor grow with a punch word; (7) at Bottom an emoji "under" its word is drawn over it; (8) white icons on a yellow disc are weak in contrast (**done in P206b, Entry 70**); (9) at Bottom the icon sits about 120 lp above the captions; (10) the hook is centred, over the speaker's face; (11) **the landing page has no sign-in entry, yet AI plans need one** (**done in P206a, Entry 69**); (12) the model may leave the hook item out (it did on the founder's clip) (**to fix: P206c**). The founder asked for (8), (11) and (12) to be fixed (2026-11-13, Entry 68); the others stay open | Founder | Entries 63-67, `~/v6.2-review/look/README.md` |
+| 39 | **Checkpoint 3's points, open after the founder's go (2026-11-13, no change asked).** Each is the founder's, for the quality pass (BP §8A.12) or earlier: (1) Clean: a highlight looks like the spoken word's pill; (2) Bold, Mono, Glow: a coloured word is the spoken word's colour; (3) Mono: the cursor joins a spoken word's highlight; (4) Bold: a highlight close to a popping neighbour; (5) a punch word followed at once by speech shows about 0.4-0.5 s; (6) Glow's halo and Mono's cursor grow with a punch word; (7) at Bottom an emoji "under" its word is drawn over it; (8) white icons on a yellow disc are weak in contrast (**done in P206b, Entry 70**); (9) at Bottom the icon sits about 120 lp above the captions; (10) the hook is centred, over the speaker's face; (11) **the landing page has no sign-in entry, yet AI plans need one** (**done in P206a, Entry 69**); (12) the model may leave the hook item out (it did on the founder's clip) (**done in P206c, Entry 71**). The founder asked for (8), (11) and (12) to be fixed (2026-11-13, Entry 68); the others stay open | Founder | Entries 63-67, `~/v6.2-review/look/README.md` |
 
 ## Known issues for later prompts
 
@@ -2388,3 +2388,59 @@ Written into `coding-promptsv6.2.md`, D-501 to D-503, §17's prompt table, and t
 - `pnpm check` exit 0.
 
 **Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P206c (the hook title always shown; the prompt's re-read, about $0.02, waits for the founder's yes).
+
+## Entry 71 - 2026-11-13 - P206c: the hook title always shown
+
+**What changed.**
+- **The guarantee, in `validate` (D-503), with no AI call.**
+  - A model plan with a valid `extras.hook` that kept no `HookTitle` after V-2 to V-5 gains one, checked by `check_item` like any item.
+  - The added item: anchors `0..word count`; accent the hook's longest word by letters and digits (the first of equal ones); id one more than the plan's largest (1 for an empty plan). Nothing is reported as dropped for it.
+  - It replaces a model's own hook item that fails too (TE-15 below found 5 in 15). A plan of the rules never gains one.
+- **V-9 reads the hook title first** (`density_rule`). `limit` sorts by first word, then kind, and `HookTitle` sorts last, so a visual anchored on the clip's first word used to beat the hook. Only that tie changes; the hook opens the clip.
+- **The instruction:**
+  - the "finished short" line says "open with the hook title";
+  - the extras line says to "always add a hook_title item with it";
+  - the catalog row's purpose begins "Always, with the hook".
+  - The system message is 16,261 characters (16,366).
+- **The re-read** (the founder's yes, about $0.02): 15 Flash calls, $0.017, balance $1.81.
+  - **The model wrote the hook item in 15 of 15 plans** (1 of 15 at P188); 10 of its own were valid.
+  - The other 5 counted wrong (an accent past the hook's last word 3, anchors short of the clip's end 2), and the guarantee replaced each. **Every clip opens on its hook.**
+  - Median drops 10.0%, at TE-15's line, from those 5 (0.0% without them, as P188c); p90 2.9 s; parse 15 / 15 first try.
+  - In `experiments.md` (TE-15, "The hook line"); the annotated plans are in `~/v6.2-review/p206c/plans/`.
+- **Docs:**
+  - TS's two statements of the old rule now name D-503;
+  - the implementation doc's "not checked" row is struck through and its catalog table row updated;
+  - "As read (P206c)" under D-503 and D-440 (23);
+  - open item 39 (12) done.
+
+**Differs from the plan.**
+- "Kept no `HookTitle`", not "has none": a model's broken hook item would otherwise leave the clip without its hook. The re-read showed this happens a third of the time.
+- V-9's hook-first order is new: the plan assumed the added hook is always the first visual, and on a tie at the first word it was not.
+
+**Declared.**
+- **D-440 (23).** Three cases build a model plan with a valid hook to test the extras or the non-item fields: `validate.rs`' inline `every_non_item_field_is_dropped_in_v4`, `tests/validate.rs`' `the_non_item_fields_are_dropped_and_the_items_kept` and `offcut-wasm-render`'s `validate_plan_answers_the_text_extras_that_passed_and_only_those`. Each now counts the added hook beside its items (1 → 2, 5 → 6, 1 → 2), keeping every other assertion. `scene_api.rs` is additive, so `v62-gate.sh`'s ALLOW gains the one line it loses.
+- **Changed by design:**
+  - `catalog_snapshot__system_prompt@v2.snap` (three lines: the catalog row, the finished-short line, the extras line);
+  - `server/tests/fixtures/deepseek/request.recorded.json`'s system length (16,366 → 16,261) and its test's comment.
+- Every other validate case unchanged, the V6.2 hook and V-9 cases included.
+
+**Tests (+6).**
+- `validate_v62.rs` +5:
+  - the hook added, with its accent and id;
+  - V-9 after it, and a first-word visual giving way;
+  - a plan's own valid hook untouched;
+  - a failing hook item dropped and replaced;
+  - nothing added without a valid hook, or to a plan of the rules.
+- `hook_title.rs` +1: the founder's case (a hook, no item) draws every frame as the same hook written as an item would, the lockup over the first 2 s, in the four styles.
+
+**Tier 3** (D1):
+- Rust **1134 / 0 / 5 (1128 + 6)** (`cargo test --workspace`, `.env` loaded);
+- Vitest 749; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- `pnpm check` exit 0.
+
+**Open.**
+- Items 35 and 39 stay open: 39's three fixes are done, its other points stay for the quality pass.
+- Known issues 5, 8, 10 and 11 (P212, P210, P209, watch).
+- Not pushed (push 4 is P209).
+- Offered: a third prompt revision on the hook item's counting (about $0.02, the founder's call).
+- Next: P207 (the levelled voice in the DSP).

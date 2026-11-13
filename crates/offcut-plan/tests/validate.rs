@@ -593,7 +593,17 @@ fn the_non_item_fields_are_dropped_and_the_items_kept() {
         energy: MusicEnergy::Calm,
     });
     let (valid, dropped) = run(plan);
-    assert_eq!(valid.items().len(), 5);
+    // D-440 (23), P206c: the valid hook with no hook item gains one
+    // (D-503); the five items are kept as before.
+    let kinds: Vec<EventKind> = valid.items().iter().map(|item| item.kind).collect();
+    assert_eq!(kinds.len(), 6, "{kinds:?}");
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|&&kind| kind == EventKind::HookTitle)
+            .count(),
+        1
+    );
     assert_eq!(dropped.len(), 3);
     assert_eq!(valid.extras().hashtags, ["#editing"]);
     assert!(

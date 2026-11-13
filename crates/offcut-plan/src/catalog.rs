@@ -278,7 +278,7 @@ const CATALOG: [ItemSpec; 9] = [
     ItemSpec {
         kind: EventKind::HookTitle,
         name: "hook_title",
-        purpose: "Only if the first sentence does not already hook: a title over the first two seconds, written in `extras.hook`; `accent` is the index of its strongest word.",
+        purpose: "Always, with the hook: a title over the first two seconds, written in `extras.hook`; `accent` is the index of its strongest word.",
         anchor: AnchorRule::ClipWide,
         params: &[ParamSpec {
             name: "accent",
