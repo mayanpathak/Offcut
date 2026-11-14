@@ -220,6 +220,12 @@ fn on_the_identity_map_every_program_time_is_its_recording_time() {
             EventKind::NumberReveal => 1_200,
             EventKind::ListReveal | EventKind::FromTo => 1_500,
             EventKind::KeywordPop => continue,
+            // V6.2's model-only kinds (D-446): a rules plan has none.
+            EventKind::Emphasis
+            | EventKind::IconPop
+            | EventKind::PunchIn
+            | EventKind::Emoji
+            | EventKind::HookTitle => continue,
         };
         let (start, end) = (item.span.start.get(), item.span.end.get() + hold + 200);
         assert!(!item_drawn(&scene, start - 1), "{item:?}");

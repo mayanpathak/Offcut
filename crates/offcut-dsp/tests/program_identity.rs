@@ -16,6 +16,9 @@ use offcut_dsp::{
     ChainConfig, ChainOutput, DspError, Flow, MusicInput, ProgramConfig, assemble, run_chain,
     silence_profile,
 };
+// V6.2 (D-487): the levelled voice, for the new case at the end.
+use offcut_dsp::level_only;
+use offcut_dsp::program::VoiceMode;
 use offcut_types::{DurMs, Lufs, TimeMap};
 use sha2::{Digest, Sha256};
 
@@ -142,4 +145,52 @@ fn silence_reads_the_floor_and_a_full_scale_sine_minus_3_db() {
     for db in profile.rms_db_10ms {
         assert!((db - -3.0103).abs() < 0.01, "{db}");
     }
+}
+
+/// V6.2 (D-487, P207): with `voice: Level`, the program on the identity map is
+/// `lvl48`, sample for sample and bit for bit, at its loudness; the default
+/// is `Clean`, V5's voice, so every case above is unchanged.
+#[test]
+fn with_voice_level_the_program_on_the_identity_map_is_the_levelled_voice() {
+    assert_eq!(ProgramConfig::default().voice, VoiceMode::Clean);
+    let level = ProgramConfig {
+        voice: VoiceMode::Level,
+    };
+    for name in ["speech_60s_portrait.mp4", "speech_20s_long_pause.mp4"] {
+        let lvl48 = level_only(&pcm(name), &ChainConfig::default()).unwrap();
+        let program = assemble(
+            &lvl48.samples,
+            &identity_of(&lvl48.samples),
+            &[],
+            None,
+            &level,
+        )
+        .unwrap();
+        assert_eq!(program.samples.len(), lvl48.samples.len(), "{name}");
+        let same = program
+            .samples
+            .iter()
+            .zip(&lvl48.samples)
+            .all(|(a, b)| a.to_bits() == b.to_bits());
+        assert!(same, "{name}: a sample changed");
+        let lu = (program.loudness.get() - lvl48.loudness.get()).abs();
+        assert!(
+            lu <= 0.01,
+            "{name}: {} vs {} LUFS",
+            program.loudness.get(),
+            lvl48.loudness.get()
+        );
+    }
+    // The levelled program is refused where the clean one is.
+    let voice = level_only(&pcm("speech_20s_long_pause.mp4"), &ChainConfig::default())
+        .unwrap()
+        .samples;
+    let music = MusicInput {
+        pcm48: &voice,
+        loudness: Lufs::new(-20.0).unwrap(),
+    };
+    assert_eq!(
+        assemble(&voice, &identity_of(&voice), &[], Some(music), &level),
+        Err(DspError::Unsupported)
+    );
 }

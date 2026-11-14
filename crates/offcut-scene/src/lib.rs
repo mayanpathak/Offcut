@@ -6,6 +6,7 @@
 //! D-169), or moves a timestamp except through the time map (D-126).
 
 pub mod anim;
+pub mod camera;
 pub mod captions;
 mod captions_draw;
 pub mod display_list;
@@ -14,7 +15,9 @@ pub mod events;
 pub mod fonts;
 pub mod framing;
 pub mod hit;
+pub mod images;
 pub mod layout;
+pub mod lockup;
 pub mod motion;
 pub mod placement;
 pub mod readability;
@@ -27,8 +30,8 @@ pub mod watermark;
 
 use offcut_plan::ValidPlan;
 use offcut_types::{
-    ChangeSummary, ClipInfo, DurMs, EditState, ExportProfile, OUTPUT_FPS, OutMs, SrcPos, TimeMap,
-    Transcript, WordIdx, WordRange,
+    ChangeSummary, ClipInfo, DurMs, EditState, EmphasisSize, EventId, EventParams, ExportProfile,
+    OUTPUT_FPS, OutMs, SrcPos, TimeMap, Transcript, VoiceMode, WordIdx, WordRange,
 };
 use thiserror::Error;
 
@@ -40,6 +43,7 @@ pub use crate::display_list::{
 use crate::events::EventTrack;
 pub use crate::fonts::{FontFace, FontSet};
 pub use crate::hit::Hit;
+pub use crate::images::ImageSet;
 use crate::styles::StyleSpec;
 pub use crate::theme::{FontRole, Role, Theme};
 
@@ -83,9 +87,20 @@ pub struct Scene {
     caption_block: Rect,
     chunks: Vec<Chunk>,
     emphasis: captions_draw::Emphasis,
+    /// The plan's emphases (V6.2, D-481), drawn by the captions.
+    marks: Vec<captions_draw::Mark>,
+    /// The plan's emoji, placed by their chunks (V6.2, D-483), drawn after
+    /// the captions.
+    emojis: Vec<events::emoji::Placed>,
+    /// While the hook is shown (V6.2, D-484), from the program's start: no
+    /// caption is drawn or hit.
+    hook_until: Option<OutMs>,
     tracks: Vec<EventTrack>,
     /// Drawn over everything when the export profile asks (INV-9).
     watermark: Option<watermark::Track>,
+    /// V6.2 (P211a, D-505): whether the program's voice is the clean chain's;
+    /// with Voice cleanup off it is only levelled (D-487).
+    voice_cleaned: bool,
 }
 
 pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
@@ -99,7 +114,33 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
 
     let words = captions::words(input.transcript, &input.edit.word_edits, map);
     let sentences = &input.transcript.sentences;
-    let mut chunks = captions::chunk(&words, sentences, &style, theme, fonts, block)?;
+    // The user's choice for an item, when there is one; every V4 item is
+    // shown by default (TS §10.8, D-145).
+    let shown = |id: &EventId| input.edit.event_overrides.get(id).copied().unwrap_or(true);
+    // A punch word (V6.2, D-482): the word of each Emphasis of size `Punch`
+    // that is shown, when the captions show the word. Without one, the
+    // chunks are `captions::chunk`'s.
+    let punches: Vec<WordIdx> = input
+        .plan
+        .items()
+        .iter()
+        .filter(|item| shown(&item.id))
+        .filter_map(|item| {
+            if let EventParams::Emphasis {
+                word,
+                size: EmphasisSize::Punch,
+                ..
+            } = item.params
+            {
+                Some(word)
+            } else {
+                None
+            }
+        })
+        .filter(|word| words.iter().any(|caption| caption.word == *word))
+        .collect();
+    let look = (&style, theme, fonts);
+    let mut chunks = captions::chunk_punched(&words, sentences, look, block, &punches)?;
     readability::hold_for_reading(&mut chunks, OutMs::new(map.out_duration().get()));
 
     let mut tracks = Vec::new();
@@ -107,21 +148,15 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         pops: Vec::new(),
         numbers: input.edit.highlight_numbers,
     };
+    let mut marks = Vec::new();
+    let (mut emojis, mut cap) = (Vec::new(), None);
     for item in input.plan.items() {
-        // The user's choice for this item, when there is one; every V4 item
-        // is shown by default (TS §10.8, D-145).
-        let shown = input
-            .edit
-            .event_overrides
-            .get(&item.id)
-            .copied()
-            .unwrap_or(true);
-        if !shown {
+        if !shown(&item.id) {
             continue;
         }
         let span = map.out_span(item.span).ok_or(SceneError::TimeMap)?;
         let (when, t) = ((span, event_zone), input.transcript);
-        let Some(track) = events::layout(item, when, t, map, &style, theme, fonts)? else {
+        let Some(mut track) = events::layout(item, when, t, map, &style, theme, fonts)? else {
             continue;
         };
         // A KeywordPop is drawn by the captions: its word, from its program
@@ -132,6 +167,47 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
                 continue;
             }
             emphasis.pops.push((pop.word, pop.start));
+        }
+        // An Emphasis too (V6.2, D-481): its word, treatment and program
+        // start. A word the captions do not show (an edit hid it after the
+        // plan was made) is not marked, and has no track, so is not counted.
+        if let EventTrack::Emphasis(mark) = &track {
+            if !words.iter().any(|shown| shown.word == mark.word) {
+                continue;
+            }
+            marks.push(captions_draw::Mark {
+                word: mark.word,
+                treatment: mark.treatment,
+                start: mark.start,
+            });
+        }
+        // An emoji and an icon (V6.2, D-483) belong to the chunk that shows
+        // their word, and leave with it: a word not shown has neither, nor
+        // has an emoji with no room in the safe area. Neither is counted then.
+        if let EventTrack::Emoji(emoji) = &track {
+            let Some((chunk, _)) = chunk_holding(&chunks, emoji.word) else {
+                continue;
+            };
+            let cap = match cap {
+                Some(cap) => cap,
+                None => *cap.insert(layout::cap_height(
+                    theme.font(style.font),
+                    style.size,
+                    fonts,
+                )?),
+            };
+            let Some(placed) = events::emoji::place(emoji, chunk, &style, cap) else {
+                continue;
+            };
+            emojis.push(placed);
+        }
+        if let EventTrack::IconPop(icon) = track {
+            let Some((chunk, word)) = chunk_holding(&chunks, icon.word) else {
+                continue;
+            };
+            let zones = (event_zone, block);
+            track =
+                EventTrack::IconPop(events::icon_pop::attach(icon, word, zones, chunk.show.end));
         }
         tracks.push(track);
     }
@@ -145,7 +221,7 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
     let scale = width as f32 / safe_area::CANVAS_WIDTH;
     Ok(Scene {
         time_map: map.clone(),
-        video: video::Track::fixed(crop),
+        video: video_track(crop, &input, map, &tracks),
         canvas: (width as f32, height as f32),
         scale,
         style,
@@ -154,9 +230,62 @@ pub fn build_scene(input: SceneInput<'_>) -> Result<Scene, SceneError> {
         caption_block: block,
         chunks,
         emphasis,
+        marks,
+        emojis,
+        hook_until: tracks.iter().find_map(|track| {
+            if let EventTrack::HookTitle(hook) = track {
+                Some(hook.until)
+            } else {
+                None
+            }
+        }),
         tracks,
         watermark,
+        voice_cleaned: input.edit.enhance.voice == VoiceMode::Clean,
     })
+}
+
+/// The chunk that shows `word`, and the word's glyph box in it.
+fn chunk_holding(chunks: &[Chunk], word: WordIdx) -> Option<(&Chunk, Rect)> {
+    chunks.iter().find_map(|chunk| {
+        let mut boxes = hit::word_boxes(chunk).into_iter();
+        boxes.find(|(at, _)| *at == word).map(|(_, r)| (chunk, r))
+    })
+}
+
+/// The video of the scene (V6.2, D-476 to D-478): today's fixed crop, unless
+/// `Enhance.motion` drifts it or a `PunchIn` of the plan zooms it. The plan's
+/// zooms stay with motion off (§12: "the plan's zooms stay").
+fn video_track(
+    crop: CropRect,
+    input: &SceneInput<'_>,
+    map: &TimeMap,
+    tracks: &[EventTrack],
+) -> video::Track {
+    let punches: Vec<events::punch_in::Track> = tracks
+        .iter()
+        .filter_map(|track| {
+            if let EventTrack::PunchIn(punch) = track {
+                Some(*punch)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let motion = input.edit.enhance.motion;
+    if !motion && punches.is_empty() {
+        return video::Track::fixed(crop);
+    }
+    let drift = if motion {
+        camera::for_clip(input.transcript, map)
+    } else {
+        camera::CameraTrack::none()
+    };
+    let frame = (
+        input.clip.display_width.get() as f32,
+        input.clip.display_height.get() as f32,
+    );
+    video::Track::with_camera(crop, drift, frame).with_punches(punches)
 }
 
 impl Scene {
@@ -171,14 +300,39 @@ impl Scene {
         u32::try_from(frames).unwrap_or(u32::MAX)
     }
 
+    /// The clip's crop, which every frame's main video shows with motion off;
+    /// with motion on a frame shows it zoomed about its centre (V6.2, D-477).
+    /// For the page's development mirror (DC-16, P209).
+    pub fn video_crop(&self) -> CropRect {
+        self.video.crop()
+    }
+
+    /// Whether the plan's hook is shown at `t` (V6.2, D-484).
+    fn hooked(&self, t: OutMs) -> bool {
+        self.hook_until.is_some_and(|until| t < until)
+    }
+
+    /// The chunk shown at `t`: none while the hook is (D-484).
+    fn shown_chunk(&self, t: OutMs) -> Option<&Chunk> {
+        if self.hooked(t) {
+            return None;
+        }
+        self.chunks.iter().find(|chunk| chunk.visible_at(t))
+    }
+
     /// What is drawn at `t`, in pixels of the output canvas: the video, the
-    /// caption chunk that is shown, every item that is shown, and the
-    /// watermark when the profile asks.
+    /// caption chunk that is shown (none under the plan's hook), every item
+    /// that is shown, and the watermark when the profile asks.
     pub fn frame_at(&self, t: OutMs) -> DisplayList {
         let mut cmds = vec![self.video.cmd(t, self.canvas)];
-        if let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) {
-            let (style, theme) = (&self.style, &self.theme);
-            captions_draw::draw_with(chunk, t, style, theme, &self.emphasis, &mut cmds);
+        if let Some(chunk) = self.shown_chunk(t) {
+            let look = (&self.style, &self.theme);
+            captions_draw::draw_marked(chunk, t, look, &self.emphasis, &self.marks, &mut cmds);
+        }
+        if !self.hooked(t) {
+            for emoji in &self.emojis {
+                events::emoji::draw_placed(emoji, t, &mut cmds);
+            }
         }
         for track in &self.tracks {
             events::draw(track, t, &mut cmds);
@@ -197,7 +351,7 @@ impl Scene {
     /// `t` (D-174): a word of the chunk shown then, the caption block, or
     /// the video. `None` outside the canvas.
     pub fn hit(&self, t: OutMs, x: f32, y: f32) -> Option<Hit> {
-        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t));
+        let shown = self.shown_chunk(t);
         hit::hit(shown, self.caption_block, x, y)
     }
 
@@ -205,7 +359,7 @@ impl Scene {
     /// the box `hit` finds it by, which the page outlines (D-183). `None`
     /// when no chunk shown then holds it.
     pub fn word_box(&self, t: OutMs, word: WordIdx) -> Option<Rect> {
-        let shown = self.chunks.iter().find(|chunk| chunk.visible_at(t))?;
+        let shown = self.shown_chunk(t)?;
         let mut boxes = hit::word_boxes(shown).into_iter();
         boxes.find(|(at, _)| *at == word).map(|(_, r)| r)
     }
@@ -233,10 +387,11 @@ impl Scene {
     /// Each word of the chunk shown at `t` as it is drawn, with its fill:
     /// what development builds of the page mirror for the tests (D-155).
     pub fn caption_words(&self, t: OutMs) -> Vec<(String, Rgba)> {
-        let Some(chunk) = self.chunks.iter().find(|chunk| chunk.visible_at(t)) else {
+        let Some(chunk) = self.shown_chunk(t) else {
             return Vec::new();
         };
-        let drawn = captions_draw::lay_out(chunk, t, &self.style, &self.theme, &self.emphasis);
+        let look = (&self.style, &self.theme);
+        let drawn = captions_draw::lay_out(chunk, t, look, &self.emphasis, &self.marks);
         let text = |word: &captions_draw::Drawn<'_>| {
             word.runs.iter().map(|(run, _)| run.text.as_str()).collect()
         };
@@ -259,9 +414,13 @@ impl Scene {
         &self.fonts
     }
 
-    /// What was changed (D-144): the items drawn, by kind.
+    /// What was changed (D-144): the items drawn, by kind. V6.2 (P211a,
+    /// D-505): the voice counts as cleaned only with Voice cleanup on.
     pub fn summary(&self) -> ChangeSummary {
-        summary::change_summary(&self.tracks)
+        ChangeSummary {
+            voice_cleaned: self.voice_cleaned,
+            ..summary::change_summary(&self.tracks)
+        }
     }
 }
 
@@ -391,7 +550,10 @@ pub(crate) mod testing {
                 vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
             }
             DrawCmd::FillPath { .. } => panic!("V2 draws no path"),
-            DrawCmd::Image { .. } => panic!("V4 draws no image"),
+            // V6.2 (P204, D-440 (4)): an emoji or an icon, its rectangle.
+            DrawCmd::Image { rect, .. } => {
+                vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
+            }
             DrawCmd::PushLayer { .. } | DrawCmd::PopLayer | DrawCmd::Video { .. } => return None,
         };
         let fold = |pick: fn(&(f32, f32)) -> f32, by: fn(f32, f32) -> f32, from: f32| {
@@ -751,6 +913,30 @@ mod tests {
     }
 
     #[test]
+    fn the_summary_counts_the_voice_cleaned_only_with_voice_cleanup_on() {
+        // V6.2 (P211a, D-505): Level is the voice only levelled (D-487), not cleaned.
+        let identity = TimeMap::identity(DurMs::new(10_000));
+        let cleaned = |voice: VoiceMode| {
+            let mut edit = EditState::default();
+            edit.enhance.voice = voice;
+            busy_with(&edit, &identity).unwrap().summary()
+        };
+        let clean = cleaned(VoiceMode::Clean);
+        let level = cleaned(VoiceMode::Level);
+        assert!(clean.voice_cleaned);
+        assert!(!level.voice_cleaned);
+        // The items are counted the same either way.
+        assert_eq!(
+            (clean.captions_emphasized, clean.visual_moments),
+            (level.captions_emphasized, level.visual_moments)
+        );
+        // V5's settings: cleaned, as every summary before V6.2.
+        let mut v5 = EditState::default();
+        v5.enhance = offcut_types::Enhance::v5();
+        assert!(busy_with(&v5, &identity).unwrap().summary().voice_cleaned);
+    }
+
+    #[test]
     fn the_summary_counts_the_items_drawn_and_not_a_disabled_one() {
         let identity = TimeMap::identity(DurMs::new(10_000));
         let counts = |edit: &EditState| {
@@ -819,5 +1005,22 @@ mod tests {
         };
         let ranges = busy_with(&hidden, &identity).unwrap().chunk_ranges();
         assert_eq!(ranges[0].0.start, WordIdx::new(1));
+    }
+
+    #[test]
+    fn the_test_bounds_of_an_image_are_its_rectangle() {
+        // V6.2 (P204, D-440 (4)): the helper measured no image before.
+        let rect = Rect {
+            x: 10.0,
+            y: 20.0,
+            w: 30.0,
+            h: 40.0,
+        };
+        let image = DrawCmd::Image {
+            image: ImageKey(7),
+            rect,
+            opacity: 0.5,
+        };
+        assert_eq!(crate::testing::bounds(&image), Some(rect));
     }
 }

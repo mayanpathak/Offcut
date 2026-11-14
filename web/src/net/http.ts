@@ -105,6 +105,10 @@ const API_ERROR_CODES: Record<ApiErrorCode, true> = {
   email_unavailable: true,
   billing_unavailable: true,
   transcribe_unavailable: true,
+  plan_quota: true,
+  plan_catalog: true,
+  plan_unavailable: true,
+  plan_invalid: true,
   internal: true,
 };
 

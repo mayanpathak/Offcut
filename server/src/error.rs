@@ -26,6 +26,16 @@ pub enum AppError {
     BillingUnavailable,
     /// Cloud transcription is off, its budget is spent, or its provider failed.
     TranscribeUnavailable,
+    /// V6.2 (v6.2implementation D-460): the month's AI plans are used up.
+    PlanQuota,
+    /// The client's catalog is not this server's.
+    PlanCatalog,
+    /// The AI plan is off, at its spend cap, or its provider failed (502).
+    PlanUnavailable,
+    /// The provider did not answer in time (504, the same code).
+    PlanTimeout,
+    /// The model's answer did not read as a plan after one retry.
+    PlanInvalid,
     Db(sqlx::Error),
     Internal,
 }
@@ -76,6 +86,15 @@ impl IntoResponse for AppError {
                 ApiErrorCode::TranscribeUnavailable,
                 None,
             ),
+            Self::PlanQuota => (StatusCode::TOO_MANY_REQUESTS, ApiErrorCode::PlanQuota, None),
+            Self::PlanCatalog => (StatusCode::CONFLICT, ApiErrorCode::PlanCatalog, None),
+            Self::PlanUnavailable => (StatusCode::BAD_GATEWAY, ApiErrorCode::PlanUnavailable, None),
+            Self::PlanTimeout => (
+                StatusCode::GATEWAY_TIMEOUT,
+                ApiErrorCode::PlanUnavailable,
+                None,
+            ),
+            Self::PlanInvalid => (StatusCode::BAD_GATEWAY, ApiErrorCode::PlanInvalid, None),
             Self::Db(error) => {
                 // The kind only. The error's own text can hold values from the query.
                 tracing::error!(kind = db_error_kind(&error), "database error");
@@ -190,6 +209,27 @@ mod tests {
         for (error, status, code) in cases {
             let (got, retry_after, body) = parts(error).await;
             assert_eq!(got.as_u16(), status);
+            assert_eq!(retry_after, None);
+            assert_eq!(
+                body,
+                serde_json::json!({ "code": code, "retry_after_secs": null })
+            );
+        }
+    }
+
+    /// V6.2 (D-460): the plan route's errors, beside the table above.
+    #[tokio::test]
+    async fn each_plan_error_maps_to_its_status_and_code() {
+        let cases = [
+            (AppError::PlanQuota, 429, "plan_quota"),
+            (AppError::PlanCatalog, 409, "plan_catalog"),
+            (AppError::PlanUnavailable, 502, "plan_unavailable"),
+            (AppError::PlanTimeout, 504, "plan_unavailable"),
+            (AppError::PlanInvalid, 502, "plan_invalid"),
+        ];
+        for (error, status, code) in cases {
+            let (got, retry_after, body) = parts(error).await;
+            assert_eq!(got.as_u16(), status, "{code}");
             assert_eq!(retry_after, None);
             assert_eq!(
                 body,

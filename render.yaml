@@ -68,5 +68,25 @@ services:
         sync: false
       - key: TRANSCRIBE_BUDGET_DAY_S
         sync: false
+      # V6.2 (v6.2implementation D-465, D-500): the AI plan, on DeepSeek. Unset,
+      # PLAN_ENABLED is false and nothing else is read; true without the key,
+      # the cap or the two prices stops the boot naming the variable.
+      # PLAN_ENABLED stays false at the merge (§14.2).
+      - key: PLAN_ENABLED
+        sync: false
+      - key: PLAN_PROVIDER
+        sync: false
+      - key: PLAN_MODEL
+        sync: false
+      - key: PLAN_API_KEY
+        sync: false
+      - key: PLAN_API_BASE_URL
+        sync: false
+      - key: AI_MONTHLY_CAP_USD
+        sync: false
+      - key: PLAN_PRICE_IN_USD_PER_MTOK
+        sync: false
+      - key: PLAN_PRICE_OUT_USD_PER_MTOK
+        sync: false
       - key: TRUSTED_PROXY_HOPS
         sync: false

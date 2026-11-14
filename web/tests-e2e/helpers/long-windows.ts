@@ -133,7 +133,12 @@ export function sourceStoreCount(page: Page, store: string): Promise<number> {
  * export downloads rather than asking to sign in: the clip page at `/app`,
  * `fixture` processed to a ready preview through the cached model.
  */
-export async function openClipSignedIn(page: Page, fixture: string, o: { picked?: boolean; plan?: "free" | "creator" } = {}): Promise<FakeApi> {
+export async function openClipSignedIn(
+  page: Page,
+  fixture: string,
+  // V6.2 (P209): `before` runs on the open page before the clip is dropped (a dev hook, say).
+  o: { picked?: boolean; plan?: "free" | "creator"; before?: (page: Page) => Promise<void> } = {},
+): Promise<FakeApi> {
   await page.setViewportSize({ width: 1280, height: 800 });
   await ensureModelCached(page.context());
   const api = await installFakeApi(page, { session: { plan: o.plan ?? "free" } });
@@ -141,6 +146,9 @@ export async function openClipSignedIn(page: Page, fixture: string, o: { picked?
   await page.goto("/app");
   await expect(page.getByTestId("drop-zone")).toBeVisible({ timeout: 30_000 });
   await expectTestBuild(page);
+  if (o.before !== undefined) {
+    await o.before(page);
+  }
   if (o.picked === true) {
     // A large file through the zone's own file field, read from the disk as a
     // person's is: `dropFile` sends the bytes in one DevTools message, which

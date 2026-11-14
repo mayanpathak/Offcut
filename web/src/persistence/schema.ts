@@ -9,6 +9,7 @@ import type {
   ClipId,
   ClipInfo,
   DetectedEvent,
+  EditPlan,
   EditState,
   ExportId,
   Plan,
@@ -32,7 +33,15 @@ export const STORES = {
   meta: "meta",
 } as const;
 
-export const META_KEYS = { anonId: "anonId", persistRequested: "persistRequested", transcription: "transcription" } as const;
+/** V6.2 adds `aiPlan`, the settings switch "AI edit plan" (v6.2implementation D-466, P193). */
+export const META_KEYS = {
+  anonId: "anonId",
+  persistRequested: "persistRequested",
+  transcription: "transcription",
+  aiPlan: "aiPlan",
+  /** V6.2 (D-486, P208): the Enhance panel's last state, the start of the next clip. */
+  enhanceDefault: "enhanceDefault",
+} as const;
 
 /**
  * Every stored value is wrapped this way. A value whose `schemaVersion` is
@@ -144,4 +153,36 @@ export interface OffcutSourcesDb extends OffcutDb {
   /** The key is `[sourceId, windowIndex]`. */
   sourceTranscripts: { key: [SourceId, number]; value: Versioned<SourceWindowRecord> };
   masterTranscripts: { key: SourceId; value: Versioned<MasterTranscriptRecord> };
+}
+
+// --- V6.2: the AI plan (v6.2implementation §8, D-469) -------------------------
+
+/**
+ * Structure version 3 adds the `plans` store. Only `plans-repo.ts` opens it,
+ * so a build with `ai_plan` off never upgrades anyone's database (D-469). The
+ * long path still opens version 2 (`DB_STRUCTURE_VERSION`), and the clip path 1.
+ */
+export const PLANS_STRUCTURE_VERSION = 3;
+
+/** The store of structure version 3. Kept apart from `STORES` and `SOURCE_STORES`. */
+export const PLAN_STORES = { plans: "plans" } as const;
+
+/**
+ * A clip's plan as it was chosen when its request was made (D-469): the model's
+ * plan, or the rules plan the clip fell back to. Restore reads it and never
+ * requests again.
+ */
+export type PlanRecord = {
+  plan: EditPlan;
+  /** Whose plan it is: `"model"` when the AI plan was used, `"rules"` when the clip fell back. */
+  source: "model" | "rules";
+  /** When the request was made, in milliseconds since the Unix epoch. */
+  requestedAt: number;
+  /** The `CATALOG_VERSION` the request was made with. */
+  catalog: number;
+};
+
+/** Structure version 3: every store of version 2, and `plans`, keyed by the clip. */
+export interface OffcutPlansDb extends OffcutSourcesDb {
+  plans: { key: ClipId; value: Versioned<PlanRecord> };
 }

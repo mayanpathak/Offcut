@@ -278,6 +278,12 @@ fn want(t: &Transcript, e: Expected, file: &str) -> Want {
             Values::None
         }
         EventKind::KeywordPop => Values::None,
+        // V6.2's model-only kinds (D-446): no labelled detector event has them.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => panic!("{file}: {:?} is not a detector kind", e.kind),
     };
     Want {
         kind: e.kind,
@@ -457,6 +463,12 @@ fn name(kind: EventKind) -> &'static str {
         EventKind::ListReveal => "list_reveal",
         EventKind::FromTo => "from_to",
         EventKind::KeywordPop => "keyword_pop",
+        // V6.2's model-only kinds (D-446).
+        EventKind::Emphasis => "emphasis",
+        EventKind::IconPop => "icon_pop",
+        EventKind::PunchIn => "punch_in",
+        EventKind::Emoji => "emoji",
+        EventKind::HookTitle => "hook_title",
     }
 }
 
@@ -480,6 +492,12 @@ fn values(e: &DetectedEvent) -> Values {
         }
         EventParams::FromTo { from, to, .. } => Values::FromTo(q(from), q(to)),
         EventParams::ListReveal { .. } | EventParams::KeywordPop { .. } => Values::None,
+        // V6.2's model-only kinds (D-446).
+        EventParams::Emphasis { .. }
+        | EventParams::IconPop { .. }
+        | EventParams::PunchIn { .. }
+        | EventParams::Emoji { .. }
+        | EventParams::HookTitle { .. } => Values::None,
     }
 }
 
@@ -586,6 +604,12 @@ fn with_threshold(kind: EventKind, threshold: f32) -> DetectorConfig {
         EventKind::ListReveal => cfg.threshold_list = threshold,
         EventKind::FromTo => cfg.threshold_from_to = threshold,
         EventKind::KeywordPop => cfg.threshold_keyword = threshold,
+        // V6.2's model-only kinds (D-446): no threshold of the detector.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => {}
     }
     cfg
 }
@@ -645,6 +669,12 @@ fn precision_over_the_labeled_set() {
                     EventParams::NumberReveal { label, .. } => (&w.label, label.clone()),
                     EventParams::ListReveal { header, .. } => (&w.header, Some(header.clone())),
                     EventParams::FromTo { .. } | EventParams::KeywordPop { .. } => continue,
+                    // V6.2's model-only kinds (D-446).
+                    EventParams::Emphasis { .. }
+                    | EventParams::IconPop { .. }
+                    | EventParams::PunchIn { .. }
+                    | EventParams::Emoji { .. }
+                    | EventParams::HookTitle { .. } => continue,
                 };
                 if let Some(wanted) = wanted.as_ref().filter(|x| got.as_ref() != Some(*x)) {
                     writeln!(

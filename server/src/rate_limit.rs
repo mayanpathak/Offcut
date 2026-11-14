@@ -46,6 +46,11 @@ pub enum RouteGroup {
     TranscribeWindowUser,
     /// V6.1: a long source's windows, per IP, checked in the handler with the clips' bucket.
     TranscribeWindowIp,
+    /// V6.2 (v6.2implementation D-461): `POST /plan`, per IP, the route's layer, before
+    /// the bearer: a guard against floods.
+    PlanIp,
+    /// V6.2: `POST /plan`, per user, checked in its handler after the bearer (assumption).
+    PlanUser,
 }
 
 /// `capacity` requests per `window`.
@@ -83,6 +88,7 @@ impl RouteGroup {
             Self::TranscribeIp => per(60, HOUR),
             Self::TranscribeWindowUser => per(120, DAY),
             Self::TranscribeWindowIp => per(200, HOUR),
+            Self::PlanIp | Self::PlanUser => per(10, MINUTE),
         }
     }
 }
@@ -426,5 +432,17 @@ mod tests {
             200
         );
         assert_eq!(accepted(&limiter, RouteGroup::TranscribeIp, ip(9), 65), 60);
+    }
+
+    /// V6.2 (D-461): the plan's two groups, beside the table above, as V6.1's
+    /// window groups are (D-440 (7)).
+    #[tokio::test(start_paused = true)]
+    async fn the_plan_groups_take_ten_a_minute() {
+        assert_eq!(RouteGroup::PlanIp.limit(), per(10, MINUTE));
+        assert_eq!(RouteGroup::PlanUser.limit(), per(10, MINUTE));
+        let limiter = RateLimiter::new(100);
+        assert_eq!(accepted(&limiter, RouteGroup::PlanIp, ip(9), 15), 10);
+        let user = RateKey::User(UserId::new(uuid::Uuid::from_u128(7)));
+        assert_eq!(accepted(&limiter, RouteGroup::PlanUser, user, 15), 10);
     }
 }

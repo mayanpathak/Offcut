@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::assets::{EmojiId, IconId};
 use crate::ids::{EventId, WordIdx, WordRange};
+use crate::params::{EmojiPlace, EmphasisSize, Treatment, ZoomMotion, ZoomScale};
 use crate::transcript::Quantity;
 use crate::units::{Confidence, Span, TimeMs};
 
@@ -20,6 +22,12 @@ pub enum EventKind {
     ListReveal,
     FromTo,
     KeywordPop,
+    // V6.2 (v6.2implementation D-446): codes 4-8, written by a model only.
+    Emphasis,
+    IconPop,
+    PunchIn,
+    Emoji,
+    HookTitle,
 }
 
 /// `at` is the time at which the item was spoken.
@@ -49,6 +57,31 @@ pub enum EventParams {
     },
     KeywordPop {
         word: WordIdx,
+    },
+    // V6.2 (D-446): the resolved forms of a model's items; the detector never
+    // makes these. `HookTitle.text` is the plan's `extras.hook`, and `accent`
+    // the index of a word of that text (D-453).
+    Emphasis {
+        word: WordIdx,
+        treatment: Treatment,
+        size: EmphasisSize,
+    },
+    IconPop {
+        word: WordIdx,
+        icon: IconId,
+    },
+    PunchIn {
+        scale: ZoomScale,
+        motion: ZoomMotion,
+    },
+    Emoji {
+        word: WordIdx,
+        emoji: EmojiId,
+        place: EmojiPlace,
+    },
+    HookTitle {
+        text: String,
+        accent: u8,
     },
 }
 
@@ -179,7 +212,14 @@ mod tests {
                 "{kind} is missing from {ts}"
             );
         }
-        assert_eq!(ts.matches(r#""kind": "#).count(), 4, "{ts}");
+        // V6.2 (D-446): the five resolved arms join the union; the four of V4 stay.
+        for kind in ["emphasis", "icon_pop", "punch_in", "emoji", "hook_title"] {
+            assert!(
+                ts.contains(&format!(r#""kind": "{kind}""#)),
+                "{kind} is missing from {ts}"
+            );
+        }
+        assert_eq!(ts.matches(r#""kind": "#).count(), 9, "{ts}");
         assert!(ts.contains("label: string | null"), "{ts}");
         assert!(ts.contains("word: WordIdx"), "{ts}");
     }

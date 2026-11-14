@@ -426,3 +426,68 @@ describe("cloud transcription (cloudimplementation D-366, D-372, D-373)", () => 
     ]);
   });
 });
+
+// V6.2 (v6.2implementation D-466, D-498; V6 CL known issue 4): the plan's
+// failures are answers of a running API, read by their code at once.
+describe("the AI plan (D-466, known issue 4)", () => {
+  const BODY = { catalog: 2, duration: 1_000, words: [{ text: "Hi.", start: 0, end: 300, energy_z: 0, pitch_z: 0 }], sentences: [{ start: 0, end: 1 }] };
+  const PLANNED = { plan: { items: [] }, plans_remaining: 39 };
+
+  it("requestPlan sends the body once as JSON with the token, and a 401 refreshes once", async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init: RequestInit = {}) => {
+      bodies.push(typeof init.body === "string" ? JSON.parse(init.body) : init.body);
+      return fakeFetch(input, init);
+    });
+    answers.set("/plan", [UNAUTHORIZED, { status: 200, body: PLANNED }]);
+    answers.set("/auth/refresh", [{ status: 200, body: SESSION }]);
+    const result = await settled(api.requestPlan(BODY as never, new AbortController().signal));
+
+    expect(result.ok && result.data).toEqual(PLANNED);
+    expect(pathsOf("/plan").map((call) => [call.method, call.headers])).toEqual([
+      ["POST", { "Content-Type": "application/json", Authorization: "Bearer old-access" }],
+      ["POST", { "Content-Type": "application/json", Authorization: "Bearer new-access" }],
+    ]);
+    expect(bodies.filter((body) => body !== undefined)).toEqual([BODY, BODY]);
+    expect(pathsOf("/auth/refresh")).toHaveLength(1);
+  });
+
+  it.each([
+    [502, "plan_unavailable"],
+    [504, "plan_unavailable"],
+    [502, "plan_invalid"],
+  ])("a %i %s is one attempt, read by its code, not a waking API", async (status, code) => {
+    answers.set("/plan", [{ status, body: { code, retry_after_secs: null } }, { status: 200, body: PLANNED }]);
+    const result = await settled(api.requestPlan(BODY as never, new AbortController().signal));
+    expect(!result.ok && result.apiError?.code).toBe(code);
+    // The second answer would be a plan: one attempt means it was never asked for.
+    expect(pathsOf("/plan")).toHaveLength(1);
+  });
+
+  it("a proxy's 503 without the API's body is not waited out either", async () => {
+    answers.set("/plan", [{ status: 503 }, { status: 200, body: PLANNED }]);
+    const result = await settled(api.requestPlan(BODY as never, new AbortController().signal));
+    expect(!result.ok && result.failure.code).toBe("E_NET_TIMEOUT");
+    expect(pathsOf("/plan")).toHaveLength(1);
+  });
+
+  it("a 401 after the one refresh is E_AUTH_SESSION_EXPIRED, with no third attempt", async () => {
+    answers.set("/plan", [UNAUTHORIZED, UNAUTHORIZED]);
+    answers.set("/auth/refresh", [{ status: 200, body: SESSION }]);
+    const result = await settled(api.requestPlan(BODY as never, new AbortController().signal));
+    expect(!result.ok && result.failure.code).toBe("E_AUTH_SESSION_EXPIRED");
+    expect(pathsOf("/plan")).toHaveLength(2);
+    expect(expired).toBe(1);
+  });
+
+  it("its one attempt may take 20 s, not 10", async () => {
+    answers.set("/plan", [{ hang: true }]);
+    const pending = api.requestPlan(BODY as never, new AbortController().signal);
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(pathsOf("/plan")).toHaveLength(1);
+    const result = await settled(pending);
+    expect(!result.ok && result.failure.code).toBe("E_NET_TIMEOUT");
+    expect(Date.now()).toBe(api.PLAN_CLIENT_TIMEOUT_MS);
+    expect(pathsOf("/plan")).toHaveLength(1);
+  });
+});

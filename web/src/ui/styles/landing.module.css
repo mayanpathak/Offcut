@@ -292,7 +292,8 @@
   margin-left: auto;
 }
 
-.landing .nav a {
+.landing .nav a,
+.landing .accountLink {
   padding: 8px 12px;
   border-radius: 8px;
   color: var(--text-2);
@@ -304,7 +305,8 @@
     background-color var(--fast) var(--ease);
 }
 
-.landing .nav a:hover {
+.landing .nav a:hover,
+.landing .accountLink:hover {
   background: rgb(255 255 255 / 0.05);
   color: var(--text);
 }
@@ -313,13 +315,22 @@
   margin-left: 8px;
 }
 
+/* V6.2 (P206a): "Sign in" or "Account", kept on a phone, where the section links go. */
+.accountLink {
+  white-space: nowrap;
+}
+
 @media (max-width: 719px) {
   .nav {
     display: none;
   }
 
-  .topBarCta {
+  .accountLink {
     margin-left: auto;
+  }
+
+  .topBarCta {
+    margin-left: 0;
   }
 }
 

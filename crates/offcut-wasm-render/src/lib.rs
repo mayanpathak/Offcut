@@ -4,6 +4,7 @@
 //! no product rule and does not branch on a domain value beyond decoding an
 //! argument and mapping an error to a code (TS §2).
 
+mod check_api;
 mod detect_api;
 mod mux_api;
 mod profile_api;

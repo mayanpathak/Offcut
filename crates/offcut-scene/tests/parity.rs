@@ -14,6 +14,11 @@
 mod labeled;
 #[path = "common/scenes.rs"]
 mod scenes;
+// V6.2 (P206): the reference transcript with all five kinds.
+#[path = "common/all_kinds.rs"]
+mod all_kinds;
+#[path = "common/hook.rs"]
+mod hook;
 
 use offcut_scene::{DrawCmd, PathEl, Rect};
 use offcut_types::FrameIdx;
@@ -205,4 +210,33 @@ fn six_scenes_draw_the_same_lists_at_540_720_and_1080_after_scaling() {
         }
         assert!(compared > 2_000, "{}: {compared}", case.name);
     }
+}
+
+/// V6.2 (P206): the reference transcript with all five kinds and Motion on,
+/// in the four styles: the lists at 540 and 720 wide are the 1080 list after
+/// scaling, at every frame, images and the hook included.
+#[test]
+fn the_reference_with_all_five_kinds_draws_the_same_lists_at_540_720_and_1080() {
+    use offcut_types::StyleId;
+    let mut compared = 0usize;
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let case = all_kinds::reference(style);
+        let full = scenes::build(&case, 1080);
+        for width in [540u32, 720] {
+            let k = width as f32 / 1080.0;
+            let small = scenes::build(&case, width);
+            assert_eq!(small.frame_count(), full.frame_count(), "{style:?}");
+            for frame in 0..full.frame_count() {
+                let t = FrameIdx::new(frame).to_out_ms();
+                let (list, list_f) = (small.frame_at(t), full.frame_at(t));
+                let what = format!("{style:?} at {width}, frame {frame}");
+                assert_eq!(list.cmds.len(), list_f.cmds.len(), "{what}");
+                for (cmd, cmd_f) in list.cmds.iter().zip(&list_f.cmds) {
+                    same(cmd, k, cmd_f, &what);
+                    compared += 1;
+                }
+            }
+        }
+    }
+    assert!(compared > 50_000, "{compared}");
 }

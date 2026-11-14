@@ -10,6 +10,7 @@ import { FEATURES } from "../config/features";
 import { type ErrorCode, type EventKind, LIMITS, type RouteReject, SOURCE_LIMITS, type UnsupportedReason } from "../gen/domain";
 import { landingCopy, pricingCopy } from "./landing";
 import { longCopy, longRejections } from "./long";
+import { planCopy, planFoundLines, planKindNames } from "./plan";
 import { transcriptionCopy } from "./transcription";
 
 type EventName = AnalyticsEvent["name"];
@@ -94,6 +95,8 @@ export const messages = {
   transcription: transcriptionCopy,
   // The long page (V6.1): copy/long.ts (v6.1implementation D-426).
   long: longCopy,
+  // V6.2's AI plan: copy/plan.ts (v6.2implementation D-491).
+  plan: planCopy,
 
   dropZone: {
     prompt: (limits: Pick<typeof LIMITS, "MAX_CLIP_DURATION">) =>
@@ -131,6 +134,7 @@ export const messages = {
       from_to: (display: string, displayTo: string) =>
         displayTo === "" ? `Found: ${display}` : `Found: ${display} to ${displayTo}`,
       keyword_pop: (display: string) => `Found: ${display}`,
+      ...planFoundLines,
     } satisfies Record<Exclude<EventKind, "from_to">, (display: string) => string> & {
       from_to: (display: string, displayTo: string) => string;
     },
@@ -206,7 +210,7 @@ export const messages = {
   visuals: {
     count: (on: number, total: number) => `${String(on)} of ${String(total)} visuals on`, goTo: (time: string) => `Go to ${time}`,
     fromTo: (from: string, to: string) => `${from} → ${to}`, points: (n: number) => `${String(n)} ${n === 1 ? "point" : "points"}`,
-    kind: { number_reveal: "Big number", list_reveal: "List", from_to: "Before → after", keyword_pop: "Emphasis" } satisfies
+    kind: { number_reveal: "Big number", list_reveal: "List", from_to: "Before → after", keyword_pop: "Emphasis", ...planKindNames } satisfies
       Record<EventKind, string>,
     // PS §10 J7.
     noEventsFound: "No numbers or lists found in this clip. Captions and cleanup applied.",
@@ -474,6 +478,7 @@ export const messages = {
       client_error: "Error in the app",
       local_data_cleared: "Local data cleared",
       asr_cloud: "Cloud transcription result",
+      plan_result: "AI edit plan result",
     } satisfies Record<EventName, string>,
   },
 

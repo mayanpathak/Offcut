@@ -7,11 +7,13 @@
 // failures of G 14.5 on purpose; their worker halves are in
 // `workers/rpc-worker.ts`, behind the same condition.
 
-import type { ErrorCode } from "../gen/domain";
+import { type FeatureFlags, FEATURES } from "../config/features";
+import type { PlanOutcome } from "../gen/api";
+import type { EditPlan, ErrorCode, EventKind, PlanItem } from "../gen/domain";
 import { useClipStore } from "../state/clip-store";
 import { useExportStore } from "../state/export-store";
 import { useUiStore } from "../state/ui-store";
-import { crashWorker, failEncoderAt, failNextSetScene, hangWorker } from "../usecases/dev-faults";
+import { crashWorker, failEncoderAt, failNextSetScene, hangWorker, imageCheck, startAsV5, videoMirror } from "../usecases/dev-faults";
 import { wordAt } from "../usecases/replace-all";
 
 type WorkerKind = Parameters<typeof crashWorker>[0];
@@ -43,7 +45,71 @@ export type DevHooks = {
   hangWorker(kind: WorkerKind): void;
   /** The video encoder fails at `frame`, the next `times` attempts (v5implementation D-218). */
   failEncoderAt(frame: number, times: number): void;
+  /** V6.2 (P194): the build's feature flags, for a capture that needs one on. */
+  flags(): FeatureFlags;
+  /**
+   * V6.2 (P194): the clip shows a model's plan in the visuals list, one item of
+   * each of the five kinds on the transcript's words after its own items, and
+   * its text extras. Only the list and the panel: the scene is not rebuilt.
+   */
+  fakePlan(): void;
+  /** V6.2 (P194): the run fell back to the rules plan for `why`; its toast shows. */
+  fakePlanFallback(why: Exclude<PlanOutcome, "ok" | "off">): void;
+  /**
+   * V6.2 (P197, TE-30): the render worker draws the `image_basic` golden's
+   * frame, images included, and reads it back: RGBA rows from the top-left,
+   * and how long the images took to decode.
+   */
+  imageCheck(): ReturnType<typeof imageCheck>;
+  /**
+   * V6.2 (P209, DC-16): the next clip is made as V5 made it, `Enhance::v5()`
+   * as its start and the AI plan switch off, for `flags-identity.spec.ts`.
+   */
+  startAsV5(): Promise<void>;
+  /** V6.2 (P209): the main video's `src` at `at` ms and the clip's crop; `null` before a scene. */
+  videoMirror(at: number): ReturnType<typeof videoMirror>;
+  /** V6.2 (P209): the clip's program audio at these sample indexes, as the preview plays it; `[]` without a clip. */
+  programSamples(at: number[]): number[];
 };
+
+/** The five kinds of V6.2, each on the word at that share of the transcript. */
+const FAKE_PLAN_KINDS: readonly [EventKind, number][] = [
+  ["hook_title", 0],
+  ["emphasis", 0.2],
+  ["punch_in", 0.4],
+  ["emoji", 0.6],
+  ["icon_pop", 0.8],
+];
+const FAKE_EXTRAS = {
+  hook: "The one thing nobody tells you",
+  post_caption: "Three habits that changed how I edit, in under a minute. Which one would you try first?",
+  hashtags: ["#editing", "#creator", "#shorts"],
+};
+
+function fakePlan(): void {
+  const { plan, transcript } = useClipStore.getState();
+  const words = transcript?.words.length ?? 0;
+  if (plan === undefined || words === 0) {
+    return;
+  }
+  const items = FAKE_PLAN_KINDS.map(([kind, at], i) => {
+    const word = Math.min(words - 1, Math.floor(at * words));
+    // The list reads the kind, the id and the words; the params are a stand-in.
+    return {
+      id: String(9_000 + i),
+      kind,
+      anchors: { start: word, end: word + 1 },
+      params: { kind, params: { word } },
+      confidence: null,
+    } as unknown as PlanItem;
+  });
+  const model: EditPlan = {
+    ...plan,
+    source: { kind: "model", provider: "deepseek", model: "deepseek-flash" },
+    items: [...plan.items, ...items],
+  };
+  useClipStore.setState({ plan: model, planExtras: FAKE_EXTRAS });
+}
 
 declare global {
   interface Window {
@@ -88,5 +154,17 @@ export function installDevHooks(): void {
     failNextSetScene,
     hangWorker,
     failEncoderAt,
+    flags: () => FEATURES,
+    fakePlan,
+    fakePlanFallback: (why) => {
+      useClipStore.setState({ planFallback: why });
+    },
+    imageCheck,
+    startAsV5,
+    videoMirror,
+    programSamples: (at) => {
+      const { prog48 } = useClipStore.getState();
+      return prog48 === null ? [] : at.map((i) => prog48[i] ?? Number.NaN);
+    },
   };
 }

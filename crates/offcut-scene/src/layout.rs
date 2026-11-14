@@ -218,6 +218,35 @@ fn shape_with(
     Ok(runs)
 }
 
+/// The height of the capitals of the face `key` at `size` (V6.2, D-483):
+/// what the font says of "H" as parley sets it, or 0.7 of the size (about
+/// Inter's and JetBrains Mono's, assumption) when the face does not say.
+pub fn cap_height(key: FontKey, size: f32, fonts: &FontSet) -> Result<f32, SceneError> {
+    if !(size.is_finite() && size > 0.0) {
+        return Err(SceneError::Layout);
+    }
+    let said = fonts::with(|shaper| {
+        let face = fonts.get(key).ok_or(SceneError::Font)?;
+        let emoji = fonts.get(FontSet::EMOJI).ok_or(SceneError::Font)?;
+        shaper.ensure(fonts)?;
+        let layout = shaper.lay_out("H", (&face.family, face.weight), &emoji.family, size);
+        let mut said = None;
+        for line in layout.lines() {
+            for item in line.items() {
+                if let PositionedLayoutItem::GlyphRun(glyph_run) = item
+                    && said.is_none()
+                {
+                    said = glyph_run.run().metrics().cap_height;
+                }
+            }
+        }
+        Ok(said)
+    })?;
+    Ok(said
+        .filter(|h| h.is_finite() && *h > 0.0)
+        .unwrap_or(0.7 * size))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,5 +289,28 @@ mod tests {
         cache.enabled = false;
         cache.put(key("e"), &fonts, &runs("e"));
         assert!(cache.entries.is_empty() && cache.by_use.is_empty());
+    }
+
+    #[test]
+    fn the_capitals_height_is_the_fonts_own() {
+        // V6.2 (P204, D-483): Inter's capitals are 1,490 of 2,048 units,
+        // JetBrains Mono's 730 of 1,000.
+        let fonts = FontSet::embedded();
+        for key in [0, 1, 4] {
+            let h = cap_height(FontKey(key), 100.0, &fonts).unwrap();
+            assert!(
+                (h - 100.0 * 1_490.0 / 2_048.0).abs() < 0.5,
+                "Inter {key}: {h}"
+            );
+        }
+        let mono = cap_height(FontKey(2), 100.0, &fonts).unwrap();
+        assert!((mono - 73.0).abs() < 0.5, "JetBrains Mono: {mono}");
+        // It scales with the size, and a size that is not one is refused.
+        let (a, b) = (
+            cap_height(FontKey(0), 72.0, &fonts).unwrap(),
+            cap_height(FontKey(0), 144.0, &fonts).unwrap(),
+        );
+        assert!((b - 2.0 * a).abs() < 1e-3);
+        assert!(cap_height(FontKey(0), 0.0, &fonts).is_err());
     }
 }

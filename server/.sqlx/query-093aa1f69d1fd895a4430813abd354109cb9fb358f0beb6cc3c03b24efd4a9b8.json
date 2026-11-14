@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_spend (month, micro_usd) VALUES ($1, $2)\n           ON CONFLICT (month) DO UPDATE SET micro_usd = ai_spend.micro_usd + EXCLUDED.micro_usd\n           RETURNING micro_usd",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "micro_usd",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ai_spend",
+            "name": "micro_usd"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "093aa1f69d1fd895a4430813abd354109cb9fb358f0beb6cc3c03b24efd4a9b8"
+}

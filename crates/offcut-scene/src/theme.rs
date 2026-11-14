@@ -126,12 +126,20 @@ fn tech() -> Theme {
     }
 }
 
+/// Glow (V6.2, D-480): Clean's colours, white Inter 800 and yellow for the
+/// spoken word and a keyword. The glow takes each word's own colour, so it
+/// needs no colour of its own.
+fn glow() -> Theme {
+    clean()
+}
+
 impl Theme {
     pub fn default_for(style: StyleId) -> Theme {
         match style {
             StyleId::Clean => clean(),
             StyleId::Bold => bold(),
             StyleId::Tech => tech(),
+            StyleId::Glow => glow(),
         }
     }
 
@@ -215,5 +223,11 @@ mod tests {
             let theme = Theme::default_for(style);
             assert_eq!(theme.font(spec(style).font), key, "{style:?}");
         }
+    }
+
+    #[test]
+    fn glow_is_drawn_in_cleans_colours_and_fonts() {
+        assert_eq!(Theme::default_for(StyleId::Glow), clean());
+        assert_eq!(Theme::default_for(StyleId::Glow).display_font, INTER_800);
     }
 }

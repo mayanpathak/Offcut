@@ -19,6 +19,19 @@
 mod inputs;
 #[path = "common/scenes.rs"]
 mod scenes;
+// V6.2 (P202): a model's plan for the emphasis snapshots.
+#[path = "common/model.rs"]
+mod model;
+// V6.2 (P205): a model's plan with the hook.
+#[path = "common/hook.rs"]
+mod hook;
+// V6.2 (P206): the reference transcript with all five kinds.
+#[path = "common/all_kinds.rs"]
+mod all_kinds;
+// Only its `case` is used here.
+#[allow(dead_code)]
+#[path = "common/labeled.rs"]
+mod labeled;
 
 use std::collections::BTreeMap;
 
@@ -190,4 +203,259 @@ fn the_from_to_steps_to_its_second_value_at_its_mark() {
     assert_eq!(parts(item.span.start.get()), (true, false, false));
     assert_eq!(parts(mark - 1), (true, false, false));
     assert_eq!(parts(mark), (true, true, true));
+}
+
+/// V6.2 (P201, D-480): the Glow style with each kind's visual, before it,
+/// while it shows and after it. New files; the three styles' are unchanged.
+#[test]
+fn glow_with_each_kind_before_during_and_after_its_visual() {
+    let style = StyleId::Glow;
+    for input in &INPUTS {
+        let scene = scenes::build(&case(input, style, BTreeMap::new()), 1080);
+        for (when, t) in ["before", "during", "after"].into_iter().zip(input.at) {
+            let name = format!("{}_{}_{when}", style_name(style), input.name);
+            insta::assert_json_snapshot!(name, scene.frame_at(OutMs::new(t)));
+        }
+    }
+}
+
+/// V6.2 (P202, D-481): the KeywordPop input's sentences with a model's plan
+/// of one `Emphasis` on "brutal" in each treatment, in the four styles,
+/// while the word is said, and 90 ms after it in Clean and Bold, whose chunk
+/// goes on after it. In Tech and Glow "brutal" ends its chunk, and with it
+/// the mark (D-481). New files.
+#[test]
+fn emphasis_each_treatment_in_each_style_while_said_and_after() {
+    use offcut_types::{
+        EmphasisSize, EventId, EventKind, ItemParams, PlanItem, Treatment, WordRange,
+    };
+    let input = &INPUTS[3];
+    let styles = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+    let treatments = [
+        (Treatment::Colour, "colour"),
+        (Treatment::Underline, "underline"),
+        (Treatment::Highlight, "highlight"),
+    ];
+    for style in styles {
+        for (treatment, treatment_name) in treatments {
+            let case = case(input, style, BTreeMap::new());
+            let words = &case.transcript.words;
+            let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+            let item = PlanItem {
+                id: EventId::new(9_200),
+                kind: EventKind::Emphasis,
+                anchors: WordRange {
+                    start: WordIdx::new(brutal),
+                    end: WordIdx::new(brutal + 1),
+                },
+                params: ItemParams::Emphasis {
+                    word: WordIdx::new(brutal),
+                    treatment,
+                    size: EmphasisSize::Normal,
+                },
+                confidence: None,
+            };
+            let case = model::with_model_items(case, vec![item]);
+            assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+            let scene = scenes::build(&case, 1080);
+            let after = case.transcript.words[brutal as usize].end_ms.get() + 90;
+            let goes_on = matches!(style, StyleId::Clean | StyleId::Bold);
+            let shown = |t: u32| {
+                scene
+                    .word_box(OutMs::new(t), WordIdx::new(brutal))
+                    .is_some()
+            };
+            assert_eq!(shown(after), goes_on, "{style:?}");
+            let mut instants = vec![("said", input.at[1])];
+            if goes_on {
+                instants.push(("after", after));
+            }
+            for (when, t) in instants {
+                assert!(shown(t), "{style:?} {t}");
+                let name = format!("emphasis_{treatment_name}_{}_{when}", style_name(style));
+                insta::assert_json_snapshot!(name, scene.frame_at(OutMs::new(t)));
+            }
+        }
+    }
+}
+
+/// V6.2 (P203, D-482): the KeywordPop input's sentences with a model's plan
+/// of one punch word, "brutal" (colour), in the four styles: while it is
+/// said, alone in capitals at 1.9 times the size, and when the next chunk
+/// is shown. New files.
+#[test]
+fn punch_word_in_each_style_while_said_and_next() {
+    use offcut_types::{
+        EmphasisSize, EventId, EventKind, ItemParams, PlanItem, Treatment, WordRange,
+    };
+    let input = &INPUTS[3];
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let case = case(input, style, BTreeMap::new());
+        let words = &case.transcript.words;
+        let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+        let item = PlanItem {
+            id: EventId::new(9_200),
+            kind: EventKind::Emphasis,
+            anchors: WordRange {
+                start: WordIdx::new(brutal),
+                end: WordIdx::new(brutal + 1),
+            },
+            params: ItemParams::Emphasis {
+                word: WordIdx::new(brutal),
+                treatment: Treatment::Colour,
+                size: EmphasisSize::Punch,
+            },
+            confidence: None,
+        };
+        let case = model::with_model_items(case, vec![item]);
+        assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+        let scene = scenes::build(&case, 1080);
+        let said = scene.frame_at(OutMs::new(input.at[1]));
+        assert_eq!(
+            texts(&said).last().map(String::as_str),
+            Some("BRUTAL"),
+            "{style:?}"
+        );
+        let next = scene.frame_at(OutMs::new(input.at[2]));
+        assert!(!texts(&next).iter().any(|t| t == "BRUTAL"), "{style:?}");
+        insta::assert_json_snapshot!(format!("punch_word_{}_said", style_name(style)), said);
+        insta::assert_json_snapshot!(format!("punch_word_{}_next", style_name(style)), next);
+    }
+}
+
+/// V6.2 (P204, D-483): the KeywordPop input's sentences with a model's plan
+/// of one emoji or one icon, in the four styles, 300 ms after its word
+/// starts (at rest): fire under "brutal" at Middle and at Bottom (over the
+/// lines: no room under them), fire beside "everyone.", a light bulb on a
+/// disc for "brutal". New files.
+#[test]
+fn emoji_and_icon_in_each_style() {
+    use offcut_types::{
+        CaptionPlacement, EmojiId, EmojiPlace, EventId, EventKind, IconId, ItemParams, PlanItem,
+        WordRange,
+    };
+    let input = &INPUTS[3];
+    let item = |word: u32, kind: EventKind, params: ItemParams| PlanItem {
+        id: EventId::new(9_300),
+        kind,
+        anchors: WordRange {
+            start: WordIdx::new(word),
+            end: WordIdx::new(word + 1),
+        },
+        params,
+        confidence: None,
+    };
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let base = case(input, style, BTreeMap::new());
+        let at = |text: &str| {
+            base.transcript
+                .words
+                .iter()
+                .position(|w| w.text == text)
+                .unwrap() as u32
+        };
+        let (brutal, everyone) = (at("brutal"), at("everyone."));
+        let emoji = |word: u32, place| {
+            let params = ItemParams::Emoji {
+                word: WordIdx::new(word),
+                emoji: EmojiId::Fire,
+                place,
+            };
+            item(word, EventKind::Emoji, params)
+        };
+        let icon = item(
+            brutal,
+            EventKind::IconPop,
+            ItemParams::IconPop {
+                word: WordIdx::new(brutal),
+                icon: IconId::Lightbulb,
+            },
+        );
+        let shots = [
+            (
+                "emoji_under",
+                0.55,
+                emoji(brutal, EmojiPlace::Under),
+                brutal,
+            ),
+            ("emoji_over", 1.0, emoji(brutal, EmojiPlace::Under), brutal),
+            (
+                "emoji_beside",
+                0.55,
+                emoji(everyone, EmojiPlace::Beside),
+                everyone,
+            ),
+            ("icon_pop", 1.0, icon.clone(), brutal),
+        ];
+        for (name, place, plan, word) in shots {
+            let mut case = case(input, style, BTreeMap::new());
+            case.edit.caption_position = CaptionPlacement::new(place).unwrap();
+            let case = model::with_model_items(case, vec![plan]);
+            assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+            let scene = scenes::build(&case, 1080);
+            let t = case.transcript.words[word as usize].start_ms.get() + 300;
+            let list = scene.frame_at(OutMs::new(t));
+            let drawn = list
+                .cmds
+                .iter()
+                .filter(|cmd| matches!(cmd, DrawCmd::Image { .. }))
+                .count();
+            assert_eq!(drawn, 1, "{name} {style:?}");
+            insta::assert_json_snapshot!(format!("{name}_{}", style_name(style)), list);
+        }
+    }
+}
+
+/// V6.2 (P205, D-484): the KeywordPop input's sentences with a model's plan
+/// of the hook "The one thing nobody tells you" ("NOBODY" the accent), in
+/// the four styles: entering (0 ms) and at rest (1,000 ms), no caption under
+/// it. New files.
+#[test]
+fn hook_in_each_style_entering_and_at_rest() {
+    let input = &INPUTS[3];
+    for style in [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow] {
+        let case = case(input, style, BTreeMap::new());
+        let case = hook::with_hook(case, "The one thing nobody tells you", 3, Vec::new());
+        assert_eq!(case.plan.items().len(), 1, "{}", case.name);
+        let scene = scenes::build(&case, 1080);
+        for (when, t) in [("enter", 0), ("rest", 1_000)] {
+            let list = scene.frame_at(OutMs::new(t));
+            let words = ["THE", "ONE", "THING", "NOBODY", "TELLS", "YOU"];
+            assert!(
+                texts(&list).iter().all(|t| words.contains(&t.as_str())),
+                "{style:?}"
+            );
+            insta::assert_json_snapshot!(format!("hook_{}_{when}", style_name(style)), list);
+        }
+    }
+}
+
+/// V6.2 (P206): the reference transcript (`a01-scriptA`) with all five
+/// kinds, Motion on, in Glow (checkpoint 3's style), at an instant that
+/// shows each at rest. New files.
+#[test]
+fn the_reference_with_all_five_kinds_in_glow() {
+    /// The instants that show each kind at rest: the hook, the underline
+    /// ("editing"), the highlight ("literally"), the snap and the emoji beside
+    /// "brutal", the push, the colour ("evenings"), the punch word ("luck."),
+    /// the icons ("numbers", "laptop.").
+    const INSTANTS: [(&str, u32); 10] = [
+        ("hook", 1_000),
+        ("emoji_under", 6_100),
+        ("underline", 11_000),
+        ("highlight", 13_200),
+        ("snap_emoji_beside", 13_800),
+        ("push", 23_300),
+        ("colour", 27_700),
+        ("punch_word", 30_300),
+        ("icon_numbers", 37_500),
+        ("icon_laptop", 41_600),
+    ];
+    let scene = scenes::build(&all_kinds::reference(StyleId::Glow), 1080);
+    for (name, t) in INSTANTS {
+        insta::assert_json_snapshot!(
+            format!("all_kinds_glow_{name}"),
+            scene.frame_at(OutMs::new(t))
+        );
+    }
 }

@@ -1,0 +1,889 @@
+---
+source: crates/offcut-plan/tests/catalog_snapshot.rs
+expression: output_schema()
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "catalog": {
+      "const": 2
+    },
+    "chapters": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "cuts": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "extras": {
+      "additionalProperties": false,
+      "properties": {
+        "hashtags": {
+          "items": {
+            "pattern": "^#[A-Za-z0-9_]{1,30}$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "hook": {
+          "maxLength": 48,
+          "type": "string"
+        },
+        "post_caption": {
+          "maxLength": 2200,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "format": {
+      "const": 1
+    },
+    "items": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "number_reveal"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "number_reveal"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "label": {
+                        "maxLength": 32,
+                        "type": "string"
+                      },
+                      "value": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "list_reveal"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "list_reveal"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "header": {
+                        "maxLength": 24,
+                        "type": "string"
+                      },
+                      "items": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "at": {
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "label": {
+                              "maxLength": 32,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "at",
+                            "label"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 7,
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "items"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "from_to"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "from_to"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "from": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      },
+                      "label": {
+                        "maxLength": 32,
+                        "type": "string"
+                      },
+                      "to": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "words": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "end": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "start": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "end"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "words"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "keyword_pop"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "keyword_pop"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "word": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "word"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "emphasis"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "emphasis"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "size": {
+                        "enum": [
+                          "normal",
+                          "punch"
+                        ]
+                      },
+                      "treatment": {
+                        "enum": [
+                          "colour",
+                          "underline",
+                          "highlight"
+                        ]
+                      },
+                      "word": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "word",
+                      "treatment",
+                      "size"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "icon_pop"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "icon_pop"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "icon": {
+                        "enum": [
+                          "trending_up",
+                          "trending_down",
+                          "bar_chart",
+                          "dollar",
+                          "wallet",
+                          "shopping_cart",
+                          "briefcase",
+                          "clock",
+                          "calendar",
+                          "lightbulb",
+                          "target",
+                          "check",
+                          "cross",
+                          "alert",
+                          "arrow_right",
+                          "heart",
+                          "star",
+                          "book",
+                          "lock",
+                          "shield",
+                          "users",
+                          "smartphone",
+                          "laptop",
+                          "mail"
+                        ]
+                      },
+                      "word": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "word",
+                      "icon"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "punch_in"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "punch_in"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "motion": {
+                        "enum": [
+                          "snap",
+                          "push"
+                        ]
+                      },
+                      "scale": {
+                        "enum": [
+                          "mild",
+                          "strong"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "scale",
+                      "motion"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "emoji"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "emoji"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "emoji": {
+                        "enum": [
+                          "laughing",
+                          "heart_eyes",
+                          "star_struck",
+                          "mind_blown",
+                          "thinking",
+                          "shocked",
+                          "crying",
+                          "cool",
+                          "partying",
+                          "skeptical",
+                          "eyes",
+                          "angry",
+                          "nervous",
+                          "thumbs_up",
+                          "thumbs_down",
+                          "clap",
+                          "raised_hands",
+                          "muscle",
+                          "folded_hands",
+                          "handshake",
+                          "money_bag",
+                          "banknote",
+                          "money_wings",
+                          "gem",
+                          "chart_up",
+                          "chart_down",
+                          "trophy",
+                          "light_bulb",
+                          "brain",
+                          "target",
+                          "crown",
+                          "rocket",
+                          "fire",
+                          "hundred",
+                          "sparkles",
+                          "lightning",
+                          "star",
+                          "collision",
+                          "party_popper",
+                          "check",
+                          "cross",
+                          "warning",
+                          "question",
+                          "exclamation",
+                          "alarm_clock",
+                          "hourglass",
+                          "heart",
+                          "broken_heart"
+                        ]
+                      },
+                      "place": {
+                        "enum": [
+                          "beside",
+                          "under"
+                        ]
+                      },
+                      "word": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "word",
+                      "emoji",
+                      "place"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "anchors": {
+                "additionalProperties": false,
+                "properties": {
+                  "end": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "type": "object"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "id": {
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "hook_title"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "hook_title"
+                  },
+                  "params": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "accent": {
+                        "maximum": 8,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "accent"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "params"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "anchors",
+              "params",
+              "confidence"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "music": {
+      "type": "null"
+    }
+  },
+  "required": [
+    "format",
+    "catalog",
+    "cuts",
+    "items",
+    "chapters",
+    "extras",
+    "music"
+  ],
+  "title": "EditPlan",
+  "type": "object"
+}

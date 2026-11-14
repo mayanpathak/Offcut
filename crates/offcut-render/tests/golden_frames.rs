@@ -23,6 +23,9 @@
 mod inputs;
 #[path = "../../offcut-scene/tests/common/scenes.rs"]
 mod scenes;
+// V6.2 (P200): a model's plan for the zoom goldens.
+#[path = "../../offcut-scene/tests/common/model.rs"]
+mod model;
 #[path = "common/ssim.rs"]
 mod ssim;
 
@@ -38,11 +41,13 @@ use std::task::{Context, Poll, Waker};
 use offcut_render::scene::{
     CropRect, DisplayList, DrawCmd, FontSet, Rect, SceneInput, Theme, VideoSlot, build_scene,
 };
+use offcut_render::scene::{ImageKey, ImageSet};
 use offcut_render::{Renderer, RgbaImage};
 use offcut_types::{
     BitsPerSec, ClipInfo, DurMs, EventKind, ExportProfile, Hz, Orientation, OutMs, ProfileKind, Px,
     Rotation, StyleId, TimeMap,
 };
+use offcut_types::{EmojiId, IconId};
 
 use inputs::{INPUTS, Input, STYLES, case, style_name};
 
@@ -169,6 +174,9 @@ fn software(name: &str, width: u32, height: u32) -> Renderer {
 /// `OFFCUT_GOLDEN_UPDATE=1`.
 fn golden(name: &str, (source, rotation): (&RgbaImage, Rotation), list: &DisplayList) {
     let mut renderer = software(name, WIDTH, HEIGHT);
+    // Every golden is drawn with the bundle's images held (V6.2, D-472): a
+    // list that names none draws as it did before them.
+    renderer.set_images(&ImageSet::embedded()).unwrap();
     let adapter = renderer.adapter_info();
     let drawn = renderer
         .render_to_image(source, rotation, list, &FontSet::embedded())
@@ -247,6 +255,12 @@ fn kind_name(input: &Input) -> &'static str {
         EventKind::ListReveal => "list",
         EventKind::FromTo => "from_to",
         EventKind::KeywordPop => "keyword",
+        // V6.2's kinds (D-446): their goldens are new files, named by their prompts.
+        EventKind::Emphasis => "emphasis",
+        EventKind::IconPop => "icon_pop",
+        EventKind::PunchIn => "punch_in",
+        EventKind::Emoji => "emoji",
+        EventKind::HookTitle => "hook_title",
     }
 }
 
@@ -441,4 +455,460 @@ fn parity_1080_box_filtered_is_540() {
             case.name
         );
     }
+}
+
+/// An image of the bundle at `rect` (x, y, side) and `opacity`.
+fn image(image: ImageKey, (x, y, side): (f32, f32, f32), opacity: f32) -> DrawCmd {
+    DrawCmd::Image {
+        image,
+        rect: Rect {
+            x,
+            y,
+            w: side,
+            h: side,
+        },
+        opacity,
+    }
+}
+
+/// Images in the overlay (V6.2, D-472, §9.1 step 2): over the portrait
+/// pattern, three emoji at 0.5x, 1x and 1.5x (the last between pixels, over
+/// the disc), one at opacity 0.5, one across the right edge, a white icon,
+/// and a half-dark rectangle after one emoji, which list order puts over it.
+#[test]
+fn image_basic() {
+    let source = pattern(1080, 1920);
+    let mut list = video_only(CropRect {
+        x: 0.0,
+        y: 0.0,
+        w: 1080.0,
+        h: 1920.0,
+    });
+    let emoji = ImageKey::of_emoji;
+    list.cmds.extend([
+        image(emoji(EmojiId::Fire), (40.0, 60.0, 80.0), 1.0),
+        image(emoji(EmojiId::Laughing), (170.0, 40.0, 160.0), 1.0),
+        image(emoji(EmojiId::Rocket), (100.5, 330.25, 240.0), 1.0),
+        image(emoji(EmojiId::HeartEyes), (360.0, 260.0, 160.0), 0.5),
+        image(emoji(EmojiId::Trophy), (460.0, 700.0, 160.0), 1.0),
+        image(ImageKey::of_icon(IconId::Check), (60.0, 700.0, 120.0), 1.0),
+        DrawCmd::FillRect {
+            rect: Rect {
+                x: 250.0,
+                y: 120.0,
+                w: 120.0,
+                h: 40.0,
+            },
+            radius: 0.0,
+            color: offcut_render::scene::Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 128,
+            },
+        },
+    ]);
+    // The browser's check draws this frame from `offcut_render::check` (P197, TE-30).
+    assert_eq!(list, offcut_render::check::image_basic());
+    golden("image_basic", (&source, Rotation::R0), &list);
+}
+
+/// TE-30's frame is one definition (P197, D-474): the source and the list
+/// the browser's check draws are this file's own.
+#[test]
+fn the_browser_checks_source_and_list_are_the_goldens() {
+    let (w, h) = offcut_render::check::SOURCE;
+    assert_eq!(offcut_render::check::pattern(w, h), pattern(w, h));
+    assert_eq!(
+        offcut_render::check::pattern(1920, 1080),
+        pattern(1920, 1080)
+    );
+    assert_eq!(offcut_render::check::CANVAS, (WIDTH, HEIGHT));
+}
+
+/// The camera drift (V6.2, D-476, D-477, §10.1): Clean's NumberReveal with
+/// `Enhance.motion` on, at the middle of the first drift segment, where the
+/// crop is zoomed about its centre by about half the drift.
+#[test]
+fn motion_mid() {
+    let input = &INPUTS[0];
+    let mut case = case(input, StyleId::Clean, BTreeMap::new());
+    case.edit.enhance.motion = true;
+    let map = TimeMap::identity(DurMs::new(case.length));
+    let camera = offcut_render::scene::camera::for_clip(&case.transcript, &map);
+    let first = camera.segs()[0];
+    let mid = OutMs::new((first.start.get() + first.end.get()) / 2);
+    let scale = camera.scale_at(mid);
+    assert!(scale > 1.02 && scale < 1.04, "{scale} at {mid:?}");
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(mid);
+    let DrawCmd::Video { src, .. } = &list.cmds[0] else {
+        panic!("the video first");
+    };
+    assert!((src.w - 1080.0 / scale).abs() < 1e-2, "{src:?} at {scale}");
+    golden("motion_mid", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// A zoom of the plan (V6.2, D-478): the NumberReveal input's sentences with
+/// a model's plan of one Strong `PunchIn` on "3,000 users", motion off, at
+/// the middle of its anchors.
+fn punch_golden(name: &str, motion: offcut_types::ZoomMotion, want: f32) {
+    let case = case(&INPUTS[0], StyleId::Clean, BTreeMap::new());
+    let words = &case.transcript.words;
+    let three = words.iter().position(|w| w.text == "3,000").unwrap() as u32;
+    let zoom = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_100),
+        kind: EventKind::PunchIn,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(three),
+            end: offcut_types::WordIdx::new(three + 2),
+        },
+        params: offcut_types::ItemParams::PunchIn {
+            scale: offcut_types::ZoomScale::Strong,
+            motion,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![zoom]);
+    let span = case.plan.items()[0].span;
+    let mid = OutMs::new((span.start.get() + span.end.get()) / 2);
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(mid);
+    let DrawCmd::Video { src, .. } = &list.cmds[0] else {
+        panic!("the video first");
+    };
+    assert!((1080.0 / src.w - want).abs() < 1e-3, "{name}: {src:?}");
+    golden(name, (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// `Snap`: at the scale for the whole of its anchors.
+#[test]
+fn punch_snap() {
+    punch_golden("punch_snap", offcut_types::ZoomMotion::Snap, 1.25);
+}
+
+/// `Push`: half way up at half its anchors (`IN_OUT` is symmetric).
+#[test]
+fn punch_push() {
+    punch_golden("punch_push", offcut_types::ZoomMotion::Push, 1.125);
+}
+
+/// The Glow style (V6.2, D-479, D-480): the KeywordPop input during its pop,
+/// the spoken word and the keyword in the accent, every word glowing in its
+/// own colour over Clean's drop shadow.
+#[test]
+fn glow_style() {
+    let (source, list) = scene_frame(StyleId::Glow, &INPUTS[3], false);
+    let glowing = list
+        .cmds
+        .iter()
+        .any(|cmd| matches!(cmd, DrawCmd::GlyphRun { fill, stroke: Some(_), .. } if fill.a == 0));
+    assert!(glowing, "the glow's strokes are drawn");
+    golden("glow_style", (&source, Rotation::R0), &list);
+}
+
+/// Emphasis (V6.2, D-481): the KeywordPop input's sentences in Bold with a
+/// model's plan of one `Emphasis` on "brutal" in `treatment`, at the input's
+/// "after" instant (2,600 ms): "brutal" said, its chunk shown, "FOR" spoken.
+fn emphasis_golden(name: &str, treatment: offcut_types::Treatment) {
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Bold, BTreeMap::new());
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_200),
+        kind: EventKind::Emphasis,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal),
+            end: offcut_types::WordIdx::new(brutal + 1),
+        },
+        params: offcut_types::ItemParams::Emphasis {
+            word: offcut_types::WordIdx::new(brutal),
+            treatment,
+            size: offcut_types::EmphasisSize::Normal,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(
+        case.plan.items().len(),
+        1,
+        "{name}: the emphasis passed validation"
+    );
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(OutMs::new(input.at[2]));
+    // What the list says before it is drawn: "BRUTAL"'s fill and the marks.
+    let theme = Theme::default_for(StyleId::Bold);
+    let fill = list
+        .cmds
+        .iter()
+        .rev()
+        .find_map(|cmd| {
+            if let DrawCmd::GlyphRun { text, fill, .. } = cmd
+                && text == "BRUTAL"
+            {
+                Some(*fill)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    let marks = list
+        .cmds
+        .iter()
+        .filter(|cmd| matches!(cmd, DrawCmd::FillRect { color, .. } if *color == theme.accent))
+        .count();
+    let want = match treatment {
+        offcut_types::Treatment::Colour => (theme.accent, 0),
+        offcut_types::Treatment::Underline => (theme.text, 1),
+        offcut_types::Treatment::Highlight => (theme.on_accent, 1),
+    };
+    assert_eq!((fill, marks), want, "{name}");
+    golden(name, (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// `Colour`: "BRUTAL" in the accent after it is said.
+#[test]
+fn emphasis_colour() {
+    emphasis_golden("emphasis_colour", offcut_types::Treatment::Colour);
+}
+
+/// `Underline`: a bar in the accent under "BRUTAL".
+#[test]
+fn emphasis_underline() {
+    emphasis_golden("emphasis_underline", offcut_types::Treatment::Underline);
+}
+
+/// `Highlight`: "BRUTAL" in ink on a rounded fill in the accent.
+#[test]
+fn emphasis_highlight() {
+    emphasis_golden("emphasis_highlight", offcut_types::Treatment::Highlight);
+}
+
+/// A punch word (V6.2, D-482): the KeywordPop input's sentences in Clean,
+/// the default style, with a model's plan of one punch word on "brutal"
+/// (colour), while it is said: alone, in capitals, at 1.9 times the style's
+/// size, in ink on the pill.
+#[test]
+fn punch_word() {
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Clean, BTreeMap::new());
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap() as u32;
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_200),
+        kind: EventKind::Emphasis,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal),
+            end: offcut_types::WordIdx::new(brutal + 1),
+        },
+        params: offcut_types::ItemParams::Emphasis {
+            word: offcut_types::WordIdx::new(brutal),
+            treatment: offcut_types::Treatment::Colour,
+            size: offcut_types::EmphasisSize::Punch,
+        },
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(
+        case.plan.items().len(),
+        1,
+        "the punch word passed validation"
+    );
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let list = scene.frame_at(OutMs::new(input.at[1]));
+    // The list before the pixels: one caption run, "BRUTAL", at 1.9.
+    let runs: Vec<(String, f32)> = list
+        .cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::GlyphRun {
+                text, transform, ..
+            } = cmd
+            {
+                Some((text.clone(), transform.m[0]))
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(runs.len(), 1, "{runs:?}");
+    assert_eq!(runs[0].0, "BRUTAL");
+    // The frame's own scale (540 of 1080) goes into the run's size, not its
+    // transform: the transform is the punch word's 1.9.
+    assert!((runs[0].1 - 1.9).abs() < 1e-4, "{runs:?}");
+    golden("punch_word", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// The KeywordPop input in `style` at `place`, with a model's plan of one
+/// item on "brutal", 300 ms after it starts (its image at rest).
+fn image_frame(style: StyleId, place: f32, params: offcut_types::ItemParams) -> DisplayList {
+    let input = &INPUTS[3];
+    let mut case = case(input, style, BTreeMap::new());
+    case.edit.caption_position = offcut_types::CaptionPlacement::new(place).unwrap();
+    let words = &case.transcript.words;
+    let brutal = words.iter().position(|w| w.text == "brutal").unwrap();
+    let start = words[brutal].start_ms.get();
+    let kind = if let offcut_types::ItemParams::Emoji { .. } = params {
+        EventKind::Emoji
+    } else {
+        EventKind::IconPop
+    };
+    let item = offcut_types::PlanItem {
+        id: offcut_types::EventId::new(9_300),
+        kind,
+        anchors: offcut_types::WordRange {
+            start: offcut_types::WordIdx::new(brutal as u32),
+            end: offcut_types::WordIdx::new(brutal as u32 + 1),
+        },
+        params,
+        confidence: None,
+    };
+    let case = model::with_model_items(case, vec![item]);
+    assert_eq!(case.plan.items().len(), 1, "the item passed validation");
+    let scene = scenes::build_with(&case, WIDTH, false);
+    scene.frame_at(OutMs::new(start + 300))
+}
+
+/// The images of a list, and the rectangles drawn after its last glyph run.
+fn images_of(list: &DisplayList) -> Vec<Rect> {
+    list.cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::Image { rect, .. } = cmd {
+                Some(*rect)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// An emoji under its word (V6.2, D-483): fire under "BRUTAL" in Bold, at
+/// the Middle snap point, where there is room under the lines.
+#[test]
+fn emoji_under() {
+    let word = offcut_types::WordIdx::new(4);
+    let list = image_frame(
+        StyleId::Bold,
+        0.55,
+        offcut_types::ItemParams::Emoji {
+            word,
+            emoji: offcut_types::EmojiId::Fire,
+            place: offcut_types::EmojiPlace::Under,
+        },
+    );
+    // The list before the pixels: one image, below every caption run, at
+    // 1.6 times Bold's capitals (half of it at the preview's 540).
+    let found = images_of(&list);
+    assert_eq!(found.len(), 1);
+    let lowest = list
+        .cmds
+        .iter()
+        .filter_map(|cmd| {
+            if let DrawCmd::GlyphRun { transform, .. } = cmd {
+                Some(transform.m[5])
+            } else {
+                None
+            }
+        })
+        .fold(f32::MIN, f32::max);
+    assert!(found[0].y > lowest, "{found:?} under {lowest}");
+    assert!((found[0].w - 97.75 / 2.0).abs() < 0.1, "{found:?}");
+    golden("emoji_under", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// An icon on its disc (V6.2, D-483): a light bulb for "brutal" in Clean at
+/// Bottom, the default placement, on a dark disc ringed in the accent in the
+/// event zone (D-502, P206b; D-440 (22): the check widened from one disc to
+/// the ring and the disc inside it).
+#[test]
+fn icon_pop() {
+    let list = image_frame(
+        StyleId::Clean,
+        1.0,
+        offcut_types::ItemParams::IconPop {
+            word: offcut_types::WordIdx::new(4),
+            icon: offcut_types::IconId::Lightbulb,
+        },
+    );
+    let found = images_of(&list);
+    assert_eq!(found.len(), 1);
+    let mut circles = list.cmds.iter().rev().filter_map(|cmd| {
+        if let DrawCmd::FillRect { rect, radius, .. } = cmd {
+            Some((*rect, *radius))
+        } else {
+            None
+        }
+    });
+    let (inner, inner_radius) = circles.next().unwrap();
+    let (disc, radius) = circles.next().unwrap();
+    assert!((radius - disc.w / 2.0).abs() < 1e-3 && (disc.w - 84.0).abs() < 1e-3);
+    assert!((inner_radius - inner.w / 2.0).abs() < 1e-3 && (inner.w - 76.0).abs() < 1e-3);
+    assert!((inner.x + inner.w / 2.0 - (disc.x + disc.w / 2.0)).abs() < 1e-3);
+    assert!(found[0].x > inner.x && found[0].x + found[0].w < inner.x + inner.w);
+    golden("icon_pop", (&pattern(1080, 1920), Rotation::R0), &list);
+}
+
+/// The hook (V6.2, D-484): `text` with its word `accent` the accent, in
+/// Clean, at 1,000 ms (at rest), over the KeywordPop input's video. While the
+/// hook is shown a scene draws its video and the hook alone, the hook as
+/// `hook_title::draw` adds it scaled to the canvas: `offcut-scene`'s
+/// `hook_title.rs` proves that frame equal to this list at 540 wide. (The
+/// list is made here, not by a scene, as a hook plan's text is a `Label`,
+/// which this crate's tests cannot build without a new dependency.)
+fn hook_golden(name: &str, text: &str, accent: u8, lines: usize) {
+    use offcut_render::scene::events::hook_title;
+    let input = &INPUTS[3];
+    let case = case(input, StyleId::Clean, BTreeMap::new());
+    let scene = scenes::build_with(&case, WIDTH, false);
+    let t = OutMs::new(1_000);
+    let theme = Theme::default_for(StyleId::Clean);
+    let track = hook_title::layout(
+        text,
+        accent,
+        OutMs::new(case.length),
+        &theme,
+        &FontSet::embedded(),
+    )
+    .unwrap()
+    .unwrap_or_else(|| panic!("{name}: the hook fits"));
+    let room = offcut_render::scene::lockup::lay_out(
+        text,
+        usize::from(accent),
+        (hook_title::room().w, hook_title::room().h),
+        &FontSet::embedded(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(room.lines.len(), lines, "{name}");
+    let mut cmds = vec![scene.frame_at(t).cmds[0].clone()];
+    let mut hook = Vec::new();
+    hook_title::draw(&track, t, &mut hook);
+    for cmd in &mut hook {
+        cmd.scale(WIDTH as f32 / 1080.0);
+    }
+    cmds.extend(hook);
+    golden(
+        name,
+        (&pattern(1080, 1920), Rotation::R0),
+        &DisplayList { cmds },
+    );
+}
+
+/// Two short words, the second the accent.
+#[test]
+fn hook_short() {
+    hook_golden("hook_short", "Stop scrolling", 1, 2);
+}
+
+/// Eight words, 43 characters, in three lines.
+#[test]
+fn hook_long() {
+    hook_golden(
+        "hook_long",
+        "The one thing nobody tells you about saving",
+        3,
+        3,
+    );
 }

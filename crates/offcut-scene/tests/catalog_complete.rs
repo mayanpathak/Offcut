@@ -24,14 +24,22 @@ use offcut_types::{
     CaptionPlacement, Confidence, DurMs, EventId, EventKind, EventParams, ListItem, OutMs, OutSpan,
     Quantity, Span, StyleId, TimeMap, TimeMs, Transcript, Unit, WordIdx, WordRange,
 };
+// V6.2 (P206, D-440 (9)): the params of the five kinds.
+use offcut_types::{EmojiId, EmojiPlace, EmphasisSize, IconId, Treatment, ZoomMotion, ZoomScale};
 
 /// Every kind there is. The match in `item` has no wildcard: a new kind
 /// does not compile until it is given an item here.
-const KINDS: [EventKind; 4] = [
+const KINDS: [EventKind; 9] = [
     EventKind::NumberReveal,
     EventKind::ListReveal,
     EventKind::FromTo,
     EventKind::KeywordPop,
+    // V6.2 (P206, D-440 (9)).
+    EventKind::Emphasis,
+    EventKind::IconPop,
+    EventKind::PunchIn,
+    EventKind::Emoji,
+    EventKind::HookTitle,
 ];
 
 fn quantity(value: f64, display: &str) -> Quantity {
@@ -80,6 +88,44 @@ fn item(kind: EventKind) -> ValidItem {
             },
             Vec::new(),
         ),
+        // V6.2's kinds (D-446), drawn from P202 to P205 (P206).
+        EventKind::Emphasis => (
+            EventParams::Emphasis {
+                word: WordIdx::new(0),
+                treatment: Treatment::Colour,
+                size: EmphasisSize::Normal,
+            },
+            Vec::new(),
+        ),
+        EventKind::IconPop => (
+            EventParams::IconPop {
+                word: WordIdx::new(0),
+                icon: IconId::Lightbulb,
+            },
+            Vec::new(),
+        ),
+        EventKind::PunchIn => (
+            EventParams::PunchIn {
+                scale: ZoomScale::Mild,
+                motion: ZoomMotion::Snap,
+            },
+            Vec::new(),
+        ),
+        EventKind::Emoji => (
+            EventParams::Emoji {
+                word: WordIdx::new(0),
+                emoji: EmojiId::Fire,
+                place: EmojiPlace::Under,
+            },
+            Vec::new(),
+        ),
+        EventKind::HookTitle => (
+            EventParams::HookTitle {
+                text: "The one thing nobody tells you".to_owned(),
+                accent: 3,
+            },
+            Vec::new(),
+        ),
     };
     ValidItem {
         id: EventId::new(1),
@@ -123,7 +169,14 @@ fn track(kind: EventKind, placement: f32) -> Option<EventTrack> {
 
 /// The `ZoneId` a catalog zone name names: its name in lower case.
 fn zone_id(name: &str) -> ZoneId {
-    let ids = [ZoneId::Event, ZoneId::Caption, ZoneId::Full];
+    // V6.2 (D-448): and the zones "video" and "hook".
+    let ids = [
+        ZoneId::Event,
+        ZoneId::Caption,
+        ZoneId::Full,
+        ZoneId::Video,
+        ZoneId::Hook,
+    ];
     let found = ids
         .into_iter()
         .find(|id| format!("{id:?}").to_lowercase() == name);
@@ -146,10 +199,11 @@ fn points(cmd: &DrawCmd) -> Vec<(f32, f32)> {
                 PathEl::Close => None,
             })
             .collect(),
-        DrawCmd::PushLayer { .. }
-        | DrawCmd::PopLayer
-        | DrawCmd::Video { .. }
-        | DrawCmd::Image { .. } => Vec::new(),
+        // V6.2 (P206): an emoji's or an icon's rectangle.
+        DrawCmd::Image { rect, .. } => {
+            vec![(rect.x, rect.y), (rect.x + rect.w, rect.y + rect.h)]
+        }
+        DrawCmd::PushLayer { .. } | DrawCmd::PopLayer | DrawCmd::Video { .. } => Vec::new(),
     }
 }
 
@@ -187,13 +241,17 @@ fn each_kind_is_drawn_in_the_zone_the_catalog_names() {
         for placement in [SNAP_TOP, SNAP_MIDDLE, SNAP_BOTTOM] {
             let track = track(row.kind, placement).unwrap();
             let mut out = Vec::new();
-            // Every step in and resting: before the hold ends.
+            // Every step in and resting: before the hold ends. V6.2 (P206,
+            // D-440 (9)): and at 1,500 ms, while the hook (the program's
+            // first 2 s) and an icon (its span, here) are shown.
+            events::draw(&track, OutMs::new(1_500), &mut out);
             events::draw(&track, OutMs::new(3_300), &mut out);
             let id = zone_id(row.zone);
             match id {
-                // The captions draw it: nothing of its own.
-                ZoneId::Caption => assert!(out.is_empty(), "{:?}", row.kind),
-                ZoneId::Event | ZoneId::Full => {
+                // The captions draw it: nothing of its own. V6.2: the video
+                // track draws a zoom (D-478): nothing of its own either.
+                ZoneId::Caption | ZoneId::Video => assert!(out.is_empty(), "{:?}", row.kind),
+                ZoneId::Event | ZoneId::Full | ZoneId::Hook => {
                     let area = zone(id, CaptionPlacement::new(placement).unwrap());
                     assert!(!out.is_empty(), "{:?}", row.kind);
                     for point in out.iter().flat_map(points) {

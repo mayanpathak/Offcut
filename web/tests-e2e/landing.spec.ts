@@ -629,3 +629,29 @@ test("L-11: the landing page has no serious or critical accessibility violation,
   await page.waitForTimeout(500);
   expect(await violations(page), "axe at the end").toEqual([]);
 });
+
+// --- V6.2 (P206a, D-501): a way to sign in from the landing page --------------
+// New cases only.
+
+const accountLink = (page: Page) => page.getByRole("banner").getByTestId("landing-account");
+
+test("V6.2: signed out, the top bar's Sign in leads to the sign-in form on /account", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/");
+  await expect(accountLink(page)).toHaveText(messages.landing.account.signIn);
+  await expect(accountLink(page)).toHaveAttribute("href", "/account");
+  await accountLink(page).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole("button", { name: messages.signIn.submit, exact: true })).toBeVisible();
+});
+
+test("V6.2: signed in, the top bar reads Account and leads to the account page; on a phone too", async ({ page }) => {
+  await installFakeApi(page, { session: {} });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(accountLink(page)).toHaveText(messages.landing.account.open);
+  await expect(accountLink(page)).toBeVisible();
+  await accountLink(page).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByTestId("account-signed-in")).toBeVisible();
+});

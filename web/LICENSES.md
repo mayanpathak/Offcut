@@ -1,12 +1,14 @@
 # Licences of the assets the web app ships
 
-The page serves three things made by others, besides its npm packages: the interface font, the landing page's accent font and the icons (v4implementation D-180, D-181; designimplementation D-330). The fonts the captions are drawn with are embedded in the scene and listed in `crates/offcut-scene/assets/fonts/LICENSES.md`.
+The page serves three things made by others, besides its npm packages: the interface font, the landing page's accent font and the icons (v4implementation D-180, D-181; designimplementation D-330). The fonts the captions are drawn with are embedded in the scene and listed in `crates/offcut-scene/assets/fonts/LICENSES.md`. The 72 images the scene can draw (V6.2) are embedded in the render module; `crates/offcut-scene/assets/images/manifest.json` lists each with its pinned source and licence, and their notices are below (Fluent Emoji) and under Lucide 1.61.0.
 
 | Asset | What it is | Taken from | Licence |
 |---|---|---|---|
 | `src/ui/assets/inter-latin.woff2` | Inter, "Version 4.001;git-9221beed3" in its name table: the Latin subset of the scene's `Inter-Variable.ttf` (Inter 4.1), made with `pyftsubset` (fonttools 4.67.0) as WOFF2, with the `wght` (100-900) and `opsz` (14-32) axes and the features `calt kern ss01 tnum`. 65,508 bytes, SHA-256 `8792da2b49183db9439fd7b98655e65f4a8c43711c7cf37b7d32ee8b13c20a8c` | `InterVariable.ttf` of the release `v4.1` of `github.com/rsms/inter`, subset by us (v4changelog Entry 1) | SIL Open Font License 1.1. The font's copyright line: "Copyright 2016 The Inter Project Authors". No Reserved Font Name |
 | `src/ui/assets/jetbrains-mono-latin.woff2` | JetBrains Mono, "Version 2.304" in its name table, at weight 700: the scene's `JetBrainsMono-Variable.ttf` pinned to `wght` 700 with `fonttools varLib.instancer`, then subset with `pyftsubset` (fonttools 4.67.0) to U+0020-007E, U+00B7, U+00D7, U+2192 and U+2014, as WOFF2, with no layout features. The landing page's accent face for timecodes, chips and figures (designimplementation D-330). 4,912 bytes, SHA-256 `146e9dd8739aaf28576f88b034e2b6be8ea0819eaec1715b2015cd2dfdb6c2ee` | `fonts/variable/JetBrainsMono[wght].ttf` of the release `v2.304` of `github.com/JetBrains/JetBrainsMono` (`crates/offcut-scene/assets/fonts/LICENSES.md`), subset by us | SIL Open Font License 1.1. The font's copyright line: "Copyright 2020 The JetBrains Mono Project Authors". No Reserved Font Name. The licence text is in `crates/offcut-scene/assets/fonts/LICENSES.md` |
 | `src/ui/icons.tsx` | 22 icon paths | `lucide-static` 1.61.0 (`github.com/lucide-icons/lucide`), copied by hand; no package is installed | ISC (Lucide). Of the 22, `alert-triangle`, `arrow-down`, `arrow-right`, `arrow-up`, `check`, `download`, `hash`, `more-horizontal`, `type` and `x` come from Feather, under MIT |
+| `crates/offcut-scene/assets/images/emoji/` (in the render module) | 48 emoji, 160 × 160 PNGs resized from the "3D" style's 256 px PNGs by `scripts/gen-image-bundle.mjs` (v6.2implementation D-470) | `github.com/microsoft/fluentui-emoji` at commit `1ffb34c752ecf5d402f04cfb4b392c77f57c54bc` | MIT, "Copyright (c) Microsoft Corporation." The text is below and in `crates/offcut-scene/assets/images/LICENSES/` |
+| `crates/offcut-scene/assets/images/icons/` (in the render module) | 24 icons drawn white at 160 × 160 from `lucide-static` 1.61.0's SVGs by the same script | `lucide-static` 1.61.0 | ISC (Lucide); `arrow-right`, `calendar`, `clock`, `lock`, `smartphone`, `target`, `triangle-alert` (Feather's `alert-triangle`) and `circle-x` (Feather's `x-circle`) come from Feather, under MIT. The text is under Lucide 1.61.0 below |
 
 The licences ask that their notice goes with every copy. They follow as their projects ship them.
 
@@ -116,6 +118,34 @@ This Font Software is licensed under the SIL Open Font License, Version 1.1.
 ```
 
 The licence is the SIL Open Font License 1.1, whose full text is quoted under Inter 4.1 above.
+
+## Fluent Emoji (commit `1ffb34c`)
+
+The file `LICENSE` of `github.com/microsoft/fluentui-emoji` at that commit, as shipped (its own indentation kept).
+
+```text
+    MIT License
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+```
 
 ## GSAP 3.15.1 (an npm package, noted here)
 

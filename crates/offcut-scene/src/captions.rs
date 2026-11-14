@@ -1,6 +1,8 @@
 //! Captions: which words are shown together, when, and where (TS §19.4).
 //! Every time here is a program time: a word's recording times go through
 //! the time map once, in `words`, and are used as they come out (D-126).
+//! A plan's punch word (V6.2, D-482) is a chunk of its own, in capitals, at
+//! `PUNCH_SCALE`; without one, every chunk is as before.
 
 use std::collections::BTreeMap;
 
@@ -28,6 +30,8 @@ pub const CHUNK_GAP_MS: u32 = 350;
 pub const CHUNK_LEAD_MS: u32 = 80;
 /// and this long after its last word ends.
 pub const CHUNK_TAIL_MS: u32 = 120;
+/// A punch word's size, of the style's (V6.2, D-482, TS §47.3; assumption).
+pub const PUNCH_SCALE: f32 = 1.9;
 
 /// One word of a caption. A number that was spoken in several words is one
 /// caption word; `word` is the first transcript word it stands for.
@@ -242,6 +246,22 @@ pub fn chunk(
     fonts: &FontSet,
     block: Rect,
 ) -> Result<Vec<Chunk>, SceneError> {
+    chunk_punched(words, sentences, (style, theme, fonts), block, &[])
+}
+
+/// `chunk`, with the plan's punch words (V6.2, D-482): the caption words
+/// whose first transcript word is in `punches`. Each ends the chunk before
+/// it and is a chunk alone, in capitals, on `punch_line`; the words after it
+/// start a chunk of their own. With no punch word it is `chunk`, chunk for
+/// chunk.
+pub fn chunk_punched(
+    words: &[CaptionWord],
+    sentences: &[Sentence],
+    (style, theme, fonts): (&StyleSpec, &Theme, &FontSet),
+    block: Rect,
+    punches: &[WordIdx],
+) -> Result<Vec<Chunk>, SceneError> {
+    let punch = |word: &CaptionWord| punches.contains(&word.word);
     let limits = Limits {
         per_line: style.max_chars_per_line.max(1),
         max_lines: style.max_lines.max(1),
@@ -252,8 +272,8 @@ pub fn chunk(
         .iter()
         .map(|word| {
             let text = match style.case {
-                Case::AsSpoken => word.text.clone(),
-                Case::Upper => word.text.to_uppercase(),
+                Case::AsSpoken if !punch(word) => word.text.clone(),
+                Case::AsSpoken | Case::Upper => word.text.to_uppercase(),
             };
             let chars = u32::try_from(text.chars().count()).unwrap_or(u32::MAX);
             Unit { word, text, chars }
@@ -268,6 +288,8 @@ pub fn chunk(
                 sentence_of(prev.word) != sentence_of(next.word)
                     || next.word.start.get().saturating_sub(prev.word.end.get()) >= CHUNK_GAP_MS
                     || to - from >= MAX_SEGMENT_WORDS
+                    || punch(prev.word)
+                    || punch(next.word)
             }
             _ => true,
         };
@@ -299,7 +321,10 @@ pub fn chunk(
         let (Some(first), Some(last)) = (group.first(), group.last()) else {
             continue;
         };
-        let lines = lines(group, space, style, block, (font, fonts))?;
+        let lines = match group.as_slice() {
+            [alone] if punch(alone.word) => vec![punch_line(alone, style, block, (font, fonts))?],
+            _ => lines(group, space, style, block, (font, fonts))?,
+        };
         // Shown from a little before its first word to a little after its
         // last, and never while the chunk before it is still shown. The
         // chunk before stays at least until its own last word has ended.
@@ -387,6 +412,45 @@ fn lines(
         line.baseline = top + height * index as f32 + ascent;
     }
     Ok(lines)
+}
+
+/// A punch word's line (V6.2, D-482): the word alone, shaped at the
+/// style's size and drawn at `PUNCH_SCALE` of it (its `scale`, which every
+/// part of its drawing follows), or smaller when that would be wider than
+/// the block less the style's decoration grown with it; centred across the
+/// block, and down it as `lines` places a line (DC-13), the decoration
+/// inside the block.
+fn punch_line(
+    placed: &Placed<'_>,
+    style: &StyleSpec,
+    block: Rect,
+    (font, fonts): (FontKey, &FontSet),
+) -> Result<Line, SceneError> {
+    let runs = shape(&placed.text, font, style.size, fonts)?;
+    let ascent = runs.iter().map(|run| run.ascent).fold(0.0, f32::max);
+    let descent = runs.iter().map(|run| run.descent).fold(0.0, f32::max);
+    let width: f32 = runs.iter().map(|run| run.width).sum();
+    let room = block.w - style.decoration_width() * PUNCH_SCALE;
+    let scale = if width * PUNCH_SCALE > room {
+        room / width
+    } else {
+        PUNCH_SCALE
+    };
+    let height = (ascent + descent) * scale;
+    let centred = (block.h - height) / 2.0;
+    let below = (centred - style.decoration_height() * scale.max(1.0)).max(0.0);
+    let top = block.y + centred + line_drop(block) * below;
+    Ok(Line {
+        words: vec![LineWord {
+            word: 0,
+            x: 0.0,
+            runs,
+        }],
+        x: block.x + (block.w - width * scale) / 2.0,
+        baseline: top + ascent * scale,
+        width,
+        scale,
+    })
 }
 
 #[cfg(test)]
@@ -773,5 +837,161 @@ mod tests {
         assert_eq!(spec(StyleId::Clean).decoration_height(), 6.5);
         assert_eq!(spec(StyleId::Bold).decoration_height(), 9.0);
         assert_eq!(spec(StyleId::Tech).decoration_height(), 32.0);
+    }
+
+    // V6.2 (P203, D-482): punch words.
+
+    const FOUR: [StyleId; 4] = [StyleId::Clean, StyleId::Bold, StyleId::Tech, StyleId::Glow];
+
+    /// "The first week felt brutal for everyone and it showed.", 300 ms a
+    /// word, one after the other.
+    fn spoken(texts: &[&str]) -> Vec<(String, u32, u32)> {
+        texts
+            .iter()
+            .enumerate()
+            .map(|(i, text)| {
+                (
+                    (*text).to_owned(),
+                    500 + 300 * i as u32,
+                    780 + 300 * i as u32,
+                )
+            })
+            .collect()
+    }
+
+    const SENTENCE: [&str; 10] = [
+        "The", "first", "week", "felt", "brutal", "for", "everyone", "and", "it", "showed.",
+    ];
+
+    /// The chunks of `timed` in `style` at `placement`, with `punches`.
+    fn punched(
+        timed: &[(String, u32, u32)],
+        style: StyleId,
+        placement: CaptionPlacement,
+        punches: &[WordIdx],
+    ) -> (Vec<Chunk>, Rect) {
+        let raw: Vec<_> = timed.iter().map(|w| word(&w.0, w.1, w.2)).collect();
+        let transcript = transcript(&raw);
+        let map = TimeMap::identity(DurMs::new(10_000));
+        let words = words(&transcript, &BTreeMap::new(), &map);
+        let (theme, fonts) = (Theme::default_for(style), FontSet::embedded());
+        let block = zone(ZoneId::Caption, placement);
+        let look = (&spec(style), &theme, &fonts);
+        let chunks = chunk_punched(&words, &transcript.sentences, look, block, punches).unwrap();
+        (chunks, block)
+    }
+
+    /// Each chunk's words, by their first transcript word.
+    fn indices(chunks: &[Chunk]) -> Vec<Vec<u32>> {
+        let words = |c: &Chunk| c.words.iter().map(|w| w.word.get()).collect();
+        chunks.iter().map(words).collect()
+    }
+
+    #[test]
+    fn with_no_punch_word_chunk_punched_is_chunk() {
+        let timed = spoken(&SENTENCE);
+        for style in FOUR {
+            for placement in [SNAP_TOP, SNAP_MIDDLE, 1.0] {
+                let p = CaptionPlacement::new(placement).unwrap();
+                let (none, block) = punched(&timed, style, p, &[]);
+                // `chunk` itself, as the V4 tests call it.
+                let raw: Vec<_> = timed.iter().map(|w| word(&w.0, w.1, w.2)).collect();
+                let t = transcript(&raw);
+                let map = TimeMap::identity(DurMs::new(10_000));
+                let shown = words(&t, &BTreeMap::new(), &map);
+                let (theme, fonts) = (Theme::default_for(style), FontSet::embedded());
+                let old = chunk(&shown, &t.sentences, &spec(style), &theme, &fonts, block);
+                assert_eq!(none, old.unwrap(), "{style:?} {placement}");
+                // A punch word the captions do not hold changes nothing.
+                let (elsewhere, _) = punched(&timed, style, p, &[WordIdx::new(40)]);
+                assert_eq!(elsewhere, none, "{style:?} {placement}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_punch_word_is_a_chunk_alone_in_capitals_at_1_9_centred_in_the_block() {
+        let timed = spoken(&SENTENCE);
+        for style in FOUR {
+            let row = spec(style);
+            for placement in [SNAP_TOP, SNAP_MIDDLE, 1.0] {
+                let p = CaptionPlacement::new(placement).unwrap();
+                let (chunks, block) = punched(&timed, style, p, &[WordIdx::new(4)]);
+                let what = format!("{style:?} at {placement}");
+                // Every word once, in order; no chunk but its own holds it.
+                let all: Vec<u32> = indices(&chunks).concat();
+                assert_eq!(all, (0..10).collect::<Vec<_>>(), "{what}");
+                let at = indices(&chunks)
+                    .iter()
+                    .position(|c| c.contains(&4))
+                    .unwrap();
+                assert_eq!(indices(&chunks)[at], [4], "{what}");
+                let alone = &chunks[at];
+                // The chunk before ends with the word before; the next starts after it.
+                assert_eq!(indices(&chunks)[at - 1].last(), Some(&3), "{what}");
+                assert_eq!(indices(&chunks)[at + 1].first(), Some(&5), "{what}");
+                // In capitals, in every style, one line at 1.9.
+                assert_eq!(alone.words[0].text, "brutal");
+                assert_eq!(alone.lines.len(), 1);
+                let line = &alone.lines[0];
+                let text: String = line.words[0].runs.iter().map(|r| r.text.as_str()).collect();
+                assert_eq!(text, "BRUTAL", "{what}");
+                assert_eq!(line.scale, PUNCH_SCALE, "{what}");
+                // Shaped at the style's size, so its runs are the size's.
+                assert!(line.words[0].runs.iter().all(|r| r.size == row.size));
+                // Centred across the block.
+                let middle = line.x + line.width * line.scale / 2.0;
+                assert!((middle - (block.x + block.w / 2.0)).abs() < 1e-3, "{what}");
+                // Its box, with the style's decoration grown with it, in the block.
+                let r = crate::hit::word_box(line, &line.words[0]);
+                let (dx, dy) = (
+                    row.decoration_width() / 2.0 * PUNCH_SCALE,
+                    row.decoration_height() * PUNCH_SCALE,
+                );
+                assert!(r.x - dx >= block.x - 1e-3, "{what}: {r:?}");
+                assert!(r.x + r.w + dx <= block.x + block.w + 1e-3, "{what}: {r:?}");
+                assert!(r.y - dy >= block.y - 1e-3, "{what}: {r:?} {block:?}");
+                assert!(r.y + r.h + dy <= block.y + block.h + 1e-3, "{what}: {r:?}");
+                // Its times are its word's, as any chunk's: from its lead, not
+                // before the word before it has ended ("felt", 1,680 ms).
+                let lead = (500 + 1_200 - CHUNK_LEAD_MS).max(780 + 900);
+                assert_eq!(alone.show.start.get(), lead, "{what}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_punch_word_too_wide_for_1_9_is_drawn_as_large_as_the_block_holds() {
+        let timed = spoken(&["It", "was", "internationalization", "again."]);
+        for style in FOUR {
+            let row = spec(style);
+            let p = CaptionPlacement::bottom();
+            let (chunks, block) = punched(&timed, style, p, &[WordIdx::new(2)]);
+            let alone = chunks
+                .iter()
+                .find(|c| c.words.len() == 1 && c.words[0].word.get() == 2);
+            let line = &alone.unwrap().lines[0];
+            assert!(line.scale < PUNCH_SCALE, "{style:?}: {}", line.scale);
+            let wide = line.width * line.scale + row.decoration_width() * PUNCH_SCALE;
+            assert!((wide - block.w).abs() < 1e-2, "{style:?}: {wide}");
+        }
+    }
+
+    #[test]
+    fn a_punch_word_at_the_start_or_the_end_of_a_sentence_is_alone_too() {
+        let timed = spoken(&SENTENCE);
+        for punch in [0, 9] {
+            let (chunks, _) = punched(
+                &timed,
+                StyleId::Clean,
+                CaptionPlacement::bottom(),
+                &[WordIdx::new(punch)],
+            );
+            let all = indices(&chunks);
+            assert_eq!(all.concat(), (0..10).collect::<Vec<_>>());
+            assert!(all.contains(&vec![punch]), "{all:?}");
+            let alone = all.iter().position(|c| *c == [punch]).unwrap();
+            assert_eq!(alone, if punch == 0 { 0 } else { all.len() - 1 });
+        }
     }
 }

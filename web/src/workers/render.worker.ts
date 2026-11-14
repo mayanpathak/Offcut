@@ -25,8 +25,9 @@ import type {
 import { OpfsError } from "../persistence/opfs";
 import { loadRender, type RenderSession } from "../wasm/load-render";
 import { openSource } from "./media/import";
-import type { FailureStage, RenderWorkerApi, SceneReport } from "./protocol";
+import type { FailureStage, PlanCheck, RenderWorkerApi, SceneReport } from "./protocol";
 import { exportClip, type SceneState, type Session, type WorkerState } from "./render/export-job";
+import { imageCheck } from "./render/image-check";
 import {
   captionMirror,
   drawStill,
@@ -38,10 +39,11 @@ import {
   previewProfile,
   previewSeek,
   styleThumbnails,
+  videoMirror,
 } from "./render/preview-job";
 import { liveFrames, VideoSource } from "./render/video-source";
 import { toAppFailure } from "./rpc";
-import { type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
+import { DEV_FAULTS, type Handlers, type JobContext, serveWorker, WorkerFailure } from "./rpc-worker";
 
 // The clip that is open, from `openSession` to `closeSession` (TS §14.3).
 // The export and the preview are in `render/export-job.ts` and
@@ -163,6 +165,19 @@ async function rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] })
   }
 }
 
+/** V6.2 (§8.1): what the validation keeps of a plan, without a scene. It keeps nothing. */
+async function validatePlan(p: {
+  transcript: Transcript;
+  plan: EditPlan;
+  wordEdits: Record<number, string>;
+}): Promise<PlanCheck> {
+  try {
+    return (await loadRender()).validatePlan(p.transcript, p.plan, p.wordEdits);
+  } catch (thrown) {
+    throw staged(thrown, "detect_scene");
+  }
+}
+
 /**
  * Validates the plan and builds the scene (TS §40.8); keeps what it was
  * built from, for the export's switch and back. A plan this build cannot
@@ -256,6 +271,7 @@ const handlers: Handlers<RenderWorkerApi> = {
   detect,
   redetectSentence: (p: Parameters<typeof redetectSentence>[0]) => Promise.resolve(redetectSentence(p)),
   rulesPlan,
+  validatePlan,
   setScene,
   attachPreview,
   previewPlay: (p: Parameters<typeof previewPlay>[0]) => previewPlay(p, worker),
@@ -264,10 +280,14 @@ const handlers: Handlers<RenderWorkerApi> = {
   previewSeek: (p: Parameters<typeof previewSeek>[0]) => previewSeek(p, worker),
   hitTest: (p: Parameters<typeof hitTest>[0]) => hitTest(p, worker),
   captionMirror: (p: Parameters<typeof captionMirror>[0]) => captionMirror(p, worker),
+  videoMirror: (p: Parameters<typeof videoMirror>[0]) => videoMirror(p, worker),
   styleThumbnails: (p: Parameters<typeof styleThumbnails>[0]) => styleThumbnails(p, worker),
   exportProfile,
   exportClip: (p: Parameters<typeof exportClip>[0], ctx: JobContext) => exportClip(p, ctx, worker),
   closeSession,
+  // V6.2 (TE-30): a development build's check; a production build folds
+  // `DEV_FAULTS` to false and keeps neither the check nor its file.
+  devImageCheck: () => (DEV_FAULTS ? imageCheck() : Promise.reject(new WorkerFailure("E_INTERNAL", "NoHandler"))),
 };
 
 serveWorker(handlers, {

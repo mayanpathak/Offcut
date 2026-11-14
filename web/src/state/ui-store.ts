@@ -37,6 +37,8 @@ export type UiState = {
   thumbnails: readonly ImageBitmap[] | null;
   /** The shortcuts sheet is open (D-185). */
   shortcuts: boolean;
+  /** V6.2 (P206a, D-501): the sign-in dialog a toast opened over the editor is open. */
+  signIn: boolean;
   // Arrow-typed, so a component may take one out of the store and call it alone.
   selectTab: (tab: Tab) => void;
   setFollow: (on: boolean) => void;
@@ -47,6 +49,7 @@ export type UiState = {
   /** Replaces the thumbnails; the ones they replace are closed (they hold GPU memory). */
   setThumbnails: (thumbnails: readonly ImageBitmap[] | null) => void;
   showShortcuts: (open: boolean) => void;
+  showSignIn: (open: boolean) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -57,6 +60,7 @@ export const useUiStore = create<UiState>((set) => ({
   save: "saved",
   thumbnails: null,
   shortcuts: false,
+  signIn: false,
   selectTab: (tab) => {
     set({ tab });
   },
@@ -90,5 +94,8 @@ export const useUiStore = create<UiState>((set) => ({
   },
   showShortcuts: (shortcuts) => {
     set({ shortcuts });
+  },
+  showSignIn: (signIn) => {
+    set({ signIn });
   },
 }));

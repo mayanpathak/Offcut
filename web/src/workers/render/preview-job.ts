@@ -7,7 +7,7 @@
 // never imports the worker.
 
 import { type ExportProfile, LIMITS, type OutMs, type Px, type StyleId } from "../../gen/domain";
-import type { CaptionMirror, ClockSync, Hit, PreviewStats } from "../protocol";
+import type { CaptionMirror, ClockSync, Hit, PreviewStats, VideoMirror } from "../protocol";
 import { WorkerFailure } from "../rpc-worker";
 import type { Session, WorkerState } from "./export-job";
 import { recorded, runPreview } from "./preview-loop";
@@ -213,11 +213,18 @@ export async function captionMirror(p: { at: OutMs }, w: WorkerState): Promise<C
   return Promise.resolve(state === undefined ? null : state.session.caption_mirror(frameTime(state, p.at)));
 }
 
-/** The three styles of the cards, in their order on the page (D-186). */
-const THUMBNAIL_STYLES: readonly StyleId[] = ["clean", "bold", "tech"];
+/** V6.2 (P209, DC-16): the main video's `src` at `at` and the clip's crop, for development and test builds. */
+export async function videoMirror(p: { atMs: number }, w: WorkerState): Promise<VideoMirror | null> {
+  const state = w.open();
+  const at = Math.max(0, Math.round(p.atMs)) as OutMs;
+  return Promise.resolve(state === undefined ? null : state.session.video_mirror(frameTime(state, at)));
+}
+
+/** The styles of the cards, in their order on the page (D-186); V6.2 adds Glow after Mono (D-480). */
+const THUMBNAIL_STYLES: readonly StyleId[] = ["clean", "bold", "tech", "glow"];
 
 /**
- * Three frames of `at` in Clean, Bold and Mono with the current edits
+ * One frame of `at` in each style of the cards (Clean, Bold, Mono, Glow) with the current edits
  * (D-186): one canvas of `width` by `height`, the scene built at that size
  * for each style, an `ImageBitmap` taken after each render. The preview's
  * scene and canvas are given back before this answers and its frame is drawn

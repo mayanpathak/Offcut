@@ -98,6 +98,24 @@ async fn rows_for(app: &TestApp, email: &str, status: &str) {
         .execute(&app.pool)
         .await
         .unwrap();
+    // V6.2 (D-440 (6), S-10): the AI plan's count and a long-video grant.
+    sqlx::query(
+        "INSERT INTO ai_usage (user_id, month, kind, count)
+         SELECT id, date_trunc('month', now())::date, 'plan', 3 FROM users WHERE email_normalized = $1",
+    )
+    .bind(email)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO ai_shorts_grants (user_id, month, prefix_hash)
+         SELECT id, date_trunc('month', now())::date, '\\x0102'::bytea FROM users
+         WHERE email_normalized = $1",
+    )
+    .bind(email)
+    .execute(&app.pool)
+    .await
+    .unwrap();
 }
 
 async fn rows_of_user(app: &TestApp, table: &str, email: &str) -> i64 {

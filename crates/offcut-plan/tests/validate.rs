@@ -431,9 +431,24 @@ fn case_20_not_in_this_build_each_non_item_field() {
             title: label("Quitting"),
         }]
     });
-    one(&|plan| plan.extras.hook = Some(label("I almost quit")));
-    one(&|plan| plan.extras.post_caption = Some("How I got my evenings back".to_owned()));
-    one(&|plan| plan.extras.hashtags = vec![label("editing")]);
+    // D-440 (2): from V6.2 the text extras are checked and kept (D-454), not dropped.
+    let kept = |change: &dyn Fn(&mut EditPlan)| {
+        let mut plan = model(Vec::new());
+        change(&mut plan);
+        let (valid, dropped) = run(plan);
+        assert_eq!(dropped, []);
+        valid.extras().clone()
+    };
+    let extras = kept(&|plan| plan.extras.hook = Some(label("I almost quit")));
+    assert_eq!(extras.hook.as_deref(), Some("I almost quit"));
+    let extras =
+        kept(&|plan| plan.extras.post_caption = Some("How I got my evenings back".to_owned()));
+    assert_eq!(
+        extras.post_caption.as_deref(),
+        Some("How I got my evenings back")
+    );
+    let extras = kept(&|plan| plan.extras.hashtags = vec![label("#editing")]);
+    assert_eq!(extras.hashtags, ["#editing"]);
     one(&|plan| {
         plan.music = Some(MusicCue {
             fits: true,
@@ -571,14 +586,26 @@ fn the_non_item_fields_are_dropped_and_the_items_kept() {
     }];
     plan.extras.hook = Some(label("I almost quit"));
     plan.extras.post_caption = Some("caption".to_owned());
-    plan.extras.hashtags = vec![label("editing")];
+    // D-440 (2): from V6.2 the extras are kept (D-454); the cut, chapter and music are not.
+    plan.extras.hashtags = vec![label("#editing")];
     plan.music = Some(MusicCue {
         fits: false,
         energy: MusicEnergy::Calm,
     });
     let (valid, dropped) = run(plan);
-    assert_eq!(valid.items().len(), 5);
-    assert_eq!(dropped.len(), 6);
+    // D-440 (23), P206c: the valid hook with no hook item gains one
+    // (D-503); the five items are kept as before.
+    let kinds: Vec<EventKind> = valid.items().iter().map(|item| item.kind).collect();
+    assert_eq!(kinds.len(), 6, "{kinds:?}");
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|&&kind| kind == EventKind::HookTitle)
+            .count(),
+        1
+    );
+    assert_eq!(dropped.len(), 3);
+    assert_eq!(valid.extras().hashtags, ["#editing"]);
     assert!(
         dropped
             .iter()

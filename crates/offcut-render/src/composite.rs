@@ -13,7 +13,8 @@ use crate::video_pass::{
 /// The video of `list`, if V4 can draw the list on a canvas of `canvas`
 /// pixels: exactly one `Video` command, the first, of the main slot, opaque,
 /// with no mask, its `src` a part of the frame and its `dst` inside the
-/// canvas; and no `Image`. Every other list is `Unsupported`.
+/// canvas. An `Image` is drawn by the overlay, so it may come after the video
+/// as text does (v6.2implementation D-473). Every other list is `Unsupported`.
 pub(crate) fn video_of(
     list: &DisplayList,
     canvas: (u32, u32),
@@ -39,8 +40,8 @@ pub(crate) fn video_of(
                 }
                 video = Some((*src, *dst));
             }
-            DrawCmd::Image { .. } => return Err(RenderError::Unsupported),
-            DrawCmd::FillRect { .. }
+            DrawCmd::Image { .. }
+            | DrawCmd::FillRect { .. }
             | DrawCmd::FillPath { .. }
             | DrawCmd::GlyphRun { .. }
             | DrawCmd::PushLayer { .. }
@@ -229,6 +230,14 @@ mod tests {
         }
     }
 
+    fn image() -> DrawCmd {
+        DrawCmd::Image {
+            image: ImageKey(0),
+            rect: whole(),
+            opacity: 1.0,
+        }
+    }
+
     fn list(cmds: Vec<DrawCmd>) -> DisplayList {
         DisplayList { cmds }
     }
@@ -241,6 +250,9 @@ mod tests {
         );
         let with_text = list(vec![video(), text(), DrawCmd::PopLayer]);
         assert_eq!(video_of(&with_text, CANVAS), Ok((strip(), whole())));
+        // V6.2 (D-473): an image after the video, between other commands.
+        let with_image = list(vec![video(), text(), image(), DrawCmd::PopLayer]);
+        assert_eq!(video_of(&with_image, CANVAS), Ok((strip(), whole())));
         // A smaller rectangle inside the canvas: black around it.
         let inset = DrawCmd::Video {
             slot: VideoSlot::Main,
@@ -260,18 +272,16 @@ mod tests {
     #[test]
     fn a_list_outside_v4s_rule_is_unsupported() {
         let unsupported = Err(RenderError::Unsupported);
-        let image = DrawCmd::Image {
-            image: ImageKey(0),
-            rect: whole(),
-            opacity: 1.0,
-        };
         let with = |change: fn(&mut DrawCmd)| {
             let mut cmd = video();
             change(&mut cmd);
             list(vec![cmd])
         };
         let cases = [
-            ("an image", list(vec![video(), image])),
+            // D-440 (3): an image after the video is drawn since V6.2
+            // (D-473); one before it, or with no video, is not.
+            ("an image before the video", list(vec![image(), video()])),
+            ("an image and no video", list(vec![image()])),
             ("two videos", list(vec![video(), video()])),
             ("a video not first", list(vec![text(), video()])),
             ("no video", list(vec![text()])),

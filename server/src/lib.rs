@@ -13,6 +13,7 @@ pub mod error;
 pub mod headers;
 pub mod log;
 pub mod mail;
+pub mod plan;
 pub mod rate_limit;
 pub mod router;
 pub mod state;

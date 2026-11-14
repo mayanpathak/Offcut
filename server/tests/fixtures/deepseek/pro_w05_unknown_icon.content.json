@@ -1,0 +1,243 @@
+{
+  "format": 1,
+  "catalog": 2,
+  "cuts": [],
+  "items": [
+    {
+      "id": "1",
+      "kind": "from_to",
+      "anchors": {
+        "start": 11,
+        "end": 26
+      },
+      "params": {
+        "kind": "from_to",
+        "params": {
+          "from": {
+            "words": {
+              "start": 14,
+              "end": 15
+            }
+          },
+          "to": {
+            "words": {
+              "start": 18,
+              "end": 19
+            }
+          },
+          "label": "Storage"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "2",
+      "kind": "from_to",
+      "anchors": {
+        "start": 26,
+        "end": 42
+      },
+      "params": {
+        "kind": "from_to",
+        "params": {
+          "from": {
+            "words": {
+              "start": 29,
+              "end": 30
+            }
+          },
+          "to": {
+            "words": {
+              "start": 37,
+              "end": 38
+            }
+          },
+          "label": "Database"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "3",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 11,
+        "end": 26
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "strong",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "4",
+      "kind": "punch_in",
+      "anchors": {
+        "start": 26,
+        "end": 42
+      },
+      "params": {
+        "kind": "punch_in",
+        "params": {
+          "scale": "strong",
+          "motion": "push"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "5",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 10,
+        "end": 11
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 10,
+          "treatment": "highlight",
+          "size": "normal"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "6",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 25,
+        "end": 26
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 25,
+          "treatment": "highlight",
+          "size": "normal"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "7",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 56,
+        "end": 57
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 56,
+          "treatment": "highlight",
+          "size": "normal"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "8",
+      "kind": "emphasis",
+      "anchors": {
+        "start": 65,
+        "end": 66
+      },
+      "params": {
+        "kind": "emphasis",
+        "params": {
+          "word": 65,
+          "treatment": "highlight",
+          "size": "normal"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "9",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 6,
+        "end": 7
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 6,
+          "icon": "cloud"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "10",
+      "kind": "icon_pop",
+      "anchors": {
+        "start": 59,
+        "end": 60
+      },
+      "params": {
+        "kind": "icon_pop",
+        "params": {
+          "word": 59,
+          "icon": "dollar"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "11",
+      "kind": "emoji",
+      "anchors": {
+        "start": 10,
+        "end": 11
+      },
+      "params": {
+        "kind": "emoji",
+        "params": {
+          "word": 10,
+          "emoji": "check",
+          "place": "under"
+        }
+      },
+      "confidence": null
+    },
+    {
+      "id": "12",
+      "kind": "emoji",
+      "anchors": {
+        "start": 56,
+        "end": 57
+      },
+      "params": {
+        "kind": "emoji",
+        "params": {
+          "word": 56,
+          "emoji": "light_bulb",
+          "place": "under"
+        }
+      },
+      "confidence": null
+    }
+  ],
+  "chapters": [],
+  "extras": {
+    "hook": "Cut our cloud bill by two thirds",
+    "post_caption": "We cut our cloud bill by two thirds in a weekend. Storage went from $2,800 to $900 a month by deleting old backups. The database went from $3,000 to $1,100 with a smaller instance. Moving to version 2 of our deploy tool made the change painless. Check your bill every month, not once a year.",
+    "hashtags": [
+      "#cloudcost",
+      "#aws",
+      "#finops",
+      "#costoptimization",
+      "#devops",
+      "#cloudcomputing",
+      "#savings",
+      "#startup"
+    ]
+  },
+  "music": null
+}

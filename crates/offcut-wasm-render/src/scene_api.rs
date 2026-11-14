@@ -10,6 +10,9 @@ use offcut_plan::{Dropped, PlanConfig, RejectReason, from_rules, validate};
 // The scene crate, through the renderer: this crate does not depend on it (D-61).
 use offcut_render::scene::safe_area::{CANVAS_HEIGHT, CANVAS_WIDTH};
 use offcut_render::scene::{FontSet, Hit, Rect, Rgba, Scene, SceneInput, Theme, build_scene};
+// V6.2 (P209, DC-16): the video mirror.
+use offcut_render::scene::{CropRect, DrawCmd, VideoSlot};
+use offcut_types::Enhance;
 use offcut_types::{
     CaptionPlacement, ClipInfo, CropOffset, DetectedEvent, EditPlan, EditState, ErrorCode, EventId,
     ExportProfile, OutMs, SrcPos, StyleId, TimeMap, Transcript, WordRange,
@@ -34,6 +37,9 @@ struct EditInput {
     caption_position: CaptionPlacement,
     #[serde(default = "highlighted")]
     highlight_numbers: bool,
+    /// V6.2 (D-485): absent in every record before V6.2 and in every `v5()` one.
+    #[serde(default = "Enhance::v5")]
+    enhance: Enhance,
 }
 
 /// `EditState`'s default for `highlight_numbers`, read from its one home.
@@ -68,6 +74,16 @@ struct ChunkValue {
 struct SceneReport {
     dropped: Vec<Dropped>,
     chunks: Vec<ChunkValue>,
+}
+
+/// V6.2 (P211a, D-504): `set_scene`'s answer, `SceneReport` and the ids of
+/// the plan's items the validation kept, so the visuals list shows what the
+/// scene can draw and nothing it left out.
+#[derive(Serialize)]
+struct KeptReport {
+    #[serde(flatten)]
+    report: SceneReport,
+    kept: Vec<EventId>,
 }
 
 fn chunks_of(scene: &Scene) -> Vec<ChunkValue> {
@@ -145,6 +161,34 @@ struct CaptionMirror {
     colors: Vec<String>,
 }
 
+/// V6.2 (P209, DC-16): what the main video shows at a time, for development
+/// and test builds: `src`, the part of the source the frame shows, and
+/// `crop`, the clip's crop, which `src` equals with motion off.
+#[derive(Debug, PartialEq, Serialize)]
+struct VideoMirror {
+    src: CropRect,
+    crop: CropRect,
+}
+
+fn video_mirror_of(scene: &Scene, t_out_ms: u32) -> Option<VideoMirror> {
+    let list = scene.frame_at(OutMs::new(t_out_ms));
+    list.cmds.iter().find_map(|cmd| {
+        if let DrawCmd::Video {
+            slot: VideoSlot::Main,
+            src,
+            ..
+        } = cmd
+        {
+            Some(VideoMirror {
+                src: *src,
+                crop: scene.video_crop(),
+            })
+        } else {
+            None
+        }
+    })
+}
+
 fn mirror_of(scene: &Scene, t_out_ms: u32) -> Option<CaptionMirror> {
     let words = scene.caption_words(OutMs::new(t_out_ms));
     if words.is_empty() {
@@ -169,6 +213,83 @@ pub fn rules_plan(transcript: JsValue, events: JsValue) -> Result<JsValue, JsVal
     let transcript: Transcript = from_js(transcript, "Transcript")?;
     let events: Vec<DetectedEvent> = from_js(events, "DetectedEvent")?;
     to_js(&from_rules(&events, &transcript))
+}
+
+/// What `validate_plan` takes (V6.2, v6.2implementation §8.1): the
+/// transcript, a plan and the user's word edits, keyed by strings as
+/// JavaScript holds them.
+#[derive(Deserialize)]
+struct PlanCheckInput {
+    transcript: Transcript,
+    plan: EditPlan,
+    #[serde(rename = "wordEdits")]
+    word_edits: BTreeMap<String, String>,
+}
+
+/// What `validate_plan` answers: how many items the plan keeps and what it
+/// left out, `{ kept, dropped, extras }`, or why it was refused whole, `{ refused }`.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+enum PlanCheck {
+    Valid {
+        kept: u32,
+        dropped: Vec<Dropped>,
+        extras: ExtrasValue,
+    },
+    Refused {
+        refused: &'static str,
+    },
+}
+
+/// V6.2 (P194, D-454): the text extras that passed, for the text extras
+/// panel: "the panel shows only what passed". `ValidExtras` as JavaScript reads it.
+#[derive(Debug, Default, PartialEq, Serialize)]
+struct ExtrasValue {
+    hook: Option<String>,
+    post_caption: Option<String>,
+    hashtags: Vec<String>,
+}
+
+/// `validate` alone, without a scene: what `set_scene` would keep of `input`'s
+/// plan. `Err` is a detail of `E_INTERNAL`: the page built every part.
+fn check_plan(input: PlanCheckInput) -> Result<PlanCheck, &'static str> {
+    let edits = word_edits(input.word_edits).ok_or("PlanCheckInput")?;
+    match validate(
+        input.plan,
+        &input.transcript,
+        &edits,
+        &PlanConfig::default(),
+    ) {
+        Ok((plan, dropped)) => {
+            let kept = u32::try_from(plan.items().len()).map_err(|_| "PlanCheckInput")?;
+            let valid = plan.extras();
+            let extras = ExtrasValue {
+                hook: valid.hook.clone(),
+                post_caption: valid.post_caption.clone(),
+                hashtags: valid.hashtags.clone(),
+            };
+            Ok(PlanCheck::Valid {
+                kept,
+                dropped,
+                extras,
+            })
+        }
+        Err(rejected) => Ok(PlanCheck::Refused {
+            refused: reject_name(rejected.reason),
+        }),
+    }
+}
+
+/// V6.2 (v6.2implementation D-467, §8.1): what the plan validation would keep
+/// of a model's plan, before the page chooses it over the rules plan. The
+/// session and its scene are not touched. `input` is
+/// `{ transcript, plan, wordEdits }`; the answer `{ kept, dropped }` or
+/// `{ refused: "PlanFormat" | "PlanCatalog" }`.
+#[wasm_bindgen]
+pub fn validate_plan(input: JsValue) -> Result<JsValue, JsValue> {
+    let input: PlanCheckInput = from_js(input, "PlanCheckInput")?;
+    let check = check_plan(input).map_err(|detail| failure(ErrorCode::Internal, detail))?;
+    to_js(&check)
 }
 
 /// The variant's name: the `detail` of a refused plan.
@@ -198,6 +319,7 @@ fn scene_of(
         crop_offset: input.edit.crop_offset,
         caption_position: input.edit.caption_position,
         highlight_numbers: input.edit.highlight_numbers,
+        enhance: input.edit.enhance,
     };
     let (plan, dropped) = validate(
         input.plan,
@@ -222,6 +344,23 @@ fn scene_of(
     Ok((scene, dropped))
 }
 
+/// V6.2 (P211a, D-504): the ids of `input`'s plan items that its validation
+/// keeps, validated as `scene_of` validates them; none when the plan or the
+/// edits are refused (`scene_of` then fails too).
+fn kept_ids(input: SceneInputValue) -> Vec<EventId> {
+    let Some(edits) = word_edits(input.edit.word_edits) else {
+        return Vec::new();
+    };
+    validate(
+        input.plan,
+        &input.transcript,
+        &edits,
+        &PlanConfig::default(),
+    )
+    .map(|(plan, _)| plan.items().iter().map(|item| item.id).collect())
+    .unwrap_or_default()
+}
+
 #[wasm_bindgen]
 impl RenderSession {
     /// `input` is `{ transcript, plan, edit, profile, timeMap }`; the clip is
@@ -229,12 +368,15 @@ impl RenderSession {
     /// transcript as edited, builds the scene and keeps it in place of the
     /// one before, and answers `{ dropped }`. The renderer is not touched.
     pub fn set_scene(&mut self, input: JsValue) -> Result<JsValue, JsValue> {
+        // V6.2 (P211a, D-504): the input is read twice, so `scene_of` stays as it was.
+        let kept = kept_ids(from_js(input.clone(), "SceneInput")?);
         let input: SceneInputValue = from_js(input, "SceneInput")?;
         let (scene, dropped) =
             scene_of(input, &self.clip).map_err(|detail| failure(ErrorCode::Internal, detail))?;
         let chunks = chunks_of(&scene);
         self.scene = Some(scene);
-        to_js(&SceneReport { dropped, chunks })
+        let report = SceneReport { dropped, chunks };
+        to_js(&KeptReport { report, kept })
     }
 
     /// Where the main video's source is at the program time `t_out_ms`;
@@ -276,6 +418,20 @@ impl RenderSession {
             .as_ref()
             .and_then(|scene| mirror_of(scene, t_out_ms));
         // A string and a list of strings always serialize.
+        mirror
+            .and_then(|mirror| to_plain(&mirror).ok())
+            .unwrap_or(JsValue::NULL)
+    }
+
+    /// V6.2 (P209, DC-16): `{ src, crop }` of the main video at `t_out_ms`
+    /// (`src` equals `crop` with motion off); `null` before a scene is set.
+    /// Only development and test builds of the page ask (D-155).
+    pub fn video_mirror(&self, t_out_ms: u32) -> JsValue {
+        let mirror = self
+            .scene
+            .as_ref()
+            .and_then(|scene| video_mirror_of(scene, t_out_ms));
+        // Two plain rectangles always serialize.
         mirror
             .and_then(|mirror| to_plain(&mirror).ok())
             .unwrap_or(JsValue::NULL)
@@ -387,7 +543,8 @@ mod tests {
             "PlanFormat"
         );
         assert_eq!(
-            refused(input(|v| v["plan"]["catalog"] = json!(2))),
+            // V6.2 (D-449): catalog 2 is this build's; a newer one is refused.
+            refused(input(|v| v["plan"]["catalog"] = json!(3))),
             "PlanCatalog"
         );
         assert_eq!(
@@ -398,8 +555,9 @@ mod tests {
 
     #[test]
     fn a_field_v4_does_not_apply_is_dropped_and_reported() {
-        let hook = input(|v| v["plan"]["extras"]["hook"] = json!("Watch this"));
-        let (_, dropped) = scene_of(hook, &clip()).unwrap();
+        // V6.2 keeps a valid hook (D-454, D-440 (2)); the music cue is still not applied (D-455).
+        let music = input(|v| v["plan"]["music"] = json!({ "fits": true, "energy": "calm" }));
+        let (_, dropped) = scene_of(music, &clip()).unwrap();
         let report = serde_json::to_value(SceneReport {
             dropped,
             chunks: Vec::new(),
@@ -448,6 +606,191 @@ mod tests {
         assert_eq!(
             serde_json::to_value(mirror).unwrap(),
             json!({ "text": "WE MADE IT", "colors": ["#ffffffff"] })
+        );
+    }
+
+    /// "We grew ten times." as a transcript of four timed words, one sentence.
+    fn four_words() -> Transcript {
+        serde_json::from_value(json!({
+            "words": [
+                { "text": "We", "start_ms": 500, "end_ms": 800, "confidence": 1.0 },
+                { "text": "grew", "start_ms": 900, "end_ms": 1_200, "confidence": 1.0 },
+                { "text": "ten", "start_ms": 1_300, "end_ms": 1_600, "confidence": 1.0 },
+                { "text": "times.", "start_ms": 1_700, "end_ms": 2_000, "confidence": 1.0 },
+            ],
+            "sentences": [{ "words": { "start": 0, "end": 4 }, "start_ms": 500, "end_ms": 2_000 }],
+            "numbers": [],
+            "model_version": "test",
+        }))
+        .unwrap()
+    }
+
+    /// A model's plan of emphasis items, one on each word given.
+    fn model_plan(words: &[u32]) -> EditPlan {
+        use offcut_types::{
+            EmphasisSize, EventKind, ItemParams, PlanItem, PlanSource, Treatment, WordIdx,
+        };
+        let mut plan = from_rules(&[], &four_words());
+        plan.source = PlanSource::Model {
+            provider: "deepseek".to_owned(),
+            model: "test".to_owned(),
+        };
+        plan.items = (1u64..)
+            .zip(words)
+            .map(|(id, &word)| PlanItem {
+                id: EventId::new(id),
+                kind: EventKind::Emphasis,
+                anchors: WordRange {
+                    start: WordIdx::new(word),
+                    end: WordIdx::new(word + 1),
+                },
+                params: ItemParams::Emphasis {
+                    word: WordIdx::new(word),
+                    treatment: Treatment::Colour,
+                    size: EmphasisSize::Normal,
+                },
+                confidence: None,
+            })
+            .collect();
+        plan
+    }
+
+    fn check(plan: EditPlan, edits: Value) -> Result<PlanCheck, &'static str> {
+        let input = json!({ "transcript": four_words(), "plan": plan, "wordEdits": edits });
+        check_plan(serde_json::from_value(input).unwrap())
+    }
+
+    #[test]
+    fn validate_plan_counts_the_items_kept_and_reports_the_drops_without_a_session() {
+        // V6.2 (P193): one item on a word, one anchored past the last word.
+        let checked = check(model_plan(&[1, 9]), json!({})).unwrap();
+        let PlanCheck::Valid { kept, dropped, .. } = &checked else {
+            panic!("refused: {checked:?}");
+        };
+        assert_eq!(*kept, 1);
+        assert_eq!(dropped.len(), 1);
+        assert_eq!(dropped[0].kind, Some(offcut_types::EventKind::Emphasis));
+        assert_eq!(
+            serde_json::to_value(&checked).unwrap(),
+            json!({ "kept": 1, "dropped": [{ "kind": "emphasis", "reason": serde_json::to_value(dropped[0].reason).unwrap() }], "extras": { "hook": null, "post_caption": null, "hashtags": [] } })
+        );
+        // Every item dropped is still an answer: kept 0.
+        let none = check(model_plan(&[9]), json!({})).unwrap();
+        assert!(matches!(none, PlanCheck::Valid { kept: 0, .. }), "{none:?}");
+        // The rules plan of no events keeps nothing and drops nothing.
+        let rules = check(from_rules(&[], &four_words()), json!({})).unwrap();
+        assert_eq!(
+            serde_json::to_value(rules).unwrap(),
+            json!({ "kept": 0, "dropped": [], "extras": { "hook": null, "post_caption": null, "hashtags": [] } })
+        );
+    }
+
+    #[test]
+    fn validate_plan_answers_a_refused_plan_and_refuses_a_bad_input() {
+        let mut newer = model_plan(&[1]);
+        newer.catalog = offcut_plan::CATALOG_VERSION + 1;
+        assert_eq!(
+            serde_json::to_value(check(newer, json!({})).unwrap()).unwrap(),
+            json!({ "refused": "PlanCatalog" })
+        );
+        let mut other = serde_json::to_value(model_plan(&[1])).unwrap();
+        other["format"] = json!(2);
+        assert_eq!(
+            check(serde_json::from_value(other).unwrap(), json!({})).unwrap(),
+            PlanCheck::Refused {
+                refused: "PlanFormat"
+            }
+        );
+        assert_eq!(
+            check(model_plan(&[1]), json!({ "01": "x" })),
+            Err("PlanCheckInput")
+        );
+    }
+
+    #[test]
+    fn validate_plan_answers_the_text_extras_that_passed_and_only_those() {
+        // V6.2 (P194, D-454): a valid hook and caption kept, a bad hashtag left out.
+        let mut plan = model_plan(&[1]);
+        plan.extras.hook = Some(serde_json::from_value(json!("We grew ten times")).unwrap());
+        plan.extras.post_caption = Some("How we grew, in one minute.".to_owned());
+        plan.extras.hashtags = vec![
+            serde_json::from_value(json!("#growth")).unwrap(),
+            serde_json::from_value(json!("#not a tag")).unwrap(),
+        ];
+        let checked = serde_json::to_value(check(plan, json!({})).unwrap()).unwrap();
+        assert_eq!(
+            checked["extras"],
+            json!({ "hook": "We grew ten times", "post_caption": "How we grew, in one minute.", "hashtags": ["#growth"] })
+        );
+        // D-440 (23), P206c: the valid hook with no hook item gains one (D-503).
+        assert_eq!(checked["kept"], json!(2));
+        assert_eq!(checked["dropped"].as_array().map(Vec::len), Some(1));
+    }
+
+    /// V6.2 (P209, DC-16): the video mirror. With motion off every frame's
+    /// main video shows the clip's crop; with it on, the camera's drift moves
+    /// `src` off the crop, and the crop answered stays the clip's.
+    #[test]
+    fn the_video_mirror_shows_the_crop_with_motion_off_and_the_drift_with_it_on() {
+        let times = (0..10_000).step_by(250);
+        let (off, _) = scene_of(input(|_| {}), &clip()).unwrap();
+        let crop = off.video_crop();
+        for t in times.clone() {
+            let mirror = video_mirror_of(&off, t).unwrap();
+            assert_eq!((mirror.src, mirror.crop), (crop, crop), "{t}");
+        }
+        let (on, _) = scene_of(
+            input(|v| v["edit"]["enhance"] = json!({ "voice": "clean", "motion": true })),
+            &clip(),
+        )
+        .unwrap();
+        let moved = times
+            .filter(|&t| video_mirror_of(&on, t).is_some_and(|m| m.src != crop && m.crop == crop))
+            .count();
+        assert!(moved > 0, "the drift moved no frame");
+        assert_eq!(
+            serde_json::to_value(video_mirror_of(&off, 0).unwrap()).unwrap()["crop"]["w"],
+            json!(1080.0)
+        );
+    }
+
+    #[test]
+    fn set_scene_reports_the_ids_of_the_items_its_validation_keeps() {
+        // V6.2 (P211a, D-504): item 1 on a word is kept, item 2 past the last word is dropped.
+        let with = |plan: EditPlan| {
+            input(|v| {
+                v["transcript"] = json!(four_words());
+                v["plan"] = json!(plan);
+            })
+        };
+        assert_eq!(kept_ids(with(model_plan(&[1, 9]))), vec![EventId::new(1)]);
+        // With a word edit: as many as `validate_plan` keeps of the same plan and edits.
+        let edited = input(|v| {
+            v["transcript"] = json!(four_words());
+            v["plan"] = json!(model_plan(&[1, 2]));
+            v["edit"]["word_edits"] = json!({ "2": "edited" });
+        });
+        let PlanCheck::Valid { kept, .. } =
+            check(model_plan(&[1, 2]), json!({ "2": "edited" })).unwrap()
+        else {
+            panic!("refused");
+        };
+        assert_eq!(u32::try_from(kept_ids(edited).len()).unwrap(), kept);
+        // A plan refused whole keeps nothing.
+        let mut newer = model_plan(&[1]);
+        newer.catalog = offcut_plan::CATALOG_VERSION + 1;
+        assert_eq!(kept_ids(with(newer)), Vec::<EventId>::new());
+        // The answer is V4's report with `kept` beside it.
+        let report = KeptReport {
+            report: SceneReport {
+                dropped: Vec::new(),
+                chunks: Vec::new(),
+            },
+            kept: vec![EventId::new(3)],
+        };
+        assert_eq!(
+            serde_json::to_value(report).unwrap(),
+            json!({ "dropped": [], "chunks": [], "kept": [EventId::new(3)] })
         );
     }
 }

@@ -2,13 +2,15 @@
 //! prosody measure of V3, and V4's program audio (TS §40.6). Nothing here
 //! classifies a pause, cuts or crossfades (TS §36, INV-5). `program::assemble`
 //! is the one function that may change a length (INV-10), and in V4 it does
-//! not; `silence::silence_profile` measures and decides nothing.
+//! not; `silence::silence_profile` measures and decides nothing. V6.2: the
+//! levelled voice, `level::level_only` (D-487), and `assemble`'s voice.
 
 pub mod chain;
 pub mod compressor;
 pub mod config;
 pub mod denoise;
 pub mod highpass;
+pub mod level;
 pub mod limiter;
 pub mod loudness;
 pub mod program;
@@ -18,6 +20,7 @@ pub mod silence;
 
 pub use chain::{ChainOutput, Flow, run_chain};
 pub use config::ChainConfig;
+pub use level::level_only;
 pub use program::{MusicInput, ProgramAudio, ProgramConfig, assemble};
 pub use prosody::measure_prosody;
 pub use silence::silence_profile;

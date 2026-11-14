@@ -175,6 +175,12 @@ fn spoken_order(a: &DetectedEvent, b: &DetectedEvent) -> Ordering {
         EventKind::ListReveal => 1,
         EventKind::FromTo => 2,
         EventKind::KeywordPop => 3,
+        // V6.2 (D-446): after the four, in code order; the detector never makes them.
+        EventKind::Emphasis => 4,
+        EventKind::IconPop => 5,
+        EventKind::PunchIn => 6,
+        EventKind::Emoji => 7,
+        EventKind::HookTitle => 8,
     };
     a.span
         .start
@@ -252,6 +258,12 @@ mod tests {
             EventParams::ListReveal { .. }
             | EventParams::FromTo { .. }
             | EventParams::KeywordPop { .. } => panic!("{:?}", event.params),
+            // V6.2's model-only kinds (D-446).
+            EventParams::Emphasis { .. }
+            | EventParams::IconPop { .. }
+            | EventParams::PunchIn { .. }
+            | EventParams::Emoji { .. }
+            | EventParams::HookTitle { .. } => panic!("{:?}", event.params),
         }
 
         // The amount as the recognizer writes it for the reference clip: two words.
@@ -287,6 +299,12 @@ mod tests {
             EventParams::ListReveal { .. }
             | EventParams::FromTo { .. }
             | EventParams::KeywordPop { .. } => panic!("{:?}", edited[0].params),
+            // V6.2's model-only kinds (D-446).
+            EventParams::Emphasis { .. }
+            | EventParams::IconPop { .. }
+            | EventParams::PunchIn { .. }
+            | EventParams::Emoji { .. }
+            | EventParams::HookTitle { .. } => panic!("{:?}", edited[0].params),
         }
         // The id is a hash of the kind and the anchors only (D-47), and an edit of
         // one word keeps the anchors: the id is the one the old event had. Not the

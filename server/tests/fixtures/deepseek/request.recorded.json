@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-flash",
+  "messages": [
+    {
+      "role": "system",
+      "content": "<16524 chars: system_prompt@v2 + schema>"
+    },
+    {
+      "role": "user",
+      "content": "<4641 chars: user_message of a01-scriptA>"
+    }
+  ],
+  "thinking": {
+    "type": "disabled"
+  },
+  "response_format": {
+    "type": "json_object"
+  },
+  "temperature": 0.2,
+  "max_tokens": 8000
+}

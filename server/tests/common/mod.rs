@@ -1,10 +1,12 @@
 //! The test application: the real router on a local port, over a database of
 //! its own. Each test gets a fresh database, so the tests run in parallel.
 
+use std::collections::VecDeque;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use axum::body::Bytes;
@@ -13,8 +15,13 @@ use ed25519_dalek::SigningKey;
 use offcut_api::billing::provider::{
     BillingError, BillingEvent, BillingEventKind, BillingProvider, EventOwner,
 };
-use offcut_api::config::Config;
+use offcut_api::config::{Config, PlanProvider as PlanProviderName, PlanSettings};
 use offcut_api::mail::{MailError, Mailer};
+use offcut_api::plan::PlanState;
+use offcut_api::plan::provider::{
+    PlanProvider, PlanProviderError, ProviderOutput, ProviderRequest, Usage,
+};
+use offcut_api::plan::spend::SpendCap;
 use offcut_api::rate_limit::RateLimiter;
 use offcut_api::state::AppState;
 use offcut_api::transcribe::budget::Budget;
@@ -25,6 +32,8 @@ use offcut_types::{UnixSecs, UserId};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{AssertSqlSafe, ConnectOptions, Connection, PgPool};
 use uuid::Uuid;
+
+pub mod plan;
 
 /// Every mail a test's sign-in would have sent, as (to, link). With `fail` set
 /// it refuses, as a provider that is down would.
@@ -183,11 +192,72 @@ impl Transcriber for FakeTranscriber {
     }
 }
 
+/// V6.2: the fake's plan when a test sets none: one keyword pop on the
+/// first word, a hook, and nothing the model should not write.
+pub const FAKE_PLAN: &str = r#"{"format":1,"catalog":2,"cuts":[],"items":[{"id":"1","kind":"keyword_pop","anchors":{"start":0,"end":1},"params":{"kind":"keyword_pop","params":{"word":0}},"confidence":null}],"chapters":[],"extras":{"hook":"A short hook"},"music":null}"#;
+
+/// The usage of each of the fake's answers: TE-15's median Flash plan.
+pub const FAKE_USAGE: Usage = Usage {
+    input_tokens: 5_465,
+    cached_input_tokens: 4_224,
+    output_tokens: 492,
+};
+
+/// An AI plan provider that records what it is sent (system, user) and
+/// answers from `answers` in turn, then with `FAKE_PLAN`; `delay` holds each
+/// answer back. With `enabled` false it is the server's switch turned off.
+pub struct FakePlanProvider {
+    pub enabled: AtomicBool,
+    pub received: Mutex<Vec<(String, String)>>,
+    pub answers: Mutex<VecDeque<Result<String, PlanProviderError>>>,
+    pub delay: Mutex<Duration>,
+}
+
+impl Default for FakePlanProvider {
+    fn default() -> FakePlanProvider {
+        FakePlanProvider {
+            enabled: AtomicBool::new(true),
+            received: Mutex::default(),
+            answers: Mutex::default(),
+            delay: Mutex::new(Duration::ZERO),
+        }
+    }
+}
+
+#[async_trait]
+impl PlanProvider for FakePlanProvider {
+    fn enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+
+    async fn complete(
+        &self,
+        request: ProviderRequest,
+    ) -> Result<ProviderOutput, PlanProviderError> {
+        self.received
+            .lock()
+            .unwrap()
+            .push((request.system, request.user));
+        let delay = *self.delay.lock().unwrap();
+        tokio::time::sleep(delay).await;
+        let answer = self.answers.lock().unwrap().pop_front();
+        let text = answer.unwrap_or_else(|| Ok(FAKE_PLAN.to_owned()))?;
+        Ok(ProviderOutput {
+            text,
+            usage: FAKE_USAGE,
+            model: "fake-model".to_owned(),
+        })
+    }
+}
+
 /// What a test may change about the app before it starts.
 pub struct TestOptions {
     pub transcribe_enabled: bool,
     /// The audio budget in seconds: (hour, day).
     pub transcribe_budget: (u32, u32),
+    /// V6.2: the AI plan's switch and its monthly cap, in micro-dollars.
+    pub plan_enabled: bool,
+    pub plan_cap_micro_usd: i64,
 }
 
 impl Default for TestOptions {
@@ -195,7 +265,23 @@ impl Default for TestOptions {
         TestOptions {
             transcribe_enabled: true,
             transcribe_budget: (7_000, 27_000),
+            plan_enabled: true,
+            plan_cap_micro_usd: 5_000_000,
         }
+    }
+}
+
+/// The plan settings the tests run with: Flash's prices (CP 1), the cap given.
+pub fn plan_settings(cap_micro_usd: i64) -> PlanSettings {
+    PlanSettings {
+        enabled: true,
+        provider: PlanProviderName::Deepseek,
+        model: "fake-model".to_owned(),
+        api_key: "unset-in-tests".to_owned(),
+        api_base_url: "https://plan.example.com".to_owned(),
+        monthly_cap_micro_usd: cap_micro_usd,
+        price_in_usd_per_mtok: 0.30,
+        price_out_usd_per_mtok: 1.20,
     }
 }
 
@@ -252,6 +338,7 @@ pub struct TestApp {
     pub mailer: Arc<FakeMailer>,
     pub billing: Arc<FakeBilling>,
     pub transcriber: Arc<FakeTranscriber>,
+    pub plan: Arc<FakePlanProvider>,
     database: String,
 }
 
@@ -290,6 +377,13 @@ impl TestApp {
             .enabled
             .store(options.transcribe_enabled, Ordering::SeqCst);
         let (hour, day) = options.transcribe_budget;
+        let plan = Arc::new(FakePlanProvider::default());
+        plan.enabled.store(options.plan_enabled, Ordering::SeqCst);
+        let plan_state = Arc::new(PlanState {
+            provider: plan.clone(),
+            provider_id: "fake",
+            cap: SpendCap::new(&plan_settings(options.plan_cap_micro_usd)),
+        });
         let state = AppState {
             db: pool.clone(),
             config: Arc::new(test_config()),
@@ -299,6 +393,7 @@ impl TestApp {
             fair_use: Arc::default(),
             transcriber: transcriber.clone(),
             transcribe_budget: Arc::new(Budget::new(hour, day)),
+            plan: plan_state,
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
@@ -313,6 +408,7 @@ impl TestApp {
             mailer,
             billing,
             transcriber,
+            plan,
             database,
         }
     }
@@ -324,7 +420,18 @@ impl Drop for TestApp {
     fn drop(&mut self) {
         // Each test binary reads what it needs of these. These reads keep the
         // ones a binary does not use from being called dead.
-        let _ = (&self.pool, &self.mailer, &self.billing, &self.transcriber);
+        let _ = (
+            &self.pool,
+            &self.mailer,
+            &self.billing,
+            &self.transcriber,
+            &self.plan,
+        );
+        let _ = (
+            FAKE_PLAN,
+            FAKE_USAGE,
+            plan_settings as fn(i64) -> PlanSettings,
+        );
         let _: fn(TestOptions) -> _ = TestApp::spawn_with;
         let _: fn(&'static TestApp, &'static serde_json::Value) -> _ = webhook;
         let drop_database = format!(

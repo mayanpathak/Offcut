@@ -17,6 +17,8 @@ hmac = { workspace = true }
 lettre = { workspace = true }
 offcut-api-types = { workspace = true }
 offcut-entitlement = { workspace = true, features = ["sign"] }
+# The catalog version, and in P191 the prompt and schema (v6.2implementation D-458, TS §40.7).
+offcut-plan = { workspace = true, features = ["prompt"] }
 offcut-types = { workspace = true }
 # TLS through `rustls` on `ring`, the one provider of this tree (v6implementation D-281).
 reqwest = { workspace = true, features = ["json", "query", "multipart", "rustls-no-provider"] }

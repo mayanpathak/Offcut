@@ -1,11 +1,14 @@
 //! Shared domain types for Offcut: units, ids, limits and every cross-boundary type.
 
+pub mod assets;
 pub mod edit;
+pub mod enhance;
 pub mod error;
 pub mod events;
 pub mod ids;
 pub mod limits;
 pub mod media;
+pub mod params;
 pub mod plan;
 pub mod profile;
 pub mod prosody;
@@ -16,12 +19,15 @@ pub mod timemap;
 pub mod transcript;
 pub mod units;
 
+pub use assets::*;
 pub use edit::*;
+pub use enhance::*;
 pub use error::*;
 pub use events::*;
 pub use ids::*;
 pub use limits::*;
 pub use media::*;
+pub use params::*;
 pub use plan::*;
 pub use profile::*;
 pub use prosody::*;
@@ -201,6 +207,16 @@ mod typescript {
         v.visit::<SourceReject>();
         v.visit::<RouteReject>();
         v.visit::<SourceErrorCode>();
+        // V6.2: the new kinds' params (params.rs, assets.rs) and Enhance, after every V6.1 type.
+        v.visit::<Treatment>();
+        v.visit::<EmphasisSize>();
+        v.visit::<ZoomScale>();
+        v.visit::<ZoomMotion>();
+        v.visit::<EmojiPlace>();
+        v.visit::<IconId>();
+        v.visit::<EmojiId>();
+        v.visit::<VoiceMode>();
+        v.visit::<Enhance>();
     }
 
     struct Brands<'a>(&'a mut String, &'a Config);
@@ -439,7 +455,8 @@ mod typescript {
         }
         assert_eq!(ts.matches("readonly __unit: ").count(), 25);
         assert!(ts.contains("\nexport const PLAN_FORMAT = 1;\n"));
-        assert!(ts.contains("\nexport const CATALOG_VERSION = 1;\n"));
+        // V6.2 (D-448): the catalog of the five new kinds.
+        assert!(ts.contains("\nexport const CATALOG_VERSION = 2;\n"));
 
         let limit_names: Vec<&str> = include_str!("limits.rs")
             .split("\npub const ")

@@ -15,6 +15,7 @@ import type {
   Dropped,
   EditPlan,
   EditState,
+  EventId,
   ExportProfile,
   OutMs,
   Prosody,
@@ -27,16 +28,25 @@ import type {
   WordIdx,
 } from "../gen/domain";
 import initRender, {
+  check_source,
   detect,
+  draw_image_check,
   export_profile_from_token,
   Mp4MuxerHandle,
   open_session,
   preview_profile,
   redetect_sentence,
   type RenderSession as ModuleSession,
+  type ImageCheck,
   rules_plan,
+  validate_plan,
 } from "./pkg/render/offcut_render";
 import renderWasmUrl from "./pkg/render/offcut_render_bg.wasm?url";
+
+/** What `validate_plan` answers (V6.2); `workers/protocol.ts`' `PlanCheck` is the same. */
+export type PlanCheckValue =
+  | { kept: number; dropped: Dropped[]; extras: { hook: string | null; post_caption: string | null; hashtags: string[] } }
+  | { refused: "PlanFormat" | "PlanCatalog" };
 
 /** One compressed video frame, with its place on the clip's timeline in microseconds. */
 export type VideoSample = { data: Uint8Array; ptsUs: number; durationUs: number; isKeyframe: boolean };
@@ -74,10 +84,18 @@ export type SceneHit =
  */
 export type RenderSession = Omit<
   ModuleSession,
-  "set_scene" | "summary" | "read_video_sample" | "source_at" | "render_frame" | "resize" | "hit" | "caption_mirror"
+  | "set_scene"
+  | "summary"
+  | "read_video_sample"
+  | "source_at"
+  | "render_frame"
+  | "resize"
+  | "hit"
+  | "caption_mirror"
+  | "video_mirror"
 > & {
   /** Builds the scene and keeps it in place of the one before; what the plan's validation left out, and its chunks. */
-  set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[] };
+  set_scene(input: SceneInput): { dropped: Dropped[]; chunks: { start: WordIdx; end: WordIdx; at: OutMs }[]; kept: EventId[] };
   /** `null` before a scene is set. */
   summary(): ChangeSummary | null;
   read_video_sample(index: number): VideoSample;
@@ -91,6 +109,14 @@ export type RenderSession = Omit<
   hit(tOut: OutMs, x: number, y: number): SceneHit | null;
   /** The caption shown at `tOut` as drawn, for development builds' tests (D-155); `null` when none is shown. */
   caption_mirror(tOut: OutMs): { text: string; colors: string[] } | null;
+  /** V6.2 (P209, DC-16): the main video's `src` at `tOut` and the clip's crop, for development builds' tests. */
+  video_mirror(tOut: OutMs): VideoMirror | null;
+};
+
+/** V6.2 (P209): what the main video shows; `src` equals `crop` with motion off. Display pixels. */
+export type VideoMirror = {
+  src: { x: number; y: number; w: number; h: number };
+  crop: { x: number; y: number; w: number; h: number };
 };
 
 /** The module's MP4 writer. `finalize()` returns the size of the file in bytes and frees the writer. */
@@ -103,6 +129,12 @@ export type { Mp4MuxerHandle };
 export type RenderApi = {
   /** The plan of the detector's events (D-124). */
   rulesPlan(transcript: Transcript, events: readonly DetectedEvent[]): EditPlan;
+  /**
+   * V6.2 (v6.2implementation §8.1): what the validation keeps of `plan`, with
+   * the user's word edits, without a scene: `{ kept, dropped }`, or the
+   * reason a plan of another build is refused whole.
+   */
+  validatePlan(transcript: Transcript, plan: EditPlan, edits: Record<number, string>): PlanCheckValue;
   /** The visual events of a transcript. `edits` is the user's word edits, by word number. */
   detect(transcript: Transcript, prosody: Prosody, edits: Record<number, string>): DetectedEvent[];
   /**
@@ -126,6 +158,14 @@ export type RenderApi = {
     v: { width: Px; height: Px; avcc: Uint8Array; frameCountHint: number },
     asc: Uint8Array,
   ): Mp4MuxerHandle;
+  /**
+   * V6.2 (TE-30, v6.2implementation D-474), for a development build's check
+   * only: the golden frames' synthetic source (RGBA, 1080 x 1920), and
+   * `image_basic`'s frame drawn over a frame of it on `canvas` (540 x 960).
+   * The check holds its renderer until `free()`, so the canvas can be read.
+   */
+  checkSource(): Uint8Array;
+  drawImageCheck(canvas: OffscreenCanvas, frame: VideoFrame): Promise<ImageCheck>;
 };
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -151,6 +191,7 @@ export async function preloadRender(): Promise<void> {
 
 const api: RenderApi = {
   rulesPlan: (transcript, events) => rules_plan(transcript, [...events]) as EditPlan,
+  validatePlan: (transcript, plan, wordEdits) => validate_plan({ transcript, plan, wordEdits }) as PlanCheckValue,
   detect: (transcript, prosody, edits) => detect(transcript, prosody, edits) as DetectedEvent[],
   redetectSentence: (transcript, prosody, edits, sentence, prev) =>
     redetect_sentence(transcript, prosody, edits, sentence, [...prev]) as DetectedEvent[],
@@ -158,6 +199,8 @@ const api: RenderApi = {
   previewProfile: () => preview_profile() as ExportProfile,
   openSession: (clip, source) => open_session(clip, source),
   newMuxer: (sink, v, asc) => new Mp4MuxerHandle(sink, v.width, v.height, v.avcc, v.frameCountHint, asc),
+  checkSource: () => check_source(),
+  drawImageCheck: (canvas, frame) => draw_image_check(canvas, frame),
 };
 
 /** Instantiates the compiled module, compiling it first if needed. For the render worker. */

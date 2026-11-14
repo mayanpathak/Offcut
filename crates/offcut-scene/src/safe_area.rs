@@ -35,6 +35,10 @@ pub enum ZoneId {
     Caption,
     /// The safe area.
     Full,
+    /// V6.2 (D-448): the video itself, the zone of a `PunchIn`; nothing is drawn in it.
+    Video,
+    /// V6.2 (D-448): the hook title's lockup over the first 2 s, the safe area.
+    Hook,
 }
 
 /// The zone `id` for a clip whose captions are at `placement`, as wide as
@@ -44,6 +48,13 @@ pub fn zone(id: ZoneId, placement: CaptionPlacement) -> Rect {
         ZoneId::Event => placement::event_zone(placement::block_at(placement)),
         ZoneId::Caption => placement::block_at(placement),
         ZoneId::Full => SAFE_AREA,
+        ZoneId::Video => Rect {
+            x: 0.0,
+            y: 0.0,
+            w: CANVAS_WIDTH,
+            h: CANVAS_HEIGHT,
+        },
+        ZoneId::Hook => SAFE_AREA,
     }
 }
 

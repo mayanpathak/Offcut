@@ -7,6 +7,13 @@
 // counted. A second change waits for the one in flight, and each of its
 // calls waits for the render worker to be free. Nothing here awaits the
 // network.
+//
+// V6.2 (v6.2implementation D-488, P208): an Enhance switch is a change
+// like any other, one step of the history, with no `review_action` of its
+// own (`export_done`'s `enhance_off` counts the choice, D-490). When the
+// voice differs between the edit before and the new one (the switch, its
+// undo or its redo), the program's audio on the new voice takes the
+// preview's place at the paused position.
 
 import { track } from "../analytics/client";
 import type { ReviewActionKind } from "../gen/api";
@@ -19,7 +26,8 @@ import { usePreviewStore } from "../state/preview-store";
 import { useUiStore } from "../state/ui-store";
 import { type Cancelled, pool, WorkerCallError, whenFree } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
-import { pause, play } from "./control-preview";
+import { pause, play, swapAudio } from "./control-preview";
+import { programOn, voiceOf } from "./voice-program";
 
 /** What `review_action` names a change: one of the server's list, which holds every review control since Prompt 120 (§13). */
 export type ReviewAction = ReviewActionKind;
@@ -82,13 +90,18 @@ async function eventsFor(transcript: Transcript, previous: EditState, next: Edit
   return answered(await whenFree(() => pool.render.detect({ transcript, prosody, wordEdits: next.word_edits })));
 }
 
+/** V6.2 (P193): whether the clip's plan is a model's, which a word edit keeps (§8.3). */
+function isModelPlan(plan: EditPlan): boolean {
+  return "source" in plan && plan.source.kind === "model";
+}
+
 /** The change in flight, settled however it ended: the next one starts after it (D-147). */
 let inFlight: Promise<void> = Promise.resolve();
 
 async function apply(
   change: (edit: EditState) => EditState,
   mode: "plan" | "scene",
-  action: ReviewAction,
+  action: ReviewAction | null,
   detail: ReviewDetail | undefined,
   joinsLastStep: ((previous: EditState) => boolean) | undefined,
 ): Promise<void> {
@@ -117,16 +130,29 @@ async function apply(
     if (mode === "plan") {
       const found = await eventsFor(transcript, previous, next);
       events = found;
-      plan = answered(await whenFree(() => pool.render.rulesPlan({ transcript, events: found })));
+      // V6.2 (P193): a model's plan stays the clip's plan; the scene validates
+      // it against the edited words. Only a rules plan is made again.
+      if (!isModelPlan(planBefore)) {
+        plan = answered(await whenFree(() => pool.render.rulesPlan({ transcript, events: found })));
+      }
     }
     // 5. The paused preview is drawn again with the new scene (D-173).
     const report = answered(
       await whenFree(() => pool.render.setScene({ transcript, plan, edit: next, timeMap, profile: "preview" })),
     );
     clipStore.setChunks(report.chunks);
+    // V6.2 (P211a, D-504): the items the list shows.
+    clipStore.setPlanKept(report.kept);
     if (mode === "plan") {
       clipStore.setEvents(events);
       clipStore.setPlan(plan);
+    }
+    // 5b. V6.2 (D-488): another voice, another program's audio, swapped in where the preview paused.
+    const voice = voiceOf(next.enhance);
+    if (voice !== voiceOf(previous.enhance)) {
+      const prog48 = await programOn(clipId, voice, timeMap);
+      clipStore.setProgram(prog48);
+      swapAudio(prog48);
     }
     // 6. The save state shows while the write is pending (D-184).
     ui.setSave("saving");
@@ -165,8 +191,10 @@ async function apply(
   if (action !== "undo" && action !== "redo" && joinsLastStep?.(previous) !== true) {
     history.push(previous);
   }
-  // 8.
-  track({ name: "review_action", props: { action, ...detail } });
+  // 8. Not for an Enhance switch (D-490: `export_done` says what was switched off).
+  if (action !== null) {
+    track({ name: "review_action", props: { action, ...detail } });
+  }
 }
 
 /**
@@ -177,11 +205,12 @@ async function apply(
  * thrown; a fault of this file is thrown. `joinsLastStep`, given the edit
  * before the change, says whether the change belongs to the history's last
  * step: then no step of its own is pushed, and one undo takes both back.
+ * `action` `null` (V6.2, an Enhance switch) sends no `review_action`.
  */
 export function update(
   change: (edit: EditState) => EditState,
   mode: "plan" | "scene",
-  action: ReviewAction,
+  action: ReviewAction | null,
   detail?: ReviewDetail,
   joinsLastStep?: (previous: EditState) => boolean,
 ): Promise<void> {
@@ -208,6 +237,8 @@ export function undoFailedChange(): Promise<void> {
         await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
       );
       clipStore.setChunks(report.chunks);
+      // V6.2 (P211a, D-504): the items the list shows.
+      clipStore.setPlanKept(report.kept);
     } catch (error) {
       const failure = failureOf(error);
       if (failure === null) {
@@ -225,4 +256,55 @@ export function undoFailedChange(): Promise<void> {
 /** Resolves when no change is in flight. */
 export function settled(): Promise<void> {
   return inFlight;
+}
+
+/**
+ * V6.2 (v6.2implementation §8.3, P193): "Regenerate plan" puts `plan` in place
+ * of the clip's plan, in the queue of changes (D-147). The edit is kept:
+ * overrides whose ids are in the new plan apply to them, and the others touch
+ * nothing. Not a step of the history, as the edit did not change. `false`:
+ * the clip could not take it now, or the scene failed (stored on the clip as
+ * an edit's failure is), and the plan before stays.
+ */
+export function replacePlan(plan: EditPlan): Promise<boolean> {
+  const run = inFlight.then(() => putPlan(plan));
+  inFlight = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function putPlan(plan: EditPlan): Promise<boolean> {
+  const clip = clipStore.useClipStore.getState();
+  const { transcript, timeMap, edit } = clip;
+  if (clip.status !== "ready" || transcript === undefined || timeMap === undefined || usePreviewStore.getState().status === "locked") {
+    return false;
+  }
+  clipStore.editStarted(edit);
+  const resume = usePreviewStore.getState().status === "playing";
+  if (resume) {
+    await pause();
+  }
+  try {
+    const report = answered(
+      await whenFree(() => pool.render.setScene({ transcript, plan, edit, timeMap, profile: "preview" })),
+    );
+    clipStore.setChunks(report.chunks);
+    // V6.2 (P211a, D-504): the items the list shows.
+    clipStore.setPlanKept(report.kept);
+    clipStore.setPlan(plan);
+  } catch (error) {
+    const failure = failureOf(error);
+    clipStore.editFailed(edit, failure ?? { code: "E_INTERNAL", stage: "preview", retryable: false });
+    if (failure === null) {
+      throw error;
+    }
+    return false;
+  }
+  clipStore.editDone();
+  if (resume) {
+    await play();
+  }
+  return true;
 }

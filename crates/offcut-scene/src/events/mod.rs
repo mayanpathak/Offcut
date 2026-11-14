@@ -1,10 +1,15 @@
 //! The visuals of plan items (TS §19.5, §40.5): one file per kind of the
 //! catalog (INV-23), each laid out once and drawn per frame.
 
+pub mod emoji;
+pub mod emphasis;
 pub mod from_to;
+pub mod hook_title;
+pub mod icon_pop;
 pub mod keyword_pop;
 pub mod list_reveal;
 pub mod number_reveal;
+pub mod punch_in;
 
 use offcut_plan::ValidItem;
 use offcut_types::{EventKind, EventParams, OutMs, OutSpan, TimeMap, Transcript};
@@ -24,6 +29,16 @@ pub enum EventTrack {
     ListReveal(list_reveal::Track),
     FromTo(from_to::Track),
     KeywordPop(keyword_pop::Track),
+    /// V6.2 (D-478): the plan's zoom, drawn by the video track.
+    PunchIn(punch_in::Track),
+    /// V6.2 (D-481): a word marked in the captions, drawn by them.
+    Emphasis(emphasis::Track),
+    /// V6.2 (D-483): an emoji by its word, drawn with the captions.
+    Emoji(emoji::Track),
+    /// V6.2 (D-483): an icon on a disc in the event zone.
+    IconPop(icon_pop::Track),
+    /// V6.2 (D-484): the hook's lockup over the first 2 s.
+    HookTitle(hook_title::Track),
 }
 
 impl EventTrack {
@@ -34,6 +49,11 @@ impl EventTrack {
             EventTrack::ListReveal(_) => EventKind::ListReveal,
             EventTrack::FromTo(_) => EventKind::FromTo,
             EventTrack::KeywordPop(_) => EventKind::KeywordPop,
+            EventTrack::PunchIn(_) => EventKind::PunchIn,
+            EventTrack::Emphasis(_) => EventKind::Emphasis,
+            EventTrack::Emoji(_) => EventKind::Emoji,
+            EventTrack::IconPop(_) => EventKind::IconPop,
+            EventTrack::HookTitle(_) => EventKind::HookTitle,
         }
     }
 }
@@ -75,6 +95,34 @@ pub fn layout(
         EventParams::KeywordPop { word } => Ok(Some(EventTrack::KeywordPop(keyword_pop::layout(
             *word, span,
         )))),
+        // V6.2 (D-478): a zoom over the item's program span.
+        EventParams::PunchIn { scale, motion } => Ok(Some(EventTrack::PunchIn(punch_in::layout(
+            *scale, *motion, span,
+        )))),
+        // V6.2 (D-481): a word the captions mark, from its program start.
+        EventParams::Emphasis {
+            word,
+            treatment,
+            size,
+        } => Ok(Some(EventTrack::Emphasis(emphasis::layout(
+            *word, *treatment, *size, span,
+        )))),
+        // V6.2 (D-483): an emoji by its word, placed by `build_scene` from
+        // its chunk; an icon on a disc in the event zone.
+        EventParams::Emoji { word, emoji, place } => Ok(Some(EventTrack::Emoji(emoji::layout(
+            *word, *emoji, *place, span,
+        )))),
+        EventParams::IconPop { word, icon } => Ok(Some(EventTrack::IconPop(icon_pop::layout(
+            *word, *icon, span, zone, theme,
+        )))),
+        // V6.2 (D-484): the hook's lockup over the program's first 2 s, in the
+        // safe area (the zone "hook"), not the item's span; none when it
+        // cannot fit, so not drawn and not counted.
+        EventParams::HookTitle { text, accent } => {
+            let duration = OutMs::new(map.out_duration().get());
+            let track = hook_title::layout(text, *accent, duration, theme, fonts)?;
+            Ok(track.map(EventTrack::HookTitle))
+        }
     }
 }
 
@@ -85,6 +133,11 @@ pub fn draw(track: &EventTrack, t: OutMs, out: &mut Vec<DrawCmd>) {
         EventTrack::ListReveal(track) => list_reveal::draw(track, t, out),
         EventTrack::FromTo(track) => from_to::draw(track, t, out),
         EventTrack::KeywordPop(track) => keyword_pop::draw(track, t, out),
+        EventTrack::PunchIn(track) => punch_in::draw(track, t, out),
+        EventTrack::Emphasis(track) => emphasis::draw(track, t, out),
+        EventTrack::Emoji(track) => emoji::draw(track, t, out),
+        EventTrack::IconPop(track) => icon_pop::draw(track, t, out),
+        EventTrack::HookTitle(track) => hook_title::draw(track, t, out),
     }
 }
 
@@ -120,4 +173,28 @@ pub(crate) fn text(
 /// `ms` after `t`.
 pub(crate) fn after(t: OutMs, ms: u32) -> OutMs {
     OutMs::new(t.get().saturating_add(ms))
+}
+
+/// An emoji's and an icon's entry (V6.2, D-483): from this share of its
+/// size to all of it,
+pub const IMAGE_POP_FROM: f32 = 0.6;
+/// over this long, on `OUT`.
+pub const IMAGE_POP_MS: u32 = 120;
+
+/// The scale of an image `since_ms` after it enters: `IMAGE_POP_FROM` at 0,
+/// 1.0 from `IMAGE_POP_MS` on.
+pub fn image_pop(since_ms: u32) -> f32 {
+    let share = (since_ms as f32 / IMAGE_POP_MS as f32).min(1.0);
+    IMAGE_POP_FROM + (1.0 - IMAGE_POP_FROM) * crate::easing::bezier(crate::easing::OUT, share)
+}
+
+/// `r` scaled by `k` about its centre.
+pub(crate) fn about_centre(r: Rect, k: f32) -> Rect {
+    let (w, h) = (r.w * k, r.h * k);
+    Rect {
+        x: r.x + (r.w - w) / 2.0,
+        y: r.y + (r.h - h) / 2.0,
+        w,
+        h,
+    }
 }

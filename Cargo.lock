@@ -1748,6 +1748,7 @@ dependencies = [
  "lettre",
  "offcut-api-types",
  "offcut-entitlement",
+ "offcut-plan",
  "offcut-types",
  "reqwest",
  "rustls",
@@ -1864,8 +1865,10 @@ dependencies = [
  "offcut-text",
  "offcut-types",
  "parley",
+ "png",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror",
 ]
 

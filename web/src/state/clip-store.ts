@@ -4,20 +4,23 @@
 
 import { create } from "zustand";
 
-import type { ClipSource, CloudOutcome } from "../gen/api";
+import type { ClipSource, CloudOutcome, PlanOutcome } from "../gen/api";
 import type {
   ClipId,
   ClipInfo,
   DetectedEvent,
   EditPlan,
   EditState,
+  Enhance,
+  EventId,
   PipelineStage,
+  PlanItem,
   Prosody,
   RouteReject,
   TimeMap,
   Transcript,
 } from "../gen/domain";
-import type { AppFailure, FeedLine, SceneChunk } from "../workers/protocol";
+import type { AppFailure, FeedLine, PlanExtras, SceneChunk } from "../workers/protocol";
 import { clear as clearHistory } from "./history";
 import { CLIP_MACHINE, type ClipEvent, type ClipStatus } from "./machines/clip-machine";
 import { transition } from "./machines/transition";
@@ -38,6 +41,24 @@ export type ClipState = {
   asrMode?: "cloud" | "device";
   /** Why this run's cloud transcription fell back, once; the interface says so (D-348). */
   asrFallback?: Exclude<CloudOutcome, "ok">;
+  /**
+   * V6.2 (v6.2implementation §8.2): why this run asked for an AI plan and used
+   * the rules plan, once; the interface says so (P194). Not set when the
+   * switch is off, nor when no plan was asked for.
+   */
+  planFallback?: Exclude<PlanOutcome, "ok" | "off">;
+  /**
+   * V6.2 (P194, D-454): the text extras of the model's plan the clip uses, as
+   * its validation kept them; absent on a rules plan, which has none.
+   */
+  planExtras?: PlanExtras;
+  /**
+   * V6.2 (P211a, D-504): the ids of the plan's items the scene built last
+   * kept, its validation against the words as edited. With `ai_plan` on the
+   * visuals list shows only these: an item left out draws nothing. Absent
+   * before a scene, and from a worker that does not say.
+   */
+  planKept?: readonly EventId[];
   transcript?: Transcript;
   prosody?: Prosody;
   events: readonly DetectedEvent[];
@@ -209,6 +230,48 @@ export function cloudFellBack(reason: Exclude<CloudOutcome, "ok">): void {
   }
 }
 
+/** V6.2: the run used the rules plan in place of an AI plan, for `reason` (§8.2). */
+export function planFellBack(reason: Exclude<PlanOutcome, "ok" | "off">): void {
+  if (useClipStore.getState().status === "processing") {
+    useClipStore.setState({ planFallback: reason });
+  }
+}
+
+/** V6.2 (P194): the text extras of the plan the clip uses now; `undefined` for a rules plan. */
+export function setPlanExtras(extras: PlanExtras | undefined): void {
+  const next = { ...useClipStore.getState() };
+  if (extras === undefined) {
+    delete next.planExtras;
+  } else {
+    next.planExtras = extras;
+  }
+  useClipStore.setState(next, true);
+}
+
+/** V6.2 (P211a, D-504): the ids of the plan's items the scene built last kept; `undefined` when the worker did not say. */
+export function setPlanKept(kept: readonly EventId[] | undefined): void {
+  const next = { ...useClipStore.getState() };
+  if (kept === undefined) {
+    delete next.planKept;
+  } else {
+    next.planKept = kept;
+  }
+  useClipStore.setState(next, true);
+}
+
+/**
+ * V6.2 (P211a, D-504): the plan's items the visuals list shows, and
+ * `export_done` counts. With `ai_plan` on, only those the last scene kept;
+ * otherwise, or before a scene says, every item, as in V6.1.
+ */
+export function listedItems(plan: EditPlan | undefined, kept: readonly EventId[] | undefined, aiPlan: boolean): readonly PlanItem[] {
+  const items = plan?.items ?? [];
+  if (!aiPlan || kept === undefined) {
+    return items;
+  }
+  return items.filter((item) => kept.includes(item.id));
+}
+
 /** One more line of the feed. A line is appended and never dropped (TS §14.3). */
 export function pushFeed(line: FeedLine): void {
   useClipStore.setState((current) => ({ feed: [...current.feed, line] }));
@@ -228,6 +291,24 @@ export function ready(result: {
 /** The plan the scene is built from now. The clip's state does not change. */
 export function setPlan(plan: EditPlan): void {
   useClipStore.setState({ plan });
+}
+
+/**
+ * V6.2 (D-487, P208): the program's audio after a voice switch, for a
+ * preview attached later. The clip's state does not change.
+ */
+export function setProgram(prog48: Float32Array): void {
+  useClipStore.setState({ prog48 });
+}
+
+/**
+ * V6.2 (D-485, D-486, P208): a new clip's Enhance settings, set before its
+ * first scene. Not a review change: nothing to undo. The clip's state does
+ * not change.
+ */
+export function setStartEnhance(enhance: Enhance): void {
+  const { edit } = useClipStore.getState();
+  useClipStore.setState({ edit: { ...edit, enhance } });
 }
 
 /** The chunks of the scene built last (D-182). The clip's state does not change. */

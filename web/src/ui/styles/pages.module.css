@@ -198,3 +198,11 @@
 .page[data-theme="dark"] .dialog::backdrop {
   background: rgb(0 0 0 / 0.6);
 }
+
+/* V6.2 (P194): the "AI edit plan" switch on the settings page. */
+.setting {
+  max-width: 40rem;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}

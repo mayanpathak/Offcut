@@ -1,12 +1,16 @@
 // Section 0: the top bar (designimplementation §6). The wordmark, the links to
-// the page's sections, "Start free", and the 2 px progress bar of a short
+// the page's sections, "Sign in" or "Account" (V6.2 P206a, D-501; kept on a
+// phone, where the section links go), "Start creating" (P211a), and the 2 px progress bar of a short
 // under it (D-317, M2). Also the playhead down the left gutter (M3).
 
 import { useMotionValueEvent, useScroll } from "motion/react";
 import { useRef } from "react";
+import { Link } from "react-router";
 
 import { messages } from "../../copy/messages";
+import { useAuthStore } from "../../state/auth-store";
 import styles from "../styles/landing.module.css";
+import { accountLinkLabel } from "./account-link";
 import { type GsapSetup, useGsap } from "./gsap";
 import { CtaLink } from "./parts";
 
@@ -61,8 +65,9 @@ export function Playhead() {
   );
 }
 
-export function TopBar({ appPath }: { appPath: string }) {
+export function TopBar({ appPath, accountPath }: { appPath: string; accountPath: string }) {
   const copy = messages.landing;
+  const auth = useAuthStore((state) => state.status);
   const bar = useRef<HTMLElement>(null);
   useGsap(bar, progressSetup);
   const { scrollY } = useScroll();
@@ -82,6 +87,9 @@ export function TopBar({ appPath }: { appPath: string }) {
           <a href="#pricing">{copy.nav.pricing}</a>
           <a href="#soon">{copy.nav.soon}</a>
         </nav>
+        <Link className={styles.accountLink} to={accountPath} data-testid="landing-account">
+          {accountLinkLabel(auth)}
+        </Link>
         <CtaLink className={styles.topBarCta} variant="primary" size="small" to={appPath}>
           {copy.cta.startFree}
         </CtaLink>

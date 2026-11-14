@@ -131,6 +131,13 @@ pub enum DrawCmd {
     },
 }
 
+impl Rgba {
+    /// The same colour at the opacity `a` (V6.2: Glow's strokes, D-479).
+    pub const fn with_alpha(self, a: u8) -> Rgba {
+        Rgba { a, ..self }
+    }
+}
+
 impl Affine {
     pub const IDENTITY: Affine = Affine {
         m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
@@ -178,8 +185,9 @@ impl DrawCmd {
     /// The command on a canvas `k` times the size: every length is multiplied,
     /// the translation of a transform too. An opacity, and the scale and
     /// rotation of a transform, are not lengths and stay. A `Video` command
-    /// is in output pixels already and stays as it is.
-    pub(crate) fn scale(&mut self, k: f32) {
+    /// is in output pixels already and stays as it is. Public (V6.2, P205)
+    /// so that a test can compose a list as `Scene::frame_at` does.
+    pub fn scale(&mut self, k: f32) {
         match self {
             DrawCmd::FillRect { rect, radius, .. } => {
                 *rect = rect.scaled(k);

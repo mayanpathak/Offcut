@@ -49,6 +49,12 @@ fn priority(kind: EventKind) -> u8 {
         EventKind::ListReveal => 1,
         EventKind::NumberReveal => 2,
         EventKind::KeywordPop => 3,
+        // V6.2's model-only kinds (D-446): the detector never makes them.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => 4,
     }
 }
 
@@ -92,6 +98,12 @@ fn window(kind: EventKind, span: Span, cfg: &DetectorConfig) -> Option<(u32, u32
     let overlay = match kind {
         EventKind::NumberReveal | EventKind::ListReveal | EventKind::FromTo => true,
         EventKind::KeywordPop => false,
+        // V6.2's model-only kinds (D-446): the detector never makes them.
+        EventKind::Emphasis
+        | EventKind::IconPop
+        | EventKind::PunchIn
+        | EventKind::Emoji
+        | EventKind::HookTitle => false,
     };
     overlay.then(|| {
         (

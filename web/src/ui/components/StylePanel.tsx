@@ -1,4 +1,4 @@
-// The Style tab (v4implementation D-186): the three cards, drawn from the
+// The Style tab (v4implementation D-186): the four cards, drawn from the
 // clip at the preview's position, and the Highlight numbers switch (D-169).
 // The cards are drawn when the tab opens and again, debounced, when what the
 // frame shows changes: the position, the words, the placement, the framing,

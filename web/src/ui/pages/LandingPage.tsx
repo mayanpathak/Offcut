@@ -31,10 +31,13 @@ import styles from "../styles/landing.module.css";
 export function LandingPage({
   settingsPath,
   appPath,
+  accountPath,
   legalPath,
 }: {
   settingsPath: string;
   appPath: string;
+  /** V6.2 (P206a, D-501): the top bar's "Sign in" or "Account" leads here. */
+  accountPath: string;
   legalPath: (doc: LegalDoc) => string;
 }) {
   const navigate = useNavigate();
@@ -55,7 +58,7 @@ export function LandingPage({
   return (
     <MotionScope>
       <div className={styles.landing} data-landing data-theme="dark">
-        <TopBar appPath={appPath} />
+        <TopBar appPath={appPath} accountPath={accountPath} />
         <Playhead />
         <main>
           <Hero appPath={appPath} settingsPath={settingsPath} />

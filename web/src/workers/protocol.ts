@@ -12,6 +12,7 @@ import type {
   EditPlan,
   EditState,
   ErrorCode,
+  EventId,
   EventKind,
   ExportId,
   ExportProfile,
@@ -31,6 +32,8 @@ import type {
   WordIdx,
 } from "../gen/domain";
 import type { Entry, RouteFlags, RouteReject, SourceErrorCode, SourceInfo } from "../gen/domain";
+// V6.2 (D-487): the voice a program is assembled on.
+import type { VoiceMode } from "../gen/domain";
 
 export type { FailureStage } from "../gen/domain";
 
@@ -132,14 +135,31 @@ export type WindowWord = { text: string; startMs: number; endMs: number; confide
 // The audio worker has no method that detects silence or plans a cut. Only
 // `assemble` applies a time map, and in V4 the only map is the identity.
 export interface AudioWorkerApi {
-  /** `out48` is kept in the worker; `out48.length === pcm48.length`. */
-  runChain(p: { pcm48: Float32Array }): Promise<{ loudness: Lufs }>;
+  /**
+   * `out48` is kept in the worker; `out48.length === pcm48.length`. V6.2
+   * (D-487): with `level`, the levelled voice of the same `pcm48` is kept
+   * too, for `takeLevel`; the page sets it with `motion` on.
+   */
+  runChain(p: { pcm48: Float32Array; level?: boolean }): Promise<{ loudness: Lufs }>;
   /** `out48` is transferred out, unmodified. */
   measureProsody(p: { words: Word[]; sentences: Sentence[] }): Promise<{ out48: Float32Array; prosody: Prosody }>;
   /** `out48` is transferred in and `prog48` out; the worker keeps nothing (D-127). */
   assemble(p: { out48: Float32Array; timeMap: TimeMap; speech: OutSpan[] }): Promise<{ prog48: Float32Array; loudness: Lufs }>;
   /** Fire-and-forget: drops any audio the worker holds (D-128). */
   release(): void;
+  /**
+   * V6.2 (D-487): `lvl48`, made by `runChain` from the same `pcm48` when the
+   * build has `motion` on, transferred out; `null` when none was made. The
+   * worker keeps nothing after.
+   */
+  takeLevel(): Promise<{ lvl48: Float32Array | null }>;
+  /** V6.2 (D-487): `assemble` on the voice `voice` names; `voice48` is transferred in and `prog48` out. */
+  assembleVoice(p: {
+    voice48: Float32Array;
+    voice: VoiceMode;
+    timeMap: TimeMap;
+    speech: OutSpan[];
+  }): Promise<{ prog48: Float32Array; loudness: Lufs }>;
 }
 
 export interface RenderWorkerApi {
@@ -149,6 +169,12 @@ export interface RenderWorkerApi {
   redetectSentence(p: { sentence: SentenceIdx; wordEdits: Record<number, string> }): Promise<DetectedEvent[]>;
   /** The plan of the detector's events (D-124). Stateless. */
   rulesPlan(p: { transcript: Transcript; events: DetectedEvent[] }): Promise<EditPlan>;
+  /**
+   * V6.2 (v6.2implementation D-467, §8.1): what the validation keeps of a
+   * model's plan against the transcript as edited, before the page chooses
+   * it. Stateless: the session and its scene are not touched.
+   */
+  validatePlan(p: { transcript: Transcript; plan: EditPlan; wordEdits: Record<number, string> }): Promise<PlanCheck>;
   /** The plan is validated against the transcript as edited before the scene is built (TS §40.4). */
   setScene(p: {
     transcript: Transcript;
@@ -178,6 +204,8 @@ export interface RenderWorkerApi {
   styleThumbnails(p: { at: OutMs; width: number; height: number }): Promise<ImageBitmap[]>;
   /** The caption shown at `at` as drawn; asked by development and test builds only (D-155). */
   captionMirror(p: { at: OutMs }): Promise<CaptionMirror | null>;
+  /** V6.2 (P209, DC-16): the main video's `src` at `at` and the clip's crop; asked by development and test builds only. */
+  videoMirror(p: { atMs: number }): Promise<VideoMirror | null>;
   /** The profile a token gives now, verified here (INV-9, v5implementation D-220). Keeps nothing. */
   exportProfile(p: { entitlementToken: string }): Promise<ExportProfile>;
   exportClip(p: {
@@ -187,13 +215,35 @@ export interface RenderWorkerApi {
     prog48: Float32Array;
   }): Promise<{ opfsPath: string; summary: ChangeSummary; stageTimings: StageTiming[] }>;
   closeSession(): Promise<void>;
+  /**
+   * V6.2 (TE-30, D-474): draws `image_basic`'s frame in this worker and reads
+   * it back. A development build's check only; a production build refuses it.
+   */
+  devImageCheck(): Promise<ImageCheckResult>;
 }
+
+/** What the image check read back: RGBA rows from the top-left, and the images' decode time. */
+export type ImageCheckResult = { width: number; height: number; pixels: Uint8Array; decodeMs: number };
 
 /** `epochMs` is `performance.timeOrigin + performance.now()`. `audioMs` is program time (D-126). */
 export type ClockSync = { audioMs: OutMs; epochMs: number };
 
+/**
+ * V6.2: what `validatePlan` answers: how many items the plan keeps and what
+ * it left out, or why a plan of another build is refused whole (DC-7).
+ */
+export type PlanCheck = { kept: number; dropped: Dropped[]; extras: PlanExtras } | { refused: "PlanFormat" | "PlanCatalog" };
+
+/** V6.2 (P194, D-454): a plan's text extras that passed its validation, for the text extras panel. */
+export type PlanExtras = { hook: string | null; post_caption: string | null; hashtags: string[] };
+
 /** What `setScene` answers: what the plan's validation left out (D-124), and the chunks of the captions (D-182). */
-export type SceneReport = { dropped: Dropped[]; chunks: SceneChunk[] };
+export type SceneReport = {
+  dropped: Dropped[];
+  chunks: SceneChunk[];
+  /** V6.2 (P211a, D-504): the ids of the plan's items the validation kept. Optional: a test's fake may leave it out. */
+  kept?: EventId[];
+};
 
 /**
  * A chunk of the captions, as the scene made it: the transcript words from
@@ -225,5 +275,7 @@ export type Hit =
 
 /** The caption shown at a time: its words joined by spaces, and each word's fill as `#rrggbbaa` (D-155). */
 export type CaptionMirror = { text: string; colors: string[] };
+/** V6.2 (P209): what the main video shows; `src` equals `crop` with motion off. Display pixels. */
+export type VideoMirror = { src: { x: number; y: number; w: number; h: number }; crop: { x: number; y: number; w: number; h: number } };
 
 export type StageTiming = { stage: PipelineStage; durationMs: DurMs };

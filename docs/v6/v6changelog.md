@@ -22,18 +22,38 @@ Entries are oldest first. Each states what changed, what differs from the plan, 
 | 23 | ~~Confirm or change the agent's 15 design choices of Entry 22~~ **Confirmed by the founder, 2026-11-08** | Founder | Entry 22, Entry 23 |
 | 19 | Groq's Dev tier before the private alpha (45-minute sources are about 30 windows each) | Founder | Entry 21, D-342 |
 | 20 | Re-read Pixabay's API terms and licence before V6.8 is planned | Agent | Entry 21 |
-| 21 | The Submagic benchmark shorts and the caption references, outside git | Founder | Entry 21 |
+| 21 | ~~The Submagic benchmark shorts and the caption references, outside git~~ **Done:** six Submagic promos in `sh2clips/documents/submagic_clips/`, read 2026-11-09 (Entry 38) | Founder | Entry 21, Entry 38 |
 | 22 | The local Tooscut copy (`sh2clips/old_project_study_editor/`) holds no licence file; keep upstream's licence text beside it so the study rule's basis is on disk | Founder | Entry 21, Entry 0 |
 | 26 | D-428's three analytics events (`long_source_accepted`, `source_stage_timing`, `source_paused`) are not built: `analytics.rs`' tests pin the event list and no existing test may change tonight. Build them, editing those pinned lists, before `long_video` goes on in production (V6.4); nothing is lost while it is off | Founder decides, V6.4 | Entry 30, D-428 |
 | 25 | HEVC clips on `/app`: the render worker (frozen in V6.1) configures its decoder with the `avcC` only, so V6.1 refuses HEVC on the clip page even with `high_res` (DC-2 holds for 4K H.264 only). Passing the `hvcC` through `frame-decoder.ts` reopens the render path: for the release that next opens it (V6.3, part copies) | Agent, V6.3 | Entry 29, D-427 |
 | 24 | Groq's free tier answered 429 after 27 window requests in about 66 s (a per-minute limit, about 20), with the hour's audio far from spent. Two windows in flight (D-409) meet it on every 45-minute source. Before `long_video` goes on: the Dev tier (open item 19), or one window in flight | Founder, before V6.4's alpha | Entry 26, experiments.md TE-18 |
+| 28 | ~~Confirm or change the agent's 15 design choices of Entry 38 (v1.5) before V6.2's plan is written~~ **Confirmed by the founder, 2026-11-11** | Founder | Entry 38, Entry 39 |
+| 29 | E-16, the blind test against Submagic: 3 source videos, 20 viewers, after V6.8 and before the founding release | Founder, after V6.8 | Entry 38, PS §19 |
+| 30 | At least 10 two-person podcast videos (wide two-shots) with the speaker marked per sentence, outside git, for TE-27 | Founder, by V6.5 | Entry 38, TS §46.6 |
+| 31 | TE-29's side-by-side panel: 20 shots, graded and ungraded, unlabelled | Founder, at V6.6a | Entry 38, TS §47.4 |
 | 27 | TE-18 (P181): at the 10 s overlap, 2 words lost and 3 changed within 2 s of the 29 seams of a 40-minute run, none doubled: the base rate of Groq's own variation (96 edits in 4,677 words), so the merge adds nothing measurable, but §13's "no word lost at a seam" fails by 2. Decide with V6.4's labelled long set before `long_video` goes on: accept, a larger overlap, or one window in flight | Founder, before V6.4's alpha | Entry 36, experiments.md TE-18 |
+| 32 | ~~V6.2's founder questions F-1 to F-9~~ **Answered 2026-11-11:** yes to all; billing already on; 15 transcripts for TE-15; AI plans for signed-in people only (v6.2implementation D-493, D-494) | Founder | Entry 40 |
+| 33 | **Closed 2026-11-11 (Entry 43): moot, DeepSeek replaces Gemini (v6.2implementation D-500).** Was: ~~The Gemini key's Google project is on the free tier~~ (P183: a 429 naming only `free_tier` quotas, Pro's at 0), although billing was thought on. Link the key's project to an active Cloud Billing account (or make a key in the billed project and put it in `.env` and `.env.deploy` as `PLAN_API_KEY`); AI Studio shows the tier. **No Gemini call until then (P183b).** Also recommended: turn off the developer logs in AI Studio's Logs and Datasets page (on by default for projects made on or after 2026-10-26, kept up to 55 days) | Founder, before P183b and P188 | Entry 42 |
+| 34 | **Closed 2026-11-11 (Entry 43): moot, Gemini is not used (D-500).** Was: ~~Gemini 3.8 Flash's price doubles on 2027-01-01~~ (0.75 / 3.75 → 1.50 / 7.50 USD per 1M tokens): set `PLAN_PRICE_IN_USD_PER_MTOK` and `PLAN_PRICE_OUT_USD_PER_MTOK` on Render again that day, or the spend cap counts low | Founder, 2027-01-01 | Entry 42, v6.2implementation D-463 |
+| 35 | **The privacy page and the settings table name DeepSeek before `ai_plan` goes on in production.** The privacy page promises "We will update this page before any new kind of data leaves your computer"; its "Cloud captions" style section, its "Who handles it" list and the settings "What leaves your device" table gain a row: the words of the transcript and their timings go to DeepSeek, in China, to plan the edit; never the audio or video. They cannot say "not kept" or "never used to train" (DeepSeek's terms state neither; D-492's note). The landing page does not change (the founder). Optional: write to DeepSeek to opt the account out of training, a right its privacy policy names | Founder (wording at CP 3) | Entry 43, v6.2implementation D-492, D-500 |
+| 36 | **Closed 2026-11-12 (Entry 48): renamed with the founder's yes.** Was: **DeepSeek's key is `PLAN_API_KEY2`** in `.env` and `.env.deploy`; D-465's configuration reads `PLAN_API_KEY`. May the agent rename it, replacing the Gemini line (name only, value never printed)? | Founder, before P189 | Entry 43, v6.2implementation D-465 |
+| 37 | **Closed 2026-11-12 (Entry 49): the founder chose `deepseek-flash`, thinking off, at 0.30 / 1.20 USD per 1M tokens; yes to the revision (done in P188b) and to item-level parsing (P190).** Was: **Checkpoint 1 (P188): choose the model, confirm the prices, and say yes or no to the prompt revision and item-level parsing.** Read `~/v6.2-review/plans/README.md`'s ten plans first, then `docs/v6.2/experiments.md` TE-15's full read. Recommended: `deepseek-flash`, thinking off; one prompt revision and Flash re-read (15 calls, about $0.02); item-level parsing in P190. P189 was built with `deepseek-flash` as the default model (the founder, 2026-11-12) | Founder, before P190 | Entry 47 |
+| 38 | **Closed 2026-11-12 (Entry 51): the founder said yes; done in P189b.** Was: **A rollback to V6.1 after V6.2's migration would not boot.** sqlx refuses a database holding a migration the binary does not know (`VersionMissing(2)`, reproduced locally). Recommended: (a) V6.2's `db::migrate` sets `ignore_missing(true)`, so later rollbacks (V6.3 → V6.2) work; and (b) §14.4 and the merge's rollback note gain one step: before booting V6.1 on a migrated database, `DELETE FROM _sqlx_migrations WHERE version = 2` (the three tables stay, unused). Nothing was changed; the founder decides, before P212 | Founder, before P212 | Entry 48 |
+| 39 | **Checkpoint 3's points, open after the founder's go (2026-11-13, no change asked).** Each is the founder's, for the quality pass (BP §8A.12) or earlier: (1) Clean: a highlight looks like the spoken word's pill; (2) Bold, Mono, Glow: a coloured word is the spoken word's colour; (3) Mono: the cursor joins a spoken word's highlight; (4) Bold: a highlight close to a popping neighbour; (5) a punch word followed at once by speech shows about 0.4-0.5 s; (6) Glow's halo and Mono's cursor grow with a punch word; (7) at Bottom an emoji "under" its word is drawn over it; (8) white icons on a yellow disc are weak in contrast (**done in P206b, Entry 70**); (9) at Bottom the icon sits about 120 lp above the captions; (10) the hook is centred, over the speaker's face; (11) **the landing page has no sign-in entry, yet AI plans need one** (**done in P206a, Entry 69**); (12) the model may leave the hook item out (it did on the founder's clip) (**done in P206c, Entry 71**). The founder asked for (8), (11) and (12) to be fixed (2026-11-13, Entry 68); the others stay open | Founder | Entries 63-67, `~/v6.2-review/look/README.md` |
 
 ## Known issues for later prompts
 
 | # | Issue | Prompt |
 |---|---|---|
-| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1) | V6.1 |
+| 3 | Carried from V5 (its known issue 3): `openEditor`'s wait for the drop zone fails on the hosted runner, most often on the first model case after `cancel.spec.ts`. Run 41502704869 failed it and its retry; a re-run passed. Its message showed `UNSUPPORTED_STORAGE`, so the storage check now has a second try (Entry 12). Whether that cures the flake is read on the next CI runs: the first attempt's page held the drop zone's words only as the 90 s ended, which a storage retry may not explain. Push 2's run 41602738386 and push 3's run 41822657804: nothing flaky. **The merge's run 41827888094 failed it on both tries** (`model-download.spec.ts`'s first case, right after `cancel.spec.ts`): the first try held "Checking your browser…" for 90 s, the retry read `UNSUPPORTED_WEBGPU`, and the setup's own check read `UNSUPPORTED_WEBGPU` once that run. A re-run of the job passed. Suspects: the runner's WebGPU adapter coming and going, and `start-app.ts`'s `anonymousId()`, an IndexedDB read with no timeout before the capability check (since V1). **Seen again (V6.2 push 2, run 43263410381):** two `model-download.spec.ts` `@no-gpu` cases held "Checking your browser…" and passed on their retry; the run was green | V6.1 |
+| 4 | **Done in P192 (Entry 54): `requestPlan` makes one attempt (`retry: "none"`), as `transcribeAudio` does; `http.ts` is unchanged.** Was: (P191) `web/src/net/http.ts` reads a 502, 503 or 504 as a waking API and tries again, unless its body's code is in `PROVIDER_FAILURES`. `plan_unavailable` (502, 504) and `plan_invalid` (502) are answers from a running API: `request-plan.ts` must not wait them out as a cold start. Add them to `PROVIDER_FAILURES` with their own `ErrorCode`, or call `/plan` without the waking retry | P192 |
+| 6 | **Done in P193 (Entry 55): (a) `import-clip.ts` clears `plans` behind the flag; (b) a cancelled run sends no `plan_result`.** Was: (P192) Two things the pipeline's wiring must do. (a) `plans-repo.ts`' `clear()` is called where `import-clip.ts` sweeps the clip before (D-40), only with `ai_plan` on, so a past clip's plan does not stay behind. (b) `planFor` reads a cancel by the caller as `unavailable`: `plan_result` is not sent when the run's own signal was aborted, as `transcribe-cloud.ts` does | P193 |
+| 7 | **Done in P194 (Entry 56).** Was: (P193) The plan's interface, with its copy in `copy/plan.ts`: the settings row "AI edit plan" calling `chooseAiPlan` (its help line names DeepSeek, open item 35, wording at CP 3); the "Regenerate plan" control calling `regeneratePlan` and its toast for each reason (`plan.regenerate.failed` for `busy` and `failed`); the fallback line, once, from the clip's `planFallback`, the sign-in line for `signed_out` (D-494). The logic is done and tested; nothing shows it yet | P194 |
+| 8 | **Moved to P211 by P210 (Entry 76):** the fake API answers at once, so no wait can be read here; P211 reads the real API's wait and the founder judges it at CP 4. Was: (P194) `plan.processing` ("Planning the edit") is not shown: the plan's wait sits inside the processing card's "Finding visual moments" step, and the store has no field that says a request is out. Show it with the flags-on run of P210 if the wait reads as a stall | P211 |
+| 9 | **Done in P196 (Entry 58): no dark fringe at 0.5×, 1.37× or 1.5×, read as pixels; Vello premultiplies each texel before it filters.** Was: (P195) Every transparent pixel of the bundle is 0, 0, 0, 0 (straight alpha). P183 read no dark fringe with Vello's straight-alpha image fill on a test disc; `image_basic` must show none on the real files at 0.5×, 1× and 1.5× and at opacity 0.5, read at 200% | P196 |
+| 10 | (P199) `flags-identity.spec.ts` line 130, `expect(on.version).toBe(2)`, fails since P192: with `ai_plan` on, the flags-on build opens the `plans` store at structure version 3 (D-469), as designed. Every other check of the case passes with the pin read as 3 (P199's temporary probe: the same records, the same export). Widen it with D-440 (8)'s edit of the spec: version 3 when the build has `ai_plan`, else 2, declared | P209 |
+| 11 | **The lavapipe SIGSEGV in `golden_frames`** (carried from V5 CL known issue 9 and the cloud release's known issue 2): the test process dies on CI's software GPU partway through the goldens, after the ones read so far passed. Seen in V6.2 at push 1 (run 43185400050 on `6078648`, a server-only commit; not read at the time) and push 3 (run 43329295884 on `1c94d83`, attempt 1: 14 of 33 goldens passed, each 0.9997, then the crash; attempt 2 passed in full). The rule stands: read the log, re-run the failed job once. **Two of V6.2's three pushes so far**, where V5 saw one in 26 runs: if it stops a re-run too, or keeps this rate past push 4, look into it (one thread per golden, or a fresh device per test) | Watch |
+| 5 | (P191) §14.2's deploy check sends `POST /api/v1/plan` with a tiny body and expects `E_PLAN_UNAVAILABLE`; since D-494 it answers 401 without a bearer, before the switch is read. Corrected in the plan's §14.2 | P212 |
 
 ## Entry 0 - 2026-11-02 - Spec revision v1.3: the long path (outside a prompt)
 
@@ -1084,3 +1104,1737 @@ No product code. Every reading, with its numbers, is in `docs/v6.1/experiments.m
 **Counts.** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
 
 **Open:** 27 (P181). **Found, not fixed:** as above.
+
+
+## Entry 38 - 2026-11-09 - Spec revision v1.5: the Submagic benchmark as rules, the picture work Tooscut showed, the Enhance panel (outside a prompt)
+
+A planning session after V6.1's merge. Nothing in the code changed. The founder's rule: **Offcut survives only if its shorts match or beat Submagic's; skip what is very hard or a big change with low impact, keep anything that makes the output much better.** The agent read the six Submagic promos in `sh2clips/documents/submagic_clips/` frame by frame (only the "AFTER" halves of four show real Submagic output; one is an AI-generated presenter), then Tooscut's colour grading, transitions, keyframes and audio effects, and put the decisions to the founder as multiple-choice questions with a recommendation each. The three core documents are now v1.5; every change is marked "v1.5" where it sits.
+
+**What the benchmark showed.** A visual change about every 2 s (one output: 11 changes in 23 s); every shot slowly pushing in; whooshes and pops on each B-roll or card entry over a quiet music bed (-16.3 LUFS); captions plainer than expected (one to four words, a heavy white sans with a soft glow, the keyword coloured with an emoji under it, punch words about 2x in capitals, hard swaps); a mixed-size hook lockup; full-screen stock B-roll; the 9:16 crop following whoever speaks in two-person podcasts. Submagic's outputs keep the source's colours unchanged. **The gap is not the captions** (Bold is near parity, and Offcut is likely ahead on line breaks, safe areas and timing) **but motion, sound, B-roll and following the speaker.**
+
+**Founder's decisions (2026-11-09).**
+
+| # | Question | Decision | Replaces |
+|---|---|---|---|
+| 1 | Order | **Keep the release numbers;** put each addition into the release that already holds what it needs; build V6.6 as V6.6a "Picture" and V6.6b "Graphics" | BP §8A.0's order, extended; "look before the Director" was declined |
+| 2 | Following the speaker | **In, at V6.5:** mouth movement matched to speech, no new model; switch only at sentence starts; split when unsure or both speak; only in shots with two or more faces | PS §9.2's "one speaker at launch"; TS §46's rejection of speaker detection |
+| 3 | Motion | **On by default, by rules,** on talking-head shots, alternating in and out; the plan's zooms on top; one switch | TS §47.2's "zoom only where the plan asks" |
+| 4 | Switching enhancements off (the founder's request) | **Measured first, one switch each, remembered:** an Enhance panel with Voice cleanup, Motion, Colour & light, Sound effects, Music; the last choice starts the next video; Voice cleanup off keeps the loudness levelling | Voice chain always on (PS §8 principle 3) |
+| 5 | HDR | **Keep rejecting HDR** with advice; no tone mapping | TE-21's open question; the agent recommended testing real phone clips first |
+| 6 | Sound effects | **Synthesize our own** in code | TE-16's licensed bundle |
+| 7 | Music | **The person's own track only;** no library at launch | TE-16's bundled tracks; the agent recommended buying a small licensed pack |
+| 8 | Captions | **Four display fonts, six presets** with our own names, word pages, glow, punch words, emoji under the keyword | |
+| 9 | Cards B and part D | **Keep both** before launch | The agent recommended moving them after launch |
+| 10 | Quality check | **Rules fix what they can, CI checks the corpus,** never blocks an export | |
+| 11 | Founding release | **After V6.8,** behind a blind test against Submagic (E-16) | BP §8A.6: right after V6.6 |
+| 12 | V6.9-V6.11 | **Before launch, built while the founding offer sells** | Unchanged from Entry 0 |
+
+**The agent's design choices, for the founder to confirm or change (open item 28).**
+
+| # | Choice | Why |
+|---|---|---|
+| 1 | The quality work is a set of rules in the scene and the DSP (motion track, sound cues, quality check), not plan items the model must remember | The worst short must be good; a model forgets |
+| 2 | `Enhance` lives in `EditState` with `#[serde(default)]` = `Enhance::v5()`, and `Enhance::v5()` gives V5's frames and samples (DC-16, INV-33) | A stored clip reopens exactly as saved; `flags_identity.spec.ts` keeps its meaning |
+| 3 | Both voices (`out48` Clean and `lvl48` Level) are prepared, so the switch only re-runs `assemble` | The switch is instant in the preview |
+| 4 | Motion: a 5% drift per segment, segments split at 4 s, never on screen recordings, scales multiplied and capped at 1.35 | Reads as a camera operator, never as a zoom effect |
+| 5 | Speaker: a switch is a hard cut at a sentence start, at least 1.5 s per turn; the split stacks the two faces, left person on top; the Framing panel offers Follow, Show both, Show one | An editor cuts, never pans, between speakers |
+| 6 | The grade is one uniform in the video pass (`Video.grade`), so a graded list stays on the simple path; `None` keeps the old pipeline byte for byte (DC-18) | No second render path for colour; goldens untouched |
+| 7 | Grade bounds: ±0.5 EV, face light at most +0.3 EV, vignette at most 12%, saturation weighted away from skin; no colour controls for the person | Do no harm is the pass line (TE-29) |
+| 8 | Caption glow is drawn as faded strokes in Vello, not a blur | Captions stay on the simple path |
+| 9 | Six synthesized sounds; rules cues are not plan items, at most 12 per short and one per 0.8 s | Switching an item off removes its sound with it |
+| 10 | Voice tuning: denoise by measured noise floor and a three-band EQ bounded to ±3 dB; no gate, reverb or de-esser yet | A good microphone is left almost alone |
+| 11 | Quality fixes are `PlanOp::AddItem` with `origin: QualityFix`, so V6.8 builds `AddItem` early | Each fix is visible, switchable and undoable |
+| 12 | V6.6b builds parts in the order A, C, E, B, D | The benchmark weighs captions above more cards |
+| 13 | Tags `v6.6a` and `v6.6b`; a new milestone id M1.23 for Picture | Numbers and tags stay readable |
+| 14 | The Creator bitrate (8 Mb/s) is re-read in the quality pass under TE-4, not changed now | Constant motion is harder to encode; a change needs a §41.2 row |
+| 15 | B-roll takes the same drift; joins gain `ZoomIn` and `ZoomOut` (from Tooscut's transition types), each with a whoosh | |
+
+**Learned from Tooscut, in our own design (TS §53.4).** Its colour model (lift, gamma and gain wheels; slope, offset and power) becomes the automatic grade's parameters; its bezier keyframe easing becomes `easing.rs`; its `ZoomIn`/`ZoomOut` transitions join §48.3; its three-band EQ (low shelf, peak, high shelf) becomes voice tuning. Not adopted: log colour spaces, its simple tone mapping (HDR stays rejected), LUT looks, HSL and power-window controls, rotate, flip and wipe transitions, reverb, a noise gate. The no-copy rule is unchanged.
+
+**Changed.**
+
+| File | What |
+|---|---|
+| `docs/technicalspec.md` (v1.5) | Status and §0; DC-8 widened from V6.5; new DC-16 (Enhance), DC-17 (speaker split), DC-18 (`Video.grade`), DC-19 (voice tuning); §41.3 flags `motion`, `speaker_framing`, `picture`, `voice_tune`; §41.5 rows for V6.2, V6.5, V6.6a, V6.6b, V6.7, V6.8; §42 the V6.6a/V6.6b note; §40.2 `Emphasis.size`, `Emoji.place`, `HookTitle` to V6.2; §40.10 rows; §46 model line, §46.1's extra outputs, new §46.6 following the speaker; §47 retitled with the quality bar; §47.1 own music, synthesized sounds, rules cues, voice tuning; §47.2 motion by rules and easing curves; new §47.3 captions, §47.4 picture, §47.5 the Enhance panel, §47.6 the quality check; §48.3 zoom transitions, §48.4 the blur's source; §49.2 `AddItem` in V6.8 with `OpOrigin`; §28 milestones M1.9-M1.19 and new M1.23; TE-16 and TE-21 closed; new TE-27, TE-28, TE-29; INV-33; §53.4 Tooscut rows; §53.5 `export_done` fields; §53.6 items 12-15; the founding release after V6.8 |
+| `docs/product.md` (v1.5) | Title and positioning; ICP and "not targeted"; principle 3 (the Enhance panel); §9.1 flows; §9.2 rows (music, two people on screen, HDR); §9.2.1 voice cleanup off; §9.4 HDR and speakers; §9.5 rows for V6.2, V6.5, V6.6a, V6.6b, V6.7, V6.8 and the founding release; §9.7 rows; §12.8; §12.10 two people on screen; §12.12 zoom transitions; new §12.16 the finished look and the Enhance panel; §16 `MusicTrack`; §13, §18 and E-5 timing; new E-16 (the blind test); §21 items 20, 22 (HDR), 23 (music library) |
+| `docs/buildplan.md` (v1.5) | Status; a v1.5 paragraph; the version table (V6.6a, V6.6b); §8A goal and order; the founder's table (two-person set, TE-29's panel, E-16 after V6.8); the estimate; §8A.2, §8A.5, §8A.7, §8A.8 additions; §8A.6 rewritten as 8A.6a Picture and 8A.6b Graphics; the founding release and its boxes moved after V6.8; §8A.12's v1.5 inputs; V6's founding-release mentions, §11.3, §12's boxes, appendices A and B |
+| `docs/v6/v6changelog.md` | This entry; open items 21 (closed), 28-31 |
+
+**Estimate.** 154 prompts still to build (V6.2 19, V6.3 16, V6.4 14, V6.5 14, V6.6a 9, V6.6b 21, V6.7 10, V6.8 21, V6.9-V6.11 30): **+30 against v1.4,** about 6-8 weeks at the founder's pace. Public launch about February to early March 2027 (ESTIMATE). TE-27 or TE-29 at twice its estimate adds up to about 11 prompts.
+
+**Checked.** Documents only: no code or test changed, nothing built. Every edit's anchor matched exactly once, or the script wrote nothing. Every new `§` reference (§46.6, §47.1-§47.6, §8A.6a, §8A.6b, §8A.8, §12.16, PS §21 items 22-23, E-16, DC-16 to DC-19, TE-27 to TE-29, INV-33, M1.23) resolves to a heading or a row. `node scripts/check-file-tree.mjs` passes.
+
+**Not done.** Not committed: the founder asked for the documents. `docs/v6.2/v6.2implementation.md`, its guide and prompts come next, after the founder confirms open item 28; as before, each release's plan adds its new files to TS §5's tree. V6.1's tag and closing entry still wait (the V6.1 status of Entry 37).
+
+## Entry 39 - 2026-11-11 - V6.1 closed: merged, deployed, tagged; v1.5 confirmed; V6.2's branch (outside a prompt)
+
+**Merge.** The founder merged pull request 16 as `b73fea5` on 2026-11-09 (03:35 UTC), with the same tree as `628c995`. Tagged `v6.1` on `b73fea5` and pushed by the agent at the founder's word (2026-11-11).
+
+**The `main` run, 42557223857.** All five jobs green on the first attempt (`ci`, `e2e-media`, `deploy-api`, `deploy-web` with its smoke).
+
+**ON §7.3's live checks (agent, 2026-11-09).** `/healthz` through the site reads `b73fea5` with `cloud_transcribe: true`; `/api/v1/me` without a session 401 with `Cache-Control: no-store` (D-429); an unauthenticated `POST /transcribe` with `X-Offcut-Window: 0/2` 401; `@smoke` against the live site green; `/app` shows no long link and `/app/long` redirects to `/app` (`long_video` off). The only console noise is the signed-out `POST /auth/refresh` 401, which predates V6.1 and is not a regression. Screens kept outside git.
+
+**Flags in production.** `long_video` off until V6.4's alpha (F-4). `high_res` may go on at the founder's choice (F-3, Entry 37); not read here.
+
+**v1.5 confirmed.** The founder confirmed the agent's 15 design choices of Entry 38 (2026-11-11): open item 28 is closed, and the three core documents at v1.5 are committed with this entry, unchanged since Entry 38.
+
+**V6.2's branch.** `v6.2-build` from `main` at `b73fea5` (BP §8A.0 step 1); this entry is its first commit. V6.1's narrow permission rules (ON A-5) are removed from the git-excluded `.claude/settings.local.json`. `docs/v6.2/`'s plan, guide and prompts are not written yet, at the founder's word; Setup's baseline of TS §41.1's proofs is read when they are.
+
+**Open after V6.1.** For the founder: F-3 (`high_res` in production); TE-20's real sleep test; open items 19, 24 and 27 before V6.4's alpha; 25 (V6.3) and 26 (V6.4); 16 and 17 from V6. Found, not fixed: `MAX_SOURCE_DURATION` has no tolerance (a 45:00.067 file is refused).
+
+**Final counts (Entry 37).** Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57, media 112 + 1 skipped, `FLAG_SUITES` 34 + 1 skipped.
+
+## Entry 40 - 2026-11-11 - V6.2's plan, guide and prompts (outside a prompt)
+
+**The founder's decisions (2026-11-11).** (1) **Gemini is the only AI provider;** the key is in `.env` and `.env.deploy`. TE-15 therefore compares two Gemini models, not two providers; the `PlanProvider` trait stays, with one adapter. (2) **V6.2 is built carefully, by hand, one prompt at a time:** "this version is very crucial because further versions depend heavily on it; I don't care if the number of prompts increases." No overnight run; risky parts are split so each proves one thing before the next is built on it; four founder checkpoints.
+
+**Written (uncommitted until V6.2's Setup).** `docs/v6.2/v6.2implementation.md` (D-433 to D-499), `docs/v6.2/v6.2buildguide.md`, `docs/v6.2/coding-promptsv6.2.md` (Setup and P183-P212: 30 prompts against BP §8A.0's 19), and their TS §5 rows. Read against the code at `aef4a1a`.
+
+**What the reading of the code changed against the specs** (each marked REOPENED in the plan, copied back in P212):
+
+- `offcut-scene/src/motion.rs` is V4's caption motion, so the camera drift goes in a new `camera.rs` (TS §47.2 named `motion.rs`); `easing.rs` gains the bezier beside its existing `Easing` enum.
+- The resolved params of the new kinds go in `EventParams`, where V4's `ValidItem` keeps them (TS §40.2 lists them only as wire params).
+- `HookTitle.accent` is an index into the hook's own words, not a transcript `WordIdx`.
+- The `plans` store is IndexedDB structure version 3 (V6.1 took 2); the unused `events` store is kept, not removed (TS §40.8).
+- `EditState.enhance` is skipped when it equals `Enhance::v5()`, so stored records and the render-cache key are unchanged for every existing clip; `Enhance` has two fields in V6.2 (`voice`, `motion`), and `EnhanceReport` waits for the first stage that adapts to a measurement (V6.6a, V6.7).
+- TS §47.3 gives the glow to none of V6.2's three styles, so nobody would see it: F-3 proposes a fourth style, Glow, leaving Clean, Bold and Mono and their goldens as they are.
+- Images are drawn in the Vello overlay rather than a new compositor pass, so the video path is untouched; the emoji and icons are embedded in the render binary as the fonts are.
+- `privacy-network.spec.ts` is V8's; V6.2's network rules are asserted in a new `ai-plan.spec.ts`.
+- Nine existing tests pin V4's catalog and V6's lists on purpose; the plan names each one that V6.2 widens (D-440), and allows no other.
+
+**Open.** Item 32 (F-1 to F-9) before Setup. Open item 1 (`AI_MONTHLY_CAP_USD`) is F-6; open item 2 (provider and model) is now Gemini, the model chosen at CP 1 (P188).
+
+**The founder's answers (2026-11-11, later the same day).** "Yes to all", except: billing on the key's Google project was **already on** (F-2); **TE-15 reads 15 labelled transcripts, not 31** (D-493: `a01` and `w01`-`w14`, 60 calls; `a02`, a private recording's transcript, is never sent); **no AI plans for signed-out people, only for signed-in ones** (D-494): `/plan` requires a bearer and there is no anonymous quota, which reopens TS §40.7's "Bearer optional" and §52's anonymous row (copied back in P212). Free 40 plans a month and Creator 1,000 soft stand; the cap is 50 USD (F-6). Open item 32 is closed; open item 1 is answered (set on Render at the merge).
+
+**A review of the three documents (2026-11-11), and the founder's answers.** An independent review checked the plan against the code (every fact it sampled held) and found five problems. The founder answered yes to all but one, and the plan records them as D-495 to D-499:
+
+- **The emoji and icon names come before the catalog** (D-495): P184 fixes the 72 names (CP 2a), so TE-15 tests the real prompt; P195 makes their images (CP 2b).
+- **Real recordings in TE-15: declined.** "Gemini provides fine models": TE-15 stays on the 15 transcripts of D-493.
+- **CP 1 reads ten plans as annotated transcripts; CP 3 is the whole reference clip with its real plan, exported in the browser and watched beside the Submagic benchmark** (D-496). The review asked for a native render; the repository decodes video only in the browser, so the export is the browser's.
+- **`motion` stays off in production until V6.5** (D-497), because nothing before V6.5's shots can tell a screen recording apart (Entry 38, choice 4).
+- **Latency** (D-498): p90 ≤ 10 s targeted, 20 s the hard line, a 20 s client timeout, 15 s per provider call; the Flash-class model unless Pro's plans are clearly better.
+- **Process** (D-499): P187 joins P186 and P198 joins P199 (28 runs, numbers kept); Medium effort where goldens guard and on records, High kept on punch words, emoji and the hook; a fresh session per prompt, cited sections only, trimmed test output, entries of about 30 lines; Setup adds `scripts/v62-gate.sh`, `debug = "line-tables-only"` for dev and test builds, and `rust-lld` for the Windows target only.
+
+## Entry 41 - 2026-11-11 - V6.2 Setup: the documents, the key's name, the gate, the build settings, the floor
+
+**Branch.** `v6.2-build` at `aef4a1a` on `main`'s `b73fea5` (G 0.2 checked). Built by hand, one prompt at a time (D-434). This commit adds `docs/v6.2/` (plan, guide, prompts, `experiments.md`), Entries 40-41 and TS §5's rows.
+
+**Founder's answers, as recorded** (Entry 40; the plan's D-442, D-493 to D-499): F-1 to F-9 yes, with billing already on, TE-15 on 15 transcripts, AI plans for signed-in people only; the review's points yes, except real recordings in TE-15; Motion off in production until V6.5.
+
+**The key (F-1).** `GEMINI_API_KEY` renamed `PLAN_API_KEY` in `.env` and `.env.deploy` (one line each, value untouched, never printed); `.env` gains `PLAN_ENABLED=true`, `PLAN_PROVIDER=gemini`, `AI_MONTHLY_CAP_USD=5`. Both files stay git-ignored. Google's model list answers the key with HTTP 200 (no content sent). **Found:** the key is not in the `AIza…` form, so a pattern alone would not catch it in a file; the gate also searches for the exact values of `PLAN_API_KEY` and `TRANSCRIBE_API_KEY` from `.env`, never printing them, and skips values under 20 characters (the local `TRANSCRIBE_API_KEY` is a 6-character placeholder, which matched ordinary words).
+
+**Build settings (G 0.8).** Root `Cargo.toml`: `[profile.dev]` and `[profile.test]` with `debug = "line-tables-only"`; `[profile.release]` unchanged; no `opt-level` change. `.cargo/config.toml` (new): `rust-lld.exe` for `x86_64-pc-windows-msvc` only. Kept: from a clean `target/`, `offcut-render`'s golden tests built and linked in 89 s and `offcut-api` in 90 s. `target/` was 20.5 GB before (cleared with `cargo clean`); 6.2 GB after the whole workspace's tests.
+
+**The gate (G 0.9).** `scripts/v62-gate.sh` (TS §5 row added): branch, `zz` files, key patterns and values, the entitlement test key unset, G 0.4's frozen paths (changed or new files), no modified golden or snapshot of the base, the additive check against an allow list kept in the script (empty now; a prompt that must remove a line adds its pattern with the D-number), nothing private tracked, `check-file-tree.mjs`, and no `ignore = "V6.2` once a P206 commit exists. Self-tested: planted `zz` files, a key pattern, a frozen-file edit, a removed line in `easing.rs` and a changed golden each failed it; restored, it answers `gate: ok`.
+
+**The floor, with the new settings (D-438; V6.2's baseline, BP §8A.0 step 1).** Rust **910 / 0 / 4** (421 s); Vitest **650**; `pnpm e2e` **57**. Media 112 + 1 skipped and `FLAG_SUITES` 34 + 1 stand from V6.1 (not re-run: D-437).
+
+**Open.** Nothing new. Next: P183, read before building.
+
+## Entry 42 - 2026-11-11 - P183: read before building
+
+No product code changed: two temporary probes ran and were removed, and two renderer files patched for a probe were restored byte for byte. Readings are in `docs/v6.2/experiments.md`; the plan gains "As read (P183)" notes under D-457, D-459, D-460, D-463, D-470, D-471, D-472, D-492 and §10.1, TE-31's pass line, and a row P183b.
+
+**Gemini (TE-15 first read).** The key sees 62 models; the candidates are `gemini-3.8-flash` and `gemini-3.1-pro-preview`, with `gemini-4-argon` a third for CP 1. Prices and terms read from Google's pages: paid-tier prompts are not used to improve products, are kept 55 days for abuse checks with possible review by Google staff; developer logs are on by default in new projects and can be turned off.
+
+**Real calls (F-9: `a01` only).** (1) `gemini-3.8-flash`, the `@v1` texts and schema: 200 in 22.7 s; 4,782 in, 937 out, 1,557 thinking tokens; about 1.3 cents. Gemini accepted the canonical schema but ignored `const` (`format` and `catalog` came back as `{}`); with the server setting both, the plan parsed and `validate` kept all 7 items. (2) `gemini-3.1-pro-preview`: **429, free-tier quotas only**. Plus Setup's and P183's two free model-list calls.
+
+**Stop and ask (open item 33): the key's project is on the free tier.** On it Google may train on what is sent and humans may read it, so no further call is made until the founder confirms billing. P183b takes the remaining reads (Pro-class, Flash with less thinking) before P188; P184 to P187 do not need them.
+
+**Decisions changed by the readings.** The server sets `format`, `catalog` and `source`; the model never writes them (D-457, D-460). Thinking is on by default and makes the call slow: `PLAN_THINKING` from configuration (D-459). Prices change on 2027-01-01 (open item 34). Straight alpha needs no premultiplying (D-472).
+
+**Vello's images (TE-30 first read, WARP).** `Scene::draw_image` with peniko's `ImageBrush` (straight alpha, bilinear, an opacity multiplier) through the real `render_to_image`: exact colours at 0.5×, 1× and 1.5×, the exact half-opacity blend, no dark fringe, soft edges, clean clipping.
+
+**Licences.** Fluent Emoji: MIT, notice only, pinned at `1ffb34c`; 3D PNGs are 256 px RGBA (about 550 kB for the bundle at 160 px, under D-471's 600 kB). Lucide: ISC, already in `web/LICENSES.md`; icons rasterised with Playwright's Chromium (no new package).
+
+**Drift (TE-31 first look).** A linear 1.00 → 1.05 drift through the real video pass moved a shape 0.021-0.039 output px every frame (0.030 expected), never zero then a jump: no snapping, so the pass line becomes "no stepping", not a speed limit.
+
+**Counts.** Unchanged (no product code): Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57 (Entry 41).
+
+**Open.** 33 (billing, logs), 34 (prices on 2027-01-01). Next: P184 (the types, CP 2a); P183b once billing is confirmed.
+
+## Entry 43 - 2026-11-11 - P183b: DeepSeek's reads (the founder's provider)
+
+**Founder's decision (D-500, REOPENED D-435):** the paid Gemini account is blocked, so **DeepSeek is the only AI provider, with thinking always off.** The adapter becomes `deepseek.rs`. The three V6.2 documents gain one rule: where they say Gemini, read DeepSeek. P183's Gemini readings stay as history. No product code changed.
+
+**Read** (`experiments.md` TE-15, "The founder's decision"): models `deepseek-flash` (V4.1 Flash) and `deepseek-v4-pro`; prices per 1M tokens at peak: Flash 0.006 / 0.30 / 1.20 (cache hit / miss / output), Pro 0.044 / 1.32 / 3.96, off-peak half; the API, JSON-mode and thinking docs; the privacy policy and the Open Platform terms.
+
+**Real calls (F-9: `a01` only).** Thinking off, `json_object`, the `@v1` texts with the schema in the system prompt. Flash ×3: 200 in 2.5-2.8 s, about 5,670 in / 460-520 out; `validate` kept 7, 9 and 7 items (drops: two `AnchorRule`, one `NumberUnresolved`). Pro ×1: 200 in 5.1 s, 5 of 5 kept. `json_schema` strict: **400, unavailable.** Before P183b, at the founder's request: thinking on took 35 s (Flash) and 145 s (Pro). Balance $1.99 → $1.93 over thirteen calls in all.
+
+**Decisions changed by the readings.** No provider-shaped schema: the schema goes in the system prompt as text (D-457). No `PLAN_THINKING`: always disabled (D-459 → D-500). Blank content is a parse failure and takes the one retry. The spend counts input at the cache-miss price unless P191 adds a third price (D-463). `PLAN_PROVIDER=deepseek` (D-465).
+
+**Terms, and what the product may say (D-492).** DeepSeek's terms do not say that API inputs are not kept or not trained on, and its privacy policy stores data in China. So the in-app copy names DeepSeek and China and makes neither claim. The landing page does not change (the founder: its promise is about the video). The privacy page and the settings table gain DeepSeek before `ai_plan` goes on (open item 35).
+
+**First read against TE-15's lines:** parse 4/4, latency well under 10 s, cost about $0.0007 a Flash plan with the cached prompt. **Flash's median drop rate of 12.5% is over the 10% line on this one transcript;** P186's prompt prose and TE-15's 15 transcripts take it up.
+
+**Gate.** `scripts/v62-gate.sh` also searches for `PLAN_API_KEY2`'s value and a DeepSeek key pattern.
+
+**Counts.** Unchanged (no product code): Rust 910 / 0 / 4, Vitest 650, `pnpm e2e` 57.
+
+**Open.** 33 and 34 closed (moot). New: 35 (the privacy page and the settings table name DeepSeek before `ai_plan` is on), 36 (rename `PLAN_API_KEY2`, before P189). Next: P184 (the types, CP 2a).
+
+## Entry 44 - 2026-11-12 - P184: the types
+
+**Founder's decisions for this night (2026-11-12).** P184 to P189 run in one session, overnight, instead of one fresh session each (bends D-499); P188 makes 30 DeepSeek calls, not 60 (each model once on the 15 transcripts); open item 36's rename is a yes; P189's default model is `deepseek-flash`; a small disagreement between documents follows the D-number with an "As read" note, while stored formats, privacy, money and promises still stop the run.
+
+**CP 2a: the 72 names, approved by the founder as drafted (2026-11-12).** Each was checked against the upstream file list first (Fluent Emoji at `1ffb34c`, 3,146 "3D" PNGs; `lucide-static` 1.61.0, 2,171 SVGs), so P195 can fail only on looks. Each variant's doc in `assets.rs` names its upstream file. Emoji (48): laughing, heart_eyes, star_struck, mind_blown, thinking, shocked, crying, cool, partying, skeptical, eyes, angry, nervous; thumbs_up, thumbs_down, clap, raised_hands, muscle, folded_hands, handshake (the "Default" tone); money_bag, banknote, money_wings, gem, chart_up, chart_down, trophy; light_bulb, brain, target (Bullseye), crown, rocket; fire, hundred, sparkles, lightning, star, collision, party_popper; check, cross, warning, question, exclamation; alarm_clock, hourglass; heart, broken_heart. Icons (24): trending_up, trending_down, bar_chart, dollar, wallet, shopping_cart, briefcase, clock, calendar, lightbulb, target, check, cross, alert, arrow_right, heart, star, book, lock, shield, users, smartphone, laptop, mail.
+
+**What changed.** `offcut-types`: `EventKind` gains `Emphasis`, `IconPop`, `PunchIn`, `Emoji`, `HookTitle` at the end; `EventParams` the five resolved arms and `ItemParams` the five wire arms, at the end (§6.1); `DropReason` gains `Density`, `HookMissing`. New `assets.rs` (`EmojiId`, `IconId`, each with `ALL`, `NAMES`, `name()`), `enhance.rs` (`VoiceMode`, `Enhance`, `v5()`, `is_v5()`, `defaults(motion_flag)`), `params.rs` (`Treatment`, `EmphasisSize`, `ZoomScale`, `ZoomMotion`, `EmojiPlace`). **REOPENED CONTRACT (D-446, D-485):** `EditState.enhance` with `#[serde(default = "Enhance::v5", skip_serializing_if = "Enhance::is_v5")]` and `#[ts(optional, as = "Option<Enhance>")]`, so a `v5()` state's JSON is byte for byte V6.1's and TypeScript sees `enhance?: Enhance` (no web code had to set it). **DECLARED CHANGE:** `offcut-wasm-render`'s `EditInput` reads `enhance` (default `v5()`) and passes it on; nothing reads it yet. Every new arm is "not drawn": the scene's `layout` returns `Ok(None)`; `validate` drops the five at V-2 (`UnknownKind`, no catalog row until P186). `pnpm gen:types`: `domain.ts` gains the nine types and the arms.
+
+**Differs from the plan (As read notes under D-439 and D-440).**
+- **`offcut-detect` is additive, not frozen.** It matches every `EventKind` by name and holds D-446's codes 4-8 (`event_id.rs`), so the kinds cannot be added with it frozen. Arms only: codes 4-8 in `event_id.rs` and `lib.rs`' order, a threshold of infinity, a hold of 0, never an overlay, priority 4 in `resolve.rs`. No line removed, no file added; the gate now checks exactly that. Its tests pass with their assertions unchanged.
+- **Existing tests touched beyond D-440's nine.** (10) `events.rs`' `event_params_typescript_is_a_union_tagged_with_kind`: before `count(), 4`, after the four names kept, the five added and `count(), 9` (the gate's allow list names that one line). (11) An added arm, with no line changed, in each exhaustive `match` of a test file: `offcut-detect`'s four test modules and `tests/{precision_recall,rules_table,determinism,redetect}.rs`, `offcut-plan/tests/plan_from_rules.rs`, `offcut-scene/tests/{catalog_complete,timemap_identity}.rs`, `offcut-render/tests/golden_frames.rs`.
+- **`params.rs`** holds the five param enums (§6.1 put them in `events.rs`), so `typescript_declares_every_type_and_limit_once` stays unchanged, as V6.1's `source.rs` did.
+- **The web code had to name the kinds too:** `copy/plan.ts` (new, D-491) with the list's kind names (§12's drafts) and type-only feed lines, imported by `messages.ts` (680 lines); stand-in icons (Type, Sparkles, Crop) and switch cases in `PlanItemList.tsx`, `ProcessingFeed.tsx` and `run-pipeline.ts`'s `displayOf` (none reachable: the detector never makes the five).
+
+**Tests.** New: 3 in `assets.rs`, 3 in `enhance.rs`, 5 in `edit.rs` (a `v5()` state equals V6.1's literal; a record without the field reads `v5()`; `motion: true` round-trips; a V6.1-shaped reader accepts a V6.2 record; the TypeScript field is optional). No golden or snapshot touched.
+
+**Counts.** Rust **921 / 0 / 4** (910 before this prompt, re-read first); Vitest **650**; `pnpm e2e` not run (decision 8A: once, at the night's end). `pnpm check` green.
+
+**Found, not fixed.** The list's draft names give "Emphasis" to both `keyword_pop` (V4) and `emphasis` (§12): one to rename at CP 3. TS §52 says the closed sets live "next to their drawing code"; D-447 puts them in `offcut-types`, as built.
+
+**Open.** 35, 36 (36 answered yes; the rename is done in P189). Next: P185.
+
+## Entry 45 - 2026-11-12 - P185: validation pieces
+
+**What changed (`offcut-plan`).** `ParamTy::Index { max }` (0 to `max`), with its arms in `config.rs`, `validate_params.rs` and `prompt.rs` (text "a whole number from 0 to N", schema integer 0..N); no row uses it yet, so the `@v1` snapshots are unchanged. **DC-7 (D-449):** V-1 refuses only a catalog newer than `CATALOG_VERSION`. **`ValidPlan.extras`** (`ValidExtras { hook, post_caption, hashtags }`, accessor `extras()`, exported) holds the extras that pass D-454; cuts, chapters and music stay `NotInThisBuild` (D-455). Per item: the five kinds resolve (the four word pointers copy through; `HookTitle` takes the valid hook's text, `HookMissing` without one, its accent below the hook's word count and within the row's `Index`, else `ParamsMismatch`, D-453); `ClipWide` anchors are exactly `0..word count`; a `PunchIn` spans 1-3 words (`Snap`) or 2-40 (`Push`) inside one sentence, else `AnchorRule` (D-450). After V-6, three passes in anchor order: the zoom rule (two `PunchIn`s never overlap, one a sentence: `TooClose`), the punch words (6 s from the last punch's end: `TooClose`; 4 a clip: `OverLimit`, D-452), and for a model's plan V-9 (one visual start in any 2.5 s: `Density`, D-451). `hold_ms`: `IconPop` holds the event zone as V4's visuals do, the other four hold none. The kinds still have no catalog row, so `validate` drops them at V-2 until P186.
+
+**DECLARED CHANGE (D-440 (2)), each assertion before and after.**
+- `tests/validate.rs` `case_20_not_in_this_build_each_non_item_field`: before, the hook, the post caption and `["editing"]` each gave one `NotInThisBuild`; after, each is kept with no drop (`extras().hook == "I almost quit"`, the caption, `hashtags == ["#editing"]`: a hashtag now needs its `#`). The five cuts, the chapter and the music keep their assertion.
+- `tests/validate.rs` `the_non_item_fields_are_dropped_and_the_items_kept`: before `dropped.len() == 6`; after `3` (cut, chapter, music) and `extras().hashtags == ["#editing"]` (the input's hashtag gains its `#`).
+- `validate.rs`' inline `every_non_item_field_is_dropped_in_v4`: before `8`; after `4`, with the hook, the caption and `["#editing", "#video"]` kept.
+- **Beyond the plan's list:** `offcut-wasm-render`'s `a_field_v4_does_not_apply_is_dropped_and_reported` used the hook as its example of a field not applied; it now uses the music cue, with its assertion unchanged (the gate's allow list names the two removed lines). And `offcut-plan/tests/ui/valid_plan_private.stderr` (trybuild) was regenerated, as its driver says to: building a `ValidPlan` outside the crate still fails on private fields, and the message now names `extras` too.
+
+**As read** (notes under D-453 and D-454, and D-440's (12)): a hashtag without `#`, empty or with another character is `ParamsMismatch`; a ninth hashtag `OverLimit`; a hook outside 2-9 words `LabelTooLong`. A gap is measured from the last kept item's end, as V-6's `min_gap` is; the density window from start to start.
+
+**Tests.** New: `tests/validate_v62.rs` (5: the hook, the caption, the hashtags, a rules plan without extras, DC-7), inline `validate.rs` (4: the zoom rule, the punch words, V-9, DC-7, each on `ValidItem`s directly), inline `validate_params.rs` (2: the hook's checks, the zoom's span rule). `validate_rules_plans.rs` and `plan_from_rules.rs` unchanged and passing, so every rules plan of the labelled set still validates whole.
+
+**Counts.** Rust **932 / 0 / 4**; Vitest **650**; no golden or snapshot touched. `cargo test -p offcut-plan`: 65.
+
+**Found, not fixed.** `validate.rs`' inline `v1_another_format_or_catalog_refuses_the_plan` refuses `empty_rules(2)` as a catalog too new; with `CATALOG_VERSION = 2` in P186 it will be read. P186 must handle it (it is not on D-440's list).
+
+**Open.** 35, 36. Next: P186.
+
+## Entry 46 - 2026-11-12 - P186 (with P187): the catalog rows, the prompt and the schema, v2
+
+**What changed.** **REOPENED CONTRACT (D-448):** `CATALOG_VERSION = 2` with §6.2's five rows after V4's four, all `Producers::Model`: `emphasis` (caption, Point, 12, 800 ms), `icon_pop` (event, Point, 6, 2,500 ms), `punch_in` (video, Words 1-40, 8, 1,500 ms), `emoji` (caption, Point, 6, 2,500 ms), `hook_title` (hook, ClipWide, 1, 0). Their `Enum` params list P184's final names (`IconId::NAMES`, `EmojiId::NAMES`) and the param enums' serde names; a new test proves each name deserializes. New zones `"video"` and `"hook"`, and the scene's `ZoneId` gains `Video` (the canvas) and `Hook` (the safe area), drawing nothing. The rules plan's `catalog` is 2. `pnpm gen:types`: `CATALOG_VERSION = 2` in `domain.ts`.
+
+**The prompt's new paragraphs (D-456), generated after the kinds and before the rules, numbers read from `validate`:**
+> A finished short: open with a hook title only if the first sentence does not already hook; zoom in on each sentence's key claim; never stack two visuals, so at most one visual (a number, a list, a from-to, an icon, an emoji or the hook title) starts in any 2.5 seconds; end on the payoff, not a call to action, unless the speaker asks for one.
+>
+> Zooms: zoom on the claim, the number or the punchline, never on filler. A snap covers one strong word (1 to 3 words); a push covers a sentence that builds (2 to 40 words). A zoom stays inside one sentence; a sentence has at most one, and two zooms never overlap.
+>
+> Emphasis and emoji: emphasis marks the one word that carries a sentence. Give size punch only to the line that lands hardest: at most one punch word in any 6 seconds, and at most 4 in a clip. Put an emoji under its word, or beside it, only where it says the word better than text. Use only the icon and emoji names listed above.
+>
+> Text extras, under extras: hook, a title for the short in the speaker's voice, 2 to 9 words and at most 48 characters, with no digit the speaker did not say. Write it always; add a hook_title item, whose accent is the index of the hook's strongest word counting from 0, only if the first sentence does not already hook. post_caption: the text to post with the short, at most 2200 characters. hashtags: at most 8, each # followed by 1 to 30 letters, digits or underscores.
+
+Also: a `ClipWide` kind's anchors now read "the whole clip, written {"start": 0, "end": the number of words}" (validate takes exactly that, P185); the five rows' own sentences are §6.2's drafts word for word.
+
+**The schema's changes (`output_schema@v2`).** `catalog` const 2; `extras.properties` gains `hook` (string, maxLength 48), `post_caption` (string, maxLength 2200), `hashtags` (array, maxItems 8, items string `^#[A-Za-z0-9_]{1,30}$`); `items.oneOf` gains the five arms, each with `kind` const, word-range anchors, required params (`Enum`s as `enum` lists, `accent` integer 0-8), `confidence` null. No provider-shaped schema: DeepSeek takes the canonical schema as text (D-457, D-500).
+
+**Snapshots (new files, each read in full before acceptance).** `catalog_snapshot__system_prompt@v2.snap`, `catalog_snapshot__output_schema@v2.snap`, `catalog_snapshot__user_message@v2.snap` (its body identical to `@v1`'s, 190 lines: the user message is unchanged). The three `@v1` files stay on disk, unchanged and untested.
+
+**DECLARED CHANGE (D-440 (1), (9)).** `catalog.rs`' two inline tests keep every V4 assertion and gain the rows (`the_rows_are_in_code_order_once_each`: nine kinds, four zone names; `the_rows_hold_the_numbers_of_the_plan`: V4's four are `Both`, the five rows' numbers and zones, the five `Model`). `catalog_complete.rs`' three cases carry `#[ignore = "V6.2: the five kinds are drawn by P206"]`. **Beyond the list (D-440 (13), As read):** the catalog's count or version pinned in `config.rs` (4 → 9), `prompt.rs` (4 → 9), `validate.rs`' V-1 case and `offcut-wasm-render`'s refusal case (newer catalog 2 → `CATALOG_VERSION + 1` and 3; the gate allows the one removed line), `offcut-types`' TS test (`CATALOG_VERSION = 1` → 2); and one match arm in `catalog_complete.rs` for the two new zones.
+
+**Tests.** New: 8 in `validate_v62.rs` (each kind kept and resolved; a rules plan of catalog 2 refuses them; the hook title's four drops; a word outside its anchors for the three word kinds; V-3; D-452; V-9 with the hook title, and a rules plan exempt from V-9 where a model's same plan is not), `catalog.rs`' enum names, `prompt.rs`' v2 kinds and extras read as an `EditPlan`.
+
+**Counts.** Rust **939 / 0 / 7** (the three ignores are D-440 (9)'s); Vitest **650**; `cargo test -p offcut-plan` 75. Every scene snapshot and golden unchanged (gate).
+
+**Found, not fixed.** `offcut-api`'s `no_media_routes.rs` `every_post_route_refuses_a_body_over_the_limit` failed once in a full parallel workspace run and passed alone and on the re-run: load-sensitive, not a change of this prompt.
+
+**Open.** 35, 36. Next: P188 (TE-15 on DeepSeek, 30 calls, then CP 1).
+
+## Entry 47 - 2026-11-12 - P188: TE-15 on DeepSeek; checkpoint 1 waits for the founder
+
+**No product code changed.** TE-15's full read is in `docs/v6.2/experiments.md`, the 30 annotated plans in `~/v6.2-review/plans/` (outside git) with a README naming the ten to read first. The scratch caller and validating tool were built on the repository's crates and are not committed. A redacted record of one exchange per model is in `~/v6.2-review/records/` for P190's fixtures.
+
+**Every real call (F-9, D-500; the founder cut TE-15 to 30 plans: each model once).** 2026-11-11 23:15:55-23:17:56 UTC, off-peak. Sent: the `@v2` system prompt with the `@v2` schema as text, and the `@v2` user message of `a01` and `w01`-`w14` (written scripts in the repository); never `a02`, audio or a frame. 33 calls, all HTTP 200, all `finish_reason: stop`, no thinking tokens:
+- `deepseek-flash`, 17 calls: one per transcript, plus a second for `w03` and `w10` (first answers named emoji outside the 72). Per plan: 4,823-6,989 tokens in (3,840-5,120 cache hits), 460-906 out, 2.4-6.0 s.
+- `deepseek-v4-pro`, 16 calls: one per transcript, plus a second for `w05` (its first answer named the icon `cloud`). Per plan: 4,820-6,986 in, 551-1,591 out, 3.1-7.4 s.
+- The account's balance went from $1.93 to $1.89: about $0.04 for the 33 calls (off-peak, half the peak prices). Plus one free balance read with no content.
+
+**Against TE-15's lines.** Parse after one retry 15/15 for each model (pass). p90 latency 3.3 s (Flash) and 6.1 s (Pro) (pass). **Median item drop rate 16.7% (Flash) and 28.6% (Pro): both over the 10% line.** Cost per plan at peak: $0.0011 (Flash), $0.0050 (Pro). The terms line ("paid-tier data does not train models") cannot pass for DeepSeek, whose terms say neither; the founder accepted that in D-500 and D-492.
+
+**Why the drops.** Pro anchors every item to its whole sentence, so `AnchorRule` takes 14 of its 30 emphasis marks, 7 of its 12 numbers and most of its icons and emoji. Flash keeps the anchor rules but zooms on almost every sentence (56 zooms in 15 short scripts), losing 12 to the 1.5 s gap and V-3; it also lays icons over numbers (4 `ZoneTaken`). Every parse failure was a single name outside the closed sets, which fails the whole plan under serde.
+
+**Recommendation (open item 37, CP 1).** `deepseek-flash`, thinking off: more items kept, half the latency, a fifth of the cost. Then one prompt revision (one-word anchors written as `{"start": w, "end": w + 1}`; a zoom only where it earns it; no icon over a number) and a 15-call re-read on Flash, about $0.02; and item-level parsing in P190 so an unknown name drops one item, not the plan. Prices to confirm: Flash 0.006 / 0.30 / 1.20, Pro 0.044 / 1.32 / 3.96 USD per 1M tokens (cache hit / miss / output), peak; off-peak half.
+
+**Stop at CP 1, as the prompt says.** P188's acceptance "the founder's choice in the entry" waits for the morning; the choice will be recorded in the commit that applies it. P189 runs tonight, as the founder allowed, with `deepseek-flash` as the configuration's default.
+
+**Counts.** Unchanged (no product code): Rust 939 / 0 / 7, Vitest 650.
+
+**Open.** 35, 36 (done in P189), **37 (CP 1)**. Next: P189.
+
+## Entry 48 - 2026-11-12 - P189: the tables and the configuration
+
+**What changed.** `server/migrations/0002_ai_usage.sql`: `ai_usage`, `ai_shorts_grants`, `ai_spend` exactly as TS §52 (D-462). `db/ai_usage.rs`: `increment` (counts a success, returns the month's count, one upsert), `count`, `month_of` (the first day of the UTC month), and the export's rows. `db/ai_spend.rs`: `add` (adds a call's micro-dollars, returns the month's total), `total`. **S-10:** `USER_TABLES` gains `ai_usage` and `ai_shorts_grants`; deletion takes them by their foreign keys, as before. The export carries `ai_usage` (month, kind, count) and `ai_shorts_grant_months` (month only, never the hash) in a server-side wrapper around `AccountExport`, each left out while empty, so an account that never used the AI plan exports exactly V6.1's JSON and `offcut-api-types` does not change. `server/.sqlx/` gains 6 queries (`cargo sqlx prepare` against the local database, migrated). **Configuration (D-465, D-500):** `config::plan_settings`, read apart from `Config` as `transcribe_budget` is: `PLAN_ENABLED` (default false), `PLAN_PROVIDER` (`deepseek` only), `PLAN_MODEL` (default `deepseek-flash`, the founder's choice for tonight; CP 1 may change it), `PLAN_API_KEY`, `PLAN_API_BASE_URL` (default DeepSeek's), `AI_MONTHLY_CAP_USD`, the two prices. With the plan on, the key, a cap above 0 and both prices are required, and the key is named first; a bad value stops the boot even with the plan off; `Debug` hides the key. `main.rs` reads them at boot (P191 hands them to the route). `render.yaml` lists the eight with `sync: false`.
+
+**Before any other change** (step 1): with the migration alone, today's server tests passed against the migrated schema, 279 of 280; the one failure was S-10's guard (`user_tables_names_every_table_with_a_user_id_column`), which this prompt satisfies.
+
+**Found, and stopped for the founder (open item 38): the V6.1 binary would not boot on the migrated database.** Its `sqlx::migrate!().run()` refuses a database holding a version it does not know (`VersionMissing(2)`; sqlx-core 0.9.0's `validate_applied_migrations`, default `ignore_missing = false`). Reproduced on local Postgres with a scratch program: V6.2's migrations, then V6.1's (0001 only) → `Err(VersionMissing(2))`; the same with `ignore_missing` → `Ok`. §14.4's rollback assumed the opposite. Recommended, not done: `db::migrate` sets `ignore_missing(true)` from V6.2, and the rollback note gains `DELETE FROM _sqlx_migrations WHERE version = 2` before booting V6.1.
+
+**The key (open item 36, the founder's yes).** `.env` and `.env.deploy`: the Gemini `PLAN_API_KEY` line removed, `PLAN_API_KEY2` renamed `PLAN_API_KEY` (names only; no value printed). `.env` (local only) also gains `PLAN_PROVIDER=deepseek`, `PLAN_MODEL=deepseek-flash` and Flash's prices (0.30 in, 1.20 out, per 1M). DeepSeek's balance endpoint answered the renamed key with 200 (no content sent). The gate's comment now names `PLAN_API_KEY` as DeepSeek's.
+
+**DECLARED CHANGE (D-440 (6)).** `account_delete.rs`' `rows_for` inserts an `ai_usage` row and a grant for the person, so its every-table checks cover them; `account_export.rs`' every-table test gains the two tables' arms and their rows (made through `db::ai_usage`), plus a new case: the AI rows by month, the grant without its hash, and an account without AI rows exporting only V6.1's four keys.
+
+**Tests.** New: 5 in `config.rs` (off by default; on reads every value; on without the key, cap or a price stops the boot naming it; a bad value stops it with the plan off; `Debug` hides the key), 1 in `db/ai_usage.rs`, 1 in `account_export.rs`, 2 in `ai_cap.rs` (the month's spend added and read; 20 concurrent adds lose nothing).
+
+**Counts.** Rust **948 / 0 / 7**; `cargo test -p offcut-api` 289; Vitest **650**; `pnpm e2e` **57** (the night's one run, decision 8A, on a fresh `pnpm build`).
+
+**Open.** 35, 37 (CP 1), **38 (the rollback)**; 36 closed. Next: P190, after CP 1.
+
+## Entry 49 - 2026-11-12 - P188b: checkpoint 1, the prompt revision, TE-15 on Flash again
+
+**Checkpoint 1 (open item 37, closed).** The founder took all four recommendations: `deepseek-flash` with thinking off; the budget prices 0.30 in / 1.20 out USD per 1M tokens (as `.env` has had since P189); one prompt revision and a 15-call Flash re-read; item-level parsing in P190. Recorded in D-498. P188's acceptance ("the founder's choice in the entry") is met here.
+
+**What changed.** `offcut-plan/src/prompt.rs`: the finished-short and zoom paragraphs ask for fewer zooms, each covering only its claim's words, and state the 1.5 s gap between zooms; two new paragraphs, on pointing at words (a one-word item anchored `{"start": w, "end": w + 1}`; a number's range exactly the number and its unit) and on the event zone the four event kinds share (1.5 s hold). Their numbers come from the catalog and `validate` (`EVENT_HOLD_MS` is now `pub(crate)` for it). `catalog.rs`: `punch_in`'s purpose says `push` covers "the few words that build to it". The prompt's unit test pins the new lines. **Snapshot changed:** `catalog_snapshot__system_prompt@v2.snap`, read and accepted (it is P186's own; nothing ships on `@v2` yet). The `@v2` output schema and user message are unchanged.
+
+**Every real call (D-500's request).** 2026-11-12 07:16-07:17 UTC, peak hours. Sent: the revised `@v2` system prompt with the `@v2` schema as text, and the `@v2` user message of `a01` and `w01`-`w14`; never `a02`. 15 calls to `deepseek-flash`, all HTTP 200 and `finish_reason: stop`, no thinking tokens, no retry. Per plan: 2.3-3.6 s, median 5,408 tokens in (4,096 cache hits) and 500 out. About $0.017 at peak prices; the balance, shown to the cent, read $1.87 before and after (two free balance reads).
+
+**Result.** Parse 15/15 first try (P188: 13/15). Zoom drops 12 → 1, anchor drops 6 → 0. Median drops 16.7% → **14.3%**, mean 17.8% → 10.9%: **the 10% line still fails on the median.** Seven of the eight number drops left take one word past the number (`$12 a`, `$60 an`, `3 sets of`, `10 pm`). Not acted on, as only one revision was approved: a second line on where a number's range ends, or a trailing-word trim in `validate`. The table and the drops are in `experiments.md`; the 15 annotated plans in `~/v6.2-review/p188b/plans/` (outside git).
+
+**Counts.** `cargo test -p offcut-plan --all-features` green (75). Rust and Vitest otherwise unchanged: 948 / 0 / 7, 650.
+
+**Open.** 35, **38 (the rollback)**; 37 closed. Next: P190.
+
+## Entry 50 - 2026-11-12 - P190: the provider and the DeepSeek adapter
+
+**What changed.** `server/src/plan/` (new, `pub mod plan` in `lib.rs`):
+- `provider.rs`: `PlanProvider` (`enabled`, `complete`), `ProviderRequest { system, user, schema }`, `ProviderOutput { text, usage, model }` with `Usage { input_tokens, cached_input_tokens, output_tokens }`, `PlanProviderError` (`Unavailable`, `Timeout`, `Blocked(Usage)`), and `UnconfiguredPlanProvider`. No error holds provider text; `ProviderOutput`'s `Debug` shows the text's length only.
+- `deepseek.rs`, the only file that names the provider: D-500's request exactly (the system prompt, then `SCHEMA_LEAD` and the compact schema; `thinking` disabled, `json_object`, temperature 0.2, `max_tokens` 8000; bearer key). `PLAN_UPSTREAM_TIMEOUT` = 15 s (D-498). Any non-2xx (429 never retried, D-459), a body that is not the answer, no choice, or no usage → `Unavailable`; a timeout → `Timeout`; a `finish_reason` other than `stop` or `length` → `Blocked` with its usage, since it was billed. A blank or cut answer returns as text for the parse to refuse. Logs carry `kind` and `status` only.
+- `parse.rs`, **checkpoint 1's item-level parsing**: `parse_plan(text, source)` sets `format`, `catalog` and `source` itself (D-457, D-460), reads the plan outside `items` strictly, then each item alone. An unreadable item is left out and counted; the rest stands. A blank, non-JSON or non-plan answer is a `ParseFailure`: its `retry_note()` gives the parser's message to the model for the one retry (D-460); its `Debug` and `Display` show the kind alone.
+
+`server/Cargo.toml` gains `offcut-plan` with `prompt` (D-458). `check-file-tree.mjs` allows the edge. `cargo deny check bans` is ok: `offcut-plan` is already a wrapper of the `offcut-text` ban. TS §5 gains the rows for `deepseek.rs`, `parse.rs`, `deepseek_adapter.rs` and `fixtures/deepseek/`; `provider.rs`'s row is corrected. TS §7 notes the new edge.
+
+**Fixtures (`server/tests/fixtures/deepseek/`, no key or account identifier).** All are real; `id`, `system_fingerprint` and the request id are redacted:
+- two answers on `a01`: Flash from P188b and Pro from P188;
+- the recorded request, with the texts cut to their lengths;
+- the 400 that refused `json_schema` (P183b);
+- three first answers from P188 that each named one value outside the 72: the emoji `cat`, `lock` used as an emoji, and the icon `cloud`.
+
+**Tests.**
+- `deepseek_adapter.rs`, 7 tests, no real call:
+  - both recorded answers read with their exact token counts and parse whole;
+  - the three one-bad-name answers fail whole under serde, as in P188, but parse item by item with one item left out each;
+  - the request matches the recorded one field for field, and the system message is the same 16,159 characters P188b sent;
+  - 400, 401, 402, 429, 500 and 503 all map to `Unavailable`, with one request per call;
+  - malformed JSON and no choice map to `Unavailable`, a blocked answer to `Blocked` with its usage, a stall to `Timeout`;
+  - a blank answer comes back with its usage, and the parse refuses it as `Blank`;
+  - nothing listening maps to `Unavailable`;
+  - a captured log holds none of the model's text, the error body, the user message, the prompt or the key.
+- 9 unit tests: 2 in `provider.rs`, 3 in `deepseek.rs`, 4 in `parse.rs`.
+
+**Differs from the plan.** The Gemini names read as DeepSeek (D-500). `parse.rs` is new (CP 1). The timeout is D-498's 15 s, not the 25 s that D-500's note repeats from TS §40.7 (recorded in D-500). `ProviderOutput` carries a `Usage` with the cache hits, rather than D-458's two token fields.
+
+**Found.** On Windows, a connection to a closed local port takes about 2 s to be refused. A 2 s timeout races it and reads as `Timeout`, so the "nothing listening" case waits 10 s. `groq_adapter.rs` passes only because it maps both outcomes to one error.
+
+**Counts.** `cargo test -p offcut-api` **305** (289 + 16), with `.env` loaded for `DATABASE_URL`. Rust **964 / 0 / 7** by count (948 + the 16 new): only `offcut-api` changed, and only `offcut-api` and `offcut-plan` were re-run. Vitest 650, unchanged: no web change, not re-run. `clippy -D warnings`, `fmt` and the gate are clean.
+
+**Open.** 35, **38 (the rollback; the founder's yes still due before P212)**. Next: P191 (the route, quotas, the cap; push 1).
+
+## Entry 51 - 2026-11-12 - P189b: the rollback across the migration (open item 38)
+
+**The founder's answer.** Yes to all of open item 38's fix, including the gap found while explaining it: going back to V6.2 after a rollback would rerun `0002` over its own tables. Open item 38 is closed.
+
+**What changed.**
+- `db::migrate` sets `ignore_missing(true)`, so this build ignores a version it does not know. A rollback from a later release to V6.2 then boots.
+- `0002_ai_usage.sql` creates its three tables `IF NOT EXISTS`. Its checksum changes, which is safe because no deployed database has it yet.
+- §14.4 gains the one step for V6.1: `DELETE FROM _sqlx_migrations WHERE version = 2` before V6.1 boots. The tables and their rows stay, unused.
+- `migration_rollback.rs` is new, with its TS §5 row.
+
+**Tests (`migration_rollback.rs`, 2).**
+1. On a database V6.2 migrated, V6.1's migrator (`0001` alone, as its binary embeds it) is refused with `VersionMissing(2)`. After the step it runs. V6.2's migration then runs again, `ai_spend`'s row is kept, and versions 1 and 2 are recorded.
+2. A version 3 recorded by a later release is ignored.
+
+**Found.** sqlx 0.9 returns `VersionMissing` while still holding its advisory lock, on the connection the pool keeps. In production the refused binary exits, which frees the lock. In a test that goes on, the next migration waits forever: the first run hung and was stopped. The test's V6.1 migrator now takes no lock. The hung run left one `offcut_test_*` database behind; it was dropped.
+
+**The local development database** recorded `0002` with its old checksum and would have refused the new file. It was repaired with §14.4's own step: the row deleted, then `sqlx migrate run --ignore-missing`. `0002` ran again over its three tables, with the new checksum.
+
+**Counts.** `cargo test -p offcut-api` 307 (305 + 2). Rust 966 / 0 / 7 by count.
+
+**Open.** 35. Next: P188c (the founder's yes to a second prompt fix), then P191.
+
+## Entry 52 - 2026-11-12 - P188c: where a number's range ends
+
+**The founder's answer.** Yes to the second prompt fix P188b offered (about $0.02).
+
+**What changed.** `offcut-plan/src/prompt.rs`'s pointing paragraph now says where a number's range starts and ends. It starts on the number and ends on the number or on the one unit word just after it (hours, percent, dollars, users), never on `a`, `an`, `of`, `per` or `pm`. Both sides of a from-to are numbers the speaker says. **Snapshot changed:** `catalog_snapshot__system_prompt@v2.snap`, read and accepted; nothing ships on `@v2` yet.
+
+**Every real call (D-500's request).** 2026-11-12 08:03-08:04 UTC, peak hours: 16 calls to `deepseek-flash` on `a01` and `w01`-`w14`, never `a02`. All were HTTP 200 and `stop`, with no thinking tokens. One was a parse retry: `w14`'s first answer named `lock` as an emoji. The calls cost about $0.016 at peak prices; the balance read $1.85 before and after (two free balance reads).
+
+**Result: TE-15 passes on `deepseek-flash`.** Median item drops **0.0%** (mean 8.5%; P188b: 14.3%, 10.9%). Parse after one retry 15/15, p90 3.3 s. No zoom was dropped. Of the 9 drops left, 5 are from-tos whose sides still end on `a` or `an`, 2 are numbers that do not resolve (`3 sets`, `Version 2`), and 2 are icons over numbers. No further revision is proposed. The table is in `experiments.md`; the plans are in `~/v6.2-review/p188c/plans/` (outside git).
+
+**Counts.** `cargo test -p offcut-plan --all-features` green (75). Rust 966 / 0 / 7 by count, unchanged.
+
+**Open.** 35. Next: P191.
+## Entry 53 - 2026-11-12 - P191: the route, quotas and the cap
+
+**What changed.**
+- `offcut-api-types/src/plan.rs`: `PlanRequest`, `PlanWord` and `PlanResponse` (§7.1), each `deny_unknown_fields`. `ApiErrorCode` gains `plan_quota`, `plan_catalog`, `plan_unavailable` and `plan_invalid`, placed before `internal`. `web/src/gen/api.ts` was regenerated, and `web/src/net/http.ts`' table of codes gains the four (the type requires it).
+- `server/src/plan/route.rs`: `POST /api/v1/plan` in §7.2's order (D-460 as read). The `PlanIp` layer and the 64 kB limit come first. The bearer is checked before the body, so a request without one is 401 even when its body is not JSON. Then `PlanUser`, the body, the catalog (409), the switch and the month's spend (502), the person's row (401), the quota (429) and the transcript (400). Then the provider, within 18 s for the whole request, and one parse retry with the parse error appended, made only with 4 s left. The answer is refused over 32 kB, a success is counted, and one log line of counts is written.
+- `plan/quota.rs`: Free 40 a month; Creator logs above 1,000 and stops at 3,000; the tier comes from `plan_now`.
+- `plan/spend.rs`: `SpendCap` prices each call at the cache-miss price, rounded up, charges blocked answers too, logs one 80% line a month, and refuses at 100%.
+- `plan/mod.rs`'s `PlanState` joins `AppState`. `main.rs` builds `DeepseekProvider` when `PLAN_ENABLED=true` and `UnconfiguredPlanProvider` otherwise.
+- `rate_limit.rs`: `PlanIp` and `PlanUser`, each 10 a minute.
+- `error.rs`: the five plan errors; a timeout is 504 with `plan_unavailable`.
+- `db/users.rs`: `exists`, with its query added to `server/.sqlx/`.
+- TS §5 rows for `offcut-api-types/src/plan.rs` and `server/tests/common/plan.rs`. `/healthz` is unchanged.
+
+**Tests.**
+- `plan_route.rs` (14): the plan as the model wrote it, with the server's source, counted and charged, and the system and user messages checked; the source set whatever the model claimed (catalog 1, the rules); no bearer is 401 before the body, with nothing sent, counted or spent; an unknown field, another catalog and a tab in a word are each refused before the provider; the switch off; a deleted account with a live token; the Free 41st, with last month's 40 not counting; a Creator's 3,001st; one parse retry with the error in the second message, counted once and charged twice; two bad answers are `plan_invalid`, charged and not counted; an unknown emoji leaves its item out with no retry; unavailable is 502, timeout 504, blocked 502 and charged, none retried; over 32 kB is `plan_invalid` and not counted; ten a minute per person across addresses, and ten per address before any bearer.
+- `ai_cap.rs` (+1): at the cap the 4th call is refused and not sent; last month's full spend does not close this month.
+- `ai_quota.rs` (2, new): only a plan that came back is counted; each month and each person counts alone.
+- `log_redaction.rs`: the plan case. A word of the request, the model's text and a parse error quoting it never appear in the log; the line shows `retried` and both calls' tokens; the 80% line appears exactly once.
+- `no_media_routes.rs`: `/plan` is in `READ_BODY`, so it is refused over 64 kB and with each media type.
+- Unit tests (9): `route.rs` 3 (the transcript checks, the buckets), `quota.rs` 2, `spend.rs` 2 (cost, once a month), `error.rs` 1 (the plan errors beside the table), `rate_limit.rs` 1 (the plan groups beside the table). `offcut-api-types` gains 1 (`plan.rs`).
+
+**DECLARED CHANGES (D-440 as read).** None of these deletes an assertion.
+- (7) needed no edit: a test beside the table, as V6.1 did.
+- (14) `errors.rs`: 14 codes → 18, and the test's name.
+- (15) `lib.rs`' TypeScript test: 43 → 46 names, with four imports added.
+- (16) `no_media_routes.rs`' `READ_BODY` gains `/plan`.
+- (17) `log_redaction.rs` gains the plan block.
+
+**Found, and fixed here: P188c broke a P190 test.** `deepseek_adapter.rs` pins the system message to the recorded request's length. P188c lengthened the prompt, and P188c was committed after only `offcut-plan`'s tests, so `the_request_is_the_one_recorded` failed from `031a9ec` until this commit. Its recorded request is now P188c's (16,366 characters).
+
+**Found.**
+1. A thread-local log subscriber missed the 80% line when its test ran beside others, though it passed alone (tracing's callsite cache). The check moved into `log_redaction.rs`, whose subscriber is the process's.
+2. The local `.env` cannot boot the full server: `MAIL_FROM` is not an address, and `BILLING_WEBHOOK_SECRET` lacks `whsec_`. Both are 14-character placeholders. The real call ran with stand-ins for those two, for that process only. `.env` was not changed.
+3. §14.2's deploy check expected `E_PLAN_UNAVAILABLE` for a bare request; with D-494 it is 401 first. Corrected in the plan.
+
+**The one real local call (F-9, step 4).**
+- 2026-11-12 08:23:31 UTC, peak hours. The real server on `offcut_dev` with `PLAN_ENABLED=true` (that process only) and DeepSeek's key.
+- A throwaway user, deleted after (its `ai_usage` row went with it), and an access token signed in-process with the local key, never printed.
+- The body was `a01`'s `PlanRequest` (157 words, 17 sentences, 11.6 kB, the repository's script).
+- **Result:** HTTP 200 in 3.8 s (provider bucket `lt5`); 9 items: 2 numbers, 3 zooms, 1 from-to, 1 list, 1 icon, 1 emphasis. Source `deepseek` / `deepseek-flash`, catalog 2, `plans_remaining` 39; a hook, a caption and 6 hashtags; counted once.
+- The log line: `{"message":"plan","kind":"ok","provider_s_bucket":"lt5","input_tokens":7303,"cached_input_tokens":7168,"output_tokens":668,"retried":false,"items":9,"items_skipped":0}`, inside the request's span (route, hashed user). No word of the transcript appears anywhere in the server's log.
+- The balance read $1.83 before and after (one call, about $0.003).
+
+**Counts.** Tier 3's server and Rust parts, run in full: `pnpm test` with `.env` loaded gives **Rust 993 / 0 / 7** (966 + 27: 26 in `offcut-api`, now 333, and 1 in `offcut-api-types`, now 32) and **Vitest 650**. `pnpm check` is clean (clippy on the workspace, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). The golden frames pass, 19. Browser e2e and `pnpm fixtures` were not run (no client change but the four codes; P192 runs the client).
+
+**Push 1.** `v6.2-build` pushed after this commit (not waited on, as the prompt says).
+
+**Open.** 35. Known issues 4 and 5 (P192, P212). Next: P192.
+
+## Entry 54 - 2026-11-12 - P192: flags, the request, the store
+
+**What changed.**
+- `config/features.ts`: `ai_plan` and `motion`, both default off (D-443). `featureFlags`' one-line return of three flags becomes a return of five, the one removed line Step 0.4 allows; `scripts/v62-gate.sh` gains its allow-list pattern. `vite.config.ts` is unchanged: its define writes whatever `featureFlags` returns.
+- `package.json`'s `build:e2e:flags` and `ci.yml`'s `dist-flags/` step: `long_video,high_res,ai_plan,motion` (D-444). Nothing reads the two new flags yet, so `dist-flags/` behaves as before.
+- `net/api-client.ts` (additions only): `PLAN_CLIENT_TIMEOUT_MS = 20_000` and `requestPlan(body, signal)`, through `authed` (one refresh on a 401), **one attempt**, 20 s.
+- `usecases/request-plan.ts` (new): `planFor({ transcript, prosody, duration, switchOn, signal })` → `{ source: "model", plan, plansRemaining }` or `{ source: "rules", why }` (D-466).
+  - `ai_plan` off or the switch off → `off`; not signed in → `signed_out`; offline → `offline`. Each at once, with no request.
+  - Otherwise one `POST /plan` and a 20 s timer over the whole request; the request is aborted when the timer wins.
+  - Codes map as D-466's note says. It never throws.
+  - `planRequestOf` builds the body from the transcript as heard and the prosody: four fields, nothing the person typed.
+  - No caller yet (P193).
+- `persistence/schema.ts` (additions): `PLANS_STRUCTURE_VERSION = 3`, `PLAN_STORES`, `PlanRecord { plan, source: "model" | "rules", requestedAt, catalog }`, `OffcutPlansDb`. `DB_STRUCTURE_VERSION` stays 2.
+- `persistence/db.ts` (additions): upgrade 3 makes `plans`; `openPlansDb()` copies `openSourcesDb`: asks for 3, opens a newer database as it is, closes itself when another tab upgrades.
+- `persistence/plans-repo.ts` (new): `put`, `get` (a newer `schemaVersion` is absent and removed), `clear`; failures are `OpfsError`.
+- TS §5: rows for the four new files; `features.ts`' row says five flags; `plans-repo.ts`' row loses "its op log" (D-469 has none).
+
+**Known issue 4 (closed).** `requestPlan` uses `retry: "none"`, as `transcribeAudio` does. A 502 or 504 `plan_unavailable` and a 502 `plan_invalid` come back on the first answer with their code, so `planFor` reads them as `unavailable` and `invalid` at once. A proxy's 502 to 504 with no body (an API still waking) is one attempt too, read as `unavailable`: the plan never waits for a cold start, and the clip goes on with the rules plan. The other fix (two new `ErrorCode`s in `PROVIDER_FAILURES`) was not taken: it would change `offcut-types`, the generated files and `http.ts` for no gain. A check: with `retry: "cold-start"` put back for a moment, 5 of the new cases failed.
+
+**Tests.**
+- `request-plan.test.ts` (29, new):
+  - off by the flag, off by the switch, four signed-out states, offline: each with no request;
+  - the model's plan, and a Creator's without a count;
+  - 12 failures, each to its outcome;
+  - a 200 without a plan is `invalid`; a client that throws, at once or later, is `unavailable`;
+  - a caller's cancel reaches the request;
+  - no answer by 20 s is `timeout`, with the request aborted (not at 19.999 s); an answer at 19.999 s is used and no timer is left;
+  - the body field for field; word edits in the clip store never reach it; a missing prosody entry reads as 0.
+- `plans-repo.test.ts` (9, new): the real `db.ts` and `plans-repo.ts` over an in-memory `openDB` that keeps IndexedDB's version rules (no npm package added, §3.1):
+  - **1 → 3 and 2 → 3 keep every record**, compared store by store, and the clip path and long path read theirs after;
+  - **the clip path still opens version 1 and the long path 2**, neither making `plans`;
+  - a new page's clip path on a version-3 database asks for 1, is refused and opens it as it is; a database at 4 opens as it is;
+  - records, the newer-`schemaVersion` rule, the sweep, `OpfsError` quota and io;
+  - only `db.ts` and `plans-repo.ts` name `openPlansDb` (D-469).
+  - Two changes to `db.ts`, each tried for a moment, failed 7 and 4 of these.
+- `api-client.test.ts` (+7, new cases only): the body once as JSON with the token and one refresh; 502 `plan_unavailable`, 504 `plan_unavailable` and 502 `plan_invalid` each one attempt; a proxy's 503 one attempt; a 401 after the refresh is `E_AUTH_SESSION_EXPIRED` with no third attempt; the attempt may take 20 s.
+- `features.test.ts`: one new case (the four names on, each new flag alone, a name in both lists).
+
+**Real browser (once, not committed).** The Vite dev server and installed Chrome, through the real `db.ts` and `plans-repo.ts`:
+- 1 → 3: 8 stores → 12, version 3, with the clip, transcript, edits and `meta` records read back;
+- 2 → 3: 11 → 12, with the source and window records read back too;
+- in both, a reloaded page's clip path read the version-3 database.
+
+**DECLARED CHANGE (D-440 (18), as read).** `features.test.ts`' two cases that compare the whole flag object gain `ai_plan: false, motion: false`; every old key and value is kept, and no assertion is deleted. `api-client.test.ts` gains new cases only.
+
+**Differs from the plan.**
+- The timer is 20 s (D-466, D-498), not §8.1's or TS §40.7's 30 s; TS's flow line still says 30 s, for P212's copy-back.
+- `ci.yml` changed as well as `package.json`, since CI builds `dist-flags/` with its own list.
+- `planFor` takes the switch as an input (P193 reads it).
+
+**Found.**
+1. Chrome's headless shell is not installed for Playwright here; the check used installed Chrome (`channel: "chrome"`), as the e2e suites do.
+2. Opening 1 → 3 also makes the three source stores, empty, in a build with `long_video` off (D-469's note).
+3. Two things for P193, as known issue 6: the clip sweep must clear `plans`, and a caller's cancel must not be reported.
+
+**Counts.** Vitest **696** (650 + 46: 29 + 9 + 7 + 1). Rust 993 / 0 / 7 by count, unchanged: no crate or server file changed (`pnpm check`'s clippy covered the workspace). `pnpm check` is clean (clippy, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). `pnpm build`'s bundle has `cloud_transcribe:!0,long_video:!1,high_res:!1,ai_plan:!1,motion:!1` (in the page's `index-*.js`). The gate prints `gate: ok`. Browser e2e was not run: no page reads the new flags or calls the new code yet (P193, P194).
+
+**Open.** 35. Known issues 5 and 6 (P212, P193). Not pushed (push 2 is P197). Next: P193 (the pipeline chooses the plan).
+
+## Entry 55 - 2026-11-12 - P193: the pipeline chooses the plan
+
+**First, before any change.** The call-sequence case in `run-pipeline.test.ts`: with `ai_plan` off, the run's calls are exactly today's 15 (`DEVICE_CALLS`), in order, with no `plan_result`, a person signed in and the card on this device. It passed on the unchanged code (30 of 30). After the change it still passes, and the mocks of `request-plan` and `plans-repo` write into the same call list, so any plan call with the flag off would fail it.
+
+**What changed.**
+- `usecases/choose-plan.ts` (new):
+  - `startPlan` (step 11b): with the switch on, a plan kept for this clip is used with no request; otherwise `planFor`, with whether a request went out and how long it took.
+  - `choosePlan` (step 12b):
+    - a model's plan that keeps at least one item is used; else the rules plan, with the reason;
+    - a plan asked for now is kept for the clip, the rules plan too when the model's could not be used;
+    - a fallback other than `off` is set on the clip once (`planFallback`);
+    - one `plan_result`.
+- `run-pipeline.ts`: 11b starts the plan only with `FEATURES.ai_plan`; 12b waits for it inside `detect_scene`, after the rules plan, then `setScene` once with the plan chosen. One line changed (the rules plan's name), 576 lines.
+- The binding: `validate_plan` in `scene_api.rs` (additive): `validate` alone, no session, `{ kept, dropped }` or `{ refused }`. It is wired through `load-render.ts`, the render worker's `validatePlan` and `protocol.ts`' `PlanCheck` (additive).
+- `review-update.ts`:
+  - a word edit keeps a model's plan, and the scene validates it against the edited words; only a rules plan is made again;
+  - `replacePlan` puts a plan in place of the clip's in the update queue.
+- `regenerate-plan.ts` (new): asks again, checks, replaces, keeps; any failure changes nothing and returns the reason.
+- The settings switch:
+  - `META_KEYS.aiPlan` (the gate's allow list gains the one-line `META_KEYS`);
+  - `prefs-repo.ts`' `getAiPlanSwitch` and `setAiPlanSwitch` (on unless stored `false`);
+  - `state/plan-store.ts` and `usecases/set-ai-plan.ts` (new);
+  - `start-app.ts` reads the switch only with the flag on.
+- `import-clip.ts`: the sweep clears `plans`, only with the flag on (known issue 6a).
+- `clip-store.ts`: `planFallback` and `planFellBack`, as `asrFallback`.
+- `plan_result` (D-490):
+  - `offcut-api-types` gains `PlanResultSource`, `PlanOutcome`, `LatencyBucket`, `MAX_DROPPED = 99`, the variant and its description;
+  - the server bounds `items` (10,000) and each drop count (99);
+  - `messages.ts` gains its name;
+  - `pnpm gen:types` was run.
+- `request-plan.ts`: its three "no request" checks are now `reasonNotToAsk`, exported so the pipeline knows a request went out; `planFor`'s behaviour is unchanged (its 29 tests pass).
+- `eslint.config.js`: the edges `run-pipeline → choose-plan`, `choose-plan, regenerate-plan → request-plan`, `regenerate-plan → review-update`.
+- TS §5: rows for the six new files.
+
+**Tests.**
+- `run-pipeline.test.ts` (+19, new cases only):
+  - the call-sequence case;
+  - a model plan chosen: asked right after the prosody, checked before the scene, kept, `plan_result` exact;
+  - a model plan with some drops still wins, the drops counted by reason;
+  - **a fully dropped model plan**: the rules plan as `invalid`, kept, its drops counted;
+  - a newer catalog: `catalog`;
+  - **each fallback** (7): quota, unavailable, invalid, timeout, offline, catalog, signed out (signed out keeps nothing and has no latency);
+  - the switch off: no stored read, nothing kept, no line;
+  - **restore makes no request** (3): a kept model plan used and checked with no request and no second `plan_result`; a kept rules plan, no request and no check; a kept plan that no longer keeps an item gives the rules plan, no request;
+  - Retry after a failure past the plan asks nothing;
+  - a cancel while the plan is awaited ends `accepted`, with no scene, nothing kept and nothing reported;
+  - a word edit on a model's plan keeps it (`redetectSentence`, `setScene`, `editsRepo.put`; no `rulesPlan`).
+- `regenerate-plan.test.ts` (16, new): success with the edit kept whole and no history step; 8 request outcomes; every item dropped, newer catalog, another format; a scene that fails; a worker that cannot check; a clip that went; not ready; flag off.
+- `set-ai-plan.test.ts` (4, new): on by default and when unreadable; kept under `aiPlan`; a failed write.
+- `scene_api.rs` (+2): kept and drops reported without a session; refused whole; a bad word-edit key.
+- `analytics.rs` (+1): a fallback without latency; a map key or value off the list is refused.
+- `analytics_allowlist.rs` (+1): stored as sent; 100 drops and 10,001 items refused; at the caps accepted.
+- Breaking the code on purpose:
+  - each of four changes failed the new cases: a fully dropped plan used (1), no stored read (4), the flag ignored (13, the call-sequence case among them), a word edit making the rules plan (1);
+  - removing `regeneratePlan`'s empty-plan guard failed 1.
+
+**DECLARED CHANGES (D-440, as read; none deletes an assertion).**
+- (5) `analytics.rs`: 20 → 21 samples, 17 → 20 enum rows.
+- (15) `lib.rs`: 46 → 49 names, `DropReason` imported, 21 docs.
+- (19) `server/tests/analytics_allowlist.rs`: `one_of_each` gains `plan_result`, 20 → 21 rows, 22 → 23 bodies.
+
+**Differs from the plan.**
+- `PipelineStage::Plan` is not added (D-467's note: it widens the web's failure stages; `latency_bucket` measures the wait).
+- The plan helpers live in `choose-plan.ts`, not `run-pipeline.ts` (700 lines).
+- §8.3's "`restore-session.ts` reads `plansRepo`": that file restores the account; there is no clip restore before V7, so the stored plan is read when a clip's run starts again.
+- The interface is P194's (known issue 7).
+- No `plan_result` for a reused plan or for "Regenerate plan".
+
+**Found.**
+1. `review-update.ts` would have replaced an AI plan with the rules plan on the first word edit, while the store kept the AI one. Fixed here (D-469's note).
+2. `run-pipeline.ts` would have reached 709 lines with the helpers inside it.
+3. `eslint --fix` removed `as` casts in two `vi.hoisted` objects that gave their fields their types; `tsc` caught it, and the objects now have return types.
+
+**Counts.**
+- Vitest **735** (696 + 39: 19 + 16 + 4).
+- Rust **997 / 0 / 7** by count (993 + 4): `offcut-wasm-render` 11, `offcut-api-types` 33, and `offcut-api` 334 run in full with `.env` loaded.
+- `pnpm check` is clean (fmt, clippy on the workspace, cargo-deny, eslint, both `tsc`, the file tree, gen-clean, copy codes). The gate prints `gate: ok`.
+- `landing.spec.ts` on a fresh `pnpm build:e2e`: 30 passed. Its table test counts the events against the generated list, so it checked the new `plan_result` row.
+- No media suite was run: with the flag off the run's calls are unchanged.
+
+**Open.** 35 (the privacy page and settings must name DeepSeek before `ai_plan` goes on). Known issues 5 and 7 (P212, P194). Not pushed (push 2 is P197). Next: P194.
+
+## Entry 56 - 2026-11-12 - P194: the list, the text extras, the copy
+
+**What changed.**
+- **Copy:**
+  - `copy/plan.ts` gains `planCopy` with §12's drafts, DeepSeek in place of Gemini (D-500);
+  - `fallbackLine` and `regenerateLine` choose the line for a reason;
+  - the Enhance and Glow drafts wait there for P201 and P208;
+  - `messages.ts` gains the import and one key, `plan` (683 lines).
+- **The visuals list** (`PlanItemList.tsx`):
+  - the five kinds get their own Lucide 1.61.0 icons in `icons.tsx` (highlighter, shapes, zoom-in, smile, heading; with copy and refresh-cw for the buttons);
+  - "Regenerate plan" sits under the list, also under an empty one, with `ai_plan` and the switch on. It is disabled while an export runs or a change is applied. A plan that changes nothing gives one toast with the reason.
+- **`TextExtrasPanel.tsx`** (new): "Text for your post" under the visuals. The hook, the post caption and the hashtags (as one line) each have Copy, which turns to "Copied" for 2 s and is announced to a screen reader. It shows only extras that passed, and nothing on a rules plan.
+- **The extras that passed reach the page.** `validate_plan` answers `extras` (D-454's note). The clip store holds `planExtras`, set where a model's plan is used: the pipeline, a stored plan, regenerate. A run again starts without them.
+- **The fallback toast:** `usePlanFallbackToast` beside the cloud's, in `Stage`, once a run. Signed out, it says that signing in gives an AI-planned edit (D-494).
+- **The settings page, with the flag on only:**
+  - the "AI edit plan" switch and its line;
+  - a row of "What leaves your device" after the sound's (open item 35's wording, a draft for CP 3).
+  - With the flag off the page and its table are as before.
+- **Dev hooks:** `flags`, `fakePlan` (a model's plan with one item of each new kind and its extras, on the list only, the scene not rebuilt) and `fakePlanFallback`.
+- **`screens.spec.ts`:** one new test, skipped unless the build has `ai_plan`.
+- **TS §5:** rows for `TextExtrasPanel.tsx` and `copy/plan.test.ts`; `PlanItemList.tsx`' row.
+
+**Captures** (`OFFCUT_FEATURES_ON=ai_plan pnpm screens --grep "V6.2"`, development build, D1). 14 files in `~/v6.2-review/ui/`, each at 1280 x 800 and 1920 x 1080:
+- `plan-visuals`: the list with the five kinds, the signed-out toast of the real run;
+- `plan-text-extras`;
+- `plan-copied`;
+- `plan-fallback-quota`;
+- `plan-regenerate-signed-out`;
+- `settings-ai-plan-on`, `settings-ai-plan-off`.
+
+The real run, signed out, sent no request and showed the sign-in line. Copy put the hook on the clipboard (read back). The switch off was kept across a reload.
+
+**axe.** No serious or critical violation (the suites' `axe` helper) on each of the 7 states, at both widths.
+
+**Tests.**
+- Vitest (+9):
+  - `run-pipeline.test.ts` +5: a model plan's extras reach the clip; none when every item is dropped, none after a failed request; a stored plan brings them back with no request; a run again starts without them;
+  - `regenerate-plan.test.ts` +1: new extras replace the old, and a failure keeps them;
+  - `copy/plan.test.ts` (3, new): each fallback's and regeneration's line; the settings line names DeepSeek and China and promises no keeping or training.
+- `scene_api.rs` +1: the extras that passed, a bad hashtag left out.
+- Removing the pipeline's `setPlanExtras` for a moment failed 1.
+- `review-edit.spec.ts`, unchanged: 18 passed on a fresh keyed `pnpm build:e2e` (`dist/`, `ai_plan:!1`).
+- `landing.spec.ts`: 30 passed on the same build (the settings table, flag off).
+
+**Declared.**
+- P193's two `validate_plan` tests in `scene_api.rs` (V6.2's own, not of the base) gain the `extras` field in their expected JSON; nothing removed.
+- No test of the base changed.
+- `screens.spec.ts` gains one test; its existing tests are unchanged.
+
+**Differs from the plan.**
+- §12's Gemini line reads DeepSeek.
+- Three regeneration lines and the settings row are new drafts (§12's as-read note).
+- `plan.processing` is not shown (known issue 8).
+- The captures need a flag-on development build, as the fake API has no `/plan` until P210; the model's plan is put on the list by a dev hook.
+
+**Found.**
+1. The page had no way to know which text extras passed. Fixed through `validate_plan`.
+2. `pnpm screens` writes its development build into `dist/`, so `dist/` must be built again (`pnpm build:e2e`) before a media suite.
+
+**Counts.**
+- Vitest **744** (735 + 9).
+- Rust **998 / 0 / 7** by count (997 + 1; `offcut-wasm-render` 12).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35: the settings line and row are drafted; the privacy policy's own text still needs DeepSeek before `ai_plan` goes on, and its wording is the founder's at CP 3. Known issues 5 and 8 (P212, P210). Not pushed (push 2 is P197). Next: P195 (the images; checkpoint 2b).
+
+## Entry 57 - 2026-11-12 - P195: the image bundle
+
+**Founder's decisions at CP 2b (2026-11-12).**
+- **The 72 images are approved as drawn, with no swaps** ("I don't want to swap anything until anything is breaking").
+- **160 px, with D-471's size line raised from 600 kB to about 1.0 MB:** "effortless user experience should be prioritized; most customers use 5G and wifi; downloading a few extra MBs might not be as big a deal".
+- The sheets they read: `~/v6.2-review/images.png` (all 72 at 1×, emoji on mid-grey, icons on mid-grey and on dark, then all at 48 px), `images-2x.png`, `images-128-vs-160.png`, `images-README.md`.
+
+**What changed.**
+- **`scripts/gen-image-bundle.mjs`** (new; `node scripts/gen-image-bundle.mjs`, with `--out` and `--size` for dry runs):
+  - reads the names and upstream files from `assets.rs`' variant docs;
+  - fetches each at its pin: Fluent Emoji `raw.githubusercontent.com/microsoft/fluentui-emoji/1ffb34c…/assets/<Name>/3D/<name>_3d.png` (the six hand gestures from `Default/`), and `unpkg.com/lucide-static@1.61.0/icons/<name>.svg`;
+  - emoji: resized 256 → 160 px in Node, Lanczos-3 on premultiplied colour, written with straight alpha;
+  - icons: drawn white by the installed Chrome (Playwright, `channel: "chrome"`, GPU off, network blocked) on Lucide's 24-unit grid, stroke 2;
+  - encodes every PNG itself (IHDR, IDAT, IEND only), keeping the smallest of a few filter and zlib settings;
+  - downloads go to a fresh temporary folder.
+- **`crates/offcut-scene/assets/images/`** (new):
+  - `emoji/` (48) and `icons/` (24): 160 × 160 RGBA PNGs, 997,875 bytes;
+  - `manifest.json`: per image its set, id, code, key, file, bytes, SHA-256, pinned source, the upstream file's SHA-256 and the licence. A later run fails if a pinned upstream file changed;
+  - `LICENSES/fluent-emoji-MIT.txt` and `LICENSES/lucide-ISC.txt` (with Feather's MIT), as shipped.
+- **`offcut-scene/src/images.rs`** (new):
+  - `ImageSet::embedded()` (`include_bytes!` of each PNG by `ImageKey`, `Clone`), with `get`, `contains`, `iter`, `len` and `SIZE = 160`;
+  - `ImageKey::of_emoji` (the code) and `ImageKey::of_icon` (`ICON_BASE` 1000 + the code);
+  - `lib.rs` exports it.
+- **`web/LICENSES.md`:** two rows for the bundle and Fluent Emoji's MIT text. The bundle's Lucide icons are covered by the Lucide section; eight of them are Feather's.
+- **`offcut-scene/Cargo.toml`:** `png` and `sha2` as dev-dependencies only. Both are workspace dependencies already, so `Cargo.lock` gains two lines in the crate's list and no package. `cargo deny check` is clean.
+- **Docs:** TS §5 rows (the script, `images.rs`, `assets/images/`, `image_bundle.rs`); "As read (P195)" notes under D-470, D-471 and §3.1.
+
+**Determinism.** Two runs into scratch folders, then a third in place: byte-identical files, icons included (Node 24.19.0, Chrome, D1).
+
+**The render binary (`offcut_render_bg.wasm`, release, `pnpm build:wasm`).**
+
+| Build | Bytes | Growth | Brotli |
+|---|---|---|---|
+| Before (`67d6247`) | 6,481,347 | | 2,452,729 |
+| After, as committed | 6,481,347 | 0 | |
+| With every image kept (a temporary reference, not committed): what P196/P197 ship | 7,480,690 | **+999,343** | 3,451,389 |
+| The same at 128 px (D-471's fallback, not taken) | 7,220,049 | +738,702 | 3,191,793 |
+
+Nothing in `offcut-wasm-render` uses `ImageSet` until P197, so the linker drops the images today. P183's estimate (10-11 kB an emoji, from Fire) was low: they average 19.7 kB.
+
+**Tests (+7).**
+- `images.rs` +3: the keys are the codes and the icons start at the base; one image per name, in key order, the same bytes when asked again; `Debug` shows lengths.
+- `tests/image_bundle.rs` (new, 4):
+  - the manifest's names equal `EmojiId::NAMES` and `IconId::NAMES` in order (72 in all), with each code and key;
+  - each file is a 160 × 160 RGBA PNG, not blank, with its SHA-256;
+  - keys and files are distinct, and the embedded bytes of each key hash to the manifest's;
+  - each source is pinned and each licence file exists.
+- Swapping two names in `images.rs` for a moment failed 1.
+- Re-run: `offcut-types` 93 / 0 / 1, `offcut-scene` 102 / 0 / 4, `offcut-render` 25 / 0 / 0 (`golden_frames` 19 passed, no golden touched), `offcut-wasm-render` 12.
+
+**Declared.** No existing test changed. No web code changed, so Vitest was not run.
+
+**Found.**
+1. Every transparent pixel is 0, 0, 0, 0. P183 read no dark fringe with straight alpha; P196's `image_basic` reads it on these files (known issue 9).
+2. `ImageSet` is not in `SceneInput` yet. P204 adds it where the scene first emits `Image` (§9.2).
+
+**Counts.** Rust **1005 / 0 / 7** by count (998 + 7); Vitest **744**. `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8 and 9 (P212, P210, P196). Not pushed (push 2 is P197). Next: P196 (the renderer draws images).
+
+## Entry 58 - 2026-11-12 - P196: the renderer draws images
+
+**P195 checked again first.** The script, run into a fresh folder, reproduced the committed bundle byte for byte. Its 7 tests pass. The commit holds its 86 files and nothing else.
+
+**What changed.**
+- **`vello_backend.rs`:**
+  - `decode` reads a bundle PNG into peniko's `ImageData` (`Rgba8`, straight alpha, as the file holds it).
+  - `Overlay::set_images` decodes each file once and replaces the set held before; on an error the old set is kept.
+  - The overlay's `Image` arm draws with `draw_image`: bilinear (`ImageQuality::Medium`), the command's opacity, scaled into its rect, in list order with the text.
+  - A key not held, or a rect or opacity that is not a number, is `Unsupported`, never a blank (§9.2). An empty rect or an opacity of 0 draws nothing.
+- **`lib.rs`:** `Renderer::set_images(&ImageSet)`; `render`'s signature is unchanged; `Unsupported`'s doc names the image cases.
+- **`composite.rs`:** `video_of` accepts `Image` after the video (D-473, DC-8's V6.2 part). `Compositor::draw` and `video_pass.rs` are untouched.
+- **`Cargo.toml`:** `png` becomes a normal dependency of `offcut-render` (D-472, §3.1), and its dev-dependency line goes. No package is added; `cargo deny check` is clean.
+- **Docs:**
+  - TS §5 rows (`vello_backend.rs`, `image_draw.rs`, `fixtures/golden/`);
+  - "As read (P196)" under D-472 and D-473;
+  - TE-30's P196 read in `experiments.md`.
+
+**Differs from the plan.** Nothing is premultiplied at decode (the prompt and §9.2 say "premultiply"). D-472's P183 note holds: Vello 0.11's shader premultiplies each texel before it filters, and an 8-bit premultiply would lose colour at soft edges. The pixel test proves the result, and marking the pixels premultiplied fails it by 127 levels.
+
+**Tests (+7).**
+- `vello_backend.rs` +3: a bundle file decodes to its straight-alpha pixels; a file that is not an RGBA PNG is refused; an image is scaled into its rect, then moved.
+- `tests/image_draw.rs` (new, 3, WARP):
+  - every pixel of an emoji at 1x is its file blended over grey (worst 0.50 of a level), and at opacity 0.5 (worst 0.74);
+  - a white icon at 0.5x, 1.37x and 1.5x between pixels has soft edges and no dark fringe (known issue 9, closed);
+  - a key not held is `Unsupported`: before any set, between the sets, past the icons, after an empty set. A NaN rect is `Unsupported`; an empty rect draws nothing.
+- `golden_frames.rs` +1, **`image_basic`**:
+  - three emoji at 0.5x, 1x and 1.5x (the last between pixels, over the disc), one at opacity 0.5, one across the right edge, a white icon, and a half-dark rectangle over one emoji (list order);
+  - written once on WARP, read at 200%: clean edges, no rim, the cut at the edge, the rectangle over the emoji.
+
+**Declared.**
+- D-440 (3): in `composite.rs`' `a_list_outside_v4s_rule_is_unsupported`, the case "an image" (`[video, image]`, `Unsupported`) is replaced by "an image before the video" and "an image and no video", both still `Unsupported`. `a_scenes_list_is_drawn_with_its_video` gains `[video, text, image, pop]`, drawn.
+- `golden_frames.rs` gains one line in `golden()`, so every golden is drawn with the bundle held, plus two `use` lines and the new test. No line is removed.
+
+**Every old frame unchanged.** All 16 old goldens read SSIM **1.0000** with the images held; parity 0.9996, 0.9997, 0.9998. Rewriting every golden to compare bytes:
+- 14 come out byte-identical;
+- `tech_list` has the same pixels with different PNG bytes (an older encoder);
+- `bold_number` differs in 0 to 2 pixels by 1 level from run to run. It does so **with and without P196** over five draws, so it is WARP's own variation, which the SSIM line allows.
+
+All restored; no golden of the base is modified.
+
+**Render binary.** 6,481,347 → **6,484,358** bytes (+3,011): the image arm makes Vello's image path reachable. The decoder and the 1.0 MB of images arrive with P197's `set_images` call.
+
+**Counts.**
+- Rust **1012 / 0 / 7** by count (1005 + 7). `offcut-render` 32 (9 + 3 + 20); `offcut-wasm-render` 12 and `offcut-scene` 102 / 0 / 4, both re-run.
+- Vitest **744** (no web code).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5 and 8 (P212, P210); 9 closed. Not pushed (push 2 is P197, waited on: CI's lavapipe must pass `image_basic`). Next: P197 (images in the browser, TE-30).
+
+## Entry 59 - 2026-11-12 - P197: images in the browser, TE-30; push 2
+
+**What changed.**
+- **`offcut-render/src/check.rs`** (new, `pub mod check`): TE-30's frame defined once, the goldens' synthetic source (`pattern`) and `image_basic`'s list. `golden_frames.rs` asserts both equal its own:
+  - `image_basic` gains `assert_eq!(list, check::image_basic())`;
+  - a new test compares the two patterns at 1080 × 1920 and 1920 × 1080, and the canvas size.
+- **The binding:**
+  - `session.rs` (additive only): `attach_canvas` hands `ImageSet::embedded()` to the renderer when it makes it; a later canvas keeps them. `render_error_value` is added for the check.
+  - `check_api.rs` (new): `check_source()` and `draw_image_check(canvas, frame)`. The second uses a renderer of its own with the images held, kept alive until the page has read the canvas, and gives `decode_ms()`.
+- **The worker passes nothing** (the prompt says it passes the images). The images are in the WASM (D-471), so the binding hands them over itself ("As read (P197)" under D-474).
+- **Web:**
+  - `protocol.ts` (additive): `devImageCheck` and `ImageCheckResult`;
+  - `render.worker.ts` serves it only when `DEV_FAULTS` holds;
+  - `workers/render/image-check.ts` (new): a `VideoFrame` of the source (`RGBA`), the draw, and the canvas read back through an `ImageBitmap`;
+  - `load-render.ts`: `checkSource`, `drawImageCheck`;
+  - `usecases/dev-faults.ts`: `imageCheck`;
+  - `ui/dev-hooks.ts`: `__offcutDev.imageCheck()`.
+- **`tests-e2e/image-parity.spec.ts`** (new, in `MEDIA_SUITES`; no `@no-gpu` case, so D1 only) and **`helpers/ssim.ts`** (new): a line-for-line copy of `ssim.rs`, which gives Rust's numbers to 10 decimals on three golden pairs. The browser's frame is kept in `web/test-results/image-parity/`.
+- **Docs:** TS §5 rows (`check.rs`, `check_api.rs`, `image-check.ts`, `helpers/ssim.ts`, `image-parity.spec.ts`); "As read (P197)" under D-474; TE-30 in `experiments.md`.
+
+**TE-30 (D-474): passes on D1.**
+- **SSIM 0.9995** (line 0.98), browser against the WARP golden, on Chrome's WebGPU, Intel "gen-12lp".
+- Read by eye at 200%: the same placement, edges, opacity, order and cut as the golden.
+- **The 72 images decode in 24 ms**, once per renderer, in the worker. `pipeline-preview`'s "no main-thread task over 100 ms from the drop to ready" passes.
+
+**The render binary.** 6,484,358 → **7,496,980** bytes: +1,012,622 for this prompt, **+1,015,633 against P195's base** (the images, the PNG decoder and the check), the ~1.0 MB the founder approved at CP 2b.
+
+**Production build** (checked in a scratch folder):
+- no `__offcutDev`, no `imageCheck`, and none of `image-check.ts`' text;
+- what stays is the `devImageCheck` stub, which refuses (`NoHandler`), and the two loader wrappers (about 100 bytes);
+- the WASM carries `check_api`, a few kB.
+
+**Tests.**
+- **Tier 3:**
+  - `pnpm check` clean;
+  - `pnpm fixtures` up to date;
+  - `pnpm test`: Rust **1013 / 0 / 7** (the workspace, run), Vitest **744**;
+  - `pnpm e2e --workers=4`: **57**;
+  - `golden_frames` 21 (+1).
+- **Media, on a keyed `pnpm build:e2e`:**
+  - `image-parity.spec.ts` 1;
+  - `pipeline-preview.spec.ts` 15 and `export-creator.spec.ts` 18: every session now decodes the images, and both pass, with the verifier's PASS on the Creator export.
+
+**Declared.**
+- `golden_frames.rs` gains lines only.
+- `playwright.config.ts`' `MEDIA_SUITES` gains one line.
+- `session.rs` and `protocol.ts` gain lines only, as the gate checks.
+- No test of the base changed.
+
+**Found.** From the Bash tool, `verifyMp4`'s plain `python` is MSYS2's 3.9 without NumPy, so `export-creator`'s verifier case failed on the first run ("NumPy cannot be imported"). With Python 3.13 first on `PATH` it passed. This is the machine's setup; nothing in the repository is changed.
+
+**Push 2.** Pushed after this commit and waited on. CI's result (`golden_frames` on lavapipe, `image_basic` included) is recorded in the next prompt's entry.
+
+**Open.** 35. Known issues 5 and 8 (P212, P210). Next: P199 with P198 (Bezier easing and the camera drift).
+
+## Entry 60 - 2026-11-12 - P199 (with P198): bezier easing and the camera drift
+
+**P197's push 2, read (CI run 43263410381, head `1f531d5`): green.** Jobs `changes`, `ci` and `e2e-media` succeeded (deploys skipped, as on a branch).
+- `golden_frames` on lavapipe (llvmpipe, LLVM 21.1.8): `image_basic` **0.9997**, every golden at least 0.9996, 21 passed. TE-30 passes on both lines.
+- gitleaks: 288 commits, no leaks (the bundle's SHA-256s pass).
+- The media job: 24 passed and 29 passed (flags). Two `model-download` `@no-gpu` cases passed on their retry: known issue 3, seen again.
+
+**What changed.**
+- **Easing first (P198's part).** `easing.rs` gains, below `ease()`:
+  - `CubicBezier` and `bezier(c, t)` (Newton's method, bisection where it fails, solved in f64);
+  - `STANDARD` (0.4, 0, 0.2, 1), `OUT` (0, 0, 0.2, 1), `IN_OUT` (0.65, 0, 0.35, 1).
+  - `Easing` and `ease()` are byte for byte as before (the gate's additive check).
+- **`camera.rs`** (new, pure; D-476):
+  - `CameraTrack` (`none()`, `scale_at`, `segs`), `CameraSeg`, `build(changes, sentences, duration)`, `for_clip(transcript, map)`;
+  - `MAX_SEG_MS = 4,000`, `MIN_SEG_MS = 800`, `DRIFT = 0.05`.
+- **`video.rs`** (D-477):
+  - `Track` holds the camera and the source frame's size; `src_at(t)` is the crop at a scale of exactly 1.0, else the crop shrunk about its centre and clamped inside the frame;
+  - `MAX_TOTAL_ZOOM = 1.35` caps it (the `PunchIn` keys join in P200).
+- **`build_scene`** takes `Track::fixed(crop)` with `Enhance.motion` off (today's path) and the camera's track with it on.
+- **Docs:**
+  - TS §5 rows (`camera.rs`, `easing.rs`, `video.rs`, `tests/camera.rs`, `motion_mid`);
+  - "As read (P199)" under D-475, D-476, D-477;
+  - TE-31 and TE-30's lavapipe line in `experiments.md`.
+
+**Differs from the plan (the As read notes).**
+- `build` takes no `shots` (none exist before V6.5).
+- The only change point is the clip's start: the hook's end joins when P205 draws the hook.
+- The scale is continuous: each segment starts where the last ended, and a held segment (under 0.8 s) holds that level, not 1.0, so a split inside one shot never jumps.
+
+**Who sees it.** Nobody yet. No web code sets `enhance` until P208's panel, so every build, flags on included, draws `v5()`: Motion off, today's frames.
+
+**Tests (+21).**
+- `easing.rs` +5:
+  - ends exact, and NaN and outside held;
+  - rising over 1,000 points;
+  - **known values to 1e-4** at five points per curve, computed apart from the code (bisection to 1e-13 in Python); moving one control point by 0.02 fails it;
+  - Newton and bisection agree to 1e-5 (Newton answers more than 900 of 999 points);
+  - `IN_OUT` symmetric.
+- `video.rs` +5:
+  - no drift equals today at every frame of a 60 s clip, `src` bit for bit;
+  - a scale of exactly 1.0 gives the crop bit for bit;
+  - the zoom is about the centre;
+  - the clamp at the frame's edge;
+  - the cap.
+- `tests/camera.rs` (new, 10):
+  - `none()`; no split up to 4 s; the split at the nearest sentence start, repeated, the earlier of two;
+  - a long stretch with no start stays whole; changes as bounds;
+  - alternation without a jump; the held short segment; the curve and the range; determinism;
+  - **the six labeled cases with motion off and on: at every frame, only `Video.src` differs** (inside the crop, smaller by at most the drift), and off is today's.
+- `golden_frames.rs` +1, **`motion_mid`**: Clean's NumberReveal with motion on at the middle of the first segment (scale about 1.03, asserted). Written once on WARP, read beside the same instant with motion off: the video zoomed about its centre, the captions and the visual unmoved.
+
+**TE-31: passes** (`experiments.md`).
+- 150 frames (5 s at 30 fps) of the drift, drawn on WARP and read to a fraction of a pixel.
+- The frame follows the scale to within 0.019 px.
+- In 136 of the frames the expected move is over 0.005 px. There each frame moved 0.81 to 1.12 times its expected move (median 1.008), and none stood still then jumped.
+- The fastest move is 0.14 output px a frame.
+
+**Every existing frame unchanged.** No snapshot changed. Every old golden reads SSIM 1.0000 on WARP.
+
+**Media (Tier 2):**
+- keyed `pnpm build:e2e` and `pnpm build:e2e:flags`;
+- `flags-identity.spec.ts` fails at its V6.1 pin of the flags-on database version (2; 3 since P192's `plans` store), **not from this prompt**: known issue 10, for P209 with D-440 (8);
+- read with the pin temporarily at 3, the whole case passes (the same records, and the same export from both builds), and the spec file was restored unchanged.
+
+**Render binary.** 7,496,980 → **7,507,007** bytes (+10,027: the curves and the camera).
+
+**Counts.**
+- Rust **1034 / 0 / 7** by count (1013 + 21; `offcut-scene` 122, `offcut-render` 34, `offcut-wasm-render` 12 re-run).
+- Vitest **744** (no web code).
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P200 (`PunchIn`).
+
+## Entry 61 - 2026-11-13 - P200: PunchIn
+
+**What changed.**
+- **`events/punch_in.rs`** (new; D-478): `Track { span, scale, motion }`, `layout`, `scale_at`, and a `draw` that adds nothing (as `KeywordPop`'s):
+  - `Snap` is at the scale from its first word's program start over its anchors;
+  - `Push` rises from 1.0 on `IN_OUT` across them;
+  - both release to 1.0 over `ZOOM_RELEASE_MS = 300` on `OUT`;
+  - `MILD = 1.12`, `STRONG = 1.25`.
+- **`events/mod.rs`:** `EventTrack::PunchIn`, its `kind`, its layout arm (the item's program span) and its `draw` arm. `PunchIn` leaves the "not drawn yet" arm.
+- **`video.rs`:** `Track::with_punches` and `Track::scale_at`. The scale is the drift times the strongest zoom at `t` (two zooms never multiply), capped at `MAX_TOTAL_ZOOM = 1.35`, never below 1.0.
+- **`lib.rs`:** `video_track` hands the plan's zooms to the video track.
+  - Motion off and no zoom: `Track::fixed`, today's path.
+  - **The plan's zooms stay with motion off** (§12: "the plan's zooms stay"); the switch is the camera's only.
+- **Tests' `common/model.rs`** (new): `with_model_items`, a model's plan of given items validated for a case. It is its own file, so the binaries that do not use it do not warn.
+- **Docs:** TS §5 rows (`events/punch_in.rs`, `tests/punch_in.rs`, `common/model.rs`, the goldens); "As read (P200)" under D-478.
+
+**Tests (+14).**
+- `punch_in.rs` +5:
+  - Mild and Strong;
+  - a snap in at its first word, held, released over 300 ms on `OUT`, falling all the way;
+  - a push on `IN_OUT`, half way at half time;
+  - an empty span only releases;
+  - it draws nothing.
+- `video.rs` +3:
+  - a zoom multiplies the drift, and alone it leaves the crop bit for bit before and after;
+  - two zooms whose release and start touch take the stronger, never the product;
+  - the product capped at 1.35.
+- `tests/punch_in.rs` (new, 4; a model's plan of one Strong zoom on "3,000 users"):
+  - a snap held over its anchors and released in 300 ms with motion off, about the centre, at every frame;
+  - a push rising across its anchors;
+  - **the zoom changes only `Video.src`**, switched off (`event_overrides`) it is gone, and it is one visual moment of the summary;
+  - with motion on, the drift times the zoom at every frame, never past the cap.
+- `golden_frames.rs` +2:
+  - **`punch_snap`** (×1.25 at the middle of its anchors) and **`punch_push`** (×1.125, half way), motion off, the scale asserted before the golden;
+  - written once on WARP, read side by side: the video zoomed about its centre, the captions unmoved.
+
+**Declared.** `golden_frames.rs` gains lines only (a module line and the two tests). No test of the base changed. P199's `video.rs` tests are unchanged (`with_punches` is additive).
+
+**Every existing frame unchanged.**
+- No snapshot changed. Every old golden reads SSIM 1.0000 on WARP.
+- **`punch_in_110.png` is byte for byte its committed file.** The update run's name filter (`punch_`) also matched it: it was rewritten identically, then checked out from git and its hash compared.
+- Media: on a keyed `pnpm build:e2e`, `pipeline-preview`'s three preview cases pass.
+- No browser flow can draw a `PunchIn` yet: model plans arrive through `/plan`, which the fake API lacks until P210.
+
+**Render binary.** 7,507,007 → **7,507,821** bytes (+814).
+
+**Counts.**
+- Rust **1048 / 0 / 7** by count (1034 + 14; `offcut-scene` 134, `offcut-render` 36, `offcut-wasm-render` 12 re-run).
+- Vitest **744**.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). Not pushed (push 3 is P206). Next: P201 (Glow and the Glow style).
+
+## Entry 62 - 2026-11-13 - P201: glow and the Glow style
+
+**What changed.**
+- **The glow (D-479):**
+  - `styles.rs`: `Glow { layers, spread, alpha }` with `reach`, and `StyleSpec.glow`, `None` for Clean, Bold and Mono. Its reach is counted in `decoration_width`/`decoration_height` as a `max` with half the stroke, so a style with none lays out bit for bit as before.
+  - `captions_draw.rs`' `draw_glow`, after the shadow and before the words: per layer, the widest first, each word's runs again as glyph runs with a clear fill and a stroke of the word's own colour at `alpha`.
+  - `display_list.rs`: `Rgba::with_alpha`, so no colour literal leaves the files `styles_use_theme.rs` allows.
+- **The Glow style (D-480):** `StyleId::Glow` appended (`edit.rs`, additive; the default stays Clean).
+  - Its spec: Inter 800 at 76 lp as spoken, 2 lines of 14 characters, 3 words, no outline, Clean's drop shadow, the glow (4 strokes of 24, 18, 12 and 6 lp at alpha 41, reaching 12 lp), the spoken word highlighted in the accent, cut in hard, a keyword in `AccentAlt`.
+  - Its theme is Clean's. **Each word glows in its own colour:** white words white, the spoken word and the keyword yellow.
+- **Web:**
+  - the picker's fourth card (`messages.plan.glow`, and `glowLine` in `copy/plan.ts`, a draft for CP 3: "Bright and soft: white words that glow, the keyword in colour.");
+  - **the cards in two rows of two** (`panel.module.css`), so each keeps its width;
+  - the worker draws four thumbnails (`THUMBNAIL_STYLES`);
+  - `pnpm gen:types` (`StyleId` gains `"glow"`);
+  - comments in `StylePanel.tsx` and `style-thumbnails.ts`.
+- **Docs:** TS §5 rows (`styles.rs`, `captions_draw.rs`, `StylePanel.tsx`); "As read (P201)" under D-479, D-480 and D-440 (20).
+
+**Differs from the plan.**
+- `Glow` has no `role` (D-479 named one): the word's own colour is D-480's "keyword in the accent colour with glow" in one rule, with no new theme role.
+- `protocol.ts`' doc line still says "three frames" (an additive file; its wording is left).
+- The analytics' `style` is the `StyleId` type, so `"glow"` is accepted with no list changed.
+
+**Tests (+8).**
+- `edit.rs` +1: Glow serializes as `"glow"`, and the default is Clean.
+- `styles.rs` +1: only Glow has a glow; its values; its decoration room (12 lp + the shadow).
+- `theme.rs` +1: Glow's theme is Clean's.
+- `captions_draw.rs` +2:
+  - four strokes a word's run, the widest first (24 to 6), each the word's colour at alpha 41, white and yellow, all before the words;
+  - Clean, Bold and Mono draw no glow.
+- `layout_safe_area.rs` +1: **Glow over the 31 labeled files at three placements, watermark on: 79,059 frames and 748,344 glow strokes, each box counting its stroke's width; none leaves the safe area or meets the watermark.**
+- `display_list_snapshots.rs` +1: Glow with each kind before, during and after: **12 new snapshot files**. `glow_keyword_pop_during` read command by command: the shadow layer, four glow layers, the words, the keyword at 1.25.
+- `golden_frames.rs` +1, **`glow_style`**: the KeywordPop input during its pop. Written once on WARP and read beside `clean_keyword` and at 200%: a soft, graded halo with no hard ring; "brutal" yellow on a yellow glow.
+
+**Declared.**
+- D-440 (20): `review-edit.spec.ts` case 14 counts four cards, not three (`toHaveCount` and the observer that times them, and its words). The 400 ms budget and every other assertion are unchanged.
+- Other test files gain lines only.
+
+**Every existing frame unchanged.** No snapshot of Clean, Bold or Mono changed. Every old golden reads 1.0000. `styles_use_theme.rs` passes with Glow.
+
+**Media** (keyed `pnpm build:e2e`, D1):
+- **the four cards came 72 ms after the tab's click** (budget 400);
+- `review-edit.spec.ts` 16 and `export-free.spec.ts` 12 passed (30 with the setup), axe clean on the editor.
+
+**Captures** (`pnpm screens`, development build): `~/v6.2-review/ui/style-tab-glow-1280x800.png` and `-1920x1080.png`.
+- At 1920 × 1080 the four cards and Highlight numbers fit.
+- **At 1280 × 800 the second row's lines and the Highlight numbers switch are below the fold** (the panel scrolls). The layout is the founder's at CP 3.
+
+**Render binary.** 7,507,821 → **7,508,635** bytes (+814).
+
+**Counts.**
+- Rust **1056 / 0 / 7** by count (1048 + 8; `offcut-types` 94, `offcut-scene` 140, `offcut-render` 37, `offcut-wasm-render` 12, `offcut-api-types` 33 re-run).
+- Vitest **744**.
+- `pnpm check` is clean (generated files staged first); the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). For CP 3: Glow's card line, and the style cards at 1280 × 800. Not pushed (push 3 is P206). Next: P202 (`Emphasis`).
+
+## Entry 63 - 2026-11-13 - P202: emphasis
+
+**What changed.**
+- **`events/emphasis.rs`** (new; D-481): `Track { word, treatment, size, start }`, `layout` (the word from its program start), and a `draw` that adds nothing, as `KeywordPop`'s. `events/mod.rs`: `EventTrack::Emphasis`, its `kind`, layout and `draw` arms; `Emphasis` leaves the "not drawn yet" arm.
+- **`lib.rs`:** `build_scene` hands each Emphasis to the captions as a `captions_draw::Mark` in the scene's new `marks` list, beside `Emphasis` (two V4 tests build that struct field by field, so it gains no field). **A word the captions do not show is not marked, has no track and is not counted** (a model's plan is kept on word edits, P193). `frame_at` and `caption_words` read the marks.
+- **`captions_draw.rs`** (559 lines above its tests): `Mark`, `mark_at`, `marked_role`, `underline`, `highlight`, `draw_marks`, and `draw_marked`; `draw_with` is `draw_marked` with no mark.
+  - **`Colour`:** the word in `Accent`, after the spoken word and a KeywordPop, before a number (D-169's first layer wins).
+  - **`Underline`:** a bar in `Accent`, 0.10 em below the baseline, 0.08 em thick, round ends, inside the glyph box.
+  - **`Highlight`:** the pill's box at rest (12 x 4 lp, radius 14) in `Accent`, padding shrunk at the safe area's edge; the word in `OnAccent`, with no outline, shadow or glow, spoken or not.
+  - Order: panel, shadow, glow, **underlines and highlights**, pill, words, cursor. Both grow with the word.
+- **`summary.rs`:** an Emphasis counts as **captions emphasized** ("N words emphasized"), not as a visual moment.
+- **Docs:** TS §5 rows (`events/emphasis.rs`, `tests/emphasis.rs`, `captions_draw.rs`, `summary.rs`, the goldens, with P201's `glow_style` that the row missed); TS §10.6's field comment; "As read (P202)" under D-481.
+
+**Differs from the plan.**
+- The marks are a list of their own, not a field of `Emphasis` (see above).
+- **`size: Punch` is drawn with its treatment at the captions' size**; P203 gives it its chunk and its size.
+- A mark ends with its chunk: in Mono and Glow "brutal" ends its chunk, so it is marked only while said.
+
+**Tests (+20).**
+- `events/emphasis.rs` +1: the track for each treatment and size; it draws nothing.
+- `captions_draw.rs` +7: a mark not started or on another word draws as before (four styles, every 10 ms); the role order over 16 layer combinations and three active treatments; colour from its start to the chunk's last frame, a KeywordPop winning; the underline's place, size and order in four styles; the highlight's box, ink, no outline, shadow or glow, clear of both neighbours, in four styles; a spoken highlighted word in ink on Bold's pop and under Clean's sliding pill, both marks growing with it; a highlight at the safe area's edge.
+- `summary.rs` +1: three emphases and a KeywordPop are 4 emphasized, a zoom 1 moment.
+- `tests/emphasis.rs` (new, 6; a model's plan on "The first week felt brutal for everyone." and the tail): marked exactly from its start while its chunk shows, **never the second "week" in another chunk** (four styles, every frame); coloured in the accent; **a word an edit hid is neither drawn nor counted** (every frame equals the plan without it); switched off it is gone, on it counts 1; **only the captions change** (the video and every run's place the same, new rectangles on the word, in the safe area); a punch word draws as a normal one.
+- `display_list_snapshots.rs` +1: **18 new snapshot files** (three treatments in four styles while "brutal" is said; and after it in Clean and Bold). `emphasis_highlight_bold_after` and `_underline_bold_after` read command by command.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, each with a model's plan of up to 12 emphases: 3,132 marks drawn, 316,236 frames, 0 problems.**
+- `golden_frames.rs` +3, Bold at 2,600 ms, the fill and the marks asserted first: **`emphasis_colour`, `emphasis_underline`, `emphasis_highlight`**. Written once on WARP by exact name (only the three files appeared); read beside the frame without the emphasis and at 200%, with the other three styles from a scratch render.
+
+**Declared.** No test of the base changed. `display_list_snapshots.rs`, `layout_safe_area.rs` and `golden_frames.rs` gain lines only (a module line and new tests).
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases, 5 passed. No browser flow can draw an Emphasis yet: model plans come through `/plan`, which the fake API lacks until P210.
+
+**Render binary.** 7,508,635 → **7,509,799** bytes (+1,164).
+
+**Counts.**
+- Rust **1076 / 0 / 7** by count (1056 + 20; `offcut-scene` 157 / 0 / 4, `offcut-render` 40, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744**. `pnpm e2e` (non-media) not re-run: no web file changed.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3:** in Clean a highlight looks like the spoken word's pill (both yellow); in Bold, Mono and Glow a coloured word is the spoken word's colour; in Mono the cursor joins a spoken word's highlight; in Bold a highlight sits close to a neighbour as it pops. Not pushed (push 3 is P206). Next: P203 (punch words).
+
+## Entry 64 - 2026-11-13 - P203: punch words
+
+**What changed.**
+- **`captions.rs`** (D-482; 455 lines above its tests): `PUNCH_SCALE = 1.9`, `chunk_punched(words, sentences, look, block, punches)` and `punch_line`. `chunk` keeps its signature and calls `chunk_punched` with no punch word, so the frozen `line_breaks.rs` and every V4 caller are untouched.
+  - A punch word is a hard break before and after it: a chunk alone; the rest of its sentence is laid out by the same search on each side. No other sentence's chunks change.
+  - In capitals in every style. **Its size is its line's `scale`** (the runs shaped at the style's size), which every part of the drawing already follows: glyphs, outline, Clean's pill, Mono's panel and cursor, Glow's glow, P202's marks, word boxes and hits. `captions_draw.rs` is unchanged.
+  - Too wide at 1.9 for the block less the decoration grown 1.9 times: as large as fits. Down the block as `lines` places one line (DC-13's lowering), the decoration inside.
+- **`lib.rs`:** `build_scene` takes the punch words before chunking: each switched-on `Emphasis { size: Punch }` whose word the captions show. Switched off or hidden: the chunks are as without it. One `shown` closure now serves both loops.
+- **`events/emphasis.rs`:** its doc says where `Punch` goes now.
+- **Docs:** TS §5 rows (`captions.rs`, `tests/punch_word.rs`, the goldens); "As read (P203)" under D-482 and D-440 (21).
+
+**Differs from the plan.** None of substance. `captions_punch.rs` was not needed (455 lines, under 650). The reading floor needed no code: `hold_for_reading` runs on every chunk.
+
+**Tests (+12).**
+- `captions.rs` +4:
+  - with no punch word, `chunk_punched` is `chunk` (four styles, three placements), and a punch word the captions do not hold changes nothing;
+  - a punch word alone, every word once in order, in capitals at 1.9, shaped at the style's size, centred, its box and decoration in the block (four styles, three placements);
+  - "internationalization" drawn as large as the block holds;
+  - at a sentence's start or end, alone too.
+- `tests/punch_word.rs` (new, 5; a model's plan over written sentences, four styles):
+  - **the reading floor:** with silence after it, shown exactly 700 ms; with the next word at once, shown until the next chunk (470 ms), every word whole;
+  - **two punch words 6 s apart** each alone, and a third 3 s after the second dropped (D-452 counts from the end of the one before);
+  - **at the clip's last word:** the last chunk, shown to the floor or the clip's end, in capitals;
+  - only its own sentence chunked anew, and a normal emphasis changes no chunk;
+  - switched off or hidden by an edit, every frame as without it; on, one emphasis of the summary.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, up to 4 punch words each: 1,416 kept, 15,972 frames with one, 0 problems.**
+- `display_list_snapshots.rs` +1: **8 new snapshot files** (four styles, while said and the next chunk). Clean, Bold and Mono read command by command: Clean's pill around "BRUTAL" at 1.9 in ink; Bold's pop held to about 1.016 by the safe area (1.93); Mono's panel and a cursor 63.8 lp wide.
+- `golden_frames.rs` +1, **`punch_word`** (Clean, while said; one caption run, "BRUTAL" at 1.9, asserted first). Written once on WARP by exact name (only the one file appeared); read beside the frame without it and at 200%, with the other three styles, its fade-in and the hand-over from a scratch render.
+
+**Declared.** D-440 (21): `tests/emphasis.rs`' `a_punch_word_is_marked_at_the_captions_size_until_p203` (P202's, pinning P202's interim rule) becomes `a_punch_word_is_marked_with_its_treatment_in_a_chunk_of_its_own`. Its frame equality is kept for the other sentence; it gains the punch word alone, in capitals, 1.9 times as tall, still marked. The equality over the punch word's own sentence cannot stay: D-482 changes those frames by design. Other test files gain lines only.
+
+**Every existing frame unchanged.** `line_breaks.rs` passes unchanged; no existing snapshot or golden is modified (P202's 18 emphasis snapshots included); every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases, 5 passed. No browser flow can draw a punch word yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,509,799 → **7,512,492** bytes (+2,693).
+
+**Counts.**
+- Rust **1088 / 0 / 7** by count (1076 + 12; `offcut-scene` 168 / 0 / 4, `offcut-render` 41, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entry 63's): a punch word followed at once by speech is on screen only for its own word (about 0.4 to 0.5 s); Glow's halo and Mono's cursor grow with it. Not pushed (push 3 is P206). Next: P204 (emoji and icons).
+
+## Entry 65 - 2026-11-13 - P204: emoji and icons
+
+**What changed.**
+- **`events/emoji.rs`** (new; D-483): the track (word, image key, place, start) draws nothing in `events::draw`: the emoji belongs to the captions (the catalog's zone). `place` sets it once by its chunk's layout boxes into a `Placed`; `draw_placed` pops it in and stops at the chunk's end.
+  - Size: 1.6 times the capitals' height of its line, never above its 160 px.
+  - **`Under`:** below the chunk's lines, centred on the word. **Over the lines when that would reach the watermark's band or leave the safe area: at Bottom, the default, always.**
+  - **`Beside`:** at the end of the word's line, centred on the capitals, if it fits in the safe area and is clear of every word of the chunk; else as `Under`.
+  - Each place keeps the decoration, a 16 lp gap and a KeywordPop's growth off the words.
+- **`events/icon_pop.rs`** (new): a 168 lp disc in `Accent` with the 112 lp white icon, drawn through `events::draw`; `layout` centres it in the zone, `attach` sets it on its word (across, kept in the zone; down, on the zone's edge by the captions) and the chunk's end.
+- **`events/mod.rs`:** `EventTrack::{Emoji, IconPop}` and their arms; `image_pop` (0.6 → 1.0 over 120 ms on `OUT`) and `about_centre`. `HookTitle` is the last kind not drawn.
+- **`layout.rs`:** `cap_height`, parley's `cap_height` of "H" (0.7 of the size if a face says nothing).
+- **`lib.rs`:** `build_scene` places each emoji (into the scene's `emojis`) and attaches each icon by the chunk that shows its word; a word not shown, or an emoji with no place, has no track and no count. `frame_at` draws the emoji after the captions. **`testing::bounds` measures an `Image`** (D-440 (4)).
+- **Docs:** TS §5 rows (`events/emoji.rs`, `events/icon_pop.rs`, `layout.rs`, `tests/emoji_icon.rs`, the goldens); "As read (P204)" under D-483, D-471 and D-440 (4).
+
+**Differs from the plan.**
+- **`ImageSet` is not added to `SceneInput`** (D-471 planned it): the scene emits only keys, every key exists (`image_bundle.rs`), the renderer holds the set since P197, and a new field would change every test that builds `SceneInput`.
+- `Under` is below the chunk's lines, not the 280 lp block, and over them without room (D-483 had no fallback for `Under`).
+- The icon also leaves with its word's chunk (D-483 named the exit for both).
+
+**Found and fixed in the prompt.** The safe-area sweep's first run found 1,114 frames of an emoji over a caption word (three cases at Top): `Beside` beside a short first line sat over a wider second line. `Beside` now needs to be clear of every word of the chunk; the run after: 0.
+
+**Tests (+16).**
+- Unit +6:
+  - `emoji.rs` 2: the track draws nothing; the placed emoji pops on `OUT` about its centre and stops at its end;
+  - `icon_pop.rs` 2: disc and icon, their pop and times; `attach` centred on the word, kept in the zone, on the edge by the captions;
+  - `layout.rs` 1: Inter's and JetBrains Mono's capitals;
+  - `lib.rs` 1: `bounds` of an image.
+- `tests/emoji_icon.rs` (new, 6; four styles):
+  - under below the lines at Top and Middle, over them at Bottom, never on a word, in the safe area and off the band;
+  - beside when the line leaves room, else under;
+  - the pop, and shown exactly while the word's chunk is;
+  - the icon's circle in the accent, in the event zone, centred on the word, on the edge by the captions, leaving with the chunk;
+  - **only images and the disc are added to a frame**; hidden or switched off, every frame as without; two visual moments;
+  - on a punch word, 1.9 times as large, capped at 160.
+- `layout_safe_area.rs` +1: **the 31 labeled files in four styles at three placements, watermark on, an emoji under, an emoji beside and an icon in turn every 2.7 s: 3,056 kept, 75,237 images drawn, none outside the safe area, on the watermark or on a caption word.**
+- `display_list_snapshots.rs` +1: **16 new snapshot files** (under at Middle, over at Bottom, beside, the icon; four styles). Three read command by command: Bold's fire under the second line centred on "BRUTAL", 97.8 lp; Bold's beside falling back under the full line; Clean's disc on the zone's bottom edge with key 1009.
+- `golden_frames.rs` +2, the list asserted first: **`emoji_under`** (Bold at Middle) and **`icon_pop`** (Clean at Bottom). Written once on WARP by exact name (only the two files appeared); read by eye, with the four styles at three placements from a scratch render at 200%.
+
+**Declared.** D-440 (4): `testing::bounds`. Other test files gain lines only.
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases and `image-parity.spec.ts`, 6 passed; TE-30 again 0.9995, the 72 images decoded in 19 ms. No browser flow can draw a plan's emoji or icon yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,512,492 → **7,522,176** bytes (+9,684).
+
+**Counts.**
+- Rust **1104 / 0 / 7** by count (1088 + 16; `offcut-scene` 182 / 0 / 4, `offcut-render` 43, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 and 64): at Bottom, the default, an emoji "under" its word is drawn over it; **the white icons on Clean's, Bold's and Glow's yellow disc are weak in contrast** (Mono's green is fine; a dark disc or an accent ring are the alternatives); at Bottom the icon sits about 120 lp above the captions. Not pushed (push 3 is P206). Next: P205 (the hook title).
+
+## Entry 66 - 2026-11-13 - P205: the hook title
+
+**What changed.**
+- **`lockup.rs`** (new, pure; D-484, §10.4): `lay_out(text, accent, (width, height), fonts)`. The hook's words in Inter 800 capitals (`LOCKUP_FONT`).
+  - Every split into 2, then 3, lines is tried. **Each line takes its own size**: the largest from 140 lp down to 48 lp in steps of 4 at which it fits the width, the accent word at twice its line's.
+  - Least worst distance from the width wins; ties go to fewer lines, then the first split.
+  - Lines are stacked by their capitals, 0.25 of the smaller size apart; the lockup must fit the room.
+  - Words are measured once at 100 lp and scaled. A one-word hook, a bad accent, or a line too wide at 48 lp gives `None`.
+- **`events/hook_title.rs`** (new): the lockup centred in the safe area above the watermark's band; the theme's `Text`, the accent word in `Accent`, over a drop shadow of Clean's grown with the size; entering 0.9 → 1.0 over 150 ms on `OUT`; shown over `[0, 2 s)` of program time or a shorter clip's length.
+- **`events/mod.rs`:** `EventTrack::HookTitle`; the item carries its text (`EventParams::HookTitle { text, accent }`), so it is laid out like any kind. **Every kind of the catalog is now drawn.**
+- **`lib.rs`:** `pub mod lockup`; `Scene.hook_until`; `shown_chunk`: **under the hook no caption is drawn, hit or boxed, nor its emoji**.
+- **`display_list.rs`:** `DrawCmd::scale` public, so that a test can compose a list as `frame_at` does.
+- **Docs:** TS §5 rows (`lockup.rs`, `events/hook_title.rs`, `display_list.rs`, `tests/{lockup,hook_title}.rs`, `common/hook.rs`, the goldens); "As read (P205)" under D-484 and §10.4.
+
+**Differs from the plan.**
+- `lay_out` takes the room's width and height and returns `Result<Option<..>>`: the height rules out a split too tall, and a font error is not a hook that does not fit.
+- D-484's "within 10% of the safe width" is what the search reaches, not a rule: two short words cannot ("STOP / SCROLLING" leaves 58%). Hooks of 5 words or more reach 0.7-3.1%.
+- **The two goldens' lists are composed, not built by a scene:** a hook plan needs a `Label`, which `offcut-render`'s tests cannot build without a new dependency (§3.1). `hook_title.rs` proves a scene's frame under the hook equal to that composition at 1080 and at 540.
+
+**Tests (+18).**
+- `events/hook_title.rs` +3:
+  - its colours and centre, until 2 s or a shorter clip;
+  - the entry on `OUT`, shadow then runs, gone at its end;
+  - a hook that cannot fit has no track.
+- `tests/lockup.rs` (new, 7):
+  - widths linear in the size (to 1e-3);
+  - the face is Inter 800;
+  - each line as large as fits (one size up does not), the accent at 2×, capitals, every word once;
+  - **against a brute force that shapes every line at every size: the same worst distance and the same number of lines** for 8 hooks;
+  - long hooks within 10%;
+  - one word, a bad accent, a word too wide, an accent too wide, no room: `None`;
+  - the same lockup twice.
+- `tests/hook_title.rs` (new, 4; four styles):
+  - **for 2 s each frame is the video and the hook exactly, then the frame without the hook exactly** (1080 and 540);
+  - no caption word boxed or hit under it;
+  - a hook that cannot fit, or switched off: every frame as without, not counted; on, one visual moment;
+  - a clip under 2 s shows it throughout.
+- `layout_safe_area.rs` +1: **12 hooks with each word the accent, four styles, three placements, watermark on: 804 of 816 drawn (the 12 others, one accent word too wide at 96 lp, not drawn), 676,287 boxes, 0 problems.**
+- `display_list_snapshots.rs` +1: **8 new snapshot files** (four styles, entering and at rest). Clean read command by command: "THE ONE THING" at 112, "NOBODY" at 120 in the accent beside "TELLS YOU" at 60, the shadow layer first, 0.9 when entering.
+- `golden_frames.rs` +2: **`hook_short`** ("STOP / SCROLLING") and **`hook_long`** ("THE ONE THING / NOBODY TELLS YOU / ABOUT SAVING"), Clean at 1,000 ms. Written once on WARP by exact name (only the two files appeared) and read by eye.
+
+**Declared.** No test of the base changed. `display_list_snapshots.rs`, `layout_safe_area.rs` and `golden_frames.rs` gain lines only.
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every old golden reads SSIM 1.0000 on WARP; parity 0.9996-0.9998.
+
+**Media** (keyed `pnpm build:e2e`, D1): `pipeline-preview.spec.ts`' preview cases and `image-parity.spec.ts`, 6 passed (TE-30 0.9995). No browser flow can draw a hook yet (model plans come through `/plan`; the fake API has it from P210).
+
+**Render binary.** 7,522,176 → **7,534,119** bytes (+11,943).
+
+**Counts.**
+- Rust **1122 / 0 / 7** by count (1104 + 18; `offcut-scene` 198 / 0 / 4, `offcut-render` 45, `offcut-wasm-render` 12, `offcut-types` 94, `offcut-api-types` 33 re-run).
+- Vitest **744** (no web file changed; not re-run). `pnpm e2e` (non-media) not re-run.
+- `pnpm check` is clean; the gate prints `gate: ok`.
+
+**Open.** 35. Known issues 5, 8, 10 (P212, P210, P209). **For CP 3** (besides Entries 63 to 65): the lockup is centred in the frame, over a speaker's face for its 2 s. **For P206:** `catalog_complete.rs`' harness item gains the five kinds; a caption-zone kind (Emphasis, Emoji) draws nothing in `events::draw`, IconPop draws in the event zone, PunchIn nothing (the video's), HookTitle in the safe area. Not pushed (push 3 is P206). Next: P206 (everything together, CP 3, push 3).
+
+## Entry 67 - 2026-11-13 - P206: everything together, checkpoint 3; push 3
+
+**What changed.**
+- **`catalog_complete.rs` un-ignored (D-440 (9))**: the release's only ignores are gone (`git grep 'ignore = "V6.2' crates` is empty). The harness is widened, nothing deleted:
+  - `KINDS` 4 → 9, and `item` makes one of each new kind;
+  - the zone names gain `video` and `hook`, and `points` measures an `Image`;
+  - each kind is drawn at 1,500 ms as well as 3,300 ms (the hook shows in the program's first 2 s);
+  - a caption- or video-zone kind draws nothing of its own; every other kind draws inside its zone.
+- **`tests/common/all_kinds.rs`** (new): the reference transcript (`a01-scriptA`) with a model's plan of a hook, four emphases (one a punch word), two emoji, two icons, a snap and a push, every item kept, Motion on.
+- **New cases** (with all five kinds, four styles):
+  - `determinism.rs`: two builds equal, the same bytes at every frame and in any order;
+  - `parity.rs`: 540 and 720 the 1080 list after scaling, at every frame;
+  - `display_list_snapshots.rs`: Glow at ten instants (10 new files, each read to show its kind).
+- **The frame cost** (§10.5): `scene_timing_all_kinds` (ignored, release only). **0.78-1.23× today's per frame** (Mono's the worst, under the 1.5× line), every frame in microseconds; recorded in `docs/v6.2/experiments.md`.
+- **Captures** in `~/v6.2-review/look/`: each kind at rest in each style (40), the hook at three lengths, ten drift frames, and `README.md` with §12's copy and the points to judge.
+- **The whole clip** (D-496), in `~/v6.2-review/cp3/`: the MP4 and `plan-annotated.md`. How it was run is "As read (P206)" under D-496: `dist-flags/` behind a scratch same-origin proxy to the local API, per-process values for that run only, the founder's real SMTP values in the local `.env`, sign-in by magic link.
+- **Docs:** TS §5 rows (`common/all_kinds.rs`, `determinism.rs`); "As read (P206)" under D-440 (9), D-496 and §10.5; open item 39.
+
+**Checkpoint 3.** The founder's own recording (79 s), cloud transcription, **DeepSeek's plan (D-500)**, Glow, exported at the free plan's 720p.
+- **The plan:** 15 items, **11 drawn** (3 zooms, 3 emphases one a punch word, 2 emoji, 2 icons, 1 number), 4 numbers dropped `NumberUnresolved`, **no `hook_title` item** (a hook text only).
+- **Motion could not be turned on:** its switch is P208's Enhance panel, so the clip has the plan's zooms and no drift.
+- **Found on the way** (not code faults; how the local run is set up):
+  - the build verifies plan tokens with its test key, so the local API signed with the e2e test seed;
+  - the cloud card needs `TRANSCRIBE_ENABLED`;
+  - the landing page has no sign-in entry.
+- **The founder's go, 2026-11-13, with no change asked.** The points raised stay open: open item 39 (twelve, from Entries 63-66 and this run).
+
+**Differs from the plan.**
+- The provider is DeepSeek, not Gemini (D-500).
+- No drift in the clip (P208).
+- `v62_kinds.rs` (§13.1) was built as one test file per kind (`emphasis.rs`, `punch_word.rs`, `emoji_icon.rs`, `hook_title.rs`, `lockup.rs`).
+
+**Tests (+6, 3 un-ignored).** `catalog_complete.rs` 3 now run; `determinism.rs` +1 (+1 ignored timing); `parity.rs` +1; `display_list_snapshots.rs` +1.
+
+**Declared.** D-440 (9): `catalog_complete.rs` as above. Other test files gain lines only (`display_list_snapshots.rs`' `labeled` module carries `#[allow(dead_code)]`: only its `case` is used there).
+
+**Every existing frame unchanged.** No existing snapshot or golden is modified; every golden reads SSIM 1.0000 on WARP (32 readings), parity 0.9996-0.9998.
+
+**Tier 3** (D1):
+- `pnpm check && pnpm fixtures && pnpm test` exit 0 (`.env` loaded for the server's database tests);
+- `pnpm e2e --workers=4`: 57 passed;
+- `golden_frames`: 33 passed.
+
+**Render binary.** 7,534,119 bytes (no scene code changed).
+
+**Counts.**
+- Rust **1128 / 0 / 5** (`cargo test --workspace`: 1122 + 6; the ignores 7 - 3 + 1; `offcut-scene` 204 / 0 / 2).
+- Vitest **744**. `pnpm e2e` 57.
+
+**Open.** 35, 39. Known issues 5, 8, 10 (P212, P210, P209). **Push 3** (not waited on). Next: P207 (the levelled voice in the DSP).
+
+## Entry 68 - 2026-11-13 - The plan gains P206a to P206c (the founder's CP 3 changes)
+
+**What changed.** Docs only. After the go, the founder asked for three of checkpoint 3's points to be fixed (open item 39 (8), (11), (12)). As CP 3's rule says, they become prompts before P207:
+- **P206a**, a way to sign in from the landing page (D-501). The fallback line's "Sign in" opens the dialog in place: leaving the editor would lose the clip before V7.
+- **P206b**, icons on a dark disc ringed in the accent (D-502). The icon goldens and snapshots are regenerated by name; the founder sees the new icon before the commit.
+- **P206c**, the hook title always shown when the AI writes a hook (D-503): `validate` adds the item a model left out (no AI call), and the prompt asks for it. The prompt's re-read (about $0.02) waits for the founder's yes.
+
+Written into `coding-promptsv6.2.md`, D-501 to D-503, §17's prompt table, and the build guide's Phase 6 table; open item 39 marks the three as planned.
+
+**Open.** 35, 39. Not pushed (push 4 is P209). Next: P206a.
+
+## Entry 69 - 2026-11-13 - P206a: sign in from the landing page; push 3's CI read
+
+**What changed.**
+- **The landing page's top bar** gains one link to `/account`: "Sign in", or "Account" once this tab is signed in (`ui/landing/account-link.ts`, its words in `messages.landing.account`). It sits after the section links and stays on a phone, where they are hidden. `LandingPage` and `TopBar` take `accountPath` (the route passes `ROUTES.account`). Its styles join the section links' rules in `landing.module.css` (687 lines).
+- **The AI plan's signed-out toast** ("Sign in to get an AI-planned edit…") gains a **"Sign in"** action (`ui/components/plan-fallback.ts`; the other reasons carry none). It sets `ui-store`'s new `signIn`, and `EditorLayout` draws `SignInDialog` over the editor, as it draws the shortcuts sheet. The page never leaves `/app`, so the clip stays. Once the tab is signed in, the dialog closes, as the export gate's does.
+- **The dialog's title** from the toast is "Sign in for an AI-planned edit": `SignInDialog` gains an optional `title`, and "Sign in to export" stays the default for its two other callers.
+- **Copy (drafts for the founder):** "Sign in", "Account" (the landing page); "Sign in", "Sign in for an AI-planned edit" (`copy/plan.ts`).
+- **Captures** in `~/v6.2-review/look-fixes/` (`p206a-*`): the landing page at 1280 × 800 and 390 × 844, signed out and signed in; the toast with its "Sign in"; the dialog over the editor. They come from three new cases in `screens.spec.ts`. The editor's half processes the reference clip signed out with `ai_plan` on, clicks the toast's "Sign in", checks the dialog and its title at `/app`, then closes it with Escape and checks that the clip still plays.
+- **Docs:** TS §5 rows for the two new modules and their tests; "As read (P206a)" under D-501; open item 39 (11) done; known issue 11.
+
+**Differs from the plan.** The dialog's own title (the plan said only "opens `SignInDialog`"): opened from the plan's toast, "Sign in to export" read wrong.
+
+**Push 3's CI** (run 43329295884 on `1c94d83`, read at this prompt's start):
+- **Attempt 1 failed:** `golden_frames` died with SIGSEGV on lavapipe after 14 of 33 goldens had passed, each at 0.9997. Push 1's run 43185400050 had failed the same way and was not read at the time.
+- **Attempt 2, one re-run of the failed job as the rule allows, passed in full:**
+  - goldens on llvmpipe (LLVM 21.1.8): 33 passed, every one at least 0.9997 (`motion_mid`, `punch_push` 1.0000; `punch_snap`, `tech_list` 0.9999);
+  - non-media 57 passed;
+  - media 26 passed and flags 29 passed, no flaky case, one standing skip each.
+- Recorded as known issue 11, to watch.
+
+**Tests (+7).** Vitest +5 (`account-link.test.ts` 2, `plan-fallback.test.ts` 3); `landing.spec.ts` +2 (signed out: "Sign in" leads to the form; signed in: "Account", on a phone too). Every existing case unchanged.
+
+**Tier 3** (D1, with P206b's uncommitted Rust in the tree; the two touch no common file):
+- Vitest **749**;
+- `pnpm e2e` **59 passed** (keyed `build:e2e`). In one earlier targeted run, L-11 (axe on the landing page) failed once under four workers; it passed alone, in the full file and in the full run;
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P206b (icons on a dark disc, waiting for the founder's yes on the look).
+
+## Entry 70 - 2026-11-13 - P206b: icons on a dark disc
+
+**What changed.**
+- **`events/icon_pop.rs`** (D-502):
+  - `Track` gains `panel` (`Role::Panel`) beside `color` (the accent).
+  - `draw` pushes the accent disc (168 lp), the panel's disc 8 lp inside it (`ICON_RING`, 152 lp), then the white icon (112 lp). The pop scales all three about the disc's centre.
+  - Every colour comes from a theme role, so Mono gets its green ring.
+- **Regenerated by exact name** (V6.2's own files, not the base's):
+  - `fixtures/golden/icon_pop.png`;
+  - the snapshots `icon_pop_clean`, `icon_pop_bold`, `icon_pop_tech`, `icon_pop_glow`, `all_kinds_glow_icon_numbers` and `all_kinds_glow_icon_laptop`.
+  - Each snapshot's diff is the inner disc's `FillRect` alone (17 lines); nothing else moved.
+- **Review frames** in `~/v6.2-review/look-fixes/` (`p206b-*`, with a README): each style at Top and Bottom, today's icon and the new one side by side at 200%, over a still of the reference clip. "Today's" is the same list without the inner disc. A throwaway test drew them and was deleted.
+- **Docs:** "As read (P206b)" under D-502 and D-440 (22); open item 39 (8) done.
+
+**The founder's yes on the new look, 2026-11-13.** Panel is 85% opaque, so a little of the accent shows through the dark disc: dark olive in Clean, Bold and Glow, dark green in Mono. The founder liked it as it is.
+
+**Declared (D-440 (22)).** Three checks widened, none deleted:
+- `icon_pop.rs`' unit test (renamed `the_disc_is_ringed_in_the_accent_dark_inside_centred_in_the_zone_with_the_icon_on_it`) asserts the ring, the inner disc and their pop, keeping every other assertion;
+- `emoji_icon.rs`' `without_images` also takes out a panel-coloured circle 100 lp across or more;
+- `golden_frames.rs`' `icon_pop` reads the ring and the inner disc, with the icon inside the inner one.
+
+**Every other frame unchanged.** No other golden or snapshot changed; `golden_frames` 33 passed on WARP. The safe-area sweep (`layout_safe_area.rs`' emoji and icon case) is green.
+
+**Tests (0 new).** Three widened, as declared.
+
+**Tier 3** (D1):
+- Rust **1128 / 0 / 5** (`cargo test --workspace`, `.env` loaded; the same counts as Entry 67: nothing added);
+- Vitest 749; `pnpm e2e` 59 passed (keyed `build:e2e`, with this change built in);
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P206c (the hook title always shown; the prompt's re-read, about $0.02, waits for the founder's yes).
+
+## Entry 71 - 2026-11-13 - P206c: the hook title always shown
+
+**What changed.**
+- **The guarantee, in `validate` (D-503), with no AI call.**
+  - A model plan with a valid `extras.hook` that kept no `HookTitle` after V-2 to V-5 gains one, checked by `check_item` like any item.
+  - The added item: anchors `0..word count`; accent the hook's longest word by letters and digits (the first of equal ones); id one more than the plan's largest (1 for an empty plan). Nothing is reported as dropped for it.
+  - It replaces a model's own hook item that fails too (TE-15 below found 5 in 15). A plan of the rules never gains one.
+- **V-9 reads the hook title first** (`density_rule`). `limit` sorts by first word, then kind, and `HookTitle` sorts last, so a visual anchored on the clip's first word used to beat the hook. Only that tie changes; the hook opens the clip.
+- **The instruction:**
+  - the "finished short" line says "open with the hook title";
+  - the extras line says to "always add a hook_title item with it";
+  - the catalog row's purpose begins "Always, with the hook".
+  - The system message is 16,261 characters (16,366).
+- **The re-read** (the founder's yes, about $0.02): 15 Flash calls, $0.017, balance $1.81.
+  - **The model wrote the hook item in 15 of 15 plans** (1 of 15 at P188); 10 of its own were valid.
+  - The other 5 counted wrong (an accent past the hook's last word 3, anchors short of the clip's end 2), and the guarantee replaced each. **Every clip opens on its hook.**
+  - Median drops 10.0%, at TE-15's line, from those 5 (0.0% without them, as P188c); p90 2.9 s; parse 15 / 15 first try.
+  - In `experiments.md` (TE-15, "The hook line"); the annotated plans are in `~/v6.2-review/p206c/plans/`.
+- **Docs:**
+  - TS's two statements of the old rule now name D-503;
+  - the implementation doc's "not checked" row is struck through and its catalog table row updated;
+  - "As read (P206c)" under D-503 and D-440 (23);
+  - open item 39 (12) done.
+
+**Differs from the plan.**
+- "Kept no `HookTitle`", not "has none": a model's broken hook item would otherwise leave the clip without its hook. The re-read showed this happens a third of the time.
+- V-9's hook-first order is new: the plan assumed the added hook is always the first visual, and on a tie at the first word it was not.
+
+**Declared.**
+- **D-440 (23).** Three cases build a model plan with a valid hook to test the extras or the non-item fields: `validate.rs`' inline `every_non_item_field_is_dropped_in_v4`, `tests/validate.rs`' `the_non_item_fields_are_dropped_and_the_items_kept` and `offcut-wasm-render`'s `validate_plan_answers_the_text_extras_that_passed_and_only_those`. Each now counts the added hook beside its items (1 → 2, 5 → 6, 1 → 2), keeping every other assertion. `scene_api.rs` is additive, so `v62-gate.sh`'s ALLOW gains the one line it loses.
+- **Changed by design:**
+  - `catalog_snapshot__system_prompt@v2.snap` (three lines: the catalog row, the finished-short line, the extras line);
+  - `server/tests/fixtures/deepseek/request.recorded.json`'s system length (16,366 → 16,261) and its test's comment.
+- Every other validate case unchanged, the V6.2 hook and V-9 cases included.
+
+**Tests (+6).**
+- `validate_v62.rs` +5:
+  - the hook added, with its accent and id;
+  - V-9 after it, and a first-word visual giving way;
+  - a plan's own valid hook untouched;
+  - a failing hook item dropped and replaced;
+  - nothing added without a valid hook, or to a plan of the rules.
+- `hook_title.rs` +1: the founder's case (a hook, no item) draws every frame as the same hook written as an item would, the lockup over the first 2 s, in the four styles.
+
+**Tier 3** (D1):
+- Rust **1134 / 0 / 5 (1128 + 6)** (`cargo test --workspace`, `.env` loaded);
+- Vitest 749; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- `pnpm check` exit 0.
+
+**Open.**
+- Items 35 and 39 stay open: 39's three fixes are done, its other points stay for the quality pass.
+- Known issues 5, 8, 10 and 11 (P212, P210, P209, watch).
+- Not pushed (push 4 is P209).
+- Offered: a third prompt revision on the hook item's counting (about $0.02, the founder's call).
+- Next: P207 (the levelled voice in the DSP).
+
+## Entry 72 - 2026-11-13 - P206c, second commit: the hook item counted right
+
+**What changed.** The third prompt revision Entry 71 offered, with the founder's yes. `prompt.rs`' extras line now spells out the hook item:
+- its accent counts the hook's own words from 0, not the transcript's ("We cut our bill": "bill" is 3; the last of n words is n - 1);
+- its anchors are every word of the transcript, start 0, end one past the last word's index.
+
+The system message is 16,500 characters (16,261).
+
+**The re-read** (15 Flash calls, $0.0175, balance $1.81 just after; `experiments.md`, TE-15, "The hook item's counting"):
+- **The model's own hook item kept in 14 of 15 plans** (10 of 15 in Entry 71); the one miss, `w04`'s accent 4 on a 4-word hook, was replaced by `validate`'s item. Every clip opens on its hook.
+- Parse 15 / 15 first try; p90 3.0 s.
+- **The median drop rate is 11.1%, over TE-15's 10% line** (mean 10.7%, down from 13.1%). The drops over the line are all outside this revision:
+  - numbers that do not resolve (9);
+  - two visuals V-9 kept apart;
+  - one zoom too close.
+- Their paragraphs are unchanged since P188c, and the drops moved between transcripts from run to run. Read as the variance of 15 plans, not a regression; no further revision proposed.
+
+**Declared.** Changed by design:
+- `catalog_snapshot__system_prompt@v2.snap` (the extras line);
+- `request.recorded.json`'s system length (16,261 → 16,500) and its test's comment.
+
+**Tests.** No new or changed case. `offcut-plan` 80, `offcut-api` 334, `pnpm check` exit 0.
+
+**Docs.** TE-15's new section; D-503's "As read (P206c)" gains (5).
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P207 (the levelled voice in the DSP).
+
+## Entry 73 - 2026-11-13 - P207: the levelled voice
+
+**What changed.**
+- **`offcut-dsp/src/level.rs`** (new, D-487): `level_only(pcm48, &ChainConfig) -> Result<ChainOutput, DspError>`, the voice with Enhance's voice switched off.
+  - It is loudness to the target, the limiter at the ceiling and one corrective pass: `run_chain`'s steps 4 to 7, written out again so that `run_chain` stays as it is.
+  - No high-pass, denoise or compressor, and no progress callback.
+  - It refuses what the chain refuses. The +24 dB gain cap is the chain's.
+- **`assemble`'s voice.** `ProgramConfig` gains `voice: VoiceMode` (re-exported from `offcut_dsp::program`), `Clean` by default.
+  - `assemble`'s signature is unchanged: its first argument is the voice the config names, `out48` for `Clean` and `lvl48` for `Level`.
+  - `ProgramConfig`'s one-line empty struct is the one line `program.rs` loses; `v62-gate.sh`'s ALLOW names it.
+- **WASM** (`offcut-wasm-core/src/audio_api.rs`, additive):
+  - `level_only(pcm48)` answers `{ lvl48, loudness, peak }`;
+  - `assemble_voice(voice48, voice, time_map, speech)` answers as `assemble` does; an unknown voice is `E_INTERNAL` `Voice`.
+  - `run_chain`, `assemble` and `measure_prosody` are unchanged. Nothing in the page calls the new entries until P208.
+  - **Read from Node on the built module:**
+    - a -30 dBFS sine levelled to -14.00 LUFS;
+    - the Level program bit for bit `lvl48`;
+    - `"clean"` bit for bit the old `assemble`;
+    - an empty input `E_DSP` `Empty`.
+  - The core binary grew 3,917 bytes (804,508 → 808,425).
+- **Docs:** TS §5 rows (`level.rs`, `tests/level_only.rs`, `program_identity.rs`' new line); "As read (P207)" under D-487.
+
+**Differs from the plan.** D-487 names `chain::level_only`; the prompt and the build guide name `level.rs`, which keeps `chain.rs` without a diff. Followed the prompt.
+
+**Acceptance.**
+- `git diff -- crates/offcut-dsp/src/chain.rs` is empty.
+- `program_identity.rs`' three old cases pass unchanged: no line of the file is removed, only an import and the new case added.
+
+**Tests (+8).**
+- `level.rs` 2 (what it refuses; silence stays at the floor).
+- `tests/level_only.rs` 5, on two derived recordings and synthetic signals:
+  - the length is the input's;
+  - the loudness is the target as the meter reads it, and the gain cap holds;
+  - no sample passes the ceiling;
+  - where the limiter does not act, the output is the input times one gain, so nothing else is done;
+  - `run_chain` on the same input is unchanged, bit for bit, and the input is untouched.
+- `program_identity.rs` +1: with `voice: Level` the program on the identity map is `lvl48` bit for bit, at its loudness, and music is refused as before.
+
+**Tier 3** (D1):
+- Rust **1142 / 0 / 5** (`cargo test --workspace`, `.env` loaded; 1134 + 8);
+- Vitest 749; `pnpm e2e` 59 passed (keyed `build:e2e`, the new WASM in it);
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). Next: P208 (the Enhance panel, `lvl48` in the audio worker, the export's voice).
+
+## Entry 74 - 2026-11-13 - P208: the Enhance panel
+
+**What changed** (all behind `motion`; with it off, every path is V6.1's).
+- **`lvl48`** (D-487):
+  - The audio worker's `runChain` makes the levelled voice from the same `pcm48` when the page asks with `level: true`. The page asks with `motion` on; the worker reads no flag.
+  - `takeLevel()` hands it over, and `assembleVoice()` builds a program on a named voice.
+  - `run-pipeline.ts` writes `clips/<id>/lvl48.f32` after `out48.f32`; `prog48.f32` stays the clean program, written as before.
+- **`voice-program.ts`** (new): the program on a voice, in one place for the review, the pipeline and the export. Clean reads `prog48.f32`, as the export always did; Level reads `lvl48.f32` and assembles it.
+- **`set-enhance.ts`** (new):
+  - `setEnhance` is a review change in mode `scene`, one history step, with no `review_action`;
+  - it is remembered under `meta.enhanceDefault` once the clip shows it;
+  - `startEnhance` gives a new clip the remembered state, else the recommended `{ clean, motion: true }`;
+  - `resetEnhance` is settings' "Back to recommended".
+  - With the flag off, nothing is read, written or switched.
+- **The voice swap** (`review-update.ts`): when the voice differs between the edit before and the new one (the switch, its undo, its redo), the program on the new voice replaces the paused preview's buffer (`control-preview.ts`' `swapAudio`) and the clip's `prog48`. A failure restores the edit before.
+- **`EnhancePanel.tsx`** (new): "Enhance" under the Style tab's cards, Voice cleanup and Motion with §12's lines, disabled during an export. **Settings:** "Enhance", a line, "Back to recommended" and a line once pressed. The two lines are new drafts.
+- **The export** reads `prog48.f32` for Clean, unchanged, and assembles `lvl48.f32` for Level.
+- **`export_done`** (D-490): `items_kept`, `items_disabled` (with `ai_plan`, counted as the Visuals tab counts) and `enhance_off` (with `motion`).
+  - They are optional on the server: a V6.1 page's event is read and stored as before. The server caps the counts and refuses a row named twice.
+  - The event's description in "What leaves your device" gains "which Enhance switches you turned off".
+- **Docs:**
+  - TS §5 rows (four files), the OPFS row for `lvl48.f32`, the `export_done` row;
+  - "As read (P208)" under D-440, D-486, D-487, D-488, D-490;
+  - `experiments.md`, D-488's switch time.
+
+**The switch time on D1** (D-488, Chrome, the flags-on keyed build, the reference clip; read from the page's own `performance` measures):
+- paused, Voice 32-83 ms (to Level about 75, back to Clean about 35) and Motion 11-20 ms;
+- while playing, Voice 86-139 ms, its pause and play included;
+- **all inside the 150 ms budget**, the playing switch closest.
+
+The same run: `lvl48.f32` had `out48.f32`'s size (14,343,360 bytes); undo took a switch back; an export with Voice cleanup off finished, its `export_done` carrying `enhance_off: ["voice"]`, `items_kept: 4`, `items_disabled: 0`. The scratch case was not committed. P209's `enhance-panel.spec.ts` is the lasting proof, reading the exported voice through a dev hook.
+
+**Differs from the plan.**
+- `export_done`'s fields are sent only with their flags. Otherwise a flags-off export would differ from V6.1's, and `export-creator.spec.ts` pins its props key for key.
+- The switch sends no `review_action`: its kinds are the server's closed list, and D-490 counts the choice in `export_done`.
+- `runChain`'s parameter gains `level?` rather than the worker reading the flag.
+- "Back to recommended" has a heading and two lines; §12 drafted only its button.
+
+**Declared.**
+- `v62-gate.sh` ALLOW: `protocol.ts`' two `runChain` lines (D-487).
+- `eslint.config.js` edges:
+  - `set-enhance.ts` → `review-update.ts`;
+  - `run-pipeline.ts` → `set-enhance.ts`;
+  - `review-update.ts`, `run-pipeline.ts`, `start-export.ts` → `voice-program.ts`.
+- D-440:
+  - (5) the prop-enum table 20 → 21 rows;
+  - (15) the TypeScript test 49 → 50 names;
+  - the server test helper gains the three fields as `None`;
+  - the fakes of `run-pipeline.test.ts` and `start-export.test.ts` gain the new methods, and `start-export.test.ts` mocks the flags at their defaults.
+- No existing case changed.
+
+**Known issue 10 (P209), wider.** `flags-identity.spec.ts`' flags-on clip now starts with the recommended Enhance, so its edit and export differ from the flags-off build's by design, as well as by the IndexedDB version. P209's dev hook sets `Enhance::v5()` for case 1, as planned.
+
+**Tests (+17).**
+- `set-enhance.test.ts` 9 (a new clip's start, a bad stored value, flags off, Motion, Voice, undo and redo, no change, a failed swap, Back to recommended).
+- `run-pipeline.test.ts` +3 (`lvl48` written beside `out48`; a clip starting on Level previews its program; a run again keeps the clip's own).
+- `start-export.test.ts` +3 (flags off: V6.1's keys and `prog48.f32`; the item counts; `enhance_off` and the Level program).
+- `analytics.rs` +1, `server/src/analytics` +1.
+
+**Tier 3** (D1):
+- Rust **1144 / 0 / 5** (`cargo test --workspace`, `.env` loaded; `offcut-api` 335 again after the clippy fix);
+- Vitest **764**; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- `pipeline-preview.spec.ts` (media, flags off) 17 passed: the clip's folder still holds exactly `out48.f32`, `prog48.f32`, `source`;
+- `pnpm check` exit 0.
+
+**Open.** 35, 39. Known issues 5, 8, 10, 11 (P212, P210, P209, watch). Not pushed (push 4 is P209). For the founder: the panel's place (Style tab) and the two settings lines, with a capture in `~/v6.2-review/look-fixes/p208-enhance-panel-1280x800.png`. Next: P209 (Enhance end to end, DC-16; push 4).
+
+## Entry 75 - 2026-11-13 - P209: Enhance end to end, DC-16; push 4
+
+**The founder's answers (2026-11-13).** The Enhance panel's place, under the Style tab's cards, and the two settings lines of P208 are approved for now; the founder will ask for changes after using them.
+
+**What changed.**
+- **DC-16, in the page.** `set-enhance.ts`' `withEnhance` and `isV5`: an Enhance equal to `Enhance::v5()` leaves `EditState` without `enhance`, at a clip's start (`run-pipeline.ts`) and on a switch. Rust already leaves it out of its JSON (D-485). Before this, a flags-on clip on V5's settings would have stored and hashed `"enhance":{…}`, unlike V6.1.
+- **The video mirror** (development and test builds only, as the caption mirror):
+  - `Scene::video_crop` and `video::Track::crop`;
+  - `RenderSession::video_mirror(t)` answering `{ src, crop }` (`scene_api.rs`, additive);
+  - the render worker's `videoMirror` (`atMs` in, the worker makes it an `OutMs`), `load-render.ts`' type, `dev-faults.ts`' `videoMirror`.
+- **Three dev hooks:**
+  - `startAsV5()`: the next clip is made as V5 made it, the AI plan switch off and `Enhance::v5()` as its start (`dev-faults.ts`);
+  - `videoMirror(at)`;
+  - `programSamples(at)`, the preview's program samples.
+- **`flags-identity.spec.ts`** (D-440 (8)):
+  - case 1's flags-on clip is made through `startAsV5()`;
+  - the version pin reads 3 with `ai_plan` (the `plans` store, D-469), else 2;
+  - the flags-off run is made once for both cases;
+  - **case 2** is new: with the defaults, the clip record, the transcript, the voice (audio packets) and the frames' count and size are V5's; the edit differs by `enhance` (`{ clean, motion: true }`) alone, and so the cache key; the mirror shows V5's crop at every time read and the drift moving `src` off it at some.
+  - **Known issue 10 closed.**
+- **`enhance-panel.spec.ts`** (new), one clip and a second:
+  - `lvl48.f32` beside `out48.f32`;
+  - the recommended start;
+  - Motion off: every time read shows the crop again;
+  - Voice off: the preview's program is `lvl48.f32`'s, sample for sample at 31 places, and `prog48.f32`'s again after undo; redo brings `lvl48` back;
+  - each switch within the edit budget, by the page's own measure;
+  - the memory `{ level, motion: false }`;
+  - the next clip starts with both off, previewing its `lvl48`;
+  - settings' "Back to recommended" says so and forgets the memory.
+- **`FLAG_SUITES`** gains `enhance-panel.spec.ts`. ~~so CI's media job runs it~~ **Corrected in P210 (Entry 76):** CI runs the flags suites with `--grep @no-gpu` only, and this spec has no such case, so it runs on D1 only, as `flags-identity.spec.ts` does. `openClipSignedIn` gains an optional `before` step.
+- **Docs:** TS §5 row; "As read (P209)" under D-440 ((8), (24)).
+
+**Both on `dist-flags/`, twice each** (D1, keyed builds, `--project=media-flags`, two separate runs):
+- 5 passed and 5 passed: `enhance-panel` 2.0 min, `flags-identity` case 1 2.9 min, case 2 1.5 min;
+- the switches: Motion 15 ms and 15 ms, Voice 74 ms and 67 ms.
+
+**Declared.**
+- D-440 (8) as above.
+- D-440 (24): `set-enhance.test.ts`' two P208 cases that read `{ clean, motion: false }` in the edit now read no `enhance` (the normalisation), every other assertion kept; two cases are added for it.
+
+**Tests (+5).** `scene_api.rs` +1 (the mirror: the crop with motion off, the drift with it on); `set-enhance.test.ts` +2; `flags-identity.spec.ts` +1; `enhance-panel.spec.ts` 1.
+
+**Tier 3** (D1):
+- Rust **1145 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **766**; `pnpm e2e` 59 passed (keyed `build:e2e`);
+- the two flags suites as above;
+- `pnpm check` exit 0.
+
+**Push 4** (not waited on): P206a to P209, read at P210's start. Known issue 11 (the lavapipe SIGSEGV) applies: one re-run of the failed job if it shows.
+
+**Open.** 35, 39. Known issues 5, 8, 11 (P212, P210, watch). Next: P210.
+
+## Entry 76 - 2026-11-13 - P210: the AI plan end to end
+
+**Push 4's CI** (run 43412796622 on `0dd99db`, P206a to P209): attempt 1 failed only on the lavapipe SIGSEGV in `golden_frames` (known issue 11); one re-run of the failed jobs passed everything: 33 goldens (23 at 0.9997, 3 at 0.9999, llvmpipe LLVM 21.1.8), Vitest 766, Playwright 59, the media cases 25 passed with 1 flaky (the first-run model download, known issue 3) and 1 skipped, the flags cases all passed with 1 skipped. Known issue 11 has now shown on 3 of V6.2's 4 pushes (1, 3, 4), each time cleared by one re-run.
+
+**A correction to Entry 75.** It said `FLAG_SUITES` gaining `enhance-panel.spec.ts` makes CI's media job run it. It does not: CI runs the flags suites with `--grep @no-gpu`, and neither `enhance-panel.spec.ts` nor `flags-identity.spec.ts` has such a case (the run's log names neither). Both run on D1 only, as planned for their acceptance. Entry 75's line is struck through and points here.
+
+**What changed.**
+- **`fake-api.ts`' `plan` option** (D-444): absent by default, so `/plan` still answers 404 and every existing suite is unchanged. With it, a request without the fake's bearer is 401 (as the server, D-494), and one with it gets `response` after `delayMs`, or `failure`. `api.setPlan` changes it later (for "Regenerate plan").
+- **`web/tests-e2e/fixtures/plan/speech_60s_portrait.json`**, a model's `PlanResponse` for the reference clip's cloud transcript. It was made by hand from TE-15's DeepSeek Flash answers for `a01-scriptA` on the items of P206's `all_kinds.rs`, whose word indexes are the cloud transcript's: the hook ("I almost quit making videos", accent "making"), two emoji, four emphases (one a punch word), two zooms and two icons. That is 11 items, and the browser's validation keeps all of them. It sits beside `fixtures/cloud/`, where the e2e fixtures live. The build guide's "a plan from P211's first run if available" was not available: P211 comes after.
+- **`helpers/plan-fixtures.ts`:** the cloud answer with three marker words planted at words no item points at (`Zorblax`, `Quintessa`, `Vexmoor`); the recorded plan and its kinds; the regenerated plan (3 of its items, a new post caption); and `signedInPlan()`.
+- **`ai-plan.spec.ts`** (new, in `FLAG_SUITES`), 11 cases:
+  - *Signed in, the switch on, one clip transcribed in the cloud:*
+    1. One `POST /plan`, its words the transcript as heard, markers included. `plan_result` is `{ model, ok, items 11, dropped_by_reason {} }`. No fallback line. Only `POST /api/v1/plan` carries a marker word, and no request carries any of 20 pieces of 32 bytes of the clip. The list shows the model's 11 items in time order, "11 of 11 visuals on", the text for the post and "Regenerate plan". axe 0.
+    2. Each Copy puts its text on the clipboard.
+    3. At the emoji's word ("nobody") the caption shows it, and the pointer finds a caption word with the emoji drawn over the block.
+    4. Each of the 11 items switched off (10 of 11), then undone (11 of 11).
+    5. The export says "4 words emphasized" and "7 visual moments", and `export_done` carries `items_kept: 11, items_disabled: 0`.
+    6. Run again: a new clip whose scene is refused once after its plan was kept (`failNextSetScene`); "Try again" makes no request, shows the same 11 items and sends no second `plan_result`.
+    7. "Regenerate plan": one request, the 3-item plan and its new caption; then a 429 `plan_quota` makes a second request, says "…this month's AI plans are used…" and changes nothing. axe 0.
+  - *Signed out* (transcribed on the device): no `/plan` request, only V4's kinds, the sign-in line once, and `plan_result` `{ rules, signed_out }`. No request carries the media.
+  - *The switch off* (Settings, then the clip): no `/plan` request, the rules plan, no "Regenerate plan", no fallback line, `plan_result` `{ rules, off }`. No request carries a marker word or the media.
+  - *Fallbacks:* 502 `plan_unavailable` and 429 `plan_quota`. Each makes one request, gives the rules plan and no text for the post, and shows its line once.
+- **Read in the first run:** case 6 first used `failClip` on the ready clip. A ready clip forced to `failed` keeps its files open, so its run again failed `E_STORAGE_IO` ("Offcut could not save on this device"). That is a fault of the hook, which skips the clip machine on purpose, not of a real failure. The case now uses a failure during processing.
+- **Known issue 8** ("Planning the edit" not shown) moves to P211: the fake answers at once, so the wait can only be read on the real API, and the founder judges it at CP 4.
+- **Docs:** TS §5 rows for the spec, the helper and `fixtures/plan/`. "As read (P210)" under D-444, D-468, §13.4's row and §14.1.
+
+**`ai-plan.spec.ts` twice on `dist-flags/`** (D1, keyed `build:e2e:flags`, `--project=media-flags`):
+- Run 1 (spec alone): 9 of the 11 cases passed. Case 6 failed as read above, and case 7 did not run after it. After the fix, the signed-in group's 7 cases passed (44.5 s with setup).
+- Run 2, inside the whole of `FLAG_SUITES`: all 11 passed. Signed-in cases 5.8 s, 0.2 s, 0.7 s, 2.1 s, 17.6 s (export), 5.7 s, 0.9 s. Signed out 1.1 min (device transcription). Switch off 5.1 s; 502 5.7 s; 429 4.7 s.
+
+**V6.1's flags suites in `dist-flags/`** (D-444), the same run: 47 passed and 1 skipped (`rejections.spec.ts`' standing skip), in 13.5 min. That covers route-long 9, rejections 13, long-resume 6, high-res 4, flags-identity 2 and enhance-panel 1, besides `ai-plan`'s 11 and setup's 2. The Enhance switches took 17 ms (Motion) and 81 ms (Voice).
+
+**Declared.** No existing test case changed. `fake-api.ts` only gains an option and a method. `FLAG_SUITES` gains one name.
+
+**Tests (+11).** `ai-plan.spec.ts` 11.
+
+**Tier 3** (D1):
+- Rust **1145 / 0 / 5** (`cargo test --workspace`, `.env` loaded; no Rust changed);
+- Vitest **766**; `pnpm e2e` **59** passed on a rebuilt keyed `build:e2e` (`dist/` unchanged);
+- the flags suites as above;
+- `pnpm check` exit 0; the gate `gate: ok`.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8, 11 (P212, P211, watch). Next: P211 (the real product, CP 4; five real calls, about $0.01, at the founder's word).
+
+## Entry 77 - 2026-11-13 - P211: the real product, checkpoint 4 (readings)
+
+**The real product on D1, read for speed, cost and look** (TE-15's product read, E-11; both in `docs/v6.2/experiments.md`). The setup:
+- the local API with the real DeepSeek key, `PLAN_ENABLED=true`, `deepseek-flash`;
+- `dist-flags/` behind a scratch proxy, so the app and the API share one origin;
+- transcription on the device for the agent's runs;
+- signed in as a local test address through a magic link written into the local database (no mail sent);
+- the reference clip five times, from a throwaway Playwright driver (deleted, never committed).
+
+**Every call** (six, listed one by one in `experiments.md`):
+- **What happened:** all six answered 200 on the first try, with no retry, no item skipped by the parse, a hook title in every plan and no fallback.
+- **Speed:** 4.0 to 5.3 s in the browser.
+- **Size:** 7,433 input tokens each (7,296 cached after the first) and 902 to 1,167 output tokens.
+- **Cost:** the server's spend counter says 21,146 µ$ (about $0.0035 a plan, cached input counted at the full price); DeepSeek's balance went $1.80 → $1.79.
+- **The extra call:** the first attempt of the driver hung on its own bug after one call (a locator read with no timeout), so it was stopped and run again; that call is call 0.
+
+**Drops** (10 of 63 items, median 14.6%, over TE-15's 10% line):
+- `zone_taken` 5, an icon placed on a word inside the list's span;
+- `number_unresolved` 4, the device transcript writes "$12 ,000";
+- `anchor_rule` 1.
+
+**E-11:** `plan_result` and `export_done` arrive in the local sink with every V6.2 field (`items_kept`, `items_disabled`, `enhance_off ["voice", "motion"]` with both off) and no content. Pass.
+
+**Captures and exports** are in `~/v6.2-review/product/`, with a README for the founder: the two exports (the defaults; Voice cleanup and Motion off), the editor, settings, and each item of run 1 at its time.
+
+**Four findings, put to the founder:**
+1. The Visuals tab lists items the validation left out, with their switch on ("10 of 10 visuals on" with 8 drawn), and `items_kept` counts them.
+2. The Hook title row's description is the whole transcript (its words are the clip's).
+3. "What we changed" says "Voice cleaned" with Voice cleanup off (`summary.rs` always said true).
+4. The drop rate above.
+
+**A mistake of the agent's.** The local stack was left for the founder with cloud transcription off (`TRANSCRIBE_ENABLED=false`, set for the agent's runs), and the message did not say so. The founder found no Cloud option. The API was restarted with it on (17:15 UTC). A stack handed over for a checkpoint now runs the product's own settings, and the message says what differs.
+
+**The founder's answers (CP 4, 2026-11-13).**
+- **Fix 1, 2 and 3:** P211a.
+- **The hook title:** fix 2 only, the row; nothing else about the hook.
+- **The post caption:** shorter: one or two sentences, at most 150 characters, asked in the prompt; the 2,200-character check stays. The founder had read it as a caption for Instagram and other social sites. P211b, with a re-read of about $0.02.
+- **The landing page:** "Start free" becomes "Start creating". P211a.
+- **Finding 4:** not asked for.
+- **Still to come after P211a and P211b:** the go, and the founder's read of known issue 8.
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211a, then P211b, then the founder's go.
+
+## Entry 78 - 2026-11-13 - P211a: the founder's CP 4 fixes
+
+**Asked for at CP 4** (Entry 77): fixes 1, 2 and 3, and "Start creating" on the landing page. Recorded as D-504 to D-507 in the plan.
+
+**What changed.**
+- **Fix 1, the list shows what is drawn (D-504):**
+  - `set_scene` now also answers `kept`, the ids of the plan's items its validation kept. It reads its input a second time and validates it once more, so `scene_of` and the two tests that build `SceneReport` are unchanged; `KeptReport` flattens `SceneReport` and adds the field.
+  - Every caller of `setScene` stores the ids (`clip-store`'s `planKept`, `setPlanKept`): the pipeline, the three review updates and the preview's reload.
+  - `listedItems` is the one rule: with `ai_plan` on, only the kept items; with it off, or before a scene says, every item, as in V6.1. The Visuals tab uses it, and so does `export_done`'s `items_kept` / `items_disabled`.
+- **Fix 2, the hook row (D-506):** the Hook title row's description is the hook's own text (the plan's validated `extras.hook`), no longer its words, which are the whole clip.
+- **Fix 3, "Voice cleaned" (D-505):** `Scene` keeps whether the edit's voice is `Clean`, and `summary()` reports that as `voice_cleaned`. It is true for every V5 and V6.1 edit, so their summaries are unchanged; with Voice cleanup off (`Level`) "What we changed" no longer says "Voice cleaned".
+- **The landing page (D-507):** `landing.cta.startFree` reads "Start creating" in the top bar, the hero, pricing and the final call. The key keeps its name; two comments that quoted the old words are updated.
+- **The gate:** two ALLOW patterns for the lines this changes, `protocol.ts`' one-line `SceneReport` (now a block with an optional `kept`) and `scene_api.rs`' `to_js(&SceneReport { dropped, chunks })`.
+
+**Tests (+4).**
+- `scene_api.rs` +1: the ids kept, as many as `validate_plan` keeps with a word edit, none for a refused plan, and the answer's shape.
+- `offcut-scene`'s `lib.rs` +1: `voice_cleaned` false with `Level`, true with `Clean` and with `Enhance::v5()`, the items counted the same.
+- `start-export.test.ts` +1: an item the scene left out is not in `items_kept`; `listedItems`' three cases.
+- `ai-plan.spec.ts` +1: a plan with one more item that the validation leaves out (an emoji past the transcript's end). The list shows the 11 kept, "11 of 11 visuals on"; `plan_result` counts the drop; the Hook title row reads "I almost quit making videos" and none of the transcript.
+
+**Declared.** No existing test case changed. `SceneReport`'s `kept` is optional in `protocol.ts`, so the Vitest fakes that answer `{ dropped, chunks }` are unchanged.
+
+**Browser runs** (D1, keyed builds):
+- **`dist-flags/`:** `ai-plan.spec.ts` 12 of 12, the new case in 4.9 s; `enhance-panel.spec.ts` 1 of 1 (Motion 18 ms, Voice 57 ms, inside the 150 ms budget with the second validation); `flags-identity.spec.ts` 2 of 2.
+- **Read along the way:** `flags-identity`'s case 1 failed once, because the run had a fresh `dist-flags/` and a stale `dist/`. The render-cache key holds `RENDERER_VERSION`, a hash of the render WASM, so two builds of different WASM give two keys by design. It passed on the two builds made from the same tree.
+- **`dist/`:** `pnpm e2e` 59 passed (the landing page with "Start creating"); `review-edit.spec.ts` and `export-free.spec.ts`, 30 passed with setup (the flags-off list and summary unchanged).
+
+**Tier 3** (D1):
+- Rust **1147 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **767**;
+- the browser runs as above;
+- `pnpm check` exit 0; the gate `gate: ok`.
+
+**The local CP 4 stack** serves the rebuilt `dist-flags/`, so the founder sees these fixes on a reload. Its API now runs from a copy of the binary in the scratchpad, so the workspace tests could rebuild `target/debug/offcut-api.exe` (Windows locks a running file); cloud transcription is on.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: P211b (the post caption at most 150 characters; a re-read of about $0.02), then the founder's go.
+
+## Entry 79 - 2026-11-14 - P211b: a shorter post caption
+
+**Asked for at CP 4** (Entry 77): a shorter post caption, one or two sentences of at most 150 characters, to post on Instagram and other social sites. Recorded as D-508.
+
+**What changed.**
+- **The prompt:**
+  - `prompt.rs`' extras line asks for the post caption in "one or two sentences and at most 150 characters" (`POST_CAPTION_TARGET_CHARS`, new);
+  - the output schema's `maxLength` and the validation's `POST_CAPTION_MAX_CHARS` stay 2,200, so a longer answer is still kept, not dropped;
+  - the system message grows from 16,500 to 16,524 characters.
+- **`system_prompt@v2.snap`:** that one line changes ("one or two sentences and", 2200 → 150). It was new in P186, so it is not a snapshot of the gate's base.
+- **The recorded request:** `request.recorded.json` holds the new length, 16,524, from this re-read's record, and `deepseek_adapter.rs`' comment says so; every other field is as recorded before.
+
+**The re-read** (TE-15, `experiments.md`; the founder's yes at CP 4):
+- **Calls:** 16 Flash calls on the 15 transcripts (one parse retry), $0.0171.
+- **Captions:** every one 79 to 148 characters (median 103), one or two sentences, all 15 kept by the validation.
+- **The hook:** kept 15 of 15.
+- **Drops:** median 12.5% (11.1% at P206c's second re-read). The reasons moved between kinds whose paragraphs did not change; read as variance.
+
+The annotated plans are in `~/v6.2-review/p211b/plans/`.
+
+**Declared.** `deepseek_adapter.rs`' recorded length (16,500 → 16,524) and its comment, as in P206c (Entries 71, 72). No assertion changed.
+
+**Tests.** `offcut-plan` and `offcut-api` 415 passed, 0 failed (`.env` loaded); clippy clean.
+
+**The local CP 4 stack** gets a rebuilt API with this prompt, so the founder's runs show the short caption.
+
+**Not pushed** (push 5 is P212).
+
+**Open.** 35, 39. Known issues 5, 8 (the founder's read at CP 4), 11. Next: the founder's go at CP 4, then P212.
+
+## Entry 80 - 2026-11-14 - P211: the founder's go at checkpoint 4
+
+**The founder's go (2026-11-14):** "go i have verified everything". They ran it on the local stack (the rebuilt `dist-flags/` with P211a's fixes, and the API with P211b's prompt and cloud transcription on).
+
+**P211's acceptance:**
+- the readings recorded, every call listed (Entry 77, `experiments.md`);
+- the founder's go recorded (here);
+- the commits `371c935`, `ddf5a92` (P211a) and `d2be873` (P211b).
+
+**Known issue 8** ("Planning the edit" not shown; the plan's 4 to 5 s wait inside "Finding visual moments") had no separate word from the founder, so it stays open.
+
+**Open.** 35, 39. Known issues 5, 8, 11. Next: P212 (copy-back, the full runs, push 5, merge, tag).
+
+## Entry 81 - 2026-11-14 - P212: copy-back and close
+
+**Copy-back (§20).** Each edit is marked "(V6.2, as built)":
+- **TS:** §7 (the V6.2 lint edges, `png` in `offcut-render`), §22.1's `POST /plan` row (bearer required), §39.3 item 35 (the plan's assumptions as measured), §40.2 (the five kinds, `HookTitle.accent` an index into the hook, the closed `IconId` and `EmojiId`, `Density` and `HookMissing`), §40.4 (V-1 as one rule, the zoom rules, V-9, punch words, the hook, the extras, D-508), §40.7 (DeepSeek, the route's order, the deadlines, the logs), §40.8 (the call sequence, the plans store, run again, `kept`), §41.2 (DC-8's V6.2 part, DC-16, D-440), §47.2, §47.3, §47.5, §52 and §53.1. TS §5's rows were added as the files appeared.
+- **PS:** §10 (the account, the sign-in toast, "Start creating"), §11 (the quotas), §12.8 (the Visuals tab and "Text for your post"), §12.16 (the look and the Enhance panel).
+- **BP:** §0's V6.2 row and §8A.2's as-built paragraph.
+
+**Tier 4** (D1, keyed builds of the final code, both rebuilt):
+- Rust **1147 / 0 / 5** (`cargo test --workspace`, `.env` loaded);
+- Vitest **767**; `pnpm e2e` **59**;
+- the media run on `dist/`: **113 passed, 1 skipped** (50.8 min, none flaky);
+- `FLAG_SUITES` on `dist-flags/`: **48 passed, 1 skipped** (14.1 min): ai-plan 12, enhance-panel 1 (Motion 18 ms, Voice 58 ms), flags-identity 2, high-res 4, long-resume 6, rejections 13, route-long 9, setup 2;
+- the verifier self-test **16**;
+- every count at or above D-438's floor.
+
+**Goldens and snapshots:** 13 new goldens and 75 new snapshots; none of `b73fea5`'s changed (the gate's rule 6).
+
+**§19:** every box ticked with its evidence but two, which are the founder's: `AI_MONTHLY_CAP_USD` on Render (open item 1; not read while `PLAN_ENABLED` is false), and the merge, the deploy, §14.2's checks (the agent's, after the merge) and the tag.
+
+**Push 5** (P210 to P212), waited on: its CI read follows in the closing note after the merge.
+
+**For the founder, in order:**
+1. **Render:** `PLAN_ENABLED` unset or `false` (unset, nothing else of the plan is read). The other plan variables may wait for the turn-on (§14.3).
+2. Mark PR #17 ready and merge.
+3. After the agent's §14.2 checks, tag `v6.2` (or tell the agent to).
+
+**Open after V6.2:**
+- 35: the privacy page names DeepSeek before `ai_plan` goes on in production;
+- 39: CP 3's points left for the quality pass;
+- open item 1 (the cap);
+- known issues 5 (§14.2's plan check reads the 401 or uses a bearer, as read in P191), 8 ("Planning the edit"), 11 (lavapipe, 3 of 4 pushes, each cleared by one re-run).

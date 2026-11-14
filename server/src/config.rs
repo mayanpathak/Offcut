@@ -149,6 +149,105 @@ pub fn transcribe_budget(get: impl Fn(&str) -> Option<String>) -> Result<(u32, u
     ))
 }
 
+/// The AI plan's provider (v6.2implementation D-500: DeepSeek only).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanProvider {
+    Deepseek,
+}
+
+/// V6.2 (v6.2implementation D-465, D-500): the AI plan's settings, read apart
+/// from `Config` as `transcribe_budget` is, so that no existing construction
+/// of `Config` changes. Off by default. With `PLAN_ENABLED=true`, the key,
+/// the monthly cap and the two prices are required (a price in code would go
+/// stale, D-463); any value given is checked either way, and a bad one stops
+/// the boot with its name.
+#[derive(Clone, PartialEq)]
+pub struct PlanSettings {
+    pub enabled: bool,
+    pub provider: PlanProvider,
+    pub model: String,
+    /// Empty while the plan is off and no key is set.
+    pub api_key: String,
+    /// Scheme, host and optional path, no trailing slash; the tests point it at a fake.
+    pub api_base_url: String,
+    /// `AI_MONTHLY_CAP_USD` in micro-dollars; 0 while the plan is off and no cap is set.
+    pub monthly_cap_micro_usd: i64,
+    /// USD per 1M tokens. A call costs `tokens × price` micro-dollars.
+    pub price_in_usd_per_mtok: f64,
+    pub price_out_usd_per_mtok: f64,
+}
+
+/// DeepSeek's API and the model chosen for V6.2 (the founder, 2026-11-12;
+/// checkpoint 1 may change it).
+pub const PLAN_API_BASE_URL_DEFAULT: &str = "https://api.deepseek.com";
+pub const PLAN_MODEL_DEFAULT: &str = "deepseek-flash";
+
+pub fn plan_settings(get: impl Fn(&str) -> Option<String>) -> Result<PlanSettings, ConfigError> {
+    let value = |name: &str| get(name).filter(|value| !value.is_empty());
+    let enabled = match value("PLAN_ENABLED") {
+        None => false,
+        Some(text) => parsed("PLAN_ENABLED", text.parse::<bool>().ok())?,
+    };
+    // Required when the plan is on; checked whenever given.
+    let needed = |name: &'static str| match value(name) {
+        Some(text) => Ok(Some(text)),
+        None if enabled => Err(ConfigError::Missing(name)),
+        None => Ok(None),
+    };
+    let amount = |name: &'static str| -> Result<f64, ConfigError> {
+        match needed(name)? {
+            None => Ok(0.0),
+            Some(text) => parsed(
+                name,
+                text.parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite() && *n >= 0.0),
+            ),
+        }
+    };
+    let provider = match value("PLAN_PROVIDER").as_deref() {
+        None | Some("deepseek") => PlanProvider::Deepseek,
+        Some(_) => return Err(ConfigError::Malformed("PLAN_PROVIDER")),
+    };
+    let api_base_url =
+        value("PLAN_API_BASE_URL").unwrap_or_else(|| PLAN_API_BASE_URL_DEFAULT.to_owned());
+    if !is_base_url(&api_base_url) {
+        return Err(ConfigError::Malformed("PLAN_API_BASE_URL"));
+    }
+    let api_key = needed("PLAN_API_KEY")?.unwrap_or_default();
+    let cap = amount("AI_MONTHLY_CAP_USD")?;
+    if enabled && cap <= 0.0 {
+        return Err(ConfigError::Malformed("AI_MONTHLY_CAP_USD"));
+    }
+    Ok(PlanSettings {
+        enabled,
+        provider,
+        model: value("PLAN_MODEL").unwrap_or_else(|| PLAN_MODEL_DEFAULT.to_owned()),
+        api_key,
+        api_base_url,
+        // At most a few hundred dollars: the product is exact to the micro-dollar.
+        monthly_cap_micro_usd: (cap * 1_000_000.0).round() as i64,
+        price_in_usd_per_mtok: amount("PLAN_PRICE_IN_USD_PER_MTOK")?,
+        price_out_usd_per_mtok: amount("PLAN_PRICE_OUT_USD_PER_MTOK")?,
+    })
+}
+
+/// Written by hand so that the key cannot reach a log.
+impl fmt::Debug for PlanSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PlanSettings")
+            .field("enabled", &self.enabled)
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("api_key", &"<redacted>")
+            .field("api_base_url", &self.api_base_url)
+            .field("monthly_cap_micro_usd", &self.monthly_cap_micro_usd)
+            .field("price_in_usd_per_mtok", &self.price_in_usd_per_mtok)
+            .field("price_out_usd_per_mtok", &self.price_out_usd_per_mtok)
+            .finish()
+    }
+}
+
 /// A value that did not parse is malformed.
 fn parsed<T>(name: &'static str, value: Option<T>) -> Result<T, ConfigError> {
     value.ok_or(ConfigError::Malformed(name))
@@ -554,5 +653,108 @@ mod tests {
                 "{name}={bad}"
             );
         }
+    }
+
+    // --- V6.2: the AI plan's settings (D-465, D-500).
+
+    fn plan(vars: &[(&'static str, &'static str)]) -> Result<PlanSettings, ConfigError> {
+        let env: HashMap<&str, &str> = vars.iter().copied().collect();
+        plan_settings(|name| env.get(name).map(|v| (*v).to_owned()))
+    }
+
+    const PLAN_ON: [(&str, &str); 5] = [
+        ("PLAN_ENABLED", "true"),
+        ("PLAN_API_KEY", "a-key-of-twenty-chars-or-more"),
+        ("AI_MONTHLY_CAP_USD", "5"),
+        ("PLAN_PRICE_IN_USD_PER_MTOK", "0.30"),
+        ("PLAN_PRICE_OUT_USD_PER_MTOK", "1.20"),
+    ];
+
+    #[test]
+    fn the_plan_is_off_by_default_with_deepseek_flash() {
+        let settings = plan(&[]).unwrap();
+        assert!(!settings.enabled);
+        assert_eq!(settings.provider, PlanProvider::Deepseek);
+        assert_eq!(settings.model, "deepseek-flash");
+        assert_eq!(settings.api_base_url, "https://api.deepseek.com");
+        assert_eq!(
+            (settings.api_key.as_str(), settings.monthly_cap_micro_usd),
+            ("", 0)
+        );
+    }
+
+    #[test]
+    fn the_plan_on_reads_every_value() {
+        let settings = plan(&PLAN_ON).unwrap();
+        assert!(settings.enabled);
+        assert_eq!(settings.monthly_cap_micro_usd, 5_000_000);
+        assert_eq!(
+            (
+                settings.price_in_usd_per_mtok,
+                settings.price_out_usd_per_mtok
+            ),
+            (0.30, 1.20)
+        );
+        let mut vars = PLAN_ON.to_vec();
+        vars.push(("PLAN_MODEL", "deepseek-v4-pro"));
+        vars.push(("PLAN_API_BASE_URL", "http://localhost:4010"));
+        let settings = plan(&vars).unwrap();
+        assert_eq!(settings.model, "deepseek-v4-pro");
+        assert_eq!(settings.api_base_url, "http://localhost:4010");
+    }
+
+    /// The boot stops naming the variable, never its value.
+    #[test]
+    fn the_plan_on_without_a_key_a_cap_or_a_price_stops_the_boot() {
+        for missing in [
+            "PLAN_API_KEY",
+            "AI_MONTHLY_CAP_USD",
+            "PLAN_PRICE_IN_USD_PER_MTOK",
+            "PLAN_PRICE_OUT_USD_PER_MTOK",
+        ] {
+            let vars: Vec<_> = PLAN_ON.into_iter().filter(|(n, _)| *n != missing).collect();
+            assert_eq!(plan(&vars), Err(ConfigError::Missing(missing)));
+            let empty: Vec<_> = PLAN_ON
+                .into_iter()
+                .map(|(n, v)| if n == missing { (n, "") } else { (n, v) })
+                .collect();
+            assert_eq!(plan(&empty), Err(ConfigError::Missing(missing)));
+        }
+        let error = plan(&[("PLAN_ENABLED", "true")]).unwrap_err().to_string();
+        assert_eq!(error, "config error: PLAN_API_KEY");
+    }
+
+    #[test]
+    fn a_bad_plan_value_stops_the_boot_even_with_the_plan_off() {
+        for (name, bad) in [
+            ("PLAN_ENABLED", "yes"),
+            ("PLAN_PROVIDER", "gemini"),
+            ("PLAN_API_BASE_URL", "api.deepseek.com"),
+            ("PLAN_API_BASE_URL", "https://api.deepseek.com/"),
+            ("AI_MONTHLY_CAP_USD", "-1"),
+            ("PLAN_PRICE_IN_USD_PER_MTOK", "abc"),
+            ("PLAN_PRICE_OUT_USD_PER_MTOK", "inf"),
+        ] {
+            assert_eq!(
+                plan(&[(name, bad)]),
+                Err(ConfigError::Malformed(name)),
+                "{name}={bad}"
+            );
+        }
+        let mut zero_cap = PLAN_ON.to_vec();
+        zero_cap.retain(|(n, _)| *n != "AI_MONTHLY_CAP_USD");
+        zero_cap.push(("AI_MONTHLY_CAP_USD", "0"));
+        assert_eq!(
+            plan(&zero_cap),
+            Err(ConfigError::Malformed("AI_MONTHLY_CAP_USD"))
+        );
+    }
+
+    #[test]
+    fn the_plan_settings_debug_hides_the_key() {
+        let settings = plan(&PLAN_ON).unwrap();
+        let text = format!("{settings:?}");
+        assert!(!text.contains("a-key-of-twenty"), "{text}");
+        assert!(text.contains("<redacted>"), "{text}");
     }
 }

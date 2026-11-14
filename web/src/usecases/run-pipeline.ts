@@ -9,6 +9,9 @@
 // said leaves in an analytics event. The one exception is cloud mode
 // (cloudimplementation §8.5, D-375): `transcribe-cloud.ts` sends the clip's
 // sound, and any failure there finishes the clip on the device.
+// V6.2 (v6.2implementation D-467): with `ai_plan` on, an AI plan is asked for
+// once the prosody is measured (`choose-plan.ts`), and step 12 uses it in
+// place of the rules plan when it keeps an item; with the flag off, as before.
 
 import { track } from "../analytics/client";
 import { FEATURES } from "../config/features";
@@ -34,7 +37,10 @@ import { useModelStore } from "../state/model-store";
 import { type Cancelled, pool, WorkerCallError } from "../workers/pool";
 import type { AppFailure } from "../workers/protocol";
 import { failureShown, signalFor } from "./cancel-job";
+import { choosePlan, startPlan } from "./choose-plan";
+import { isV5, startEnhance } from "./set-enhance";
 import { transcribeInCloud } from "./transcribe-cloud";
+import { programOn, voiceOf } from "./voice-program";
 
 // The two caps of TS §22.6. The server refuses a whole batch for one value
 // above them, so no measured value is sent uncapped.
@@ -147,6 +153,13 @@ function displayOf(event: DetectedEvent, transcript: Transcript): string {
       return String(params.count);
     case "keyword_pop":
       return transcript.words[params.word]?.text ?? "";
+    // V6.2's kinds (D-446): the detector never makes them, so no line shows one.
+    case "emphasis":
+    case "icon_pop":
+    case "punch_in":
+    case "emoji":
+    case "hook_title":
+      return "";
     default:
       return assertNever(params);
   }
@@ -324,6 +337,16 @@ async function hearOnDevice(
  * settled, as a failure is.
  */
 async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortSignal): Promise<void> {
+  // 1a. V6.2 (D-486, P208): with `motion` on, a clip's Enhance settings are
+  //     set once, before its first scene: the remembered state, else the
+  //     recommended one. A run that starts again keeps the clip's own.
+  //     V5's settings leave the edit as V6.1 wrote it (DC-16).
+  if (clipStore.useClipStore.getState().edit.enhance === undefined) {
+    const start = await startEnhance();
+    if (start !== undefined && !isV5(start)) {
+      clipStore.setStartEnhance(start);
+    }
+  }
   const { clipInfo, edit } = clipStore.useClipStore.getState();
   if (clipInfo === undefined) {
     throw new Error("runPipeline: the clip has no ClipInfo");
@@ -352,7 +375,9 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   const chainAt = performance.now();
   run.audioStarted = true;
   const chain = settle(
-    pool.audio.runChain({ pcm48 }, { transfer: [pcm48.buffer] }).then((r) => answered(r, "audio_chain", signal)),
+    pool.audio
+      .runChain({ pcm48, ...(FEATURES.motion && { level: true }) }, { transfer: [pcm48.buffer] })
+      .then((r) => answered(r, "audio_chain", signal)),
   ).then((c) => {
     if ("ok" in c) {
       track({ name: "stage_timing", props: { stage: "audio_chain", duration_ms: capMs(c.at - chainAt) } });
@@ -424,6 +449,9 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   );
   const { prosody } = measured;
   const out48 = owned(measured.out48);
+  // 11b. V6.2 (D-467): with `ai_plan` on, the plan is asked for now and
+  //      awaited at step 12. With it off, nothing of the plan runs.
+  const planned = FEATURES.ai_plan ? startPlan(clipId, transcript, prosody, clipInfo.duration, signal) : undefined;
 
   // 12. (E) The events, their plan, and the scene built from it (D-124).
   run.stage = "detect_scene";
@@ -441,7 +469,21 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
       ...(displayTo !== undefined && { displayTo }),
     });
   }
-  const plan = answered(await pool.render.rulesPlan({ transcript, events }), run.stage, signal);
+  const rules = answered(await pool.render.rulesPlan({ transcript, events }), run.stage, signal);
+  // 12b. V6.2 (D-467): the AI plan asked for at 11b, waited for inside
+  //      `detect_scene`, used if it keeps an item against the edited words.
+  let plan = rules;
+  if (planned !== undefined) {
+    const started = await planned;
+    goOn(signal);
+    plan = await choosePlan(started, rules, clipId, async (candidate) =>
+      answered(
+        await pool.render.validatePlan({ transcript, plan: candidate, wordEdits: edit.word_edits }),
+        run.stage,
+        signal,
+      ),
+    );
+  }
   clipStore.setPlan(plan);
   const timeMap = identityTimeMap(clipInfo.duration);
   const report = answered(
@@ -450,6 +492,8 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
     signal,
   );
   clipStore.setChunks(report.chunks);
+  // V6.2 (P211a, D-504): the items the list shows.
+  clipStore.setPlanKept(report.kept);
   track({
     name: "stage_timing",
     props: { stage: "detect_scene", duration_ms: capMs(performance.now() - sceneStartedAt) },
@@ -462,6 +506,14 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   run.stage = "storage";
   await opfs.writeAudio(clipId, out48);
   goOn(signal);
+  // 13b. V6.2 (D-487): the levelled voice the chain's worker made, beside it.
+  if (FEATURES.motion) {
+    const { lvl48 } = answered(await pool.audio.takeLevel(), "audio_chain", signal);
+    if (lvl48 !== null) {
+      await opfs.writeLevel(clipId, owned(lvl48));
+      goOn(signal);
+    }
+  }
   run.stage = "audio_chain";
   const program = answered(
     await pool.audio.assemble({ out48, timeMap, speech: [] }, { transfer: [out48.buffer] }),
@@ -475,9 +527,14 @@ async function steps(clipId: ClipId, startedAt: number, run: Run, signal: AbortS
   await transcriptRepo.put(clipId, { transcript, prosody });
   await editsRepo.put(clipId, { editState: edit });
   goOn(signal);
+  // 13c. V6.2 (D-487): a clip that starts on the levelled voice previews its
+  //      program; `prog48.f32` stays the clean one, as the export reads it.
+  const voice = voiceOf(edit.enhance);
+  const preview = voice === "clean" ? prog48 : await programOn(clipId, voice, timeMap);
+  goOn(signal);
 
   // 14.
-  clipStore.ready({ transcript, prosody, events, timeMap, prog48 });
+  clipStore.ready({ transcript, prosody, events, timeMap, prog48: preview });
   const count = (kind: EventKind): number =>
     Math.min(MAX_COUNT, events.filter((event) => event.kind === kind).length);
   track({
