@@ -2838,3 +2838,29 @@ The annotated plans are in `~/v6.2-review/p211b/plans/`.
 - 39: CP 3's points left for the quality pass;
 - open item 1 (the cap);
 - known issues 5 (§14.2's plan check reads the 401 or uses a bearer, as read in P191), 8 ("Planning the edit"), 11 (lavapipe, 3 of 4 pushes, each cleared by one re-run).
+
+## Entry 82 - 2026-11-14 - V6.2 closed: merged, deployed, checked, tagged (outside a prompt)
+
+**Merge.** The founder marked pull request 17 ready and merged it as `57d9a3e` on 2026-11-14. Tagged `v6.2` on `57d9a3e` and pushed by the agent at the founder's word (2026-11-14).
+
+**The `main` run, 43567630788.** Attempt 1 failed only on the lavapipe SIGSEGV in `golden_frames` (known issue 11). The founder re-ran the failed jobs; attempt 2 passed every job (`ci`, `e2e-media`, `deploy-api`, `deploy-web` with its smoke) and deployed.
+
+**§14.2's live checks (agent, 2026-11-14), with `PLAN_ENABLED` off on Render:**
+- `/healthz` through the site reads `57d9a3e`;
+- an unsigned `POST /api/v1/plan` answers 401 (known issue 5's reading, D-494);
+- the live bundle reads `ai_plan:!1` and `motion:!1` (both off);
+- `check-headers` passes;
+- the deploy smoke: 1 passed.
+
+**Flags in production, the founder's call (2026-11-14, for a creator demo): every flag on**, knowingly ahead of open item 35 (the privacy page naming DeepSeek) and open items 24 and 27 (`long_video` on Groq's free tier).
+- Render: `PLAN_ENABLED=true`, `deepseek-flash`, the cap at 50 USD (open item 1's value), prices 0.30 / 1.20 USD per 1M tokens.
+- Vercel: `OFFCUT_FEATURES_ON=long_video,high_res,ai_plan,motion`; `deploy-web` green on attempt 6; the live bundle reads all four on (`!0`).
+- **Gotcha:** Vercel's "Add variable" form defaults Type to Secret, and `vercel pull` in CI writes a Secret variable as the literal `[SENSITIVE]`, so a flag variable must be Type Config.
+
+**Known issue 11** has now stopped 4 of V6.2's 6 runs (pushes 1, 3 and 4, and `main`), each cleared by one re-run. Suggested, not done: retry or isolate the golden step, or pin llvmpipe.
+
+**Open after V6.2:**
+- 35, **now urgent**: `ai_plan` is on in production before the privacy page names DeepSeek;
+- 24 and 27: `long_video` is on in production on Groq's free tier;
+- 39: CP 3's points left for the quality pass;
+- known issues 8 ("Planning the edit") and 11 (lavapipe).
